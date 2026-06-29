@@ -33,6 +33,15 @@ function fmtTime(ms) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+function fmtDurationCompact(ms) {
+  if (ms == null || Number.isNaN(Number(ms))) return '未知';
+  const total = Math.max(0, Math.round(Number(ms) / 1000));
+  if (total < 60) return `${total}s`;
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return seconds ? `${minutes}m${seconds}s` : `${minutes}m`;
+}
+
 function escapeHtml(text) {
   return String(text ?? '')
     .replaceAll('&', '&amp;')
@@ -753,7 +762,22 @@ function renderLarkEventLog(events) {
     box.innerHTML = '<p class="hint">暂无飞书事件。若长连接已连接但这里一直为空，说明开放平台还没有把事件推给这个应用。</p>';
     return;
   }
-  box.innerHTML = events.map((event) => `
+  box.innerHTML = events.map((event) => {
+    const timing = event.timing ?? {};
+    const receivedMs = Date.parse(event.at);
+    const createdMs = Date.parse(timing.event_created_at || '');
+    const startMs = Date.parse(timing.meeting_start_at || '');
+    const deliveryDelay = Number.isFinite(receivedMs) && Number.isFinite(createdMs)
+      ? fmtDurationCompact(receivedMs - createdMs)
+      : null;
+    const startDelay = Number.isFinite(receivedMs) && Number.isFinite(startMs)
+      ? fmtDurationCompact(receivedMs - startMs)
+      : null;
+    const delayText = [
+      deliveryDelay ? `投递延迟=${deliveryDelay}` : '',
+      startDelay ? `开会到接收=${startDelay}` : '',
+    ].filter(Boolean).join(' · ');
+    return `
     <article class="event-log-row">
       <div class="item-title">
         <span>${escapeHtml(event.event_type)}</span>
@@ -763,10 +787,12 @@ function renderLarkEventLog(events) {
       <div class="item-meta">${escapeHtml([
         event.timeline_started ? 'started' : '',
         event.ignored_reason ? `reason=${event.ignored_reason}` : '',
+        delayText,
         (event.parsed_keys || []).length ? `keys=${event.parsed_keys.join(', ')}` : '',
       ].filter(Boolean).join(' · '))}</div>
     </article>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function renderRealMeetingProbe() {
@@ -882,6 +908,8 @@ function renderAcceptanceGuide() {
     ?? search?.passive_scan
     ?? null;
   const evidence = deliveryDiagnostics?.evidence ?? {};
+  const eventLatency = evidence.event_delivery_latency ?? {};
+  const startDelayStats = eventLatency.ws_timeline_started_delay_stats ?? {};
   const binding = acceptanceReport?.current_evidence?.annotation_binding
     ?? evidence.annotation_binding
     ?? readiness.current?.annotation_binding
@@ -960,6 +988,14 @@ function renderAcceptanceGuide() {
         : hasRealEvent
           ? `已有真实飞书事件 ${evidence.real_event_count} 条，但还没有直开会议开始事件`
           : '尚未收到真实飞书会议开始事件',
+    },
+    {
+      label: '飞书事件延迟',
+      ok: eventLatency.last_ws_timeline_started_delivery_delay_ms == null
+        || Number(eventLatency.last_ws_timeline_started_delivery_delay_ms) <= 30_000,
+      detail: eventLatency.last_ws_timeline_started_delivery_delay_ms != null
+        ? `最近开始事件投递延迟 ${fmtDurationCompact(eventLatency.last_ws_timeline_started_delivery_delay_ms)}，从会议 start_time 到本机接收 ${fmtDurationCompact(eventLatency.last_ws_timeline_started_meeting_start_to_receive_ms)}；最近 ${startDelayStats.count ?? 0} 个开始事件 P95=${fmtDurationCompact(startDelayStats.p95_delivery_delay_ms)}，>60s ${startDelayStats.delayed_over_60s_count ?? 0} 次`
+        : '还没有可计算的真实会议开始事件投递延迟；收到飞书事件后会自动显示',
     },
     {
       label: '实时标注通道',

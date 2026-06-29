@@ -96,6 +96,18 @@ export function createLarkClient(env = process.env) {
       .filter(Boolean);
   }
 
+  function meetingSearchTime(value) {
+    if (value == null || value === '') return null;
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      const ms = numeric > 10_000_000_000 ? numeric : numeric * 1000;
+      return new Date(ms).toISOString();
+    }
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) return new Date(parsed).toISOString();
+    return String(value);
+  }
+
   function createAuthorizeUrl(state, opts = {}) {
     if (!appId) throw new Error('Missing LARK_APP_ID');
     const params = new URLSearchParams({
@@ -306,8 +318,8 @@ export function createLarkClient(env = process.env) {
     if (opts.open_room_ids?.length) meetingFilter.open_room_ids = opts.open_room_ids.map(String);
     if (opts.start_time || opts.end_time) {
       meetingFilter.start_time = {};
-      if (opts.start_time) meetingFilter.start_time.start_time = String(opts.start_time);
-      if (opts.end_time) meetingFilter.start_time.end_time = String(opts.end_time);
+      if (opts.start_time) meetingFilter.start_time.start_time = meetingSearchTime(opts.start_time);
+      if (opts.end_time) meetingFilter.start_time.end_time = meetingSearchTime(opts.end_time);
     }
     if (Object.keys(meetingFilter).length) body.meeting_filter = meetingFilter;
     const qs = new URLSearchParams();

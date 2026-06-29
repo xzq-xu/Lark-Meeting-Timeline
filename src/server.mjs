@@ -96,7 +96,7 @@ let deviceSimulator = loadDeviceSimulatorState();
 const defaultPassiveMeetingScan = {
   enabled: false,
   tenant_fallback_enabled: true,
-  interval_ms: 10_000,
+  interval_ms: 2_000,
   tenant_fallback_cooldown_ms: 5 * 60_000,
   lookback_seconds: 10 * 60,
   lookahead_seconds: 2 * 60,
@@ -534,6 +534,8 @@ function persistLarkEventLog() {
 }
 
 function pushLarkEventLog(entry) {
+  const preview = redactForLog(entry.preview ?? entry.parsed ?? null);
+  const timing = larkEventTimingFromPayload(preview);
   const logged = {
     id: entry.id ?? `${Date.now()}-${larkEventLog.length}`,
     at: new Date().toISOString(),
@@ -546,7 +548,8 @@ function pushLarkEventLog(entry) {
     parsed_keys: entry.parsed && typeof entry.parsed === 'object'
       ? Object.keys(entry.parsed).filter((key) => !/token|secret|ticket|authorization/i.test(key)).slice(0, 30)
       : [],
-    preview: redactForLog(entry.preview ?? entry.parsed ?? null),
+    timing,
+    preview,
   };
   larkEventLog.unshift(logged);
   larkEventLog.splice(50);
@@ -604,6 +607,8 @@ function larkEventLogSummary(events = larkEventLog) {
   const wsProcessed = wsEvents.filter((event) => event.timeline_processed);
   const wsStarted = wsEvents.filter((event) => event.timeline_started);
   const wsIgnored = wsEvents.filter((event) => !event.timeline_candidate && !event.timeline_processed);
+  const wsStartedDelayStats = larkEventDelayStats(wsStarted);
+  const wsProcessedDelayStats = larkEventDelayStats(wsProcessed);
   return {
     event_count: events.length,
     ws_event_count: wsEvents.length,
@@ -626,11 +631,97 @@ function larkEventLogSummary(events = larkEventLog) {
     last_ws_timeline_processed_event: wsProcessed[0] ?? null,
     last_ws_timeline_started_event: wsStarted[0] ?? null,
     last_ws_ignored_event: wsIgnored[0] ?? null,
+    last_ws_event_delivery_delay_ms: larkEventDeliveryDelayMs(wsEvents[0]),
+    last_ws_timeline_started_delivery_delay_ms: wsStartedDelayStats.last_delivery_delay_ms,
+    last_ws_timeline_started_meeting_start_to_receive_ms: wsStartedDelayStats.last_meeting_start_to_receive_ms,
+    ws_timeline_started_delay_stats: wsStartedDelayStats,
+    ws_timeline_processed_delay_stats: wsProcessedDelayStats,
   };
 }
 
 function eventLogEntryMs(entry = {}) {
   return isoMs(entry.at) ?? 0;
+}
+
+function larkEventTimingFromPayload(payload = {}) {
+  const createdMs = larkEventCreatedMsFromPayload(payload);
+  const meetingStartMs = explicitMeetingStartMs(payload);
+  return {
+    event_created_at: createdMs != null ? new Date(createdMs).toISOString() : null,
+    meeting_start_at: meetingStartMs != null ? new Date(meetingStartMs).toISOString() : null,
+  };
+}
+
+function larkEventCreatedMsFromPayload(payload = {}) {
+  const event = payload?.event ?? payload?.data?.event ?? payload;
+  const header = payload?.header ?? {};
+  return parseAbsoluteMs(firstNonEmpty(
+    header.create_time,
+    payload?.create_time,
+    event?.create_time,
+    payload?.event_ts,
+    payload?.ts,
+    event?.event_ts,
+    event?.time,
+  ));
+}
+
+function larkEventCreatedMs(entry = {}) {
+  const timingMs = parseAbsoluteMs(entry.timing?.event_created_at);
+  if (timingMs != null) return timingMs;
+  return larkEventCreatedMsFromPayload(loggedEventPayload(entry) ?? {});
+}
+
+function larkEventMeetingStartMs(entry = {}) {
+  const timingMs = parseAbsoluteMs(entry.timing?.meeting_start_at);
+  if (timingMs != null) return timingMs;
+  return explicitMeetingStartMs(loggedEventPayload(entry) ?? {});
+}
+
+function larkEventDeliveryDelayMs(entry = {}) {
+  if (!entry) return null;
+  const receivedMs = eventLogEntryMs(entry);
+  const createdMs = larkEventCreatedMs(entry);
+  if (!receivedMs || createdMs == null) return null;
+  return Math.max(0, receivedMs - createdMs);
+}
+
+function larkMeetingStartToReceiveMs(entry = {}) {
+  if (!entry) return null;
+  const receivedMs = eventLogEntryMs(entry);
+  const startMs = larkEventMeetingStartMs(entry);
+  if (!receivedMs || startMs == null) return null;
+  return Math.max(0, receivedMs - startMs);
+}
+
+function percentile(sortedValues, ratio) {
+  if (!sortedValues.length) return null;
+  const index = Math.min(sortedValues.length - 1, Math.max(0, Math.ceil(sortedValues.length * ratio) - 1));
+  return sortedValues[index];
+}
+
+function larkEventDelayStats(events = []) {
+  const deliveryDelays = events
+    .map((entry) => larkEventDeliveryDelayMs(entry))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+  const startDelays = events
+    .map((entry) => larkMeetingStartToReceiveMs(entry))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+  return {
+    count: deliveryDelays.length,
+    last_delivery_delay_ms: larkEventDeliveryDelayMs(events[0]),
+    last_meeting_start_to_receive_ms: larkMeetingStartToReceiveMs(events[0]),
+    p50_delivery_delay_ms: percentile(deliveryDelays, 0.5),
+    p95_delivery_delay_ms: percentile(deliveryDelays, 0.95),
+    max_delivery_delay_ms: deliveryDelays.at(-1) ?? null,
+    p50_meeting_start_to_receive_ms: percentile(startDelays, 0.5),
+    p95_meeting_start_to_receive_ms: percentile(startDelays, 0.95),
+    max_meeting_start_to_receive_ms: startDelays.at(-1) ?? null,
+    delayed_over_30s_count: deliveryDelays.filter((value) => value > 30_000).length,
+    delayed_over_60s_count: deliveryDelays.filter((value) => value > 60_000).length,
+  };
 }
 
 function loggedEventPayload(entry = {}) {
@@ -1801,7 +1892,7 @@ async function prepareRealDemoRuntime(body = {}, req = null) {
       ...passiveMeetingScan,
       enabled: true,
       tenant_fallback_enabled: body.tenant_fallback_enabled ?? passiveMeetingScan.tenant_fallback_enabled ?? defaultPassiveMeetingScan.tenant_fallback_enabled,
-      interval_ms: Math.min(Math.max(Number(body.interval_ms ?? passiveMeetingScan.interval_ms ?? 10_000), 5000), 5 * 60_000),
+      interval_ms: Math.min(Math.max(Number(body.interval_ms ?? passiveMeetingScan.interval_ms ?? defaultPassiveMeetingScan.interval_ms), 1000), 5 * 60_000),
       lookback_seconds: Math.min(Math.max(Number(body.lookback_seconds ?? passiveMeetingScan.lookback_seconds ?? 600), 60), 2 * 60 * 60),
       lookahead_seconds: Math.min(Math.max(Number(body.lookahead_seconds ?? passiveMeetingScan.lookahead_seconds ?? 120), 0), 30 * 60),
     });
@@ -1859,6 +1950,7 @@ function realDemoAutoArmOptionsFromEnv() {
     auto_open_session_on_annotation: boolFromEnv(process.env.REAL_DEMO_AUTO_OPEN_SESSION_ON_ANNOTATION, true),
     tenant_fallback_enabled: boolFromEnv(process.env.REAL_DEMO_TENANT_FALLBACK_SCAN, false),
     reset_temporary_axis: boolFromEnv(process.env.REAL_DEMO_RESET_TEMPORARY_AXIS, true),
+    interval_ms: boundedNumber(process.env.REAL_DEMO_PASSIVE_SCAN_INTERVAL_MS, defaultPassiveMeetingScan.interval_ms, 1000, 5 * 60_000),
     device_stream_interval_ms: boundedNumber(process.env.REAL_DEMO_DEVICE_STREAM_INTERVAL_MS, 1500, 200, 60_000),
     device_stream_max_count: boundedNumber(process.env.REAL_DEMO_DEVICE_STREAM_COUNT, 5, 1, 200),
     device_stream_label_prefix: process.env.REAL_DEMO_DEVICE_STREAM_LABEL_PREFIX || '流式设备标注',
@@ -2570,9 +2662,7 @@ function chooseCurrentMeetingCandidate(items = [], requestedId = null, nowMs = D
 function currentUserIdCandidates() {
   const user = publicAuthState().user ?? {};
   return [
-    user.user_id,
     user.open_id,
-    user.union_id,
   ].filter(Boolean).map(String);
 }
 
@@ -2613,7 +2703,7 @@ async function searchCurrentUserMeetings(body = {}) {
   }
   const idCandidates = currentUserIdCandidates();
   if (!idCandidates.length) {
-    const error = new Error('当前 OAuth 用户缺少 user_id/open_id/union_id，无法按当前用户扫描会议。');
+    const error = new Error('当前 OAuth 用户缺少 open_id，无法按当前用户扫描会议。');
     error.status = 400;
     throw error;
   }
@@ -2633,13 +2723,16 @@ async function searchCurrentUserMeetings(body = {}) {
   const attempts = [];
   const seen = new Set();
   const items = [];
+  const filterKinds = Array.isArray(body.filter_kinds) && body.filter_kinds.length
+    ? body.filter_kinds
+    : ['participant_ids'];
   for (const id of idCandidates) {
-    for (const filterKind of ['participant_ids', 'organizer_ids']) {
+    for (const filterKind of filterKinds) {
       const opts = { ...baseOpts, [filterKind]: [id] };
       try {
         const raw = await lark.searchMeetingsWithToken(userToken, opts);
         const rawItems = candidateMeetingsFromSearchResponse(raw);
-        attempts.push({ filter_kind: filterKind, id, ok: true, item_count: rawItems.length, raw });
+        attempts.push({ filter_kind: filterKind, id, id_type: 'open_id', ok: true, item_count: rawItems.length, raw });
         for (const item of rawItems) {
           const itemId = String(item.id ?? item.meeting_id ?? item.meeting?.id ?? item.display_info ?? JSON.stringify(item));
           if (seen.has(itemId)) continue;
@@ -2647,7 +2740,7 @@ async function searchCurrentUserMeetings(body = {}) {
           items.push(item);
         }
       } catch (error) {
-        attempts.push({ filter_kind: filterKind, id, ok: false, error: error.message ?? String(error) });
+        attempts.push({ filter_kind: filterKind, id, id_type: 'open_id', ok: false, error: error.message ?? String(error) });
       }
     }
   }
@@ -2663,6 +2756,7 @@ async function searchCurrentUserMeetings(body = {}) {
   return {
     auth_mode: 'user_oauth',
     user_ids_tried: idCandidates,
+    user_id_types_tried: idCandidates.map(() => 'open_id'),
     item_count: items.length,
     items,
     attempts,
@@ -2865,6 +2959,23 @@ function tenantFallbackCooldownResult(context = {}) {
   };
 }
 
+function passiveSearchRateLimitCooldownResult(context = {}) {
+  const last = passiveMeetingScan.last_result ?? {};
+  if (last.reason !== 'search_rate_limited' || !last.next_allowed_at) return null;
+  const nextAllowedMs = isoMs(last.next_allowed_at);
+  const now = context.now ?? Date.now();
+  if (nextAllowedMs == null || now >= nextAllowedMs) return null;
+  return {
+    status: 'skipped',
+    reason: 'search_rate_limited_cooldown',
+    at: context.at ?? new Date(now).toISOString(),
+    error: last.error ?? 'Feishu meeting search is rate limited',
+    required_scope: last.required_scope ?? 'vc:meeting.search:read',
+    permission_url: last.permission_url ?? permissionUrlForScopes('vc:meeting.search:read'),
+    next_allowed_at: new Date(nextAllowedMs).toISOString(),
+  };
+}
+
 async function tryBindTenantMeetingForPassiveScan(body = {}, context = {}) {
   const now = context.now ?? Date.now();
   const at = context.at ?? new Date(now).toISOString();
@@ -2961,6 +3072,10 @@ async function autoBindPassiveMeeting(body = {}) {
       last_result: passiveMeetingScan.last_result ?? null,
     };
   }
+  if (!body.force) {
+    const cooldown = passiveSearchRateLimitCooldownResult({ now, at });
+    if (cooldown) return rememberPassiveMeetingScanResult(cooldown);
+  }
   const current = await store.load();
   if (isRealMeetingAxis(current.meeting) && !current.meeting?.end_time) {
     return rememberPassiveMeetingScanResult({
@@ -3039,13 +3154,16 @@ async function autoBindPassiveMeeting(body = {}) {
     });
   } catch (error) {
     const response = meetingSearchErrorPayload(error);
+    const message = error.message ?? String(error);
+    const rateLimited = /frequency limit|rate limit|too many requests|too frequent/i.test(message);
     return rememberPassiveMeetingScanResult({
       status: 'error',
-      reason: 'search_failed',
+      reason: rateLimited ? 'search_rate_limited' : 'search_failed',
       at,
       error: response.payload?.error ?? error.message ?? String(error),
       required_scope: response.payload?.required_scope,
       permission_url: response.payload?.permission_url,
+      next_allowed_at: rateLimited ? new Date(now + 30_000).toISOString() : null,
     });
   }
 }
@@ -3097,8 +3215,8 @@ function triggerImmediatePassiveMeetingScan(source = 'manual') {
 
 function passiveMeetingScanIntervalMs() {
   return Math.min(Math.max(Number(
-    passiveMeetingScan.interval_ms ?? 10_000,
-  ), 5000), 5 * 60_000);
+    passiveMeetingScan.interval_ms ?? defaultPassiveMeetingScan.interval_ms,
+  ), 1000), 5 * 60_000);
 }
 
 function stopPassiveMeetingScanLoop() {
@@ -4015,6 +4133,26 @@ async function processLarkEventPayload(payload, opts = {}) {
     && isMeetingContextBootstrapEvent(rawEventType)
     && (currentIsTemporaryAxis || shouldCreatePendingTimeline(current));
   const currentIsRealAxis = isRealMeetingAxis(current.meeting);
+  const currentStartMs = parseAbsoluteMs(current.meeting?.start_time);
+  const incomingStartMs = payloadStartMs ?? parseAbsoluteMs(meetingPatch.start_time);
+  const staleStartBeforeCurrentAxis = Boolean(
+    event.type === 'meeting_start'
+      && currentIsRealAxis
+      && !currentIsCarryableFallbackAxis
+      && !incomingMatchesCurrent
+      && currentStartMs != null
+      && incomingStartMs != null
+      && incomingStartMs < currentStartMs - 30_000,
+  );
+  if (staleStartBeforeCurrentAxis) {
+    return {
+      ok: false,
+      ignored_reason: 'stale_meeting_start_before_current_axis',
+      event,
+      timeline_started: false,
+      state: current,
+    };
+  }
   const endMatchesKnownRealAxis = event.type === 'meeting_end' && currentIsRealAxis && incomingMatchesCurrent;
   const endCanReconstructFromPayloadStart = event.type === 'meeting_end'
     && payloadStartMs != null
@@ -5018,7 +5156,11 @@ async function publicDeliveryDiagnostics(req) {
   const parserSelfTest = wsParserSelfTestPayload();
   const eventAudit = realMeetingEventAudit(config, { parser_self_test: parserSelfTest });
 
-  const rawWsSummary = `recent_ws_event_count=${eventSummary.ws_event_count}, ws_timeline_candidate_count=${eventSummary.ws_timeline_candidate_count}, ws_timeline_started_count=${eventSummary.ws_timeline_started_count}`;
+  const deliveryDelay = eventSummary.ws_timeline_started_delay_stats ?? {};
+  const deliveryDelayText = deliveryDelay.last_delivery_delay_ms != null
+    ? `, last_start_delivery_delay=${Math.round(deliveryDelay.last_delivery_delay_ms / 1000)}s`
+    : '';
+  const rawWsSummary = `recent_ws_event_count=${eventSummary.ws_event_count}, ws_timeline_candidate_count=${eventSummary.ws_timeline_candidate_count}, ws_timeline_started_count=${eventSummary.ws_timeline_started_count}${deliveryDelayText}`;
   let status = 'waiting_for_lark_delivery';
   let summary = `长连接已连接并注册直开会议事件，但尚未收到飞书云端投递的 ${meetingEventRequirements.direct_meeting.start_event}；${rawWsSummary}`;
   const nextActions = [];
@@ -5113,6 +5255,13 @@ async function publicDeliveryDiagnostics(req) {
       ws_timeline_processed_count: eventSummary.ws_timeline_processed_count,
       ws_timeline_started_count: eventSummary.ws_timeline_started_count,
       ws_ignored_count: eventSummary.ws_ignored_count,
+      event_delivery_latency: {
+        last_ws_event_delivery_delay_ms: eventSummary.last_ws_event_delivery_delay_ms,
+        last_ws_timeline_started_delivery_delay_ms: eventSummary.last_ws_timeline_started_delivery_delay_ms,
+        last_ws_timeline_started_meeting_start_to_receive_ms: eventSummary.last_ws_timeline_started_meeting_start_to_receive_ms,
+        ws_timeline_started_delay_stats: eventSummary.ws_timeline_started_delay_stats,
+        ws_timeline_processed_delay_stats: eventSummary.ws_timeline_processed_delay_stats,
+      },
       local_http_event_count: localHttpEvents.length,
       local_parser_verified: localParserVerified,
       open_annotation_count: annotations.length,
@@ -6179,7 +6328,7 @@ async function handleApi(req, res, url) {
     const next = { ...passiveMeetingScan };
     if (body.enabled != null) next.enabled = Boolean(body.enabled);
     if (body.tenant_fallback_enabled != null) next.tenant_fallback_enabled = Boolean(body.tenant_fallback_enabled);
-    if (body.interval_ms != null) next.interval_ms = Math.min(Math.max(Number(body.interval_ms), 5000), 5 * 60_000);
+    if (body.interval_ms != null) next.interval_ms = Math.min(Math.max(Number(body.interval_ms), 1000), 5 * 60_000);
     if (body.lookback_seconds != null) next.lookback_seconds = Math.min(Math.max(Number(body.lookback_seconds), 60), 2 * 60 * 60);
     if (body.lookahead_seconds != null) next.lookahead_seconds = Math.min(Math.max(Number(body.lookahead_seconds), 0), 30 * 60);
     savePassiveMeetingScanState(next);
