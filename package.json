@@ -1,0 +1,31 @@
+{
+  "name": "lark-meeting-timeline-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "REAL_DEMO_AUTO_ARM=1 REAL_DEMO_AUTO_ANNOTATION=0 REAL_DEMO_DEVICE_SIMULATOR=0 REAL_DEMO_DEVICE_STREAM=0 node src/server.mjs",
+    "start:plain": "node src/server.mjs",
+    "monitor:real-demo": "node scripts/monitor-real-demo.mjs",
+    "event:report": "node scripts/event-delivery-report.mjs --report-file=data/event-delivery-report.json",
+    "onsite:status": "node scripts/onsite-status.mjs --report-file=data/onsite-status-report.json",
+    "auth:status": "node scripts/auth-meeting-scan-status.mjs --report-file=data/auth-meeting-scan-status-report.json",
+    "auth:open": "node scripts/auth-meeting-scan-status.mjs --open=true --wait=true --report-file=data/auth-meeting-scan-status-report.json",
+    "auth:meeting-scan": "node scripts/monitor-real-demo.mjs --open-auth --wait-auth --scan-after-auth --once --auth-timeout-ms=300000",
+    "demo:live": "node scripts/monitor-real-demo.mjs --prepare --open-auth --wait-auth --scan-after-auth --auto-mark --timeout-ms=900000 --auth-timeout-ms=300000 --report-file=data/live-demo-report.json",
+    "accept:real-meeting": "node scripts/monitor-real-demo.mjs --prepare --auto-mark --timeout-ms=900000 --report-file=data/real-meeting-acceptance-report.json",
+    "accept:real-meeting:auth": "node scripts/monitor-real-demo.mjs --prepare --open-auth --wait-auth --scan-after-auth --auto-mark --timeout-ms=900000 --auth-timeout-ms=300000 --report-file=data/real-meeting-acceptance-report.json",
+    "accept:onsite": "node scripts/device-preflight.mjs --report-file=data/onsite-device-preflight-report.json && node scripts/monitor-real-demo.mjs --prepare --open-auth --wait-auth --scan-after-auth --auto-mark --timeout-ms=900000 --auth-timeout-ms=300000 --report-file=data/onsite-acceptance-report.json",
+    "accept:onsite:strict": "node scripts/device-preflight.mjs --report-file=data/onsite-strict-device-preflight-report.json && node scripts/monitor-real-demo.mjs --prepare --open-auth --wait-auth --scan-after-auth --auto-mark --require-event-axis --timeout-ms=900000 --auth-timeout-ms=300000 --report-file=data/onsite-strict-event-acceptance-report.json",
+    "device:preflight": "node scripts/device-preflight.mjs --report-file=data/device-preflight-report.json",
+    "device:roundtrip": "node scripts/device-roundtrip.mjs",
+    "device:mark": "node scripts/device-mark-client.mjs",
+    "check": "node test/aligner.test.mjs && node test/ui-state.test.mjs && node test/ui-monitor-control.test.mjs && node test/runtime-script-contract.test.mjs && node test/device-ingest-contract.test.mjs && node test/device-preflight.test.mjs && node test/device-roundtrip.test.mjs && node test/device-mark-client.test.mjs && node test/device-batch-ingest-contract.test.mjs && node test/annotation-status-contract.test.mjs && node test/realtime-annotation-current-axis.test.mjs && node test/end-event-start-anchor.test.mjs && node test/meeting-info-event-shape.test.mjs && node test/annotation-end-recompute.test.mjs && node test/annotation-start-recompute.test.mjs && node test/runtime-smoke.mjs && node test/auto-acceptance.test.mjs && node test/auto-acceptance-ended-meeting.test.mjs && node test/readiness-fallback.test.mjs && node test/probe-persistence.test.mjs && node test/probe-annotation-routing.test.mjs && node test/probe-auto-bind.test.mjs && node test/probe-server-auto-bind.test.mjs && node test/passive-meeting-scan.test.mjs && node test/passive-tenant-meeting-scan.test.mjs && node test/passive-tenant-scan-cooldown.test.mjs && node test/annotation-arrival-passive-bind.test.mjs && node test/oauth-callback-passive-scan.test.mjs && node test/real-demo-oauth-callback-device-stream.test.mjs && node test/real-demo-startup-auto-arm.test.mjs && node test/real-demo-prepare.test.mjs && node test/real-demo-prepare-no-auth.test.mjs && node test/real-demo-wait.test.mjs && node test/real-demo-progress.test.mjs && node test/real-demo-progress-stream.test.mjs && node test/event-delivery-report.test.mjs && node test/onsite-status.test.mjs && node test/auth-meeting-scan-status.test.mjs && node test/real-demo-live-command-contract.test.mjs && node test/real-demo-monitor-cli.test.mjs && node test/real-demo-monitor-auth-scan.test.mjs && node test/real-demo-end-event-does-not-bootstrap.test.mjs && node test/real-demo-nested-event-and-button-gate.test.mjs && node test/real-demo-meeting-start-diagnostics.test.mjs && node test/restore-latest-real-axis.test.mjs && node test/real-demo-open-annotation-sse.test.mjs && node test/open-meeting-session.test.mjs && node test/inline-meeting-session-annotation.test.mjs && node test/real-demo-auto-open-session-annotation.test.mjs && node test/real-demo-pending-rebind-completion.test.mjs && node test/real-demo-post-meeting-transcript-not-blocking.test.mjs && node test/device-stream-simulator.test.mjs && node test/real-demo-prepare-device-stream.test.mjs && node test/real-demo-device-stream-resume.test.mjs && node test/transcript-status.test.mjs && node test/oauth-scope.test.mjs && node test/event-log-persistence.test.mjs && node test/raw-ws-event-diagnostics.test.mjs && node test/ws-parser-self-test.test.mjs && node test/real-event-audit.test.mjs && node test/tenant-search-readiness.test.mjs && node test/meeting-search-invalid-token.test.mjs && node test/meeting-search-requires-start-time.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.68.0"
+  }
+}

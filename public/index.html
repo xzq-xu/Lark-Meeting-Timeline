@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lark Meeting Timeline Demo</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="topbar">
+        <div>
+          <h1>飞书会议时间轴对齐 Demo</h1>
+          <p id="meetingMeta">loading</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="refreshBtn" type="button">刷新</button>
+          <button id="resetBtn" type="button">重置样例</button>
+        </div>
+      </section>
+
+      <section class="status-grid" id="stats"></section>
+
+      <section class="readiness-panel">
+        <div class="panel-title">
+          <h2>链路验收状态</h2>
+          <span id="readinessSummary">loading</span>
+        </div>
+        <div id="readinessList" class="readiness-list"></div>
+      </section>
+
+      <section class="workspace">
+        <div class="timeline-panel">
+          <div class="panel-title">
+            <h2>统一时间轴</h2>
+            <span id="durationLabel"></span>
+          </div>
+          <div id="timeline" class="timeline"></div>
+        </div>
+
+        <aside class="control-panel">
+          <section class="control-block">
+            <h2>飞书事件接入</h2>
+            <p id="larkWebhookStatus" class="hint">loading</p>
+            <p id="larkDeliveryDiagnostics" class="hint">loading</p>
+            <div class="probe-box">
+              <div class="inline-actions">
+                <button id="startRealMeetingProbeBtn" type="button">启动事件等待</button>
+                <button id="refreshProbeBtn" type="button">刷新验收状态</button>
+                <button id="resetProbeBtn" type="button">清除验收状态</button>
+                <button id="restoreLatestRealAxisBtn" type="button">恢复最近真实轴</button>
+              </div>
+              <p id="realMeetingProbeStatus" class="hint">loading</p>
+            </div>
+            <div class="acceptance-guide">
+              <div class="guide-header">
+                <strong>真实会议验收助手</strong>
+                <span id="acceptanceBadge" class="tag warn">loading</span>
+              </div>
+              <p id="realDemoAcceptanceSummary" class="hint">验收摘要加载中</p>
+              <p id="realDemoStatusSummary" class="hint">loading</p>
+              <p id="realDemoMonitorSummary" class="hint">等待完成证据：未启动</p>
+              <div id="acceptanceGuideSteps" class="guide-steps"></div>
+              <div class="inline-actions">
+                <button id="prepareRealDemoBtn" type="button">进入真实等待状态</button>
+                <button id="monitorRealDemoBtn" type="button">等待完成证据</button>
+                <button id="startAcceptanceBtn" type="button">启动验收探针</button>
+                <button id="writeAcceptanceMarkBtn" type="button">写入验收标注</button>
+                <button id="toggleAutoAcceptanceBtn" type="button">自动验收标注</button>
+                <button id="toggleDeviceSimulatorBtn" type="button">虚拟设备标注</button>
+                <button id="togglePassiveScanBtn" type="button">被动扫描建轴</button>
+                <button id="reauthMeetingScopeBtn" type="button">授权会议扫描</button>
+              </div>
+              <p id="acceptanceNextAction" class="hint"></p>
+            </div>
+            <label>
+              HTTP webhook URL
+              <input id="larkWebhookUrlInput" readonly />
+            </label>
+            <div id="larkEventLog" class="event-log"></div>
+          </section>
+
+          <section class="control-block">
+            <h2>会中实时标注</h2>
+            <p class="hint">真实链路由飞书会议事件自动建轴；本地模拟只用于事件订阅未打通时验证，不代表真实飞书会议。</p>
+            <label>
+              会议标题
+              <input id="liveTitleInput" placeholder="实时标注会议" />
+            </label>
+            <label>
+              飞书会议链接
+              <input id="liveMeetingUrlInput" placeholder="可粘贴正在进行的飞书会议链接" />
+            </label>
+            <div class="inline-actions">
+              <button id="startOpenSessionBtn" type="button">开放会话建轴</button>
+              <button id="createLarkReserveBtn" type="button">创建飞书会议</button>
+              <button id="syncActiveMeetingBtn" type="button">同步活跃会议</button>
+            </div>
+            <button id="bindMyMeetingBtn" type="button">扫描我的真实会议</button>
+            <button id="bindTenantMeetingBtn" type="button">实验：应用身份扫描</button>
+            <button id="bindMeetingNoBtn" type="button">按会议号/链接绑定真实会议</button>
+            <details class="dev-actions">
+              <summary>本地模拟按钮</summary>
+              <div class="inline-actions">
+                <button id="startLiveBtn" type="button">本地模拟开始</button>
+                <button id="endLiveBtn" type="button">本地模拟结束</button>
+              </div>
+            </details>
+            <label>
+              相对会议时间（调试覆盖，可空）
+              <input id="liveOffsetInput" placeholder="留空=采集当下；仅调试时填 00:03:25 / 205000" />
+            </label>
+            <label>
+              标注采集时间（可空）
+              <input id="liveCapturedAtInput" placeholder="ISO/ms；会中缓存后发送时填真实采集时间" />
+            </label>
+            <label>
+              标注内容
+              <input id="liveLabelInput" placeholder="手写 why? / 圈出风险 / next action" />
+            </label>
+            <button id="liveMarkBtn" type="button">写入实时标注</button>
+            <p id="streamStatus" class="hint"></p>
+          </section>
+
+          <section class="control-block device-panel">
+            <h2>设备接入调试</h2>
+            <p id="deviceIngestStatus" class="hint">loading</p>
+            <div class="inline-actions">
+              <button id="refreshDeviceIngestBtn" type="button">读取接入信息</button>
+              <button id="sendDeviceMarkBtn" type="button">发送设备标注</button>
+              <button id="startDeviceStreamBtn" type="button">开始流式模拟</button>
+              <button id="stopDeviceStreamBtn" type="button">停止流式模拟</button>
+              <button id="copyDeviceCurlBtn" type="button">复制 curl</button>
+            </div>
+            <label>
+              设备 ID
+              <input id="deviceIdInput" placeholder="hanwang-alpha-001" />
+            </label>
+            <label>
+              设备类型
+              <input id="deviceTypeInput" placeholder="hanwang_epaper" />
+            </label>
+            <label>
+              设备 payload
+              <textarea id="devicePayloadInput" spellcheck="false"></textarea>
+            </label>
+            <label>
+              外部设备 curl
+              <textarea id="deviceCurlInput" spellcheck="false" readonly></textarea>
+            </label>
+          </section>
+
+          <section class="control-block">
+            <h2>会后飞书妙记同步</h2>
+            <div class="inline-actions auth-actions">
+              <button id="larkLoginBtn" type="button">登录飞书账号（妙记）</button>
+              <button id="larkMeetingScanLoginBtn" type="button">授权会议扫描兜底</button>
+              <button id="larkRefreshAuthBtn" type="button">刷新授权</button>
+              <button id="larkLogoutBtn" type="button">清除授权</button>
+            </div>
+            <p id="larkAuthScopeHint" class="hint"></p>
+            <p id="larkAuthStatus" class="hint"></p>
+            <label>
+              搜索关键词
+              <input id="minuteSearchInput" placeholder="会议标题 / 关键词，可留空" />
+            </label>
+            <button id="searchMinutesBtn" type="button">搜索我的妙记</button>
+            <div id="minuteResults" class="mini-results"></div>
+            <label>
+              minute_token / 妙记链接
+              <input id="minuteTokenInput" placeholder="输入飞书妙记 minute_token 或直接粘贴妙记链接" />
+            </label>
+            <label>
+              会议开始时间
+              <input id="meetingStartInput" placeholder="2026-06-26T02:00:00.000Z" />
+            </label>
+            <button id="syncMinuteBtn" type="button">会后同步妙记转写</button>
+            <p id="larkConfig" class="hint"></p>
+          </section>
+
+          <section class="control-block">
+            <h2>开发辅助：批量导入标注</h2>
+            <textarea id="sequenceInput" spellcheck="false"></textarea>
+            <button id="importSequenceBtn" type="button">贴到时间轴</button>
+          </section>
+
+          <section class="control-block">
+            <h2>会后导入飞书转写 JSON</h2>
+            <textarea id="transcriptInput" spellcheck="false"></textarea>
+            <button id="importTranscriptBtn" type="button">更新转写</button>
+          </section>
+        </aside>
+      </section>
+
+      <section class="details-grid">
+        <section>
+          <h2>标注对齐结果</h2>
+          <div id="alignmentList" class="list"></div>
+        </section>
+        <section>
+          <h2>会议转写片段</h2>
+          <div id="segmentList" class="list"></div>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

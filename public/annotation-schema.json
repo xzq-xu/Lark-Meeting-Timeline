@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.hmp.dev/schemas/meeting-annotation-event.schema.json",
+  "title": "MeetingAnnotationEvent",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Stable event id from the sender. Used for dedupe/upsert."
+    },
+    "time_ms": {
+      "type": "number",
+      "description": "Meeting-relative timestamp in milliseconds. Use only when the sender already knows the meeting offset."
+    },
+    "captured_at_ms": {
+      "type": "number",
+      "description": "Absolute epoch timestamp in milliseconds when the annotation/stroke was captured. Required for production device events that may be uploaded late or in batches."
+    },
+    "captured_at": {
+      "type": "string",
+      "description": "Absolute ISO timestamp when the annotation/stroke was captured. Use captured_at_ms when possible."
+    },
+    "ink_end_at_ms": {
+      "type": "number",
+      "description": "Absolute epoch timestamp in milliseconds when the ink stroke group ended."
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "Absolute ISO timestamp. The server converts it to meeting-relative time."
+    },
+    "timestamp_ms": {
+      "type": "number",
+      "description": "Absolute sender epoch timestamp in milliseconds. Kept for compatibility; captured_at_ms is preferred."
+    },
+    "device_time_ms": {
+      "type": "number",
+      "description": "Absolute device epoch timestamp in milliseconds."
+    },
+    "source": {
+      "type": "string",
+      "examples": ["browser_demo", "hanwang_epaper", "eink_device"]
+    },
+    "kind": {
+      "type": "string",
+      "examples": ["handwriting_trigger", "mark", "attention", "todo", "question"]
+    },
+    "label": {
+      "type": "string",
+      "description": "Human-readable label shown on the timeline."
+    },
+    "text": {
+      "type": "string",
+      "description": "Best current text reading, if any."
+    },
+    "text_candidates": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Candidate readings from handwriting/OCR recognizers."
+    },
+    "intent": {
+      "type": "string",
+      "examples": ["question", "risk_check", "follow_up"]
+    },
+    "mark": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "action": {
+          "type": "string",
+          "examples": ["underline", "enclosure", "cross", "arrow", "freehand"]
+        },
+        "target_text": { "type": "string" }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional target region or resolved document/UI object."
+    },
+    "strokes": {
+      "type": "array",
+      "description": "Raw stroke points or stroke groups from the input device. If points contain absolute t/ts/timestamp_ms values, the server can infer captured_at_ms from the latest point."
+    },
+    "stroke_points": {
+      "type": "array",
+      "description": "Compatibility alias for strokes."
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional timing wrapper. Supports captured_at_ms, captured_at, time_ms, offset_ms, relative_ms, and meeting_time_ms."
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" }
+      }
+    },
+    "meeting_session": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional inline open meeting session context. When present, the server starts or reuses a meeting axis before normalizing this annotation.",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "examples": ["lark", "feishu"]
+        },
+        "meeting_id": {
+          "type": "string",
+          "description": "Stable meeting/session id if the detector has one."
+        },
+        "title": {
+          "type": "string"
+        },
+        "meeting_url": {
+          "type": "string"
+        },
+        "start_time_ms": {
+          "type": "number",
+          "description": "Absolute epoch timestamp in milliseconds for the meeting/session start."
+        },
+        "start_time": {
+          "type": "string",
+          "description": "ISO timestamp for the meeting/session start."
+        },
+        "detector_source": {
+          "type": "string",
+          "examples": ["hanwang_host_app", "desktop_meeting_observer"]
+        }
+      }
+    },
+    "start_meeting_session": {
+      "type": "boolean",
+      "description": "Alternative inline session start flag. When true, top-level meeting_* fields are used to create an open meeting session."
+    },
+    "force_meeting_session": {
+      "type": "boolean",
+      "description": "Allow inline meeting_session to replace a different active real meeting axis."
+    },
+    "force_new_session": {
+      "type": "boolean",
+      "description": "Explicitly start a new pending annotation session instead of attaching to the current concrete meeting axis."
+    },
+    "new_session": {
+      "type": "boolean",
+      "description": "Alias for force_new_session."
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Uninterpreted extension payload."
+    }
+  },
+  "anyOf": [
+    { "required": ["time_ms"] },
+    { "required": ["captured_at_ms"] },
+    { "required": ["captured_at"] },
+    { "required": ["ink_end_at_ms"] },
+    { "required": ["timestamp"] },
+    { "required": ["timestamp_ms"] },
+    { "required": ["device_time_ms"] },
+    { "required": ["timing"] },
+    { "required": ["label"] },
+    { "required": ["text"] }
+  ]
+}

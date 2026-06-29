@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+
+data/
+node_modules/
+
+.DS_Store
+*.log
+*.pid
+npm-debug.log*
+
+.idea/
+.vscode/
+coverage/
