@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import {
   createLocalMeetingObserver,
+  createLocalMeetingTimelineObserver,
   observeMeetingSnapshot,
 } from '../packages/meeting-timeline-sdk/adapters/local-observer.mjs';
 
@@ -74,5 +75,55 @@ const ended = observer.observe({
 });
 assert.equal(ended.signals[0].type, 'meeting_ended');
 assert.equal(observer.getState().activeMeeting, null);
+
+const clientCalls = [];
+const timelineClient = {
+  async startMeeting(payload) {
+    clientCalls.push({ method: 'startMeeting', payload });
+    return { ok: true, payload };
+  },
+  async endMeeting(payload) {
+    clientCalls.push({ method: 'endMeeting', payload });
+    return { ok: true, payload };
+  },
+};
+
+const timelineObserver = createLocalMeetingTimelineObserver(timelineClient, {
+  source: 'desktop_observer',
+});
+
+const timelineStart = await timelineObserver.observe({
+  tab: {
+    url: 'https://meet.google.com/xyz-abcd-uvw',
+    title: 'Weekly sync - Google Meet',
+  },
+  observedAtMs: startMs + 50_000,
+});
+assert.equal(timelineStart.signals.length, 1);
+assert.equal(timelineStart.results.length, 1);
+assert.equal(timelineStart.results[0].action, 'startMeeting');
+assert.equal(clientCalls[0].method, 'startMeeting');
+assert.equal(clientCalls[0].payload.platform, 'google_meet');
+assert.equal(clientCalls[0].payload.meeting_id, 'xyz-abcd-uvw');
+assert.equal(clientCalls[0].payload.detector_source, 'google_meet_desktop_observer');
+
+const timelineRepeat = await timelineObserver.observe({
+  url: 'https://meet.google.com/xyz-abcd-uvw',
+  observedAtMs: startMs + 51_000,
+});
+assert.equal(timelineRepeat.signals.length, 0);
+assert.equal(timelineRepeat.results.length, 0);
+assert.equal(clientCalls.length, 1);
+
+const timelineEnd = await timelineObserver.observe({
+  active: false,
+  observedAtMs: startMs + 60_000,
+});
+assert.equal(timelineEnd.signals.length, 1);
+assert.equal(timelineEnd.results.length, 1);
+assert.equal(timelineEnd.results[0].action, 'endMeeting');
+assert.equal(clientCalls[1].method, 'endMeeting');
+assert.equal(clientCalls[1].payload.meeting_id, 'xyz-abcd-uvw');
+assert.equal(clientCalls[1].payload.end_time_ms, startMs + 60_000);
 
 console.log('ok local meeting observer state machine');

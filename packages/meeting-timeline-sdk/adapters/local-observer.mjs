@@ -1,4 +1,5 @@
-import { compactObject, normalizeAbsoluteMs } from '../index.mjs';
+import { MeetingTimelineSdkError, compactObject, normalizeAbsoluteMs } from '../index.mjs';
+import { applyMeetingSignals } from './core.mjs';
 import { detectMeetingFromUrl } from './meeting-url.mjs';
 
 function firstNonEmpty(...values) {
@@ -121,6 +122,14 @@ function normalizeObserverState(state = null) {
   };
 }
 
+function splitTimelineObserverOptions(options = {}) {
+  const { applyOptions, ...observerOptions } = options ?? {};
+  return {
+    observerOptions,
+    applyOptions: applyOptions ?? {},
+  };
+}
+
 export function observeMeetingSnapshot(state = null, snapshot = {}, options = {}) {
   const previous = normalizeObserverState(state);
   const atMs = observedAtMs(snapshot, options);
@@ -205,6 +214,37 @@ export function createLocalMeetingObserver(options = {}) {
     reset(nextState = null) {
       state = normalizeObserverState(nextState);
       return state;
+    },
+  };
+}
+
+export function createLocalMeetingTimelineObserver(client, options = {}) {
+  if (!client || typeof client !== 'object') {
+    throw new MeetingTimelineSdkError('Meeting timeline client is required for createLocalMeetingTimelineObserver');
+  }
+
+  const base = splitTimelineObserverOptions(options);
+  const observer = createLocalMeetingObserver(base.observerOptions);
+  return {
+    async observe(snapshot = {}, observeOptions = {}) {
+      const next = splitTimelineObserverOptions(observeOptions);
+      const observed = observer.observe(snapshot, next.observerOptions);
+      const results = observed.signals.length === 0
+        ? []
+        : await applyMeetingSignals(client, observed.signals, {
+          ...base.applyOptions,
+          ...next.applyOptions,
+        });
+      return {
+        ...observed,
+        results,
+      };
+    },
+    getState() {
+      return observer.getState();
+    },
+    reset(nextState = null) {
+      return observer.reset(nextState);
     },
   };
 }

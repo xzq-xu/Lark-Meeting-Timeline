@@ -175,10 +175,21 @@ await handleWebhook({
 });
 ```
 
-浏览器扩展、桌面观察器或电子纸宿主 App 不需要等官方 webhook，可以先用 `local-observer` 把窗口 URL 快照转成 meeting signal，再交给 `applyMeetingSignals()`：
+浏览器扩展、桌面观察器或电子纸宿主 App 不需要等官方 webhook。推荐直接用 `local-observer` 的高层入口：宿主只要定期喂窗口 URL / 标题 / 可见状态快照，SDK 会判断会议开始/结束并写入 timeline：
 
 ```js
-import { applyMeetingSignals } from '@ai-annotation/meeting-timeline-sdk/adapters/core';
+import { createLocalMeetingTimelineObserver } from '@ai-annotation/meeting-timeline-sdk/adapters/local-observer';
+
+const observer = createLocalMeetingTimelineObserver(timeline, { source: 'desktop_observer' });
+await observer.observe({
+  url: 'https://meet.google.com/abc-defg-hij',
+  observedAtMs: Date.now(),
+});
+```
+
+如果接入方只想拿 signal 自己处理，也可以用低层状态机：
+
+```js
 import { createLocalMeetingObserver } from '@ai-annotation/meeting-timeline-sdk/adapters/local-observer';
 
 const observer = createLocalMeetingObserver({ source: 'desktop_observer' });
@@ -187,7 +198,7 @@ const observed = observer.observe({
   observedAtMs: Date.now(),
 });
 
-await applyMeetingSignals(timeline, observed.signals);
+console.log(observed.signals);
 ```
 
 如果宿主已经知道事件类型，也可以直接走 `local-detector`：

@@ -1,4 +1,5 @@
-import type { NormalizedMeetingSignal } from './core.mjs';
+import type { MeetingTimelineClient } from '../index.mjs';
+import type { ApplyMeetingSignalOptions, ApplyMeetingSignalResult, NormalizedMeetingSignal } from './core.mjs';
 import type { DetectedMeetingFromUrl } from './meeting-url.mjs';
 
 export interface LocalObserverState {
@@ -45,10 +46,18 @@ export interface LocalObserverOptions {
   [key: string]: unknown;
 }
 
+export interface LocalTimelineObserverOptions extends LocalObserverOptions {
+  applyOptions?: ApplyMeetingSignalOptions;
+}
+
 export interface LocalObserverResult {
   state: LocalObserverState;
   signals: NormalizedMeetingSignal[];
   detectedMeeting?: DetectedMeetingFromUrl | null;
+}
+
+export interface LocalTimelineObserverResult extends LocalObserverResult {
+  results: ApplyMeetingSignalResult[];
 }
 
 export function observeMeetingSnapshot(
@@ -59,6 +68,15 @@ export function observeMeetingSnapshot(
 
 export function createLocalMeetingObserver(options?: LocalObserverOptions): {
   observe(snapshot?: LocalObserverSnapshot, options?: LocalObserverOptions): LocalObserverResult;
+  getState(): LocalObserverState;
+  reset(nextState?: LocalObserverState | null): LocalObserverState;
+};
+
+export function createLocalMeetingTimelineObserver(
+  client: MeetingTimelineClient,
+  options?: LocalTimelineObserverOptions,
+): {
+  observe(snapshot?: LocalObserverSnapshot, options?: LocalTimelineObserverOptions): Promise<LocalTimelineObserverResult>;
   getState(): LocalObserverState;
   reset(nextState?: LocalObserverState | null): LocalObserverState;
 };
