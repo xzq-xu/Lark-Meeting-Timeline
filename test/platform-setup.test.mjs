@@ -4,6 +4,7 @@ import {
   GOOGLE_MEET_EVENT_TYPES,
   GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES,
   LARK_MEETING_EVENT_TYPES,
+  LOCAL_DETECTOR_EVENT_TYPES,
   MICROSOFT_GRAPH_LIFECYCLE_EVENTS,
   WEBEX_WEBHOOK_RESOURCES,
   ZOOM_MEETING_EVENT_TYPES,
@@ -27,11 +28,22 @@ import {
 
 const baseUrl = 'https://timeline.example.com';
 
+assert.equal(platformEventEndpoint(baseUrl, 'local-detector'), 'https://timeline.example.com/api/platform-events/local-detector');
 assert.equal(platformEventEndpoint(baseUrl, 'lark'), 'https://timeline.example.com/api/platform-events/lark');
 assert.equal(platformEventEndpoint(baseUrl, 'google-meet'), 'https://timeline.example.com/api/platform-events/google-meet');
 assert.equal(platformEventEndpoint(baseUrl, 'teams'), 'https://timeline.example.com/api/platform-events/teams');
 assert.equal(platformEventEndpoint(baseUrl, 'zoom'), 'https://timeline.example.com/api/platform-events/zoom');
 assert.equal(platformEventEndpoint(baseUrl, 'webex'), 'https://timeline.example.com/api/platform-events/webex');
+
+const localDetectorManifest = platformSetupManifest('desktop-observer', { baseUrl });
+assert.equal(localDetectorManifest.endpoint, 'https://timeline.example.com/api/platform-events/local-detector');
+assert.equal(localDetectorManifest.default_event_types.includes('meeting_started'), true);
+assert.equal(LOCAL_DETECTOR_EVENT_TYPES.includes('meeting_ended'), true);
+assert.equal(localDetectorManifest.capabilities.realtime_axis.status, 'supported');
+assert.equal(localDetectorManifest.capabilities.sdk_modules.events, '@ai-annotation/meeting-timeline-sdk/adapters/local-detector');
+const localDetectorMaintenance = evaluatePlatformSubscriptionMaintenance('local-detector', {});
+assert.equal(localDetectorMaintenance.renewal_supported, false);
+assert.match(localDetectorMaintenance.detail, /no_remote_subscription/);
 
 const larkManifest = platformSetupManifest('feishu', { baseUrl });
 assert.equal(larkManifest.endpoint, 'https://timeline.example.com/api/platform-events/lark');
@@ -134,10 +146,10 @@ assert.equal(webexManifest.capabilities.post_meeting_transcript.sdk_normalizer, 
 assert.equal(webexManifest.capabilities.realtime_axis.status, 'supported_best_effort');
 
 const all = allPlatformSetupManifests({ baseUrl });
-assert.equal(all.length, 5);
-assert.deepEqual(all.map((item) => item.platform), ['lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex']);
+assert.equal(all.length, 6);
+assert.deepEqual(all.map((item) => item.platform), ['local_detector', 'lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex']);
 const allCapabilities = allPlatformCapabilityContracts({ baseUrl });
-assert.deepEqual(allCapabilities.map((item) => item.platform), ['lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex']);
+assert.deepEqual(allCapabilities.map((item) => item.platform), ['local_detector', 'lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex']);
 assert.equal(allCapabilities.every((item) => item.endpoints.transcript_import === 'https://timeline.example.com/api/import/transcript'), true);
 
 const googleReady = evaluatePlatformSetupReadiness('google-meet', {
@@ -174,7 +186,7 @@ const allReadiness = evaluateAllPlatformSetupReadiness({
     WEBEX_WEBHOOK_SECRET: 'webex-secret',
   },
 });
-assert.deepEqual(allReadiness.map((item) => item.ready), [true, true, true, true, true]);
+assert.deepEqual(allReadiness.map((item) => item.ready), [true, true, true, true, true, true]);
 
 const graphRenewal = buildMicrosoftGraphSubscriptionRenewalRequest({
   subscriptionId: 'graph-sub-1',
@@ -236,9 +248,10 @@ const allMaintenance = evaluateAllPlatformSubscriptionMaintenance({
 }, {
   now: '2026-06-26T02:00:00.000Z',
 });
-assert.deepEqual(allMaintenance.map((item) => item.platform), ['lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex']);
+assert.deepEqual(allMaintenance.map((item) => item.platform), ['local_detector', 'lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex']);
 assert.equal(allMaintenance[0].renewal_supported, false);
-assert.equal(allMaintenance[1].renewal_due, true);
-assert.equal(allMaintenance[2].status, 'active');
+assert.equal(allMaintenance[1].renewal_supported, false);
+assert.equal(allMaintenance[2].renewal_due, true);
+assert.equal(allMaintenance[3].status, 'active');
 
 console.log('ok platform setup builders');

@@ -36,6 +36,23 @@ const googleStartEvent = {
   },
 };
 
+const localDetectorStartEvent = {
+  id: 'local-detector-start-1',
+  type: 'meeting_started',
+  detected_platform: 'google_meet',
+  meeting_id: 'local-google-meet-001',
+  meeting_url: 'https://meet.google.com/local-demo',
+  title: 'Local detector Google Meet',
+  start_time_ms: startMs,
+};
+
+const normalizedLocalDetector = normalizePlatformEvent('desktop-observer', localDetectorStartEvent);
+assert.equal(normalizedLocalDetector.platform, 'local_detector');
+assert.equal(normalizedLocalDetector.source, 'local_detector');
+assert.equal(normalizedLocalDetector.signals[0].type, 'meeting_started');
+assert.equal(normalizedLocalDetector.signals[0].meeting.platform, 'google_meet');
+assert.equal(normalizedLocalDetector.signals[0].meeting.meeting_id, 'local-google-meet-001');
+
 const normalized = normalizePlatformEvent('meet', googleStartEvent);
 assert.equal(normalized.platform, 'google_meet');
 assert.equal(normalized.source, 'google_meet_webhook');
@@ -74,6 +91,12 @@ assert.equal(startResult.results.length, 1);
 assert.equal(startResult.results[0].action, 'startMeeting');
 assert.equal(calls.at(-1).method, 'startMeeting');
 assert.equal(calls.at(-1).input.start_time_ms, startMs);
+
+const localDetectorStartResult = await ingestPlatformEvent(client, 'local-detector', localDetectorStartEvent);
+assert.equal(localDetectorStartResult.platform, 'local_detector');
+assert.equal(localDetectorStartResult.results[0].action, 'startMeeting');
+assert.equal(calls.at(-1).input.platform, 'google_meet');
+assert.equal(calls.at(-1).input.detector_source, 'google_meet_local_detector');
 
 const larkStartResult = await ingestPlatformEvent(client, 'lark-suite', larkStartEvent);
 assert.equal(larkStartResult.platform, 'lark');

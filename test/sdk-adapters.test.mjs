@@ -6,6 +6,7 @@ import {
 } from '../packages/meeting-timeline-sdk/adapters/core.mjs';
 import { normalizeGoogleMeetEvent, unwrapGooglePubSubEvent } from '../packages/meeting-timeline-sdk/adapters/google-meet.mjs';
 import { normalizeLarkEvent } from '../packages/meeting-timeline-sdk/adapters/lark.mjs';
+import { normalizeLocalDetectorEvent } from '../packages/meeting-timeline-sdk/adapters/local-detector.mjs';
 import { normalizeMicrosoftTeamsEvent } from '../packages/meeting-timeline-sdk/adapters/microsoft-teams.mjs';
 import { normalizeWebexEvent } from '../packages/meeting-timeline-sdk/adapters/webex.mjs';
 import { normalizeZoomEvent } from '../packages/meeting-timeline-sdk/adapters/zoom.mjs';
@@ -127,6 +128,37 @@ const appliedLifecycle = await applyMeetingSignal(client, lifecycleSignal, {
 assert.equal(appliedLifecycle.applied, true);
 assert.equal(appliedLifecycle.action, 'onSubscriptionLifecycleSignal');
 assert.equal(appliedLifecycle.response.subscription, 'subscriptions/google-sub-001');
+
+const localDetectorStart = normalizeLocalDetectorEvent({
+  id: 'local-start-1',
+  type: 'meeting_started',
+  detected_platform: 'google_meet',
+  meeting_id: 'local-google-meet-001',
+  meeting_url: 'https://meet.google.com/local-demo',
+  title: 'Local detector Google Meet',
+  start_time_ms: startMs,
+});
+assert.equal(localDetectorStart.length, 1);
+assert.equal(localDetectorStart[0].type, 'meeting_started');
+assert.equal(localDetectorStart[0].meeting.platform, 'google_meet');
+assert.equal(localDetectorStart[0].meeting.meeting_id, 'local-google-meet-001');
+assert.equal(localDetectorStart[0].source, 'local_detector');
+
+const localDetectorStartResult = await applyMeetingSignal(client, localDetectorStart[0]);
+assert.equal(localDetectorStartResult.action, 'startMeeting');
+assert.equal(calls.at(-1).input.platform, 'google_meet');
+assert.equal(calls.at(-1).input.detector_source, 'google_meet_local_detector');
+
+const localDetectorEnd = normalizeLocalDetectorEvent({
+  type: 'meeting_ended',
+  meeting: {
+    platform: 'google_meet',
+    id: 'local-google-meet-001',
+    endTimeMs: startMs + 300_000,
+  },
+});
+assert.equal(localDetectorEnd[0].type, 'meeting_ended');
+assert.equal(localDetectorEnd[0].occurred_at_ms, startMs + 300_000);
 
 const larkStart = normalizeLarkEvent({
   header: {

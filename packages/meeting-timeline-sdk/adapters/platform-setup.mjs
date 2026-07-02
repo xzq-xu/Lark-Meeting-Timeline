@@ -9,6 +9,13 @@ export const LARK_MEETING_EVENT_TYPES = Object.freeze([
   'vc.meeting.leave_meeting_v1',
 ]);
 
+export const LOCAL_DETECTOR_EVENT_TYPES = Object.freeze([
+  'meeting_started',
+  'meeting_ended',
+  'participant_joined',
+  'participant_left',
+]);
+
 export const GOOGLE_MEET_EVENT_TYPES = Object.freeze([
   'google.workspace.meet.conference.v2.started',
   'google.workspace.meet.conference.v2.ended',
@@ -48,9 +55,16 @@ export const WEBEX_WEBHOOK_RESOURCES = Object.freeze([
   { resource: 'meetingTranscripts', events: ['created'] },
 ]);
 
-export const MEETING_PLATFORM_KEYS = Object.freeze(['lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex']);
+export const MEETING_PLATFORM_KEYS = Object.freeze(['local_detector', 'lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex']);
 
 export const MEETING_PLATFORM_ALIASES = Object.freeze({
+  'local-detector': 'local_detector',
+  local_detector: 'local_detector',
+  detector: 'local_detector',
+  'desktop-observer': 'local_detector',
+  desktop_observer: 'local_detector',
+  observer: 'local_detector',
+  manual: 'local_detector',
   lark: 'lark',
   feishu: 'lark',
   'fei-shu': 'lark',
@@ -69,6 +83,50 @@ export const MEETING_PLATFORM_ALIASES = Object.freeze({
 });
 
 const platformCapabilityContracts = Object.freeze({
+  local_detector: {
+    platform: 'local_detector',
+    display_name: 'Local Meeting Detector',
+    realtime_axis: {
+      status: 'supported',
+      source: 'Desktop observer, browser extension, e-ink host app, or explicit manual signal',
+      signal_types: ['meeting_started', 'meeting_ended'],
+      fallback: 'primary_low_latency_path_when_official_events_are_delayed_or_unavailable',
+    },
+    participant_track: {
+      status: 'supported_if_detector_provides_roster_changes',
+      source: 'local observer participant signals',
+      signal_types: ['participant_joined', 'participant_left'],
+    },
+    post_meeting_transcript: {
+      status: 'not_applicable',
+      availability: 'provider_specific_post_meeting',
+      detail: 'local_detector_only_establishes_the_axis; transcript_import_still_uses_the_detected_provider_or_generic_import',
+    },
+    recording: {
+      status: 'not_applicable',
+      detail: 'recording_artifacts_should_be_imported_from_the_detected_provider',
+    },
+    subscription_lifecycle: {
+      status: 'not_applicable',
+      detail: 'local_detector_has_no_remote_subscription_lifecycle',
+    },
+    realtime_transcript: {
+      status: 'not_supported',
+      detail: 'local_detector_does_not_require_realtime_transcript_for_annotation_alignment',
+    },
+    sdk_modules: {
+      events: '@ai-annotation/meeting-timeline-sdk/adapters/local-detector',
+      ingest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest',
+      transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
+      setup: '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup',
+      security: '@ai-annotation/meeting-timeline-sdk/adapters/webhook-security',
+    },
+    limitations: [
+      'detector_must_provide_absolute_time_for_reliable_alignment',
+      'detected_provider_identity_can_be_partial_without_url_or_meeting_id',
+      'provider_webhook_events_should_later_reconcile_or_backfill_the_axis_when_available',
+    ],
+  },
   lark: {
     platform: 'lark',
     display_name: 'Feishu / Lark',
@@ -565,6 +623,7 @@ export function buildGoogleWorkspaceSubscriptionRenewalRequest(input = {}) {
 export function platformEventEndpoint(baseUrl, platform) {
   const key = normalizePlatform(platform);
   const path = {
+    local_detector: '/api/platform-events/local-detector',
     lark: '/api/platform-events/lark',
     google_meet: '/api/platform-events/google-meet',
     microsoft_teams: '/api/platform-events/teams',
@@ -598,6 +657,25 @@ export function platformSetupManifest(platform, options = {}) {
     ? `${endpoint}/status`
     : null;
   const manifests = {
+    local_detector: {
+      platform: 'local_detector',
+      display_name: 'Local Meeting Detector',
+      endpoint,
+      status_endpoint: statusEndpoint,
+      transport: 'Local SDK call or local HTTP request',
+      capabilities: platformCapabilityContract('local_detector', options),
+      default_event_types: LOCAL_DETECTOR_EVENT_TYPES,
+      required_security_env: [],
+      optional_security_env: [],
+      required_setup: [
+        'Run the detector in a trusted host context such as a desktop observer, browser extension, e-ink companion app, or explicit manual controller.',
+        'When the detector knows a real meeting is active, send meeting_started with detected_platform, meeting_id or meeting_url, and start_time_ms when available.',
+        'Send meeting_ended when the local observer confirms the meeting is closed.',
+        'Use captured_at_ms on annotations; do not wait for provider transcript or webhook events before creating the realtime axis.',
+        'Let provider-specific webhooks backfill or reconcile metadata when they arrive later.',
+      ],
+      builders: [],
+    },
     lark: {
       platform: 'lark',
       display_name: 'Feishu / Lark',
@@ -794,14 +872,16 @@ export function evaluatePlatformSubscriptionMaintenance(platform, subscription =
   const key = normalizePlatform(platform);
   const nowMs = parseTimeMs(options.now) ?? Date.now();
   const renewalWindowMs = Number(options.renewalWindowMs ?? options.renewal_window_ms ?? 12 * 60 * 60 * 1000);
-  if (key === 'lark' || key === 'zoom' || key === 'webex') {
+  if (key === 'local_detector' || key === 'lark' || key === 'zoom' || key === 'webex') {
     return {
       platform: key,
       status: 'configured_manually',
       renewal_supported: false,
       renewal_due: false,
       expired: false,
-      detail: key === 'lark'
+      detail: key === 'local_detector'
+        ? 'local_detector_has_no_remote_subscription_renewal'
+        : key === 'lark'
         ? 'lark_long_connection_or_event_callback_does_not_use_short_cycle_subscription_renewal'
         : `${key}_webhook_subscriptions_do_not_require_short_cycle_renewal`,
     };

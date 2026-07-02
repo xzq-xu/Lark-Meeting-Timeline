@@ -89,12 +89,14 @@ try {
       && item.realtime_axis.status === 'supported_best_effort'
   )), true);
   assert.equal(typeof info.platform_events.setup_endpoint, 'string');
+  assert.equal(info.platform_events.platforms.some((item) => item.platform === 'local_detector'), true);
   assert.equal(info.platform_events.platforms.some((item) => item.platform === 'google_meet'), true);
   assert.equal(info.platform_events.platforms.some((item) => item.platform === 'webex'), true);
   assert.equal(info.platform_events.platforms.some((item) => item.platform === 'lark'), true);
 
   const setup = await getJson(baseUrl, '/api/platform-events/setup');
-  assert.equal(setup.setup.length, 5);
+  assert.equal(setup.setup.length, 6);
+  assert.equal(setup.setup.some((item) => item.platform === 'local_detector' && item.endpoint === `${baseUrl}/api/platform-events/local-detector`), true);
   assert.equal(setup.setup.some((item) => item.platform === 'lark' && item.endpoint === `${baseUrl}/api/platform-events/lark`), true);
   assert.equal(setup.setup.some((item) => item.platform === 'google_meet' && item.endpoint === `${baseUrl}/api/platform-events/google-meet`), true);
   assert.equal(setup.setup.some((item) => item.platform === 'webex' && item.endpoint === `${baseUrl}/api/platform-events/webex`), true);
@@ -402,6 +404,21 @@ try {
       && event.metadata?.artifact_url === 'https://webex.example/webex-transcript-1.vtt'
   )), true);
 
+  const localDetectorStart = await postJson(baseUrl, '/api/platform-events/local-detector', {
+    force: true,
+    id: 'local-detector-start-001',
+    type: 'meeting_started',
+    detected_platform: 'google_meet',
+    meeting_id: 'local-google-meet-001',
+    meeting_url: 'https://meet.google.com/local-demo',
+    title: 'Local detector platform event test',
+    start_time_ms: startMs,
+  });
+  assert.equal(localDetectorStart.results[0].action, 'startMeeting');
+  assert.equal(localDetectorStart.state.meeting.source, 'local_detector');
+  assert.equal(localDetectorStart.state.meeting.platform, 'google_meet');
+  assert.equal(localDetectorStart.state.meeting.meeting_id, 'local-google-meet-001');
+
   const larkStart = await postJson(baseUrl, '/api/platform-events/lark', {
     force: true,
     header: {
@@ -427,6 +444,7 @@ try {
   assert.equal(larkStart.state.meeting.minute_token, 'minute-token-001');
 
   const allStatus = await getJson(baseUrl, '/api/platform-events/status');
+  assert.equal(allStatus.status.local_detector.received_count, 1);
   assert.equal(allStatus.status.lark.received_count, 1);
   assert.equal(allStatus.status.google_meet.received_count, 7);
   assert.equal(allStatus.status.microsoft_teams.received_count, 3);

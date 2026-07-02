@@ -1,5 +1,6 @@
 import { normalizeGoogleMeetEvent } from './google-meet.mjs';
 import { normalizeLarkEvent } from './lark.mjs';
+import { normalizeLocalDetectorEvent } from './local-detector.mjs';
 import { normalizeMicrosoftTeamsEvent } from './microsoft-teams.mjs';
 import {
   MEETING_PLATFORM_ALIASES,
@@ -10,11 +11,16 @@ import { normalizeWebexEvent } from './webex.mjs';
 import { normalizeZoomEvent } from './zoom.mjs';
 
 const normalizers = Object.freeze({
+  local_detector: normalizeLocalDetectorEvent,
   lark: normalizeLarkEvent,
   google_meet: normalizeGoogleMeetEvent,
   microsoft_teams: normalizeMicrosoftTeamsEvent,
   zoom: normalizeZoomEvent,
   webex: normalizeWebexEvent,
+});
+
+const sourceByPlatform = Object.freeze({
+  local_detector: 'local_detector',
 });
 
 function aliasesFor(platform) {
@@ -27,7 +33,7 @@ export const MEETING_PLATFORM_EVENT_ADAPTERS = Object.freeze(
   MEETING_PLATFORM_KEYS.map((platform) => Object.freeze({
     key: platform,
     aliases: Object.freeze(aliasesFor(platform)),
-    source: `${platform}_webhook`,
+    source: sourceByPlatform[platform] ?? `${platform}_webhook`,
     normalize: normalizers[platform],
   })),
 );

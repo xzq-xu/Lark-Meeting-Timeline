@@ -18,13 +18,15 @@ import {
 import * as transcriptAdapters from '../packages/meeting-timeline-sdk/adapters/transcript.mjs';
 
 const baseUrl = 'https://timeline.example.com';
-const expectedPlatforms = ['lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex'];
+const expectedPlatforms = ['local_detector', 'lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex'];
 
 assert.deepEqual([...MEETING_PLATFORM_KEYS], expectedPlatforms);
+assert.equal(MEETING_PLATFORM_ALIASES['local-detector'], 'local_detector');
 assert.equal(MEETING_PLATFORM_ALIASES.feishu, 'lark');
 assert.equal(MEETING_PLATFORM_ALIASES['google-meet'], 'google_meet');
 assert.equal(MEETING_PLATFORM_ALIASES['microsoft-teams'], 'microsoft_teams');
 assert.equal(normalizeMeetingPlatform('meet'), 'google_meet');
+assert.equal(normalizeMeetingPlatform('desktop-observer'), 'local_detector');
 assert.equal(normalizeMeetingPlatform('teams'), 'microsoft_teams');
 assert.equal(normalizeMeetingPlatform('cisco-webex'), 'webex');
 assert.equal(normalizeMeetingPlatform('lark-suite'), 'lark');
@@ -44,7 +46,7 @@ for (const platform of MEETING_PLATFORM_KEYS) {
   const manifest = platformSetupManifest(platform, { baseUrl });
   const capability = platformCapabilityContract(platform, { baseUrl });
   assert.equal(eventAdapter.key, platform);
-  assert.equal(eventAdapter.source, `${platform}_webhook`);
+  assert.equal(eventAdapter.source, platform === 'local_detector' ? 'local_detector' : `${platform}_webhook`);
   assert.equal(typeof eventAdapter.normalize, 'function');
   assert.equal(eventAdapter.aliases.includes(platform), true);
   for (const alias of eventAdapter.aliases) {
