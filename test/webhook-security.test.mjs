@@ -1,14 +1,29 @@
 import assert from 'node:assert/strict';
-import { createHmac } from 'node:crypto';
+import { createHmac, createSign, generateKeyPairSync } from 'node:crypto';
 
 import {
   buildZoomUrlValidationResponse,
   microsoftGraphValidationResponse,
   platformWebhookVerificationStatus,
   verifyGooglePubSubBearer,
+  verifyGooglePubSubOidcJwt,
   verifyMicrosoftGraphClientState,
   verifyZoomWebhookEvent,
 } from '../packages/meeting-timeline-sdk/adapters/webhook-security.mjs';
+
+function base64Url(input) {
+  return Buffer.from(typeof input === 'string' ? input : JSON.stringify(input), 'utf8')
+    .toString('base64url');
+}
+
+function signJwt({ privateKey, kid, payload }) {
+  const header = { alg: 'RS256', typ: 'JWT', kid };
+  const signingInput = `${base64Url(header)}.${base64Url(payload)}`;
+  const signer = createSign('RSA-SHA256');
+  signer.update(signingInput);
+  signer.end();
+  return `${signingInput}.${signer.sign(privateKey).toString('base64url')}`;
+}
 
 const zoomSecret = 'zoom-secret-token';
 const plainToken = 'zoom-plain-token';
@@ -58,6 +73,47 @@ assert.equal(verifyGooglePubSubBearer({
   headers: { authorization: 'Bearer wrong-token' },
   expectedToken: 'expected-token',
 }).reason, 'google_pubsub_bearer_mismatch');
+
+const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const kid = 'google-test-kid';
+const publicJwk = { ...publicKey.export({ format: 'jwk' }), kid, alg: 'RS256', use: 'sig' };
+const oidcAudience = 'https://timeline.example.com/api/platform-events/google-meet';
+const serviceAccountEmail = 'pubsub-pusher@demo-project.iam.gserviceaccount.com';
+const nowSec = Math.floor(Date.now() / 1000);
+const oidcJwt = signJwt({
+  privateKey,
+  kid,
+  payload: {
+    iss: 'https://accounts.google.com',
+    sub: '1234567890',
+    aud: oidcAudience,
+    email: serviceAccountEmail,
+    email_verified: true,
+    iat: nowSec - 30,
+    exp: nowSec + 3600,
+  },
+});
+const oidcResult = await verifyGooglePubSubOidcJwt({
+  headers: { authorization: `Bearer ${oidcJwt}` },
+  expectedAudience: oidcAudience,
+  serviceAccountEmail,
+  jwks: { keys: [publicJwk] },
+});
+assert.equal(oidcResult.ok, true);
+assert.equal(oidcResult.email, serviceAccountEmail);
+assert.equal(oidcResult.audience, oidcAudience);
+assert.equal((await verifyGooglePubSubOidcJwt({
+  token: oidcJwt,
+  expectedAudience: 'https://wrong.example.com',
+  serviceAccountEmail,
+  jwks: { keys: [publicJwk] },
+})).reason, 'google_pubsub_oidc_audience_mismatch');
+assert.equal((await verifyGooglePubSubOidcJwt({
+  token: oidcJwt,
+  expectedAudience: oidcAudience,
+  serviceAccountEmail: 'other@demo-project.iam.gserviceaccount.com',
+  jwks: { keys: [publicJwk] },
+})).reason, 'google_pubsub_oidc_email_mismatch');
 
 const publicStatus = platformWebhookVerificationStatus('zoom', { ok: true, skipped: false, reason: 'verified' });
 assert.deepEqual(publicStatus, { platform: 'zoom', ok: true, skipped: false, reason: 'verified' });

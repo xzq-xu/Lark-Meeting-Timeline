@@ -98,6 +98,7 @@ Google Meet adapter 同时支持已经解包的 Workspace Events CloudEvent，�
 import {
   buildZoomUrlValidationResponse,
   microsoftGraphValidationResponse,
+  verifyGooglePubSubOidcJwt,
   verifyMicrosoftGraphClientState,
   verifyZoomWebhookEvent,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/webhook-security';
@@ -123,13 +124,22 @@ const graphCheck = verifyMicrosoftGraphClientState(req.body, {
   clientState: process.env.MICROSOFT_GRAPH_CLIENT_STATE,
 });
 if (!graphCheck.ok) throw new Error(graphCheck.reason);
+
+const googleCheck = await verifyGooglePubSubOidcJwt({
+  headers: req.headers,
+  expectedAudience: process.env.GOOGLE_PUBSUB_OIDC_AUDIENCE,
+  serviceAccountEmail: process.env.GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL,
+});
+if (!googleCheck.ok) throw new Error(googleCheck.reason);
 ```
 
 当前 server demo 会读取这些环境变量：
 
 - `ZOOM_WEBHOOK_SECRET_TOKEN`：启用 Zoom URL validation 和事件签名校验。
 - `MICROSOFT_GRAPH_CLIENT_STATE`：启用 Microsoft Graph change notification `clientState` 校验。
-- `GOOGLE_PUBSUB_BEARER_TOKEN`：对 Google Pub/Sub push 做轻量 bearer 校验；完整 OIDC JWT 校验建议在部署网关或后续 adapter 增强中完成。
+- `GOOGLE_PUBSUB_OIDC_AUDIENCE`：启用 Google Pub/Sub authenticated push OIDC JWT 校验，匹配 JWT `aud` claim。
+- `GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL`：可选，匹配 Pub/Sub push subscription 里配置的 service account email claim。
+- `GOOGLE_PUBSUB_BEARER_TOKEN`：没有配置 OIDC 时，对 Google Pub/Sub push 做轻量 bearer 校验，主要用于本地或网关前置鉴权兜底。
 
 ## 首条标记内联建轴
 

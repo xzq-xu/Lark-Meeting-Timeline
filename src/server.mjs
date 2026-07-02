@@ -14,6 +14,7 @@ import {
   microsoftGraphValidationResponse,
   platformWebhookVerificationStatus,
   verifyGooglePubSubBearer,
+  verifyGooglePubSubOidcJwt,
   verifyMicrosoftGraphClientState,
   verifyZoomWebhookEvent,
 } from '../packages/meeting-timeline-sdk/adapters/webhook-security.mjs';
@@ -5937,6 +5938,7 @@ async function annotationIngestInfoPayload(req) {
         zoom_secret_configured: Boolean(process.env.ZOOM_WEBHOOK_SECRET_TOKEN),
         microsoft_graph_client_state_configured: Boolean(process.env.MICROSOFT_GRAPH_CLIENT_STATE),
         google_pubsub_bearer_configured: Boolean(process.env.GOOGLE_PUBSUB_BEARER_TOKEN),
+        google_pubsub_oidc_configured: Boolean(process.env.GOOGLE_PUBSUB_OIDC_AUDIENCE || process.env.GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL),
       },
     },
     meeting_session_inline_annotation: {
@@ -6218,7 +6220,7 @@ function platformRawEventType(raw) {
   );
 }
 
-function platformWebhookVerification(adapter = {}, req = {}, body = {}, rawBody = '') {
+async function platformWebhookVerification(adapter = {}, req = {}, body = {}, rawBody = '') {
   if (adapter.key === 'zoom') {
     return platformWebhookVerificationStatus(
       adapter.key,
@@ -6232,6 +6234,17 @@ function platformWebhookVerification(adapter = {}, req = {}, body = {}, rawBody 
     );
   }
   if (adapter.key === 'google_meet') {
+    if (process.env.GOOGLE_PUBSUB_OIDC_AUDIENCE || process.env.GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL) {
+      return platformWebhookVerificationStatus(
+        adapter.key,
+        await verifyGooglePubSubOidcJwt({
+          headers: req.headers,
+          expectedAudience: process.env.GOOGLE_PUBSUB_OIDC_AUDIENCE,
+          serviceAccountEmail: process.env.GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL,
+          jwksUrl: process.env.GOOGLE_PUBSUB_JWKS_URL,
+        }),
+      );
+    }
     return platformWebhookVerificationStatus(
       adapter.key,
       verifyGooglePubSubBearer({ headers: req.headers }),
@@ -6626,7 +6639,7 @@ async function handleApi(req, res, url) {
         return sendJson(res, 200, response);
       }
       const verification = adapter
-        ? platformWebhookVerification(adapter, req, body, rawBody)
+        ? await platformWebhookVerification(adapter, req, body, rawBody)
         : null;
       if (verification && verification.ok === false) {
         updatePlatformEventStatus(adapter, {

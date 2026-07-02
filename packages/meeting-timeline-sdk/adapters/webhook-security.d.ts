@@ -37,6 +37,23 @@ export function verifyGooglePubSubBearer(input?: {
   expectedToken?: string;
 }): WebhookVerificationResult;
 
+export function verifyGooglePubSubOidcJwt(input?: {
+  headers?: Headers | Record<string, string | string[] | undefined>;
+  token?: string;
+  expectedAudience?: string | string[];
+  audience?: string | string[];
+  serviceAccountEmail?: string;
+  expectedEmail?: string;
+  issuer?: string | string[];
+  jwks?: { keys?: unknown[] };
+  publicKeys?: Record<string, string | Buffer | JsonWebKey>;
+  certs?: Record<string, string | Buffer>;
+  jwksUrl?: string;
+  fetchImpl?: typeof fetch;
+  nowMs?: number;
+  clockToleranceSec?: number;
+}): Promise<WebhookVerificationResult>;
+
 export function platformWebhookVerificationStatus(
   platform: string,
   result?: WebhookVerificationResult,

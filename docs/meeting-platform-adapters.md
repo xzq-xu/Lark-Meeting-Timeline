@@ -303,7 +303,7 @@ GET  /api/platform-events/status
 - `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
 - Zoom：支持 `endpoint.url_validation` challenge response；配置 `ZOOM_WEBHOOK_SECRET_TOKEN` 后校验 `x-zm-request-timestamp` 和 `x-zm-signature`。
 - Microsoft Graph / Teams：支持 `validationToken` 纯文本响应；配置 `MICROSOFT_GRAPH_CLIENT_STATE` 后校验通知里的 `clientState`。
-- Google Meet / Pub/Sub：配置 `GOOGLE_PUBSUB_BEARER_TOKEN` 后可做轻量 bearer gate；完整 Pub/Sub OIDC JWT 校验仍建议作为下一步增强或交给部署网关处理。
+- Google Meet / Pub/Sub：配置 `GOOGLE_PUBSUB_OIDC_AUDIENCE` 后会校验 authenticated push 的 Google-signed OIDC JWT，并可用 `GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL` 限定 service account email；未配置 OIDC 时可用 `GOOGLE_PUBSUB_BEARER_TOKEN` 做轻量 bearer gate。
 
 `GET /api/platform-events/status` 会返回每个平台最近一次 `last_verification`，用于区分“未配置所以跳过校验”和“签名/状态不匹配被拒绝”。
 
