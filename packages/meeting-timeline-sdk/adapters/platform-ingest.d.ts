@@ -56,11 +56,57 @@ export interface ReconciledPlatformEventIngestResult extends NormalizedPlatformE
   results: ApplyMeetingSignalResult[];
 }
 
+export interface PlatformEventDiagnosticIssue {
+  severity: 'info' | 'warning' | 'error';
+  code: string;
+  message: string;
+  [key: string]: unknown;
+}
+
+export interface PlatformEventDiagnosticResult {
+  ok: boolean;
+  supported: boolean;
+  actionable: boolean;
+  platform?: string;
+  source?: string;
+  adapter?: {
+    key?: string;
+    source?: string;
+    aliases?: readonly string[];
+  };
+  signal_count?: number;
+  signal_types?: string[];
+  coverage?: {
+    realtime_axis: boolean;
+    meeting_start: boolean;
+    meeting_end: boolean;
+    participant_track: boolean;
+    speaker_activity: boolean;
+    artifact_ready: boolean;
+    subscription_lifecycle: boolean;
+  };
+  meetings?: Array<Record<string, unknown>>;
+  signals?: Array<Record<string, unknown>>;
+  raw_signals?: NormalizedMeetingSignal[];
+  issues: PlatformEventDiagnosticIssue[];
+  error?: string;
+  details?: Record<string, unknown>;
+}
+
 export function normalizePlatformEvent(
   platformOrInput: string | PlatformEventIngestInput,
   payload?: unknown,
   options?: PlatformEventIngestOptions,
 ): NormalizedPlatformEvent;
+
+export function diagnosePlatformEvent(
+  platformOrInput: string | PlatformEventIngestInput,
+  payload?: unknown,
+  options?: PlatformEventIngestOptions & {
+    includeRawSignals?: boolean;
+    include_raw_signals?: boolean;
+  },
+): PlatformEventDiagnosticResult;
 
 export function ingestPlatformEvent(
   client: MeetingTimelineClient,

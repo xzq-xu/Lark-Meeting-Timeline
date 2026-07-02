@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import {
+  diagnosePlatformEvent,
   ingestPlatformEvent,
   normalizePlatformEvent,
 } from '../packages/meeting-timeline-sdk/adapters/platform-ingest.mjs';
@@ -60,6 +61,53 @@ assert.equal(normalized.source, 'google_meet_webhook');
 assert.equal(normalized.signals.length, 1);
 assert.equal(normalized.signals[0].type, 'meeting_started');
 assert.equal(normalized.signals[0].meeting.meeting_id, 'google-record-001');
+
+const googleDiagnostics = diagnosePlatformEvent('google-meet', googleStartEvent);
+assert.equal(googleDiagnostics.ok, true);
+assert.equal(googleDiagnostics.supported, true);
+assert.equal(googleDiagnostics.actionable, true);
+assert.equal(googleDiagnostics.signal_count, 1);
+assert.deepEqual(googleDiagnostics.signal_types, ['meeting_started']);
+assert.equal(googleDiagnostics.coverage.meeting_start, true);
+assert.equal(googleDiagnostics.meetings[0].meeting_id, 'google-record-001');
+assert.equal(googleDiagnostics.signals[0].type, 'meeting_started');
+assert.equal(
+  googleDiagnostics.issues.some((item) => item.code === 'provider_event_missing_meeting_url'),
+  true,
+);
+
+const emptyLocalDiagnostics = diagnosePlatformEvent('local-detector', {
+  type: 'unsupported_local_signal',
+  meeting_id: 'local-empty-001',
+  occurred_at_ms: startMs,
+});
+assert.equal(emptyLocalDiagnostics.ok, true);
+assert.equal(emptyLocalDiagnostics.actionable, false);
+assert.equal(emptyLocalDiagnostics.signal_count, 0);
+assert.equal(emptyLocalDiagnostics.issues[0].code, 'no_supported_signals');
+
+const googleLifecycleDiagnostics = diagnosePlatformEvent('google-meet', {
+  id: 'google-lifecycle-diagnostic-1',
+  type: 'google.workspace.events.subscription.v1.expirationReminder',
+  time: startIso,
+  data: {
+    subscription: {
+      name: 'subscriptions/google-diagnostic-sub',
+      expireTime: new Date(startMs + 60_000).toISOString(),
+    },
+  },
+});
+assert.equal(googleLifecycleDiagnostics.ok, true);
+assert.equal(googleLifecycleDiagnostics.actionable, true);
+assert.deepEqual(googleLifecycleDiagnostics.signal_types, ['subscription_lifecycle']);
+assert.equal(googleLifecycleDiagnostics.coverage.subscription_lifecycle, true);
+assert.equal(googleLifecycleDiagnostics.issues[0].code, 'subscription_lifecycle_only');
+
+const unsupportedDiagnostics = diagnosePlatformEvent('unknown-platform', {});
+assert.equal(unsupportedDiagnostics.ok, false);
+assert.equal(unsupportedDiagnostics.supported, false);
+assert.equal(unsupportedDiagnostics.actionable, false);
+assert.equal(unsupportedDiagnostics.issues[0].code, 'unsupported_platform');
 
 const normalizedLark = normalizePlatformEvent('feishu', larkStartEvent);
 assert.equal(normalizedLark.platform, 'lark');
