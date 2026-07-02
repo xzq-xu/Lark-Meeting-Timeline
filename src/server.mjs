@@ -8,7 +8,12 @@ import * as Lark from '@larksuiteoapi/node-sdk';
 import { applyMeetingSignals } from '../packages/meeting-timeline-sdk/adapters/core.mjs';
 import { normalizeGoogleMeetEvent } from '../packages/meeting-timeline-sdk/adapters/google-meet.mjs';
 import { normalizeMicrosoftTeamsEvent } from '../packages/meeting-timeline-sdk/adapters/microsoft-teams.mjs';
-import { allPlatformSetupManifests, buildPlatformSetup, platformSetupManifest } from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
+import {
+  allPlatformSetupManifests,
+  buildPlatformSetup,
+  evaluateAllPlatformSetupReadiness,
+  evaluatePlatformSetupReadiness,
+} from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
 import { normalizeZoomEvent } from '../packages/meeting-timeline-sdk/adapters/zoom.mjs';
 import {
   buildZoomUrlValidationResponse,
@@ -6287,7 +6292,7 @@ function platformSetupSecurityConfig() {
 
 function platformSetupOptionsFromQuery(req, url, adapter = null) {
   const baseUrl = url.searchParams.get('base_url') ?? url.searchParams.get('baseUrl') ?? localUrlFor(req, '');
-  const options = { baseUrl };
+  const options = { baseUrl, env: process.env };
   if (!adapter || adapter.key === 'google_meet') {
     const targetResource = url.searchParams.get('google_target_resource') ?? url.searchParams.get('target_resource');
     const pubsubTopic = url.searchParams.get('google_pubsub_topic') ?? url.searchParams.get('pubsub_topic');
@@ -6328,10 +6333,14 @@ function publicPlatformEventSetup(req, url, adapter = null) {
   const setup = adapter
     ? buildPlatformSetup(adapter.key, options)
     : allPlatformSetupManifests(options);
+  const readiness = adapter
+    ? evaluatePlatformSetupReadiness(adapter.key, options)
+    : Object.fromEntries(evaluateAllPlatformSetupReadiness(options).map((item) => [item.platform, item]));
   return {
     generated_at: new Date().toISOString(),
     setup_endpoint: localUrlFor(req, '/api/platform-events/setup'),
     security_env_configured: platformSetupSecurityConfig(),
+    readiness,
     setup,
   };
 }

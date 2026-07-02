@@ -61,6 +61,89 @@ function urlEncode(value) {
   return encodeURIComponent(String(value));
 }
 
+function envValue(env = {}, name) {
+  return env[name] ?? env[name.toLowerCase()] ?? env[name.replace(/_/g, '-')];
+}
+
+function hasEnv(env = {}, name) {
+  const value = envValue(env, name);
+  return value != null && value !== '';
+}
+
+function endpointReadiness(endpoint) {
+  if (!endpoint) return { ok: false, reason: 'endpoint_missing' };
+  let parsed;
+  try {
+    parsed = new URL(endpoint);
+  } catch {
+    return { ok: false, reason: 'endpoint_invalid' };
+  }
+  const host = parsed.hostname.toLowerCase();
+  const local = ['localhost', '127.0.0.1', '::1'].includes(host);
+  if (parsed.protocol !== 'https:' && !local) {
+    return { ok: false, reason: 'endpoint_must_be_https_or_localhost', protocol: parsed.protocol };
+  }
+  return { ok: true, reason: local ? 'local_development_endpoint' : 'public_https_endpoint' };
+}
+
+function missingEnv(env = {}, names = []) {
+  return names.filter((name) => !hasEnv(env, name));
+}
+
+function platformReadinessChecks(platform, manifest = {}, env = {}) {
+  const endpointCheck = endpointReadiness(manifest.endpoint);
+  const checks = [{
+    id: 'endpoint',
+    ok: endpointCheck.ok,
+    severity: endpointCheck.ok ? 'info' : 'error',
+    detail: endpointCheck.reason,
+  }];
+  if (platform === 'google_meet') {
+    const oidcConfigured = hasEnv(env, 'GOOGLE_PUBSUB_OIDC_AUDIENCE');
+    const bearerConfigured = hasEnv(env, 'GOOGLE_PUBSUB_BEARER_TOKEN');
+    checks.push({
+      id: 'google_pubsub_auth',
+      ok: oidcConfigured || bearerConfigured,
+      severity: oidcConfigured ? 'info' : bearerConfigured ? 'warn' : 'error',
+      detail: oidcConfigured
+        ? 'oidc_configured'
+        : bearerConfigured
+          ? 'bearer_fallback_configured'
+          : 'missing_google_pubsub_oidc_or_bearer',
+      required_any_env: ['GOOGLE_PUBSUB_OIDC_AUDIENCE', 'GOOGLE_PUBSUB_BEARER_TOKEN'],
+    });
+    checks.push({
+      id: 'google_pubsub_service_account_email',
+      ok: hasEnv(env, 'GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL'),
+      severity: hasEnv(env, 'GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL') ? 'info' : 'warn',
+      detail: hasEnv(env, 'GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL')
+        ? 'service_account_email_bound'
+        : 'service_account_email_not_bound',
+    });
+  } else {
+    const missing = missingEnv(env, manifest.required_security_env ?? []);
+    checks.push({
+      id: 'required_security_env',
+      ok: missing.length === 0,
+      severity: missing.length === 0 ? 'info' : 'error',
+      detail: missing.length === 0 ? 'required_security_env_configured' : 'missing_required_security_env',
+      missing_env: missing,
+    });
+  }
+  return checks;
+}
+
+function readinessFromChecks(checks = []) {
+  const blocking = checks.filter((item) => item.severity === 'error' && item.ok !== true);
+  const warnings = checks.filter((item) => item.severity === 'warn' && item.ok !== true);
+  return {
+    ready: blocking.length === 0,
+    warning_count: warnings.length,
+    blocking_count: blocking.length,
+    checks,
+  };
+}
+
 export function buildGoogleMeetWorkspaceSubscriptionRequest(input = {}) {
   const targetResource = firstNonEmpty(input.targetResource, input.target_resource);
   const pubsubTopic = firstNonEmpty(input.pubsubTopic, input.pubsub_topic, input.topic);
@@ -235,6 +318,22 @@ export function buildPlatformSetup(platform, options = {}) {
   return manifest;
 }
 
+export function evaluatePlatformSetupReadiness(platform, options = {}) {
+  const key = normalizePlatform(platform);
+  const manifest = platformSetupManifest(key, options);
+  const env = options.env ?? {};
+  return {
+    platform: key,
+    ...readinessFromChecks(platformReadinessChecks(key, manifest, env)),
+  };
+}
+
+export function evaluateAllPlatformSetupReadiness(options = {}) {
+  return ['google_meet', 'microsoft_teams', 'zoom'].map((platform) => (
+    evaluatePlatformSetupReadiness(platform, options)
+  ));
+}
+
 export const MEETING_PLATFORM_SETUP_BUILDERS = Object.freeze({
   buildGoogleMeetWorkspaceSubscriptionRequest,
   buildMicrosoftTeamsMeetingCallSubscriptionRequest,
@@ -242,4 +341,6 @@ export const MEETING_PLATFORM_SETUP_BUILDERS = Object.freeze({
   platformSetupManifest,
   allPlatformSetupManifests,
   buildPlatformSetup,
+  evaluatePlatformSetupReadiness,
+  evaluateAllPlatformSetupReadiness,
 });

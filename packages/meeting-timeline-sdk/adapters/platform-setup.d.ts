@@ -4,6 +4,7 @@ export const ZOOM_MEETING_EVENT_TYPES: readonly string[];
 
 export interface PlatformSetupOptions {
   baseUrl?: string;
+  env?: Record<string, unknown>;
   googleMeetSubscription?: Record<string, unknown>;
   microsoftTeamsSubscription?: Record<string, unknown>;
   zoomSubscription?: Record<string, unknown>;
@@ -75,5 +76,7 @@ export function platformEventEndpoint(baseUrl: string, platform: string): string
 export function platformSetupManifest(platform: string, options?: PlatformSetupOptions): Record<string, unknown>;
 export function allPlatformSetupManifests(options?: PlatformSetupOptions): Record<string, unknown>[];
 export function buildPlatformSetup(platform: string, options?: PlatformSetupOptions): Record<string, unknown>;
+export function evaluatePlatformSetupReadiness(platform: string, options?: PlatformSetupOptions): Record<string, unknown>;
+export function evaluateAllPlatformSetupReadiness(options?: PlatformSetupOptions): Record<string, unknown>[];
 
 export const MEETING_PLATFORM_SETUP_BUILDERS: Readonly<Record<string, unknown>>;

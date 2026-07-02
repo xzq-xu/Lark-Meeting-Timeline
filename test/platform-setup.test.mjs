@@ -8,6 +8,8 @@ import {
   buildMicrosoftTeamsMeetingCallSubscriptionRequest,
   buildPlatformSetup,
   buildZoomEventSubscriptionRequest,
+  evaluateAllPlatformSetupReadiness,
+  evaluatePlatformSetupReadiness,
   platformEventEndpoint,
   platformSetupManifest,
 } from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
@@ -65,5 +67,40 @@ assert.equal(zoomSetup.zoom_event_subscription_request.event_subscription_name, 
 const all = allPlatformSetupManifests({ baseUrl });
 assert.equal(all.length, 3);
 assert.deepEqual(all.map((item) => item.platform), ['google_meet', 'microsoft_teams', 'zoom']);
+
+const googleReady = evaluatePlatformSetupReadiness('google-meet', {
+  baseUrl,
+  env: {
+    GOOGLE_PUBSUB_OIDC_AUDIENCE: 'https://timeline.example.com/api/platform-events/google-meet',
+    GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL: 'pubsub@demo.iam.gserviceaccount.com',
+  },
+});
+assert.equal(googleReady.ready, true);
+assert.equal(googleReady.checks.find((item) => item.id === 'google_pubsub_auth').detail, 'oidc_configured');
+
+const googleBearerFallback = evaluatePlatformSetupReadiness('google-meet', {
+  baseUrl,
+  env: { GOOGLE_PUBSUB_BEARER_TOKEN: 'dev-token' },
+});
+assert.equal(googleBearerFallback.ready, true);
+assert.equal(googleBearerFallback.warning_count, 1);
+
+const zoomNotReady = evaluatePlatformSetupReadiness('zoom', {
+  baseUrl: 'http://timeline.example.com',
+  env: {},
+});
+assert.equal(zoomNotReady.ready, false);
+assert.equal(zoomNotReady.blocking_count, 2);
+assert.equal(zoomNotReady.checks.some((item) => item.id === 'endpoint' && item.detail === 'endpoint_must_be_https_or_localhost'), true);
+
+const allReadiness = evaluateAllPlatformSetupReadiness({
+  baseUrl,
+  env: {
+    GOOGLE_PUBSUB_OIDC_AUDIENCE: 'https://timeline.example.com/api/platform-events/google-meet',
+    MICROSOFT_GRAPH_CLIENT_STATE: 'teams-state',
+    ZOOM_WEBHOOK_SECRET_TOKEN: 'zoom-secret',
+  },
+});
+assert.deepEqual(allReadiness.map((item) => item.ready), [true, true, true]);
 
 console.log('ok platform setup builders');

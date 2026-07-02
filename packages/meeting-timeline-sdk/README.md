@@ -100,6 +100,7 @@ import {
   buildGoogleMeetWorkspaceSubscriptionRequest,
   buildMicrosoftTeamsMeetingCallSubscriptionRequest,
   buildZoomEventSubscriptionRequest,
+  evaluatePlatformSetupReadiness,
   platformSetupManifest,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup';
 
@@ -120,6 +121,11 @@ const zoom = buildZoomEventSubscriptionRequest({
 
 const manifest = platformSetupManifest('google-meet', {
   baseUrl: 'https://timeline.example.com',
+});
+
+const readiness = evaluatePlatformSetupReadiness('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+  env: process.env,
 });
 ```
 
