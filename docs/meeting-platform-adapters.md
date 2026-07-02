@@ -309,7 +309,7 @@ GET  /api/platform-events/status
 
 `GET /api/platform-events/status` 会返回每个平台最近一次 `last_verification`，用于区分“未配置所以跳过校验”和“签名/状态不匹配被拒绝”。
 
-`GET /api/platform-events/setup` 会返回 Google Meet、Microsoft Teams、Zoom 的接入 manifest：默认事件类型、endpoint、权限/环境变量要求和操作步骤，同时包含 readiness 诊断，检查 endpoint 是否是 HTTPS/localhost、必需安全环境变量是否已配置。`GET /api/platform-events/:platform/setup` 可按平台返回，并支持用 query 生成订阅 request body，例如 Teams 的 `join_web_url` + `client_state`，或 Google 的 `target_resource` + `pubsub_topic`。
+`GET /api/platform-events/setup` 会返回 Google Meet、Microsoft Teams、Zoom 的接入 manifest：默认事件类型、endpoint、权限/环境变量要求和操作步骤，同时包含 readiness 诊断，检查 endpoint 是否是 HTTPS/localhost、必需安全环境变量是否已配置。`GET /api/platform-events/:platform/setup` 可按平台返回，并支持用 query 生成订阅 request body，例如 Teams 的 `join_web_url` + `client_state`，或 Google 的 `target_resource` + `pubsub_topic`。同一接口还会基于 `subscription_expires_at`、`subscription_id`、`subscription_name` 等 query 返回 maintenance 建议，用于 Graph / Workspace Events 订阅续期调度。
 
 SDK 包结构建议：
 

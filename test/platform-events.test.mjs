@@ -91,10 +91,12 @@ try {
   assert.equal(setup.readiness.google_meet.ready, false);
   assert.equal(setup.readiness.google_meet.checks.some((item) => item.id === 'google_pubsub_auth' && item.ok === false), true);
 
-  const teamsSetup = await getJson(baseUrl, `/api/platform-events/teams/setup?join_web_url=${encodeURIComponent('https://teams.microsoft.com/l/meetup-join/example')}&client_state=test-state`);
+  const teamsSetup = await getJson(baseUrl, `/api/platform-events/teams/setup?join_web_url=${encodeURIComponent('https://teams.microsoft.com/l/meetup-join/example')}&client_state=test-state&subscription_id=graph-sub-1&subscription_expires_at=${encodeURIComponent('2026-06-26T02:30:00.000Z')}&now=${encodeURIComponent('2026-06-26T02:00:00.000Z')}`);
   assert.equal(teamsSetup.setup.platform, 'microsoft_teams');
   assert.equal(teamsSetup.readiness.platform, 'microsoft_teams');
   assert.equal(teamsSetup.readiness.ready, false);
+  assert.equal(teamsSetup.maintenance.status, 'renewal_due');
+  assert.equal(teamsSetup.maintenance.renewal_request.path, '/subscriptions/graph-sub-1');
   assert.equal(teamsSetup.setup.graph_subscription_request.notificationUrl, `${baseUrl}/api/platform-events/teams`);
   assert.equal(teamsSetup.setup.graph_subscription_request.clientState, 'test-state');
   assert.match(teamsSetup.setup.graph_subscription_request.resource, /meetingCallEvents$/);

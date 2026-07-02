@@ -47,6 +47,16 @@ function addSeconds(date, seconds) {
   return new Date(date.getTime() + seconds * 1000).toISOString();
 }
 
+function parseTimeMs(value) {
+  if (value == null || value === '') return null;
+  if (value instanceof Date) {
+    const ms = value.getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function normalizePlatform(platform) {
   const key = platformAliases.get(String(platform ?? '').toLowerCase().replace(/\s+/g, '-'));
   if (!key) {
@@ -207,6 +217,39 @@ export function buildZoomEventSubscriptionRequest(input = {}) {
   });
 }
 
+export function buildMicrosoftGraphSubscriptionRenewalRequest(input = {}) {
+  const subscriptionId = firstNonEmpty(input.subscriptionId, input.subscription_id, input.id);
+  const now = input.now instanceof Date ? input.now : new Date(input.now ?? Date.now());
+  const expirationDateTime = firstNonEmpty(
+    input.expirationDateTime,
+    input.expiration_date_time,
+    input.expiresAt,
+    input.expires_at,
+  ) ?? addSeconds(now, Number(input.ttlSeconds ?? input.ttl_seconds ?? 2 * 24 * 60 * 60));
+  return compactObject({
+    method: 'PATCH',
+    path: subscriptionId ? `/subscriptions/${subscriptionId}` : '/subscriptions/{subscription-id}',
+    body: {
+      expirationDateTime,
+    },
+  });
+}
+
+export function buildGoogleWorkspaceSubscriptionRenewalRequest(input = {}) {
+  const subscriptionName = firstNonEmpty(input.subscriptionName, input.subscription_name, input.name);
+  const ttl = firstNonEmpty(input.ttl, input.ttlSeconds != null ? `${input.ttlSeconds}s` : null, input.ttl_seconds != null ? `${input.ttl_seconds}s` : null);
+  const expireTime = firstNonEmpty(input.expireTime, input.expire_time, input.expiresAt, input.expires_at);
+  const updateMask = ttl ? 'ttl' : expireTime ? 'expire_time' : 'ttl';
+  return compactObject({
+    method: 'PATCH',
+    path: subscriptionName ? `/v1beta/${subscriptionName}` : '/v1beta/{subscription-name}',
+    query: {
+      updateMask,
+    },
+    body: ttl ? { ttl } : expireTime ? { expireTime } : { ttl: '86400s' },
+  });
+}
+
 export function platformEventEndpoint(baseUrl, platform) {
   const key = normalizePlatform(platform);
   const path = {
@@ -334,13 +377,89 @@ export function evaluateAllPlatformSetupReadiness(options = {}) {
   ));
 }
 
+function subscriptionExpirationMs(subscription = {}) {
+  return parseTimeMs(firstNonEmpty(
+    subscription.expirationDateTime,
+    subscription.expiration_date_time,
+    subscription.expireTime,
+    subscription.expire_time,
+    subscription.expiresAt,
+    subscription.expires_at,
+    subscription.expiration,
+  ));
+}
+
+export function evaluatePlatformSubscriptionMaintenance(platform, subscription = {}, options = {}) {
+  const key = normalizePlatform(platform);
+  const nowMs = parseTimeMs(options.now) ?? Date.now();
+  const renewalWindowMs = Number(options.renewalWindowMs ?? options.renewal_window_ms ?? 12 * 60 * 60 * 1000);
+  if (key === 'zoom') {
+    return {
+      platform: key,
+      status: 'configured_manually',
+      renewal_supported: false,
+      renewal_due: false,
+      expired: false,
+      detail: 'zoom_webhook_subscriptions_do_not_require_short_cycle_renewal',
+    };
+  }
+  const expiresAtMs = subscriptionExpirationMs(subscription);
+  if (expiresAtMs == null) {
+    return {
+      platform: key,
+      status: 'unknown',
+      renewal_supported: true,
+      renewal_due: false,
+      expired: false,
+      detail: 'subscription_expiration_missing',
+    };
+  }
+  const expiresInMs = expiresAtMs - nowMs;
+  const expired = expiresInMs <= 0;
+  const renewalDue = expired || expiresInMs <= renewalWindowMs;
+  const renewAtMs = Math.max(nowMs, expiresAtMs - renewalWindowMs);
+  const status = expired ? 'expired' : renewalDue ? 'renewal_due' : 'active';
+  const renewalRequest = key === 'microsoft_teams'
+    ? buildMicrosoftGraphSubscriptionRenewalRequest({
+      subscriptionId: subscription.id ?? subscription.subscriptionId ?? subscription.subscription_id,
+      now: new Date(nowMs),
+      ttlSeconds: options.renewalTtlSeconds ?? options.renewal_ttl_seconds ?? 2 * 24 * 60 * 60,
+    })
+    : buildGoogleWorkspaceSubscriptionRenewalRequest({
+      subscriptionName: subscription.name ?? subscription.subscriptionName ?? subscription.subscription_name,
+      ttl: options.renewalTtl ?? options.renewal_ttl ?? '86400s',
+    });
+  return {
+    platform: key,
+    status,
+    renewal_supported: true,
+    renewal_due: renewalDue,
+    expired,
+    expires_at: new Date(expiresAtMs).toISOString(),
+    expires_in_ms: expiresInMs,
+    renew_at: new Date(renewAtMs).toISOString(),
+    renewal_window_ms: renewalWindowMs,
+    renewal_request: renewalRequest,
+  };
+}
+
+export function evaluateAllPlatformSubscriptionMaintenance(subscriptions = {}, options = {}) {
+  return ['google_meet', 'microsoft_teams', 'zoom'].map((platform) => (
+    evaluatePlatformSubscriptionMaintenance(platform, subscriptions[platform] ?? {}, options)
+  ));
+}
+
 export const MEETING_PLATFORM_SETUP_BUILDERS = Object.freeze({
   buildGoogleMeetWorkspaceSubscriptionRequest,
   buildMicrosoftTeamsMeetingCallSubscriptionRequest,
   buildZoomEventSubscriptionRequest,
+  buildMicrosoftGraphSubscriptionRenewalRequest,
+  buildGoogleWorkspaceSubscriptionRenewalRequest,
   platformSetupManifest,
   allPlatformSetupManifests,
   buildPlatformSetup,
   evaluatePlatformSetupReadiness,
   evaluateAllPlatformSetupReadiness,
+  evaluatePlatformSubscriptionMaintenance,
+  evaluateAllPlatformSubscriptionMaintenance,
 });

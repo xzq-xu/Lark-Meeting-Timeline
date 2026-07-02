@@ -12,7 +12,9 @@ import {
   allPlatformSetupManifests,
   buildPlatformSetup,
   evaluateAllPlatformSetupReadiness,
+  evaluateAllPlatformSubscriptionMaintenance,
   evaluatePlatformSetupReadiness,
+  evaluatePlatformSubscriptionMaintenance,
 } from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
 import { normalizeZoomEvent } from '../packages/meeting-timeline-sdk/adapters/zoom.mjs';
 import {
@@ -6328,6 +6330,56 @@ function platformSetupOptionsFromQuery(req, url, adapter = null) {
   return options;
 }
 
+function platformSubscriptionFromQuery(url, platformKey) {
+  const prefix = {
+    google_meet: 'google_',
+    microsoft_teams: 'teams_',
+    zoom: 'zoom_',
+  }[platformKey] ?? '';
+  const value = (...names) => {
+    for (const name of names) {
+      const direct = url.searchParams.get(name);
+      if (direct != null) return direct;
+      if (prefix) {
+        const prefixed = url.searchParams.get(`${prefix}${name}`);
+        if (prefixed != null) return prefixed;
+      }
+    }
+    return null;
+  };
+  return {
+    id: value('subscription_id', 'id'),
+    name: value('subscription_name', 'name'),
+    expirationDateTime: value('subscription_expires_at', 'expires_at', 'expiration_date_time'),
+    expireTime: value('expire_time'),
+  };
+}
+
+function platformSubscriptionMaintenanceFromQuery(url, adapter = null) {
+  const options = {
+    now: url.searchParams.get('now'),
+    renewalWindowMs: url.searchParams.get('renewal_window_ms'),
+    renewalTtlSeconds: url.searchParams.get('renewal_ttl_seconds'),
+    renewalTtl: url.searchParams.get('renewal_ttl'),
+  };
+  if (adapter) {
+    return evaluatePlatformSubscriptionMaintenance(
+      adapter.key,
+      platformSubscriptionFromQuery(url, adapter.key),
+      options,
+    );
+  }
+  const subscriptions = Object.fromEntries(
+    platformEventAdapterDefinitions.map((item) => [
+      item.key,
+      platformSubscriptionFromQuery(url, item.key),
+    ]),
+  );
+  return Object.fromEntries(
+    evaluateAllPlatformSubscriptionMaintenance(subscriptions, options).map((item) => [item.platform, item]),
+  );
+}
+
 function publicPlatformEventSetup(req, url, adapter = null) {
   const options = platformSetupOptionsFromQuery(req, url, adapter);
   const setup = adapter
@@ -6341,6 +6393,7 @@ function publicPlatformEventSetup(req, url, adapter = null) {
     setup_endpoint: localUrlFor(req, '/api/platform-events/setup'),
     security_env_configured: platformSetupSecurityConfig(),
     readiness,
+    maintenance: platformSubscriptionMaintenanceFromQuery(url, adapter),
     setup,
   };
 }

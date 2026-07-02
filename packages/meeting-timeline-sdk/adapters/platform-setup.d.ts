@@ -72,11 +72,41 @@ export function buildZoomEventSubscriptionRequest(input?: {
   [key: string]: unknown;
 }): Record<string, unknown>;
 
+export function buildMicrosoftGraphSubscriptionRenewalRequest(input?: {
+  subscriptionId?: string;
+  subscription_id?: string;
+  id?: string;
+  expirationDateTime?: string;
+  expiration_date_time?: string;
+  expiresAt?: string;
+  expires_at?: string;
+  ttlSeconds?: number;
+  ttl_seconds?: number;
+  now?: number | string | Date;
+  [key: string]: unknown;
+}): Record<string, unknown>;
+
+export function buildGoogleWorkspaceSubscriptionRenewalRequest(input?: {
+  subscriptionName?: string;
+  subscription_name?: string;
+  name?: string;
+  ttl?: string;
+  ttlSeconds?: number;
+  ttl_seconds?: number;
+  expireTime?: string;
+  expire_time?: string;
+  expiresAt?: string;
+  expires_at?: string;
+  [key: string]: unknown;
+}): Record<string, unknown>;
+
 export function platformEventEndpoint(baseUrl: string, platform: string): string;
 export function platformSetupManifest(platform: string, options?: PlatformSetupOptions): Record<string, unknown>;
 export function allPlatformSetupManifests(options?: PlatformSetupOptions): Record<string, unknown>[];
 export function buildPlatformSetup(platform: string, options?: PlatformSetupOptions): Record<string, unknown>;
 export function evaluatePlatformSetupReadiness(platform: string, options?: PlatformSetupOptions): Record<string, unknown>;
 export function evaluateAllPlatformSetupReadiness(options?: PlatformSetupOptions): Record<string, unknown>[];
+export function evaluatePlatformSubscriptionMaintenance(platform: string, subscription?: Record<string, unknown>, options?: Record<string, unknown>): Record<string, unknown>;
+export function evaluateAllPlatformSubscriptionMaintenance(subscriptions?: Record<string, Record<string, unknown>>, options?: Record<string, unknown>): Record<string, unknown>[];
 
 export const MEETING_PLATFORM_SETUP_BUILDERS: Readonly<Record<string, unknown>>;

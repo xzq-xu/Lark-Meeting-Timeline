@@ -5,11 +5,15 @@ import {
   ZOOM_MEETING_EVENT_TYPES,
   allPlatformSetupManifests,
   buildGoogleMeetWorkspaceSubscriptionRequest,
+  buildGoogleWorkspaceSubscriptionRenewalRequest,
   buildMicrosoftTeamsMeetingCallSubscriptionRequest,
+  buildMicrosoftGraphSubscriptionRenewalRequest,
   buildPlatformSetup,
   buildZoomEventSubscriptionRequest,
   evaluateAllPlatformSetupReadiness,
+  evaluateAllPlatformSubscriptionMaintenance,
   evaluatePlatformSetupReadiness,
+  evaluatePlatformSubscriptionMaintenance,
   platformEventEndpoint,
   platformSetupManifest,
 } from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
@@ -102,5 +106,64 @@ const allReadiness = evaluateAllPlatformSetupReadiness({
   },
 });
 assert.deepEqual(allReadiness.map((item) => item.ready), [true, true, true]);
+
+const graphRenewal = buildMicrosoftGraphSubscriptionRenewalRequest({
+  subscriptionId: 'graph-sub-1',
+  now: '2026-06-26T02:00:00.000Z',
+  ttlSeconds: 172800,
+});
+assert.deepEqual(graphRenewal, {
+  method: 'PATCH',
+  path: '/subscriptions/graph-sub-1',
+  body: { expirationDateTime: '2026-06-28T02:00:00.000Z' },
+});
+
+const googleRenewal = buildGoogleWorkspaceSubscriptionRenewalRequest({
+  subscriptionName: 'subscriptions/google-sub-1',
+  ttl: '86400s',
+});
+assert.deepEqual(googleRenewal, {
+  method: 'PATCH',
+  path: '/v1beta/subscriptions/google-sub-1',
+  query: { updateMask: 'ttl' },
+  body: { ttl: '86400s' },
+});
+
+const teamsMaintenance = evaluatePlatformSubscriptionMaintenance('teams', {
+  id: 'graph-sub-1',
+  expirationDateTime: '2026-06-26T06:00:00.000Z',
+}, {
+  now: '2026-06-26T02:00:00.000Z',
+  renewalWindowMs: 12 * 60 * 60 * 1000,
+});
+assert.equal(teamsMaintenance.status, 'renewal_due');
+assert.equal(teamsMaintenance.renewal_due, true);
+assert.equal(teamsMaintenance.renewal_request.path, '/subscriptions/graph-sub-1');
+
+const googleMaintenance = evaluatePlatformSubscriptionMaintenance('google-meet', {
+  name: 'subscriptions/google-sub-1',
+  expireTime: '2026-06-28T02:00:00.000Z',
+}, {
+  now: '2026-06-26T02:00:00.000Z',
+});
+assert.equal(googleMaintenance.status, 'active');
+assert.equal(googleMaintenance.renewal_due, false);
+assert.equal(googleMaintenance.renewal_request.body.ttl, '86400s');
+
+const zoomMaintenance = evaluatePlatformSubscriptionMaintenance('zoom', {}, {
+  now: '2026-06-26T02:00:00.000Z',
+});
+assert.equal(zoomMaintenance.renewal_supported, false);
+assert.equal(zoomMaintenance.renewal_due, false);
+
+const allMaintenance = evaluateAllPlatformSubscriptionMaintenance({
+  google_meet: { name: 'subscriptions/google-sub-1', expireTime: '2026-06-26T03:00:00.000Z' },
+  microsoft_teams: { id: 'graph-sub-1', expirationDateTime: '2026-06-29T02:00:00.000Z' },
+}, {
+  now: '2026-06-26T02:00:00.000Z',
+});
+assert.deepEqual(allMaintenance.map((item) => item.platform), ['google_meet', 'microsoft_teams', 'zoom']);
+assert.equal(allMaintenance[0].renewal_due, true);
+assert.equal(allMaintenance[1].status, 'active');
 
 console.log('ok platform setup builders');

@@ -98,8 +98,10 @@ Google Meet adapter 同时支持已经解包的 Workspace Events CloudEvent，�
 ```js
 import {
   buildGoogleMeetWorkspaceSubscriptionRequest,
+  buildMicrosoftGraphSubscriptionRenewalRequest,
   buildMicrosoftTeamsMeetingCallSubscriptionRequest,
   buildZoomEventSubscriptionRequest,
+  evaluatePlatformSubscriptionMaintenance,
   evaluatePlatformSetupReadiness,
   platformSetupManifest,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup';
@@ -127,6 +129,18 @@ const readiness = evaluatePlatformSetupReadiness('google-meet', {
   baseUrl: 'https://timeline.example.com',
   env: process.env,
 });
+
+const teamsMaintenance = evaluatePlatformSubscriptionMaintenance('teams', {
+  id: 'graph-subscription-id',
+  expirationDateTime: '2026-06-28T02:00:00.000Z',
+});
+
+if (teamsMaintenance.renewal_due) {
+  const request = buildMicrosoftGraphSubscriptionRenewalRequest({
+    subscriptionId: 'graph-subscription-id',
+  });
+  // PATCH https://graph.microsoft.com/v1.0${request.path}
+}
 ```
 
 ## Webhook 验证工具
