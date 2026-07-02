@@ -181,4 +181,79 @@ const webexVerification = await verifyPlatformWebhook('webex', {
 assert.equal(webexVerification.ok, true);
 assert.equal(webexVerification.reason, 'verified');
 
+const reconciledCalls = [];
+const reconciledClient = {
+  async startMeeting(input) {
+    reconciledCalls.push({ method: 'startMeeting', input });
+    return { ok: true, input };
+  },
+  async endMeeting(input) {
+    reconciledCalls.push({ method: 'endMeeting', input });
+    return { ok: true, input };
+  },
+  async insertMark(input) {
+    reconciledCalls.push({ method: 'insertMark', input });
+    return { ok: true, input };
+  },
+};
+const reconciledHandler = createPlatformWebhookHandler(reconciledClient, {
+  reconcile: true,
+  verify: false,
+});
+const reconciledUrl = 'https://meet.google.com/xyz-abcd-efg';
+const localStartBody = {
+  type: 'meeting_started',
+  detected_platform: 'google_meet',
+  meeting_url: reconciledUrl,
+  start_time_ms: startMs + 20_000,
+  title: 'SDK handler reconciled Google Meet',
+};
+const reconciledLocalStart = await reconciledHandler({
+  platform: 'local-detector',
+  method: 'POST',
+  body: localStartBody,
+});
+assert.equal(reconciledLocalStart.status, 200);
+assert.equal(reconciledLocalStart.body.raw_signal_count, 1);
+assert.equal(reconciledLocalStart.body.signal_count, 1);
+assert.equal(reconciledLocalStart.body.results[0].action, 'startMeeting');
+assert.equal(reconciledCalls.at(-1).input.platform, 'google_meet');
+assert.equal(reconciledCalls.at(-1).input.meeting_url, reconciledUrl);
+
+const duplicateLocalStart = await reconciledHandler({
+  platform: 'local-detector',
+  method: 'POST',
+  body: localStartBody,
+});
+assert.equal(duplicateLocalStart.status, 200);
+assert.equal(duplicateLocalStart.body.raw_signal_count, 1);
+assert.equal(duplicateLocalStart.body.signal_count, 0);
+assert.equal(duplicateLocalStart.body.results.length, 0);
+assert.equal(duplicateLocalStart.body.reconciliation.skipped[0].reason, 'duplicate_signal_fingerprint');
+assert.equal(reconciledCalls.length, 1);
+
+const providerReconcileEvent = {
+  id: 'google-handler-reconcile-001',
+  type: 'google.workspace.meet.conference.v2.started',
+  time: new Date(startMs + 21_000).toISOString(),
+  data: {
+    conferenceRecord: { name: 'conferenceRecords/google-handler-reconcile-001' },
+    meetingUri: reconciledUrl,
+    title: 'SDK handler reconciled Google Meet',
+  },
+};
+const providerReconcile = await reconciledHandler({
+  platform: 'google-meet',
+  method: 'POST',
+  body: providerReconcileEvent,
+});
+assert.equal(providerReconcile.status, 200);
+assert.equal(providerReconcile.body.raw_signal_count, 1);
+assert.equal(providerReconcile.body.signal_count, 1);
+assert.equal(providerReconcile.body.reconciliation.decisions[0].reason, 'provider_reconciles_local_axis');
+assert.equal(providerReconcile.body.results[0].action, 'startMeeting');
+assert.equal(reconciledCalls.length, 2);
+assert.equal(reconciledHandler.getReconciliationState().active_meetings.length, 1);
+assert.equal(reconciledHandler.resetReconciliationState().seen.length, 0);
+
 console.log('ok meeting timeline SDK platform webhook handler');

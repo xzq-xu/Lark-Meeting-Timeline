@@ -1,5 +1,8 @@
 import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
-import { ingestPlatformEvent } from './platform-ingest.mjs';
+import {
+  createReconciledPlatformEventIngestor,
+  ingestPlatformEvent,
+} from './platform-ingest.mjs';
 import { meetingPlatformEventAdapterFor } from './platform-registry.mjs';
 import {
   buildZoomUrlValidationResponse,
@@ -101,10 +104,31 @@ function publicIngestResult(result = {}, verification = null) {
     source: result.source,
     adapter: publicAdapter(result.adapter),
     verification,
+    raw_signal_count: result.rawSignals?.length,
     signal_count: result.signals?.length ?? 0,
     signals: result.signals,
+    reconciliation: result.reconciliation,
     results: result.results,
   });
+}
+
+function reconcileEnabled(options = {}) {
+  if (options.reconcile === false || options.reconciled === false) return false;
+  return Boolean(
+    options.reconcile === true
+      || options.reconciled === true
+      || options.reconciledIngestor
+      || options.reconciled_ingestor
+      || options.reconciler
+      || options.signalReconciler
+      || options.signal_reconciler,
+  );
+}
+
+function reconciledIngestorFor(client, options = {}) {
+  return options.reconciledIngestor
+    ?? options.reconciled_ingestor
+    ?? (reconcileEnabled(options) ? createReconciledPlatformEventIngestor(client, options) : null);
 }
 
 function googleVerificationConfigured(google = {}) {
@@ -229,15 +253,20 @@ export async function handlePlatformWebhookRequest(client, input = {}, options =
       });
     }
 
-    const result = await ingestPlatformEvent(client, {
+    const ingestInput = {
       platform: adapter.key,
       body: platformEventPayload(body),
       options: {
         receivedAtMs: firstNonEmpty(input.receivedAtMs, input.received_at_ms, input.received_at, options.receivedAtMs),
         normalizerOptions: options.normalizerOptions ?? options.normalizer_options,
         applyOptions: options.applyOptions ?? options.apply_options,
+        reconcileOptions: options.reconcileOptions ?? options.reconcile_options,
       },
-    });
+    };
+    const reconciledIngestor = reconciledIngestorFor(client, options);
+    const result = reconciledIngestor
+      ? await reconciledIngestor.ingest(ingestInput)
+      : await ingestPlatformEvent(client, ingestInput);
     return jsonResponse(200, publicIngestResult(result, verification));
   } catch (error) {
     return jsonResponse(error.status ?? 400, {
@@ -249,11 +278,36 @@ export async function handlePlatformWebhookRequest(client, input = {}, options =
 }
 
 export function createPlatformWebhookHandler(client, defaults = {}) {
-  return (input = {}, options = {}) => handlePlatformWebhookRequest(client, {
-    ...input,
-    platform: firstNonEmpty(input.platform, defaults.platform),
-  }, {
-    ...defaults,
-    ...options,
-  });
+  let sharedReconciledIngestor = defaults.reconciledIngestor ?? defaults.reconciled_ingestor;
+
+  function ensureReconciledIngestor(options = {}) {
+    if (!reconcileEnabled(options)) return null;
+    if (options.reconciledIngestor || options.reconciled_ingestor) {
+      sharedReconciledIngestor = options.reconciledIngestor ?? options.reconciled_ingestor;
+      return sharedReconciledIngestor;
+    }
+    if (!sharedReconciledIngestor) {
+      sharedReconciledIngestor = createReconciledPlatformEventIngestor(client, options);
+    }
+    return sharedReconciledIngestor;
+  }
+
+  async function handle(input = {}, options = {}) {
+    const mergedOptions = {
+      ...defaults,
+      ...options,
+    };
+    const reconciledIngestor = ensureReconciledIngestor(mergedOptions);
+    return handlePlatformWebhookRequest(client, {
+      ...input,
+      platform: firstNonEmpty(input.platform, defaults.platform),
+    }, {
+      ...mergedOptions,
+      reconciledIngestor,
+    });
+  }
+
+  handle.getReconciliationState = () => sharedReconciledIngestor?.getState?.() ?? null;
+  handle.resetReconciliationState = (nextState = {}) => sharedReconciledIngestor?.reset?.(nextState) ?? null;
+  return handle;
 }

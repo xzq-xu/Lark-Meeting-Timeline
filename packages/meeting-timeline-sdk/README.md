@@ -167,7 +167,7 @@ await ingestor.ingest('local-detector', {
 await ingestor.ingest('google-meet', req.body); // 后到的官方 start 可校准本地轴
 ```
 
-如果外部项目想直接复用完整 HTTP webhook 入口，可以用 `platform-webhook-handler`。它会处理 Microsoft Graph `validationToken`、Zoom `endpoint.url_validation`、Zoom/Webex/Teams/Google Pub/Sub 验证，再把事件交给 `ingestPlatformEvent()`：
+如果外部项目想直接复用完整 HTTP webhook 入口，可以用 `platform-webhook-handler`。它会处理 Microsoft Graph `validationToken`、Zoom `endpoint.url_validation`、Zoom/Webex/Teams/Google Pub/Sub 验证，再把事件交给 `ingestPlatformEvent()`。真实产品如果同时接本地观察器和官方 webhook，建议直接打开 `reconcile: true`，handler 会复用同一个有状态 reconciler，把本地先到的轴和官方后到的事件对齐，并在响应里返回 `reconciliation` 供调试：
 
 ```js
 import { createMeetingTimelineClient } from '@ai-annotation/meeting-timeline-sdk';
@@ -175,6 +175,7 @@ import { createPlatformWebhookHandler } from '@ai-annotation/meeting-timeline-sd
 
 const timeline = createMeetingTimelineClient({ baseUrl: 'http://localhost:8787' });
 const handleWebhook = createPlatformWebhookHandler(timeline, {
+  reconcile: true,
   googleMeet: {
     expectedAudience: 'https://timeline.example.com/api/platform-events/google-meet',
     serviceAccountEmail: 'pubsub-pusher@demo.iam.gserviceaccount.com',
@@ -202,6 +203,8 @@ const result = await handleWebhook({
 
 res.status(result.status).set(result.headers).send(result.body);
 ```
+
+如果多个 HTTP endpoint 分别接 Google Meet、Teams、Zoom、Webex，但最终写同一个 timeline，可以把同一个 handler 或 `createReconciledPlatformEventIngestor()` 传给这些 endpoint，避免每个 endpoint 维护一份去重状态。`handleWebhook.getReconciliationState()` 可以用于诊断当前活跃会议、已处理 fingerprint 和最近发言人信号；测试或切换账号时可调用 `handleWebhook.resetReconciliationState()` 清空状态。
 
 本地观察器或汉王宿主 App 也可以走同一个 handler，只是默认验证结果会是 `platform_verification_not_configured`：
 

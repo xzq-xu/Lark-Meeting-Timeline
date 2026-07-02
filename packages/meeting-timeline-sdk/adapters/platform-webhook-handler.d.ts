@@ -1,5 +1,15 @@
 import type { MeetingTimelineClient } from '../index.mjs';
-import type { PlatformEventIngestResult } from './platform-ingest.mjs';
+import type {
+  PlatformEventIngestInput,
+  PlatformEventIngestOptions,
+  PlatformEventIngestResult,
+  ReconciledPlatformEventIngestResult,
+} from './platform-ingest.mjs';
+import type {
+  MeetingSignalReconciliationResult,
+  MeetingSignalReconcilerOptions,
+  MeetingSignalReconcilerState,
+} from './signal-reconciler.mjs';
 import type { WebhookVerificationResult } from './webhook-security.mjs';
 
 export interface PlatformWebhookRequestInput {
@@ -19,14 +29,42 @@ export interface PlatformWebhookRequestInput {
   received_at?: number | string | Date;
 }
 
+export interface PlatformWebhookSignalReconciler {
+  reconcile(
+    signals?: ReconciledPlatformEventIngestResult['signals'],
+    options?: MeetingSignalReconcilerOptions,
+  ): MeetingSignalReconciliationResult;
+  getState(): MeetingSignalReconcilerState;
+  reset(nextState?: Partial<MeetingSignalReconcilerState>): MeetingSignalReconcilerState;
+}
+
+export interface PlatformWebhookReconciledIngestor {
+  ingest(
+    platformOrInput: string | PlatformEventIngestInput,
+    payload?: unknown,
+    options?: PlatformEventIngestOptions,
+  ): Promise<ReconciledPlatformEventIngestResult>;
+  getState(): MeetingSignalReconcilerState;
+  reset(nextState?: Partial<MeetingSignalReconcilerState>): MeetingSignalReconcilerState;
+}
+
 export interface PlatformWebhookHandlerOptions {
   platform?: string;
   verify?: boolean;
+  reconcile?: boolean;
+  reconciled?: boolean;
   receivedAtMs?: number | string | Date;
   normalizerOptions?: Record<string, unknown>;
   normalizer_options?: Record<string, unknown>;
   applyOptions?: Record<string, unknown>;
   apply_options?: Record<string, unknown>;
+  reconcileOptions?: MeetingSignalReconcilerOptions;
+  reconcile_options?: MeetingSignalReconcilerOptions;
+  reconciler?: PlatformWebhookSignalReconciler;
+  signalReconciler?: PlatformWebhookSignalReconciler;
+  signal_reconciler?: PlatformWebhookSignalReconciler;
+  reconciledIngestor?: PlatformWebhookReconciledIngestor;
+  reconciled_ingestor?: PlatformWebhookReconciledIngestor;
   secretToken?: string;
   secret?: string;
   bearerToken?: string;
@@ -69,7 +107,18 @@ export interface PlatformWebhookIngestBody extends Omit<PlatformEventIngestResul
     aliases: readonly string[];
   };
   verification?: WebhookVerificationResult | null;
+  raw_signal_count?: number;
   signal_count: number;
+  reconciliation?: MeetingSignalReconciliationResult;
+}
+
+export interface PlatformWebhookHandler {
+  (
+    input?: PlatformWebhookRequestInput,
+    options?: PlatformWebhookHandlerOptions,
+  ): Promise<PlatformWebhookHandlerResponse>;
+  getReconciliationState(): MeetingSignalReconcilerState | null;
+  resetReconciliationState(nextState?: Partial<MeetingSignalReconcilerState>): MeetingSignalReconcilerState | null;
 }
 
 export function verifyPlatformWebhook(
@@ -87,4 +136,4 @@ export function handlePlatformWebhookRequest(
 export function createPlatformWebhookHandler(
   client: MeetingTimelineClient,
   defaults?: PlatformWebhookHandlerOptions,
-): (input?: PlatformWebhookRequestInput, options?: PlatformWebhookHandlerOptions) => Promise<PlatformWebhookHandlerResponse>;
+): PlatformWebhookHandler;
