@@ -125,6 +125,7 @@ const platformCapabilityContracts = Object.freeze({
     sdk_modules: {
       events: '@ai-annotation/meeting-timeline-sdk/adapters/local-detector',
       url_detection: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-url',
+      local_observer: '@ai-annotation/meeting-timeline-sdk/adapters/local-observer',
       ingest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest',
       webhook_handler: '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler',
       transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
@@ -181,6 +182,7 @@ const platformCapabilityContracts = Object.freeze({
     sdk_modules: {
       events: '@ai-annotation/meeting-timeline-sdk/adapters/lark',
       url_detection: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-url',
+      local_observer: '@ai-annotation/meeting-timeline-sdk/adapters/local-observer',
       ingest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest',
       webhook_handler: '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler',
       transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
@@ -238,6 +240,7 @@ const platformCapabilityContracts = Object.freeze({
     sdk_modules: {
       events: '@ai-annotation/meeting-timeline-sdk/adapters/google-meet',
       url_detection: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-url',
+      local_observer: '@ai-annotation/meeting-timeline-sdk/adapters/local-observer',
       ingest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest',
       webhook_handler: '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler',
       transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
@@ -295,6 +298,7 @@ const platformCapabilityContracts = Object.freeze({
     sdk_modules: {
       events: '@ai-annotation/meeting-timeline-sdk/adapters/microsoft-teams',
       url_detection: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-url',
+      local_observer: '@ai-annotation/meeting-timeline-sdk/adapters/local-observer',
       ingest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest',
       webhook_handler: '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler',
       transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
@@ -351,6 +355,7 @@ const platformCapabilityContracts = Object.freeze({
     sdk_modules: {
       events: '@ai-annotation/meeting-timeline-sdk/adapters/zoom',
       url_detection: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-url',
+      local_observer: '@ai-annotation/meeting-timeline-sdk/adapters/local-observer',
       ingest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest',
       webhook_handler: '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler',
       transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
@@ -407,6 +412,7 @@ const platformCapabilityContracts = Object.freeze({
     sdk_modules: {
       events: '@ai-annotation/meeting-timeline-sdk/adapters/webex',
       url_detection: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-url',
+      local_observer: '@ai-annotation/meeting-timeline-sdk/adapters/local-observer',
       ingest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest',
       webhook_handler: '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler',
       transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',

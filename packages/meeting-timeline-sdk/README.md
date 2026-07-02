@@ -88,6 +88,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/zoom`
 - `@ai-annotation/meeting-timeline-sdk/adapters/webex`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-url`
+- `@ai-annotation/meeting-timeline-sdk/adapters/local-observer`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler`
@@ -174,7 +175,22 @@ await handleWebhook({
 });
 ```
 
-桌面观察器或电子纸宿主 App 不需要等官方 webhook，可以直接走 `local-detector`：
+浏览器扩展、桌面观察器或电子纸宿主 App 不需要等官方 webhook，可以先用 `local-observer` 把窗口 URL 快照转成 meeting signal，再交给 `applyMeetingSignals()`：
+
+```js
+import { applyMeetingSignals } from '@ai-annotation/meeting-timeline-sdk/adapters/core';
+import { createLocalMeetingObserver } from '@ai-annotation/meeting-timeline-sdk/adapters/local-observer';
+
+const observer = createLocalMeetingObserver({ source: 'desktop_observer' });
+const observed = observer.observe({
+  url: 'https://meet.google.com/abc-defg-hij',
+  observedAtMs: Date.now(),
+});
+
+await applyMeetingSignals(timeline, observed.signals);
+```
+
+如果宿主已经知道事件类型，也可以直接走 `local-detector`：
 
 ```js
 await ingestPlatformEvent(timeline, 'local-detector', {
