@@ -4,8 +4,11 @@ import {
   MEETING_APP_EXTENSION_PLATFORM_KEYS,
   MEETING_APP_EXTENSION_PROFILES,
   buildMeetingAppContentScriptManifest,
+  buildMeetingAppExtensionBackgroundSource,
+  buildMeetingAppExtensionContentScriptSource,
   buildMeetingAppExtensionInstallPlan,
   buildMeetingAppExtensionMatchPatterns,
+  buildMeetingAppExtensionScaffold,
   meetingAppExtensionProfile,
   normalizeMeetingAppExtensionPlatform,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-extension.mjs';
@@ -72,6 +75,37 @@ assert.equal(plan.snapshot_recorder_adapter, '@ai-annotation/meeting-timeline-sd
 assert.equal(plan.launch_gate_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate');
 assert.equal(plan.runtime_contract.timestamp_field, 'captured_at_ms');
 assert.deepEqual(plan.manifest.content_scripts[0].js, ['content.js']);
+
+const contentScriptSource = buildMeetingAppExtensionContentScriptSource({
+  platforms: ['google_meet', 'microsoft_teams'],
+});
+assert.match(contentScriptSource, /installMeetingAppContentScriptBridge/);
+assert.match(contentScriptSource, /meet\.google\.com/);
+assert.match(contentScriptSource, /teams\.microsoft\.com/);
+assert.match(contentScriptSource, /startRuntime: true/);
+
+const backgroundSource = buildMeetingAppExtensionBackgroundSource({
+  baseUrl: 'https://timeline.example.com/',
+});
+assert.match(backgroundSource, /const BASE_URL = "https:\/\/timeline\.example\.com";/);
+assert.match(backgroundSource, /\/api\/meeting-session\/start/);
+assert.match(backgroundSource, /\/api\/annotations\/batch/);
+
+const scaffold = buildMeetingAppExtensionScaffold({
+  platforms: ['google_meet'],
+  baseUrl: 'https://timeline.example.com',
+  outputScript: 'content-script.js',
+});
+assert.equal(scaffold.type, 'meeting_app_extension_scaffold');
+assert.equal(scaffold.validation.uses_all_urls, false);
+assert.equal(scaffold.manifest.background.service_worker, 'background.js');
+assert.equal(scaffold.manifest.background.type, 'module');
+assert.equal(scaffold.manifest.host_permissions.includes('https://timeline.example.com/*'), true);
+assert.deepEqual(scaffold.manifest.content_scripts[0].js, ['content-script.js']);
+assert.equal(scaffold.files.find((file) => file.path === 'manifest.json').mime, 'application/json');
+assert.match(scaffold.files.find((file) => file.path === 'src/content-script.entry.mjs').content, /meeting-app-content-script/);
+assert.match(scaffold.files.find((file) => file.path === 'background.js').content, /runtimeApi\(\)\?\.onMessage/);
+assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /Bundle `src\/content-script\.entry\.mjs`/);
 
 assert.throws(
   () => meetingAppExtensionProfile('unknown-meeting'),

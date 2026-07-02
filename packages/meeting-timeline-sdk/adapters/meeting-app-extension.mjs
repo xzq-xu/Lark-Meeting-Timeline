@@ -125,6 +125,10 @@ function plainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+function json(value) {
+  return JSON.stringify(value, null, 2);
+}
+
 function extensionOptions(platformsOrOptions = {}, options = {}) {
   if (typeof platformsOrOptions === 'string' || Array.isArray(platformsOrOptions)) {
     return { ...options, platforms: platformsOrOptions };
@@ -133,6 +137,31 @@ function extensionOptions(platformsOrOptions = {}, options = {}) {
     return { ...platformsOrOptions, ...options };
   }
   return platformsOrOptions ?? {};
+}
+
+function endpointOriginPattern(value) {
+  if (!value) return undefined;
+  try {
+    const url = new URL(String(value));
+    return `${url.protocol}//${url.host}/*`;
+  } catch {
+    return undefined;
+  }
+}
+
+function matchPatternHost(pattern) {
+  const withoutProtocol = String(pattern).replace(/^[a-z]+:\/\//i, '');
+  const host = withoutProtocol.split('/')[0];
+  return host.replace(/^\*\./, '').replace(/^\*$/, '');
+}
+
+function sourceFile(path, content, role, mime = 'text/plain') {
+  return {
+    path,
+    role,
+    mime,
+    content: content.endsWith('\n') ? content : `${content}\n`,
+  };
 }
 
 function platformList(input = {}) {
@@ -273,6 +302,220 @@ export function buildMeetingAppExtensionInstallPlan(options = {}) {
       'The content script does not require realtime transcript access; speaker and lifecycle events can be inferred locally.',
       'Provider webhooks should still be used when available for post-meeting reconciliation.',
     ],
+  });
+}
+
+export function buildMeetingAppExtensionContentScriptSource(options = {}) {
+  const installPlan = buildMeetingAppExtensionInstallPlan(options);
+  const platformMap = Object.fromEntries(installPlan.platforms.map((platform) => {
+    const profile = MEETING_APP_EXTENSION_PROFILES[platform];
+    return [platform, profile.host_permissions.map((pattern) => matchPatternHost(pattern)).filter(Boolean)];
+  }));
+  const messagePrefix = firstNonEmpty(options.messagePrefix, options.message_prefix, 'meeting_timeline.client_call');
+  return [
+    "import { installMeetingAppContentScriptBridge } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script';",
+    '',
+    `const PLATFORM_HOSTS = ${json(platformMap)};`,
+    `const CLIENT_CALL_TYPE = ${JSON.stringify(messagePrefix)};`,
+    '',
+    'function extensionRuntime() {',
+    '  return globalThis.chrome?.runtime ?? globalThis.browser?.runtime;',
+    '}',
+    '',
+    'function inferPlatform(hostname = globalThis.location?.hostname ?? "") {',
+    '  const host = String(hostname);',
+    '  for (const [platform, hosts] of Object.entries(PLATFORM_HOSTS)) {',
+    '    if (hosts.some((item) => host === item || host.endsWith(`.${item}`))) return platform;',
+    '  }',
+    '  return "unknown";',
+    '}',
+    '',
+    'function callTimeline(method, input = {}) {',
+    '  const runtime = extensionRuntime();',
+    '  if (!runtime?.sendMessage) return Promise.resolve({ ok: false, reason: "missing_extension_runtime" });',
+    '  const message = {',
+    '    type: CLIENT_CALL_TYPE,',
+    '    method,',
+    '    platform: inferPlatform(),',
+    '    captured_at_ms: Date.now(),',
+    '    url: globalThis.location?.href,',
+    '    input,',
+    '  };',
+    '  return new Promise((resolve) => {',
+    '    runtime.sendMessage(message, (response) => {',
+    '      const runtimeError = globalThis.chrome?.runtime?.lastError;',
+    '      if (runtimeError) resolve({ ok: false, reason: "runtime_error", error: runtimeError.message });',
+    '      else resolve(response ?? { ok: true });',
+    '    });',
+    '  });',
+    '}',
+    '',
+    'const client = {',
+    '  startMeeting: (input) => callTimeline("startMeeting", input),',
+    '  endMeeting: (input) => callTimeline("endMeeting", input),',
+    '  insertMark: (input) => callTimeline("insertMark", input),',
+    '  insertMarks: (input) => callTimeline("insertMarks", input),',
+    '  importTranscript: (input) => callTimeline("importTranscript", input),',
+    '};',
+    '',
+    'const bridge = installMeetingAppContentScriptBridge(client, {',
+    '  browser_runtime_preset: inferPlatform(),',
+    '  source: "meeting_app_extension",',
+    '  extensionMessaging: true,',
+    '  windowMessaging: true,',
+    '  startRuntime: true,',
+    '});',
+    '',
+    'globalThis.__meetingTimelineBridge = bridge;',
+    'extensionRuntime()?.sendMessage?.({',
+    '  type: "meeting_timeline.extension_attached",',
+    '  platform: inferPlatform(),',
+    '  captured_at_ms: Date.now(),',
+    '  url: globalThis.location?.href,',
+    '});',
+  ].join('\n');
+}
+
+export function buildMeetingAppExtensionBackgroundSource(options = {}) {
+  const baseUrl = String(firstNonEmpty(options.baseUrl, options.base_url, 'https://timeline.example.com')).replace(/\/+$/, '');
+  const messagePrefix = firstNonEmpty(options.messagePrefix, options.message_prefix, 'meeting_timeline.client_call');
+  const endpoints = {
+    startMeeting: '/api/meeting-session/start',
+    endMeeting: '/api/meeting-session/end',
+    insertMark: '/api/annotations',
+    insertMarks: '/api/annotations/batch',
+    importTranscript: '/api/import/transcript',
+  };
+  return [
+    `const BASE_URL = ${JSON.stringify(baseUrl)};`,
+    `const CLIENT_CALL_TYPE = ${JSON.stringify(messagePrefix)};`,
+    `const ENDPOINTS = ${json(endpoints)};`,
+    '',
+    'function runtimeApi() {',
+    '  return globalThis.chrome?.runtime ?? globalThis.browser?.runtime;',
+    '}',
+    '',
+    'async function postJson(path, payload) {',
+    '  const response = await fetch(`${BASE_URL}${path}`, {',
+    '    method: "POST",',
+    '    headers: { "content-type": "application/json" },',
+    '    body: JSON.stringify(payload),',
+    '  });',
+    '  const text = await response.text();',
+    '  let body;',
+    '  try { body = text ? JSON.parse(text) : undefined; } catch { body = text; }',
+    '  return { ok: response.ok, status: response.status, body };',
+    '}',
+    '',
+    'runtimeApi()?.onMessage?.addListener?.((message, sender, sendResponse) => {',
+    '  if (!message || message.type !== CLIENT_CALL_TYPE) return false;',
+    '  const path = ENDPOINTS[message.method];',
+    '  if (!path) {',
+    '    sendResponse({ ok: false, reason: "unsupported_method", method: message.method });',
+    '    return false;',
+    '  }',
+    '  const payload = {',
+    '    ...(message.input ?? {}),',
+    '    platform: message.input?.platform ?? message.platform,',
+    '    captured_at_ms: message.input?.captured_at_ms ?? message.captured_at_ms,',
+    '    meeting_url: message.input?.meeting_url ?? message.url,',
+    '    detector_source: message.input?.detector_source ?? "meeting_app_extension",',
+    '    extension_sender: {',
+    '      tab_id: sender?.tab?.id,',
+    '      frame_id: sender?.frameId,',
+    '      url: sender?.url,',
+    '    },',
+    '  };',
+    '  postJson(path, payload).then(sendResponse).catch((error) => {',
+    '    sendResponse({ ok: false, reason: "timeline_request_failed", error: String(error?.message ?? error) });',
+    '  });',
+    '  return true;',
+    '});',
+  ].join('\n');
+}
+
+export function buildMeetingAppExtensionReadme(options = {}) {
+  const installPlan = buildMeetingAppExtensionInstallPlan(options);
+  const scriptFile = installPlan.content_scripts[0]?.js?.[0] ?? 'content-script.js';
+  return [
+    '# Meeting Timeline Browser Extension',
+    '',
+    'This scaffold installs the Meeting Timeline content bridge into supported meeting web apps.',
+    '',
+    '## Supported Pages',
+    '',
+    ...installPlan.matches.map((pattern) => `- \`${pattern}\``),
+    '',
+    '## Build',
+    '',
+    `Bundle \`src/content-script.entry.mjs\` to \`${scriptFile}\` with your application bundler, then load this directory as an unpacked Chrome/Edge extension.`,
+    '',
+    'The generated background worker forwards timeline client calls to the configured timeline service base URL.',
+    '',
+    'Before production rollout, capture real meeting app snapshots with `meeting-app-snapshot-recorder` and validate them with `meeting-app-gate`.',
+  ].join('\n');
+}
+
+export function buildMeetingAppExtensionScaffold(options = {}) {
+  const scriptFile = firstNonEmpty(options.outputScript, options.output_script, 'content-script.js');
+  const backgroundFile = firstNonEmpty(options.backgroundScript, options.background_script, 'background.js');
+  const baseUrl = firstNonEmpty(options.baseUrl, options.base_url);
+  const endpointPermission = endpointOriginPattern(baseUrl);
+  const manifest = buildMeetingAppContentScriptManifest({
+    ...options,
+    js: scriptFile,
+    permissions: unique([
+      ...asArray(firstNonEmpty(options.permissions, options.extension_permissions, [])),
+      'storage',
+    ]),
+    extraHostPermissions: unique([
+      ...asArray(firstNonEmpty(options.extraHostPermissions, options.extra_host_permissions)),
+      endpointPermission,
+    ]),
+    manifestOverrides: {
+      ...(options.manifestOverrides ?? options.manifest_overrides ?? {}),
+      background: {
+        service_worker: backgroundFile,
+        type: 'module',
+        ...((options.manifestOverrides ?? options.manifest_overrides ?? {}).background ?? {}),
+      },
+    },
+  });
+  const installPlan = buildMeetingAppExtensionInstallPlan({
+    ...options,
+    js: scriptFile,
+    extraHostPermissions: unique([
+      ...asArray(firstNonEmpty(options.extraHostPermissions, options.extra_host_permissions)),
+      endpointPermission,
+    ]),
+  });
+  const contentScriptSource = buildMeetingAppExtensionContentScriptSource(options);
+  const backgroundSource = buildMeetingAppExtensionBackgroundSource(options);
+  const readme = buildMeetingAppExtensionReadme({
+    ...options,
+    js: scriptFile,
+  });
+  return compactObject({
+    type: 'meeting_app_extension_scaffold',
+    schema: MEETING_APP_EXTENSION_SCHEMA,
+    version: 1,
+    install_plan: installPlan,
+    manifest,
+    files: [
+      sourceFile('manifest.json', `${json(manifest)}\n`, 'manifest', 'application/json'),
+      sourceFile('src/content-script.entry.mjs', contentScriptSource, 'content_script_entry', 'text/javascript'),
+      sourceFile(backgroundFile, backgroundSource, 'background_service_worker', 'text/javascript'),
+      sourceFile('README.md', readme, 'readme', 'text/markdown'),
+    ],
+    bundle: {
+      content_script_input: 'src/content-script.entry.mjs',
+      content_script_output: scriptFile,
+      background_output: backgroundFile,
+    },
+    validation: {
+      uses_all_urls: manifest.host_permissions?.includes('<all_urls>') ?? false,
+      platform_count: installPlan.platforms.length,
+    },
   });
 }
 

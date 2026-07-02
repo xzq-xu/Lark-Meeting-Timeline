@@ -63,6 +63,7 @@ import {
   buildMeetingAppContentScriptManifest,
   buildMeetingAppExtensionInstallPlan,
   buildMeetingAppExtensionMatchPatterns,
+  buildMeetingAppExtensionScaffold,
 } from './meeting-app-extension.mjs';
 
 function firstNonEmpty(...values) {
@@ -274,6 +275,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppExtensionMatches(extensionOptions = {}) {
       return buildMeetingAppExtensionMatchPatterns(withDefaults(defaults, extensionOptions));
+    },
+    meetingAppExtensionScaffold(extensionOptions = {}) {
+      return buildMeetingAppExtensionScaffold(withDefaults(defaults, extensionOptions));
     },
     assertMeetingAppLaunchGate(platform, gateOptions = {}) {
       return assertMeetingAppLaunchGate(platform, withDefaults(defaults, gateOptions));

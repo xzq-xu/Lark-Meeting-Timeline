@@ -10,7 +10,7 @@ import type { PlatformCaptureOptions, PlatformCaptureRecord } from './platform-c
 import type { PlatformLaunchGateOptions } from './platform-gate.mjs';
 import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
-import type { MeetingAppExtensionInstallPlan, MeetingAppExtensionMatchPatterns, MeetingAppExtensionOptions } from './meeting-app-extension.mjs';
+import type { MeetingAppExtensionInstallPlan, MeetingAppExtensionMatchPatterns, MeetingAppExtensionOptions, MeetingAppExtensionScaffold } from './meeting-app-extension.mjs';
 import type { PlatformEventDiagnosticResult, PlatformEventIngestInput, PlatformEventIngestOptions, ReconciledPlatformEventIngestResult } from './platform-ingest.mjs';
 import type {
   MeetingAppFixtureDiagnosis,
@@ -66,6 +66,7 @@ export interface MeetingPlatformTimelineKit {
   meetingAppExtensionInstallPlan(extensionOptions?: MeetingAppExtensionOptions): MeetingAppExtensionInstallPlan;
   meetingAppContentScriptManifest(extensionOptions?: MeetingAppExtensionOptions): Record<string, unknown>;
   meetingAppExtensionMatches(extensionOptions?: MeetingAppExtensionOptions): MeetingAppExtensionMatchPatterns;
+  meetingAppExtensionScaffold(extensionOptions?: MeetingAppExtensionOptions): MeetingAppExtensionScaffold;
   assertMeetingAppLaunchGate(platform: string, gateOptions?: MeetingAppLaunchGateOptions): MeetingAppLaunchGate;
   assertAllMeetingAppLaunchGates(gateOptions?: MeetingAppLaunchGateOptions): MeetingAppLaunchGateSummary;
   diagnose(platform: string, payload?: unknown, diagnosticOptions?: Record<string, unknown>): PlatformEventDiagnosticResult;

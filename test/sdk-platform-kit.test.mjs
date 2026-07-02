@@ -130,6 +130,13 @@ assert.deepEqual(extensionManifest.content_scripts[0].js, ['content.js']);
 const extensionPlan = kit.meetingAppExtensionInstallPlan();
 assert.equal(extensionPlan.content_script_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script');
 assert.equal(extensionPlan.platforms.length, 5);
+const extensionScaffold = kit.meetingAppExtensionScaffold({
+  platforms: ['google-meet'],
+  baseUrl,
+});
+assert.equal(extensionScaffold.type, 'meeting_app_extension_scaffold');
+assert.equal(extensionScaffold.manifest.host_permissions.includes(`${baseUrl}/*`), true);
+assert.equal(extensionScaffold.files.some((file) => file.path === 'src/content-script.entry.mjs'), true);
 
 assert.equal(kit.assertMeetingAppLaunchGate('webex', {
   allowFixtureProduction: true,
