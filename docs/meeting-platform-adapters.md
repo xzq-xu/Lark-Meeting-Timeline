@@ -172,6 +172,7 @@ type NormalizedMeetingSignal =
 注意点：
 
 - 官方事件适合校准轴和会后补齐，但不应阻塞电子纸标注实时落轴。
+- Pub/Sub push 默认是 wrapped JSON，事件在 `message.data`，需要 base64 解码；当前 Google adapter 已支持 wrapped push body 和已解包 CloudEvent 两种输入。
 - 事件 payload 可能只给 resource name，需要再调 REST API 获取详情。
 - Transcript entry 和 Google Docs transcript 可能不完全一致，需要保留 provider/source 字段。
 

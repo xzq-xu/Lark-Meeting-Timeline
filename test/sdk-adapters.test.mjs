@@ -4,7 +4,7 @@ import {
   applyMeetingSignals,
   normalizeMeetingSignal,
 } from '../packages/meeting-timeline-sdk/adapters/core.mjs';
-import { normalizeGoogleMeetEvent } from '../packages/meeting-timeline-sdk/adapters/google-meet.mjs';
+import { normalizeGoogleMeetEvent, unwrapGooglePubSubEvent } from '../packages/meeting-timeline-sdk/adapters/google-meet.mjs';
 import { normalizeMicrosoftTeamsEvent } from '../packages/meeting-timeline-sdk/adapters/microsoft-teams.mjs';
 import { normalizeZoomEvent } from '../packages/meeting-timeline-sdk/adapters/zoom.mjs';
 
@@ -112,6 +112,33 @@ assert.equal(googleStart[0].type, 'meeting_started');
 assert.equal(googleStart[0].meeting.platform, 'google_meet');
 assert.equal(googleStart[0].meeting.meeting_id, 'google-record-001');
 assert.equal(googleStart[0].occurred_at_ms, startMs);
+
+const googlePubSubCloudEvent = {
+  id: 'g-pubsub-start-1',
+  type: 'google.workspace.meet.conference.v2.started',
+  time: startIso,
+  data: {
+    conferenceRecord: { name: 'conferenceRecords/google-record-pubsub-001' },
+    title: 'Google Pub/Sub weekly review',
+  },
+};
+const googlePubSubWrapped = {
+  message: {
+    messageId: 'pubsub-message-001',
+    publishTime: startIso,
+    data: Buffer.from(JSON.stringify(googlePubSubCloudEvent), 'utf8').toString('base64'),
+    attributes: { eventType: googlePubSubCloudEvent.type },
+  },
+  subscription: 'projects/demo-project/subscriptions/meet-events',
+};
+const googlePubSubUnwrapped = unwrapGooglePubSubEvent(googlePubSubWrapped);
+assert.equal(googlePubSubUnwrapped.id, 'g-pubsub-start-1');
+assert.equal(googlePubSubUnwrapped.pubsub.message_id, 'pubsub-message-001');
+const googlePubSubStart = normalizeGoogleMeetEvent(googlePubSubWrapped);
+assert.equal(googlePubSubStart.length, 1);
+assert.equal(googlePubSubStart[0].type, 'meeting_started');
+assert.equal(googlePubSubStart[0].meeting.meeting_id, 'google-record-pubsub-001');
+assert.equal(googlePubSubStart[0].source_event_id, 'g-pubsub-start-1');
 
 const googleParticipant = normalizeGoogleMeetEvent({
   id: 'g-join-1',

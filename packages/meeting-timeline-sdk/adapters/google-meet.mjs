@@ -15,6 +15,38 @@ function firstPath(raw, paths) {
   return firstNonEmpty(...paths.map((path) => getPath(raw, path)));
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function decodePubSubData(data) {
+  if (typeof data !== 'string' || !data) return null;
+  const text = Buffer.from(data, 'base64').toString('utf8');
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { data: text };
+  }
+}
+
+export function unwrapGooglePubSubEvent(raw = {}) {
+  if (!isPlainObject(raw) || !isPlainObject(raw.message) || typeof raw.message.data !== 'string') return raw;
+  const decoded = decodePubSubData(raw.message.data);
+  if (!decoded) return raw;
+  const event = isPlainObject(decoded) ? { ...decoded } : { data: decoded };
+  if (!event.id) event.id = raw.message.messageId ?? raw.message.message_id;
+  if (!event.pubsub) {
+    event.pubsub = {
+      subscription: raw.subscription,
+      message_id: raw.message.messageId ?? raw.message.message_id,
+      publish_time: raw.message.publishTime ?? raw.message.publish_time,
+      attributes: raw.message.attributes,
+    };
+  }
+  return compactObject(event);
+}
+
 function resourceId(name, resourceName) {
   const text = String(name || '');
   const match = text.match(new RegExp(`${resourceName}/([^/]+)`));
@@ -141,24 +173,25 @@ export function normalizeGoogleMeetEvent(raw = {}, options = {}) {
   if (Array.isArray(raw)) {
     return raw.flatMap((item) => normalizeGoogleMeetEvent(item, options));
   }
-  const type = eventTypeOf(raw);
+  const event = unwrapGooglePubSubEvent(raw);
+  const type = eventTypeOf(event);
   const lowerType = type.toLowerCase();
-  const data = dataOf(raw);
-  const meeting = meetingIdentity(raw, data);
+  const data = dataOf(event);
+  const meeting = meetingIdentity(event, data);
   const base = meeting ? {
     meeting,
-    occurred_at_ms: eventTimestampMs(raw, options),
-    source_event_id: firstNonEmpty(raw.id, raw.event_id, raw.eventId),
+    occurred_at_ms: eventTimestampMs(event, options),
+    source_event_id: firstNonEmpty(event.id, event.event_id, event.eventId),
     source: 'webhook',
-    raw,
+    raw: event,
   } : null;
 
   if (lowerType.endsWith('conference.v2.started')) return base ? [{ ...base, type: 'meeting_started' }] : [];
   if (lowerType.endsWith('conference.v2.ended')) return base ? [{ ...base, type: 'meeting_ended' }] : [];
-  if (lowerType.endsWith('participant.v2.joined')) return participantSignal(raw, data, 'participant_joined', options);
-  if (lowerType.endsWith('participant.v2.left')) return participantSignal(raw, data, 'participant_left', options);
-  if (lowerType.endsWith('transcript.v2.filegenerated')) return artifactSignal(raw, data, 'transcript', options);
-  if (lowerType.endsWith('recording.v2.filegenerated')) return artifactSignal(raw, data, 'recording', options);
-  if (lowerType.endsWith('smartnote.v2.filegenerated')) return artifactSignal(raw, data, 'smart_notes', options);
+  if (lowerType.endsWith('participant.v2.joined')) return participantSignal(event, data, 'participant_joined', options);
+  if (lowerType.endsWith('participant.v2.left')) return participantSignal(event, data, 'participant_left', options);
+  if (lowerType.endsWith('transcript.v2.filegenerated')) return artifactSignal(event, data, 'transcript', options);
+  if (lowerType.endsWith('recording.v2.filegenerated')) return artifactSignal(event, data, 'recording', options);
+  if (lowerType.endsWith('smartnote.v2.filegenerated')) return artifactSignal(event, data, 'smart_notes', options);
   return [];
 }

@@ -83,7 +83,7 @@ try {
   assert.equal(info.platform_events.supported, true);
   assert.equal(info.platform_events.platforms.some((item) => item.platform === 'google_meet'), true);
 
-  const googleStart = await postJson(baseUrl, '/api/platform-events/google-meet', {
+  const googleStartEvent = {
     id: 'google-start-001',
     type: 'google.workspace.meet.conference.v2.started',
     time: startIso,
@@ -92,6 +92,15 @@ try {
       meetingUri: 'https://meet.google.com/abc-defg-hij',
       title: 'Google platform event test',
     },
+  };
+  const googleStart = await postJson(baseUrl, '/api/platform-events/google-meet', {
+    message: {
+      messageId: 'google-pubsub-message-001',
+      publishTime: startIso,
+      data: Buffer.from(JSON.stringify(googleStartEvent), 'utf8').toString('base64'),
+      attributes: { eventType: googleStartEvent.type },
+    },
+    subscription: 'projects/demo-project/subscriptions/google-meet-events',
   });
   assert.equal(googleStart.ok, true);
   assert.equal(googleStart.signal_count, 1);
