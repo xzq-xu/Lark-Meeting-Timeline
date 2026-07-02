@@ -97,6 +97,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-router`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-http`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-node`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-capture`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-gate`
@@ -190,6 +191,38 @@ const handlePlatformWebhook = createMeetingPlatformFetchHandler(timeline, {
 });
 
 export default handlePlatformWebhook;
+```
+
+在 Node `http` 或 Express/Koa 类服务里，可以用 `platform-node` 直接接 `IncomingMessage`/`ServerResponse`。它会读取请求流并保留 raw body 给 Zoom/Webex 签名校验：
+
+```js
+import { createServer } from 'node:http';
+import { createMeetingPlatformNodeHandler } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-node';
+
+const handleNodeWebhook = createMeetingPlatformNodeHandler(timeline, {
+  basePath: '/api/platform-events',
+  verify: true,
+  reconcile: true,
+});
+
+createServer((req, res) => {
+  handleNodeWebhook(req, res).catch((error) => {
+    res.statusCode = 500;
+    res.end(error.message);
+  });
+}).listen(8788);
+```
+
+Express 风格可以直接挂 middleware：
+
+```js
+import { createMeetingPlatformExpressMiddleware } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-node';
+
+app.use('/api/platform-events', createMeetingPlatformExpressMiddleware(timeline, {
+  basePath: '/api/platform-events',
+  verify: true,
+  reconcile: true,
+}));
 ```
 
 Local detector adapter 支持桌面观察器、浏览器扩展、汉王宿主 App 或人工控制器上报 `meeting_started` / `meeting_ended`，payload 可以带 `detected_platform: 'google_meet'` 或 `meeting.platform: 'zoom'` 表示真实会议来源；如果只传窗口 URL，SDK 会用 `meeting-url` 自动识别 Google Meet / Teams / Zoom / Lark / Webex 的平台和会议 ID。Local detector 也支持 `active_speaker`、`speaker_started`、`speaker_ended` 这类发言人信号，用来低延迟标出发言人位置。Lark adapter 支持 `vc.meeting.all_meeting_started_v1`、`vc.meeting.all_meeting_ended_v1`、`vc.meeting.meeting_started_v1`、`vc.meeting.meeting_ended_v1`、`vc.meeting.join_meeting_v1`、`vc.meeting.leave_meeting_v1`，并会把 `minute_token` 透传到会议轴，便于会后妙记导入。Google Meet adapter 同时支持已经解包的 Workspace Events CloudEvent，以及 Pub/Sub 默认 wrapped push body。wrapped body 会自动 base64 解码 `message.data`，所以 webhook handler 可以直接把 `req.body` 传给 `normalizeGoogleMeetEvent(req.body)`。Google Workspace Events 的 `subscription.v1.suspended`、`subscription.v1.expirationReminder`、`subscription.v1.expired` 会归一化为 `subscription_lifecycle`。Microsoft Graph change notifications 的 `lifecycleEvent` 值 `reauthorizationRequired`、`subscriptionRemoved`、`missed` 也会归一化为 `subscription_lifecycle`。Webex adapter 支持 `meetings` started/ended、`meetingParticipants` joined/left、`recordings` created/updated、`meetingTranscripts` created。

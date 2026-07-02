@@ -27,6 +27,7 @@ import {
   platformWebhookRoutePath,
 } from './platform-webhook-router.mjs';
 import { createMeetingPlatformFetchHandler } from './platform-http.mjs';
+import { createMeetingPlatformNodeHandler } from './platform-node.mjs';
 import {
   buildMeetingPlatformCaptureAcceptanceSummary,
   buildPlatformCaptureAcceptanceReport,
@@ -149,12 +150,14 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     reconcile: firstNonEmpty(defaults.reconcile, defaults.reconciled, true),
   });
   const fetchHandler = createMeetingPlatformFetchHandler(router, defaults);
+  const nodeHandler = createMeetingPlatformNodeHandler(router, defaults);
 
   return {
     client: bridge.client,
     bridge,
     webhookRouter: router,
     fetchHandler,
+    nodeHandler,
     platforms: MEETING_PLATFORM_KEYS,
     observe(snapshot = {}, observeOptions = {}) {
       return bridge.observe(snapshot, observeOptions);
@@ -188,6 +191,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     handleFetchRequest(request, fetchOptions = {}) {
       return fetchHandler(request, fetchOptions);
+    },
+    handleNodeRequest(req, res, nodeOptions = {}) {
+      return nodeHandler(req, res, nodeOptions);
     },
     captureWebhook(input = {}, captureOptions = {}) {
       return capturePlatformWebhookEvent(input, undefined, withDefaults(defaults, captureOptions));

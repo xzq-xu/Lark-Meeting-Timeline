@@ -942,6 +942,7 @@ export function platformCapabilityContract(platform, options = {}) {
       onboarding: '@ai-annotation/meeting-timeline-sdk/adapters/platform-onboarding',
       webhook_router: '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-router',
       platform_http: '@ai-annotation/meeting-timeline-sdk/adapters/platform-http',
+      platform_node: '@ai-annotation/meeting-timeline-sdk/adapters/platform-node',
       platform_capture: '@ai-annotation/meeting-timeline-sdk/adapters/platform-capture',
       platform_gate: '@ai-annotation/meeting-timeline-sdk/adapters/platform-gate',
       fixtures: '@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures',
