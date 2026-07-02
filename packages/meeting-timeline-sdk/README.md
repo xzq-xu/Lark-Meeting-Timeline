@@ -85,10 +85,43 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/microsoft-teams`
 - `@ai-annotation/meeting-timeline-sdk/adapters/zoom`
 - `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-setup`
 
 `meeting_started` 会调用 `startMeeting`，`meeting_ended` 会调用 `endMeeting`。`participant_joined/left` 和 `artifact_ready` 默认不会写入用户标注流；如果需要临时显示参会人位置，可以给 `applyMeetingSignals` 传 `{ participantAsAnnotation: true }`，或者用 `onParticipantSignal` / `onArtifactSignal` 接到自己的服务端轨道。
 
 Google Meet adapter 同时支持已经解包的 Workspace Events CloudEvent，以及 Pub/Sub 默认 wrapped push body。wrapped body 会自动 base64 解码 `message.data`，所以 webhook handler 可以直接把 `req.body` 传给 `normalizeGoogleMeetEvent(req.body)`。
+
+## 平台接入配置
+
+`platform-setup` 提供只读 manifest 和订阅 request body builder，方便宿主项目生成配置页或自动化脚本：
+
+```js
+import {
+  buildGoogleMeetWorkspaceSubscriptionRequest,
+  buildMicrosoftTeamsMeetingCallSubscriptionRequest,
+  buildZoomEventSubscriptionRequest,
+  platformSetupManifest,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup';
+
+const google = buildGoogleMeetWorkspaceSubscriptionRequest({
+  targetResource: '//cloudidentity.googleapis.com/users/me',
+  pubsubTopic: 'projects/demo/topics/meet-events',
+});
+
+const teams = buildMicrosoftTeamsMeetingCallSubscriptionRequest({
+  joinWebUrl: 'https://teams.microsoft.com/l/meetup-join/...',
+  notificationUrl: 'https://timeline.example.com/api/platform-events/teams',
+  clientState: process.env.MICROSOFT_GRAPH_CLIENT_STATE,
+});
+
+const zoom = buildZoomEventSubscriptionRequest({
+  webhookUrl: 'https://timeline.example.com/api/platform-events/zoom',
+});
+
+const manifest = platformSetupManifest('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+});
+```
 
 ## Webhook 验证工具
 

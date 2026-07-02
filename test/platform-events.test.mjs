@@ -81,7 +81,19 @@ try {
 
   const info = await getJson(baseUrl, '/api/annotation-ingest-info');
   assert.equal(info.platform_events.supported, true);
+  assert.equal(typeof info.platform_events.setup_endpoint, 'string');
   assert.equal(info.platform_events.platforms.some((item) => item.platform === 'google_meet'), true);
+
+  const setup = await getJson(baseUrl, '/api/platform-events/setup');
+  assert.equal(setup.setup.length, 3);
+  assert.equal(setup.setup.some((item) => item.platform === 'google_meet' && item.endpoint === `${baseUrl}/api/platform-events/google-meet`), true);
+  assert.equal(setup.security_env_configured.GOOGLE_PUBSUB_OIDC_AUDIENCE, false);
+
+  const teamsSetup = await getJson(baseUrl, `/api/platform-events/teams/setup?join_web_url=${encodeURIComponent('https://teams.microsoft.com/l/meetup-join/example')}&client_state=test-state`);
+  assert.equal(teamsSetup.setup.platform, 'microsoft_teams');
+  assert.equal(teamsSetup.setup.graph_subscription_request.notificationUrl, `${baseUrl}/api/platform-events/teams`);
+  assert.equal(teamsSetup.setup.graph_subscription_request.clientState, 'test-state');
+  assert.match(teamsSetup.setup.graph_subscription_request.resource, /meetingCallEvents$/);
 
   const googleStartEvent = {
     id: 'google-start-001',

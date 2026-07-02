@@ -8,6 +8,7 @@ import * as Lark from '@larksuiteoapi/node-sdk';
 import { applyMeetingSignals } from '../packages/meeting-timeline-sdk/adapters/core.mjs';
 import { normalizeGoogleMeetEvent } from '../packages/meeting-timeline-sdk/adapters/google-meet.mjs';
 import { normalizeMicrosoftTeamsEvent } from '../packages/meeting-timeline-sdk/adapters/microsoft-teams.mjs';
+import { allPlatformSetupManifests, buildPlatformSetup, platformSetupManifest } from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
 import { normalizeZoomEvent } from '../packages/meeting-timeline-sdk/adapters/zoom.mjs';
 import {
   buildZoomUrlValidationResponse,
@@ -5926,6 +5927,7 @@ async function annotationIngestInfoPayload(req) {
     platform_events: {
       supported: true,
       status_endpoint: localUrlFor(req, '/api/platform-events/status'),
+      setup_endpoint: localUrlFor(req, '/api/platform-events/setup'),
       description: 'Server-side adapters can ingest Google Meet, Microsoft Teams, and Zoom event payloads, normalize them into meeting timeline signals, start/end the same meeting axis contract, and append participant join/leave plus artifact-ready events with duplicate filtering.',
       platforms: platformEventAdapterDefinitions.map((item) => ({
         platform: item.key,
@@ -6181,8 +6183,10 @@ function parsePlatformEventRoute(pathname = '') {
   const parts = pathname.split('/').filter(Boolean);
   if (parts[0] !== 'api' || parts[1] !== 'platform-events') return null;
   if (parts.length === 3 && parts[2] === 'status') return { action: 'status', platform: null };
+  if (parts.length === 3 && parts[2] === 'setup') return { action: 'setup', platform: null };
   if (parts.length === 3) return { action: 'ingest', platform: parts[2] };
   if (parts.length === 4 && parts[3] === 'status') return { action: 'status', platform: parts[2] };
+  if (parts.length === 4 && parts[3] === 'setup') return { action: 'setup', platform: parts[2] };
   return null;
 }
 
@@ -6268,6 +6272,67 @@ function publicPlatformEventStatus(req, adapter = null) {
       status_endpoint: localUrlFor(req, `/api/platform-events/${item.aliases[0]}/status`),
     })),
     status: adapter ? rows[0] : Object.fromEntries(rows.map((item) => [item.platform, item])),
+  };
+}
+
+function platformSetupSecurityConfig() {
+  return {
+    ZOOM_WEBHOOK_SECRET_TOKEN: Boolean(process.env.ZOOM_WEBHOOK_SECRET_TOKEN),
+    MICROSOFT_GRAPH_CLIENT_STATE: Boolean(process.env.MICROSOFT_GRAPH_CLIENT_STATE),
+    GOOGLE_PUBSUB_OIDC_AUDIENCE: Boolean(process.env.GOOGLE_PUBSUB_OIDC_AUDIENCE),
+    GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL: Boolean(process.env.GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL),
+    GOOGLE_PUBSUB_BEARER_TOKEN: Boolean(process.env.GOOGLE_PUBSUB_BEARER_TOKEN),
+  };
+}
+
+function platformSetupOptionsFromQuery(req, url, adapter = null) {
+  const baseUrl = url.searchParams.get('base_url') ?? url.searchParams.get('baseUrl') ?? localUrlFor(req, '');
+  const options = { baseUrl };
+  if (!adapter || adapter.key === 'google_meet') {
+    const targetResource = url.searchParams.get('google_target_resource') ?? url.searchParams.get('target_resource');
+    const pubsubTopic = url.searchParams.get('google_pubsub_topic') ?? url.searchParams.get('pubsub_topic');
+    if (targetResource || pubsubTopic) {
+      options.googleMeetSubscription = {
+        targetResource,
+        pubsubTopic,
+      };
+    }
+  }
+  if (!adapter || adapter.key === 'microsoft_teams') {
+    const joinWebUrl = url.searchParams.get('teams_join_web_url') ?? url.searchParams.get('join_web_url');
+    const clientState = url.searchParams.get('teams_client_state') ?? url.searchParams.get('client_state');
+    if (joinWebUrl || clientState) {
+      options.microsoftTeamsSubscription = {
+        joinWebUrl,
+        notificationUrl: localUrlFor(req, '/api/platform-events/teams'),
+        clientState,
+      };
+    }
+  }
+  if (!adapter || adapter.key === 'zoom') {
+    const zoomName = url.searchParams.get('zoom_subscription_name');
+    if (zoomName || url.searchParams.get('zoom_scope') || url.searchParams.get('zoom_account_id')) {
+      options.zoomSubscription = {
+        name: zoomName,
+        webhookUrl: localUrlFor(req, '/api/platform-events/zoom'),
+        subscriptionScope: url.searchParams.get('zoom_scope'),
+        accountId: url.searchParams.get('zoom_account_id'),
+      };
+    }
+  }
+  return options;
+}
+
+function publicPlatformEventSetup(req, url, adapter = null) {
+  const options = platformSetupOptionsFromQuery(req, url, adapter);
+  const setup = adapter
+    ? buildPlatformSetup(adapter.key, options)
+    : allPlatformSetupManifests(options);
+  return {
+    generated_at: new Date().toISOString(),
+    setup_endpoint: localUrlFor(req, '/api/platform-events/setup'),
+    security_env_configured: platformSetupSecurityConfig(),
+    setup,
   };
 }
 
@@ -6605,6 +6670,23 @@ async function handleApi(req, res, url) {
   }
 
   const platformRoute = parsePlatformEventRoute(url.pathname);
+  if (platformRoute?.action === 'setup' && req.method === 'GET') {
+    const adapter = platformRoute.platform ? platformEventAdapterFor(platformRoute.platform) : null;
+    if (platformRoute.platform && !adapter) {
+      return sendJson(res, 404, {
+        error: `Unsupported meeting platform: ${platformRoute.platform}`,
+        ...publicPlatformEventSetup(req, url),
+      });
+    }
+    try {
+      return sendJson(res, 200, publicPlatformEventSetup(req, url, adapter));
+    } catch (error) {
+      return sendJson(res, error.status ?? 400, {
+        error: error.message ?? String(error),
+      });
+    }
+  }
+
   if (platformRoute?.action === 'status' && req.method === 'GET') {
     const adapter = platformRoute.platform ? platformEventAdapterFor(platformRoute.platform) : null;
     if (platformRoute.platform && !adapter) {

@@ -292,6 +292,8 @@ Teams SDK 可以让会议内 app/bot 接收 meetingStart、meetingEnd、particip
 
 ```text
 POST /api/platform-events/:platform
+GET  /api/platform-events/setup
+GET  /api/platform-events/:platform/setup
 GET  /api/platform-events/:platform/status
 GET  /api/platform-events/status
 ```
@@ -307,6 +309,8 @@ GET  /api/platform-events/status
 
 `GET /api/platform-events/status` 会返回每个平台最近一次 `last_verification`，用于区分“未配置所以跳过校验”和“签名/状态不匹配被拒绝”。
 
+`GET /api/platform-events/setup` 会返回 Google Meet、Microsoft Teams、Zoom 的接入 manifest：默认事件类型、endpoint、权限/环境变量要求和操作步骤。`GET /api/platform-events/:platform/setup` 可按平台返回，并支持用 query 生成订阅 request body，例如 Teams 的 `join_web_url` + `client_state`，或 Google 的 `target_resource` + `pubsub_topic`。
+
 SDK 包结构建议：
 
 ```text
@@ -314,6 +318,8 @@ packages/meeting-timeline-sdk/
   index.mjs
   index.d.ts
   adapters/
+    platform-setup.mjs
+    platform-setup.d.ts
     webhook-security.mjs
     webhook-security.d.ts
     core.mjs
