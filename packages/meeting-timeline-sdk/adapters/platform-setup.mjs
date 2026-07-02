@@ -128,6 +128,7 @@ const platformCapabilityContracts = Object.freeze({
       local_observer: '@ai-annotation/meeting-timeline-sdk/adapters/local-observer',
       ingest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest',
       webhook_handler: '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler',
+      webhook_router: '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-router',
       transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
       setup: '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup',
       security: '@ai-annotation/meeting-timeline-sdk/adapters/webhook-security',
@@ -938,6 +939,7 @@ export function platformCapabilityContract(platform, options = {}) {
       acceptance: '@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance',
       artifact_plan: '@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan',
       onboarding: '@ai-annotation/meeting-timeline-sdk/adapters/platform-onboarding',
+      webhook_router: '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-router',
     },
     endpoints: options.baseUrl ? {
       platform_events: platformEventEndpoint(options.baseUrl, key),

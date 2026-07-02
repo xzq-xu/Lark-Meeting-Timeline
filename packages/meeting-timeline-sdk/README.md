@@ -94,6 +94,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge`
 - `@ai-annotation/meeting-timeline-sdk/adapters/signal-reconciler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-router`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-onboarding`
@@ -277,6 +278,37 @@ console.log(diagnosticResult.body.diagnostic.issues);
 ```
 
 如果多个 HTTP endpoint 分别接 Google Meet、Teams、Zoom、Webex，但最终写同一个 timeline，可以把同一个 handler 或 `createReconciledPlatformEventIngestor()` 传给这些 endpoint，避免每个 endpoint 维护一份去重状态。`handleWebhook.getReconciliationState()` 可以用于诊断当前活跃会议、已处理 fingerprint 和最近发言人信号；测试或切换账号时可调用 `handleWebhook.resetReconciliationState()` 清空状态。
+
+如果外部项目希望 SDK 直接管理一组平台 webhook 路由，可以用 `platform-webhook-router`。它不绑定 Express/Fastify/Koa，只负责把请求路径匹配到平台，并复用同一个 handler/reconciler：
+
+```js
+import { createMeetingPlatformWebhookRouter } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-router';
+
+const router = createMeetingPlatformWebhookRouter(timeline, {
+  basePath: '/api/platform-events',
+  baseUrl: 'https://timeline.example.com',
+  verify: true,
+  reconcile: true,
+  googleMeet: {
+    expectedAudience: 'https://timeline.example.com/api/platform-events/google-meet',
+  },
+  zoom: {
+    secretToken: process.env.ZOOM_WEBHOOK_SECRET_TOKEN,
+  },
+});
+
+// GET /api/platform-events/status
+// GET /api/platform-events/setup
+// POST /api/platform-events/google-meet
+// GET/POST /api/platform-events/teams
+const response = await router({
+  method: req.method,
+  url: req.url,
+  headers: req.headers,
+  body: req.body,
+  rawBody: req.rawBody,
+});
+```
 
 本地观察器或汉王宿主 App 也可以走同一个 handler，只是默认验证结果会是 `platform_verification_not_configured`：
 
