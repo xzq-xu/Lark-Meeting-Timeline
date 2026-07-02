@@ -90,6 +90,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-url`
 - `@ai-annotation/meeting-timeline-sdk/adapters/local-observer`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-session-discovery`
+- `@ai-annotation/meeting-timeline-sdk/adapters/active-speaker`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
 - `@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge`
@@ -583,6 +584,36 @@ await ingestPlatformEvent(timeline, 'local-detector', {
 ```
 
 实时发言人轨也建议先走 `local-detector`。Google Meet、Teams、Zoom、Webex 的官方 webhook 主要提供会议开始/结束、参会人、录制和转写产物，不应假设它们能低延迟提供 active speaker；会后可以再用 transcript segment 的 `speaker_name` 回填。
+
+如果宿主拿到的是连续 UI/音频/DOM 采样，不要每帧都直接写时间轴。先用 `active-speaker` 做去抖和切换滤波，默认候选发言人稳定约 300ms 才发出 `speaker_started`，静音持续约 1500ms 才发出 `speaker_ended`：
+
+```js
+import { createActiveSpeakerTimelineObserver } from '@ai-annotation/meeting-timeline-sdk/adapters/active-speaker';
+
+const speakers = createActiveSpeakerTimelineObserver(timeline, {
+  source: 'browser_dom_observer',
+  minStableMs: 300,
+  switchStableMs: 400,
+  endIdleMs: 1500,
+  applyOptions: { speakerAsAnnotation: true },
+});
+
+await speakers.observe({
+  meeting: {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+  },
+  activeSpeaker: {
+    id: 'speaker-ada',
+    name: 'Ada',
+    speaking: true,
+  },
+  observedAtMs: Date.now(),
+});
+```
+
+短暂误检会停留在候选状态，不会落到时间轴；真正切换发言人时，SDK 会用候选第一次出现的时间作为 `captured_at_ms`，避免为了滤波把视觉落点推迟几百毫秒。
 
 ```js
 await ingestPlatformEvent(timeline, 'local-detector', {

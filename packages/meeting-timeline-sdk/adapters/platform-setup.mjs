@@ -937,6 +937,7 @@ export function platformCapabilityContract(platform, options = {}) {
       timeline_bridge: '@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge',
       signal_reconciler: '@ai-annotation/meeting-timeline-sdk/adapters/signal-reconciler',
       session_discovery: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-session-discovery',
+      active_speaker: '@ai-annotation/meeting-timeline-sdk/adapters/active-speaker',
       acceptance: '@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance',
       artifact_plan: '@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan',
       artifact_fetch: '@ai-annotation/meeting-timeline-sdk/adapters/artifact-fetch',
@@ -1242,6 +1243,7 @@ export function buildPlatformIntegrationPlan(platform, options = {}) {
       strategy: capabilities.speaker_activity.status?.startsWith('not_supported')
         ? 'local_detector_realtime_or_transcript_backfill'
         : 'provider_or_local_detector',
+      active_speaker_module: capabilities.sdk_modules.active_speaker,
       ...capabilities.speaker_activity,
     },
     post_meeting_transcript: {
