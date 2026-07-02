@@ -936,6 +936,7 @@ export function platformCapabilityContract(platform, options = {}) {
       ...contract.sdk_modules,
       timeline_bridge: '@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge',
       signal_reconciler: '@ai-annotation/meeting-timeline-sdk/adapters/signal-reconciler',
+      session_discovery: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-session-discovery',
       acceptance: '@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance',
       artifact_plan: '@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan',
       artifact_fetch: '@ai-annotation/meeting-timeline-sdk/adapters/artifact-fetch',
@@ -1216,6 +1217,7 @@ export function buildPlatformIntegrationPlan(platform, options = {}) {
       local_observer: {
         module: capabilities.sdk_modules.local_observer,
         url_detection_module: capabilities.sdk_modules.url_detection,
+        session_discovery_module: capabilities.sdk_modules.session_discovery,
         supported_platform_from_url: key !== 'local_detector',
       },
     },

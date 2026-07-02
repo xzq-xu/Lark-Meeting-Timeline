@@ -89,6 +89,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/webex`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-url`
 - `@ai-annotation/meeting-timeline-sdk/adapters/local-observer`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-session-discovery`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
 - `@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge`
@@ -131,6 +132,35 @@ await bridge.importTranscript({
   raw: googleTranscriptEntries,
 });
 ```
+
+如果宿主项目拿到的是桌面窗口、浏览器标签页或 native app 进程快照，先用 `meeting-session-discovery` 把这些低层信号转成统一会议候选，再交给 observer 建轴。这个路径适合 Google Meet 浏览器页，也适合 Zoom / Teams / Lark / Webex native app 没有 webhook 或 webhook 延迟较高的情况：
+
+```js
+import { createMeetingSessionTimelineDiscovery } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-session-discovery';
+
+const discovery = createMeetingSessionTimelineDiscovery(timeline, {
+  source: 'desktop_session_discovery',
+});
+
+await discovery.observeEnvironment({
+  windows: [{
+    id: 'browser-1',
+    focused: true,
+    application: { name: 'Google Chrome', bundleId: 'com.google.Chrome' },
+    tabs: [
+      { id: 'mail', active: false, url: 'https://mail.google.com', title: 'Inbox' },
+      { id: 'meet', active: true, url: 'https://meet.google.com/abc-defg-hij', title: 'Review - Google Meet' },
+    ],
+  }, {
+    id: 'zoom-1',
+    title: 'Zoom Meeting',
+    application: { name: 'zoom.us', bundleId: 'us.zoom.xos' },
+    inMeeting: true,
+  }],
+}, { observedAtMs: Date.now() });
+```
+
+`meeting-session-discovery` 会优先使用 URL 中的真实会议 ID；如果 native app 没有 URL，会在明确 `inMeeting: true` 或标题/进程足够像会议窗口时生成稳定的本地 `native-{platform}-...` 会话 ID。后续收到官方 webhook 时可以继续用 `signal-reconciler` 或 `platform-ingest` 做校准/回填。
 
 如果业务项目要接入多个会议平台，推荐从 `platform-kit` 开始。它把 `timeline-bridge`、webhook router、平台 setup/onboarding、fixture acceptance 组合成一个入口；底层 normalizer、验签、artifact fetch 仍然可以按需单独 import：
 
