@@ -99,6 +99,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-source`
@@ -345,12 +346,15 @@ const report = buildMeetingAppFixtureAcceptanceReport();
 // report.accepted === true 表示本地 DOM/AX 归一化链路基线通过
 ```
 
-正式接入 Google Meet / Teams Web / Zoom Web / Webex Web / Lark Web 前，建议再跑 `meeting-app-gate`。它不检查官方 webhook 权限，而是检查本地会议 App 路径是否满足实时标注：browser runtime preset、DOM capture profile、MutationObserver track/ignore selectors、建轴、发言人位置和结束信号。fixture-only 只能证明 SDK wiring；要证明生产可用，需要传入真实采集到的 DOM snapshots：
+正式接入 Google Meet / Teams Web / Zoom Web / Webex Web / Lark Web 前，建议再跑 `meeting-app-gate`。它不检查官方 webhook 权限，而是检查本地会议 App 路径是否满足实时标注：browser runtime preset、DOM capture profile、MutationObserver track/ignore selectors、建轴、发言人位置和结束信号。fixture-only 只能证明 SDK wiring；要证明生产可用，需要用 `meeting-app-snapshot-recorder` 记录真实采集到的 DOM snapshots：
 
 ```js
 import {
   buildMeetingAppLaunchGate,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate';
+import {
+  createMeetingAppSnapshotRecorder,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder';
 
 const fixtureGate = buildMeetingAppLaunchGate('google-meet', {
   allowFixtureProduction: true,
@@ -358,10 +362,13 @@ const fixtureGate = buildMeetingAppLaunchGate('google-meet', {
 });
 // fixtureGate.status === 'warning'
 
+const recorder = createMeetingAppSnapshotRecorder({ captureProfile: 'google_meet' });
+recorder.capture({ document, location, window }, { phase: 'active', label: 'live-active' });
+// 用户离开会议或回到 prejoin 页面后再采一帧：
+recorder.capture({ document, location, window }, { phase: 'ended', label: 'live-ended' });
+
 const liveGate = buildMeetingAppLaunchGate('google-meet', {
-  snapshots: {
-    google_meet: [liveActiveSnapshot, liveEndedSnapshot],
-  },
+  recordSet: recorder.exportRecords(),
 });
 // liveGate.production_ready === true 时，才表示真实 Google Meet DOM 适配已验收。
 ```

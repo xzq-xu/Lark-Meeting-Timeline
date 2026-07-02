@@ -113,6 +113,11 @@ const appGateSummary = kit.meetingAppLaunchGateSummary({
 assert.equal(appGateSummary.ok, true);
 assert.equal(appGateSummary.gates.length, 5);
 
+const kitRecorder = kit.meetingAppSnapshotRecorder({ captureProfile: 'google_meet' });
+kitRecorder.add(kit.meetingAppFixture('google-meet'), { phase: 'active', label: 'kit-active' });
+assert.equal(kitRecorder.getState().record_count, 1);
+assert.equal(kit.meetingAppGateInputFromRecords(kitRecorder.exportRecords()).snapshots.google_meet.length, 1);
+
 assert.equal(kit.assertMeetingAppLaunchGate('webex', {
   allowFixtureProduction: true,
   requireProductionReady: false,

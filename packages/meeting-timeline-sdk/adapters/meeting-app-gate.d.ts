@@ -5,6 +5,7 @@ import type {
   MeetingAppFixtureOptions,
   MeetingAppFixturePlatform,
 } from './meeting-app-fixtures.mjs';
+import type { MeetingAppSnapshotRecord, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 
 export type MeetingAppLaunchGateEvidenceLevel = 'captured_dom' | 'fixture_dom' | 'none';
 
@@ -19,6 +20,11 @@ export interface MeetingAppLaunchGateOptions extends MeetingAppFixtureOptions {
   snapshots?: Record<string, unknown>[] | Record<string, Record<string, unknown>[] | Record<string, unknown>>;
   domSnapshots?: Record<string, unknown>[] | Record<string, Record<string, unknown>[] | Record<string, unknown>>;
   dom_snapshots?: Record<string, unknown>[] | Record<string, Record<string, unknown>[] | Record<string, unknown>>;
+  snapshotRecords?: MeetingAppSnapshotRecord[] | MeetingAppSnapshotRecordSet;
+  snapshot_records?: MeetingAppSnapshotRecord[] | MeetingAppSnapshotRecordSet;
+  recordSet?: MeetingAppSnapshotRecordSet;
+  record_set?: MeetingAppSnapshotRecordSet;
+  records?: MeetingAppSnapshotRecord[] | MeetingAppSnapshotRecordSet;
   requiredCoverage?: string[];
   required_coverage?: string[];
   requireMeetingEnd?: boolean;

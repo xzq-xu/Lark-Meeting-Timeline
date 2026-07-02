@@ -6,6 +6,7 @@ import {
   diagnoseMeetingAppFixtureLifecycle,
 } from './meeting-app-fixtures.mjs';
 import { normalizeMeetingAppSnapshot, observeMeetingAppSample } from './meeting-apps.mjs';
+import { meetingAppSnapshotsFromRecords } from './meeting-app-snapshot-recorder.mjs';
 import { normalizeMeetingPlatform } from './platform-setup.mjs';
 
 export const MEETING_APP_LAUNCH_GATE_EVIDENCE_LEVELS = Object.freeze([
@@ -205,7 +206,17 @@ function gateStatus(blockingIssues = [], warnings = []) {
 export function buildMeetingAppLaunchGate(platform, options = {}) {
   const key = normalizeAppPlatform(platform);
   const runtime = runtimeCoverage(key, options);
-  const capturedSnapshots = sampleCollectionFor(key, options.snapshots ?? options.domSnapshots ?? options.dom_snapshots);
+  const snapshotRecords = firstNonEmpty(
+    options.snapshotRecords,
+    options.snapshot_records,
+    options.recordSet,
+    options.record_set,
+    options.records,
+  );
+  const capturedSnapshots = [
+    ...sampleCollectionFor(key, options.snapshots ?? options.domSnapshots ?? options.dom_snapshots),
+    ...sampleCollectionFor(key, snapshotRecords ? meetingAppSnapshotsFromRecords(snapshotRecords, options) : []),
+  ];
   const requiredCoverage = defaultRequiredCoverage(options);
   const evidenceLevel = capturedSnapshots.length > 0
     ? 'captured_dom'

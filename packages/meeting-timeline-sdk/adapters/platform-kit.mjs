@@ -55,6 +55,10 @@ import {
   buildMeetingAppLaunchGate,
   buildMeetingAppLaunchGateSummary,
 } from './meeting-app-gate.mjs';
+import {
+  buildMeetingAppLaunchGateInputFromRecords,
+  createMeetingAppSnapshotRecorder,
+} from './meeting-app-snapshot-recorder.mjs';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -249,6 +253,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppLaunchGateSummary(gateOptions = {}) {
       return buildMeetingAppLaunchGateSummary(withDefaults(defaults, gateOptions));
+    },
+    meetingAppSnapshotRecorder(recorderOptions = {}) {
+      return createMeetingAppSnapshotRecorder(withDefaults(defaults, recorderOptions));
+    },
+    meetingAppGateInputFromRecords(records = [], recordOptions = {}) {
+      return buildMeetingAppLaunchGateInputFromRecords(records, withDefaults(defaults, recordOptions));
     },
     assertMeetingAppLaunchGate(platform, gateOptions = {}) {
       return assertMeetingAppLaunchGate(platform, withDefaults(defaults, gateOptions));
