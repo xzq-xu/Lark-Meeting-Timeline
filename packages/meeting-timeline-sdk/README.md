@@ -187,6 +187,22 @@ await observer.observe({
 });
 ```
 
+如果宿主拿到的是浏览器扩展/桌面观察器的多窗口多标签快照，可以直接用 `observeCandidates()`。SDK 会展开 `windows[].tabs[]`、筛出 Google Meet / Teams / Zoom / Webex / Lark 候选，并选择最可信的会议标签；浏览器 tab 的 `active: false` 不会被误判成会议结束：
+
+```js
+await observer.observeCandidates({
+  windows: [{
+    focused: true,
+    tabs: [
+      { active: true, url: 'https://mail.example.com', title: 'Mail' },
+      { active: false, url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet' },
+    ],
+  }],
+}, {
+  observedAtMs: Date.now(),
+});
+```
+
 如果接入方只想拿 signal 自己处理，也可以用低层状态机：
 
 ```js
@@ -200,6 +216,8 @@ const observed = observer.observe({
 
 console.log(observed.signals);
 ```
+
+低层状态机同样支持 `observeCandidates()`，返回值会带 `selection.candidates` 和 `selection.selectedSnapshot`，方便调试为什么选中了某个会议窗口。
 
 如果宿主已经知道事件类型，也可以直接走 `local-detector`：
 

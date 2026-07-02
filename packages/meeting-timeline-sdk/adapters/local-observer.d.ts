@@ -43,6 +43,10 @@ export interface LocalObserverOptions {
   initialState?: LocalObserverState | null;
   observedAtMs?: number | string | Date;
   receivedAtMs?: number | string | Date;
+  preferredPlatform?: string;
+  preferredMeetingId?: string;
+  preferredMeeting?: DetectedMeetingFromUrl | null;
+  activeMeeting?: DetectedMeetingFromUrl | null;
   [key: string]: unknown;
 }
 
@@ -56,7 +60,30 @@ export interface LocalObserverResult {
   detectedMeeting?: DetectedMeetingFromUrl | null;
 }
 
+export interface LocalMeetingCandidate {
+  index: number;
+  rank: number;
+  candidate_count: number;
+  snapshot: LocalObserverSnapshot;
+  detectedMeeting: DetectedMeetingFromUrl;
+  score: number;
+}
+
+export interface LocalMeetingSelection {
+  selectedSnapshot: LocalObserverSnapshot | null;
+  detectedMeeting: DetectedMeetingFromUrl | null;
+  candidates: LocalMeetingCandidate[];
+}
+
+export interface LocalObserverCandidateResult extends LocalObserverResult {
+  selection: LocalMeetingSelection;
+}
+
 export interface LocalTimelineObserverResult extends LocalObserverResult {
+  results: ApplyMeetingSignalResult[];
+}
+
+export interface LocalTimelineObserverCandidateResult extends LocalObserverCandidateResult {
   results: ApplyMeetingSignalResult[];
 }
 
@@ -66,8 +93,17 @@ export function observeMeetingSnapshot(
   options?: LocalObserverOptions,
 ): LocalObserverResult;
 
+export function selectMeetingSnapshot(
+  input?: LocalObserverSnapshot[] | { snapshots?: LocalObserverSnapshot[]; candidates?: LocalObserverSnapshot[]; items?: LocalObserverSnapshot[]; tabs?: LocalObserverSnapshot[]; windows?: Array<LocalObserverSnapshot & { tabs?: LocalObserverSnapshot[] }> },
+  options?: LocalObserverOptions,
+): LocalMeetingSelection;
+
 export function createLocalMeetingObserver(options?: LocalObserverOptions): {
   observe(snapshot?: LocalObserverSnapshot, options?: LocalObserverOptions): LocalObserverResult;
+  observeCandidates(
+    candidates?: LocalObserverSnapshot[] | { snapshots?: LocalObserverSnapshot[]; candidates?: LocalObserverSnapshot[]; items?: LocalObserverSnapshot[]; tabs?: LocalObserverSnapshot[]; windows?: Array<LocalObserverSnapshot & { tabs?: LocalObserverSnapshot[] }> },
+    options?: LocalObserverOptions,
+  ): LocalObserverCandidateResult;
   getState(): LocalObserverState;
   reset(nextState?: LocalObserverState | null): LocalObserverState;
 };
@@ -77,6 +113,10 @@ export function createLocalMeetingTimelineObserver(
   options?: LocalTimelineObserverOptions,
 ): {
   observe(snapshot?: LocalObserverSnapshot, options?: LocalTimelineObserverOptions): Promise<LocalTimelineObserverResult>;
+  observeCandidates(
+    candidates?: LocalObserverSnapshot[] | { snapshots?: LocalObserverSnapshot[]; candidates?: LocalObserverSnapshot[]; items?: LocalObserverSnapshot[]; tabs?: LocalObserverSnapshot[]; windows?: Array<LocalObserverSnapshot & { tabs?: LocalObserverSnapshot[] }> },
+    options?: LocalTimelineObserverOptions,
+  ): Promise<LocalTimelineObserverCandidateResult>;
   getState(): LocalObserverState;
   reset(nextState?: LocalObserverState | null): LocalObserverState;
 };

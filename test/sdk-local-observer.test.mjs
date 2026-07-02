@@ -4,6 +4,7 @@ import {
   createLocalMeetingObserver,
   createLocalMeetingTimelineObserver,
   observeMeetingSnapshot,
+  selectMeetingSnapshot,
 } from '../packages/meeting-timeline-sdk/adapters/local-observer.mjs';
 
 const startMs = 1_782_442_800_000;
@@ -76,6 +77,63 @@ const ended = observer.observe({
 assert.equal(ended.signals[0].type, 'meeting_ended');
 assert.equal(observer.getState().activeMeeting, null);
 
+const windowSelection = selectMeetingSnapshot({
+  windows: [{
+    id: 'win-1',
+    focused: true,
+    lastFocusedAtMs: startMs + 45_000,
+    tabs: [
+      {
+        id: 'tab-docs',
+        active: true,
+        url: 'https://docs.example.com/notes',
+        title: 'Notes',
+      },
+      {
+        id: 'tab-meet',
+        active: false,
+        url: 'https://meet.google.com/qwe-rtyu-iop',
+        title: 'Project review - Google Meet',
+      },
+    ],
+  }],
+}, {
+  recencyBaseMs: startMs,
+});
+assert.equal(windowSelection.detectedMeeting.platform, 'google_meet');
+assert.equal(windowSelection.detectedMeeting.meeting_id, 'qwe-rtyu-iop');
+assert.equal(windowSelection.candidates.length, 1);
+assert.equal(windowSelection.selectedSnapshot.active, undefined);
+
+const candidateObserver = createLocalMeetingObserver({ source: 'browser_extension' });
+const candidateStart = candidateObserver.observeCandidates({
+  windows: [{
+    focused: true,
+    tabs: [
+      { active: true, url: 'https://mail.example.com', title: 'Mail' },
+      { active: false, url: 'https://meet.google.com/qwe-rtyu-iop', title: 'Project review - Google Meet' },
+    ],
+  }],
+}, {
+  observedAtMs: startMs + 46_000,
+});
+assert.equal(candidateStart.signals.length, 1);
+assert.equal(candidateStart.signals[0].type, 'meeting_started');
+assert.equal(candidateStart.signals[0].meeting.platform, 'google_meet');
+assert.equal(candidateStart.selection.candidates.length, 1);
+
+const candidateEnd = candidateObserver.observeCandidates({
+  tabs: [
+    { active: true, url: 'https://mail.example.com', title: 'Mail' },
+    { active: false, url: 'https://docs.example.com/notes', title: 'Notes' },
+  ],
+}, {
+  observedAtMs: startMs + 47_000,
+});
+assert.equal(candidateEnd.signals.length, 1);
+assert.equal(candidateEnd.signals[0].type, 'meeting_ended');
+assert.equal(candidateObserver.getState().activeMeeting, null);
+
 const clientCalls = [];
 const timelineClient = {
   async startMeeting(payload) {
@@ -125,5 +183,20 @@ assert.equal(timelineEnd.results[0].action, 'endMeeting');
 assert.equal(clientCalls[1].method, 'endMeeting');
 assert.equal(clientCalls[1].payload.meeting_id, 'xyz-abcd-uvw');
 assert.equal(clientCalls[1].payload.end_time_ms, startMs + 60_000);
+
+const timelineCandidateStart = await timelineObserver.observeCandidates({
+  tabs: [
+    {
+      active: true,
+      url: 'https://teams.microsoft.com/l/meetup-join/19%3Ameeting_CANDIDATE%40thread.v2/0',
+      title: 'Candidate Teams meeting',
+    },
+  ],
+}, {
+  observedAtMs: startMs + 70_000,
+});
+assert.equal(timelineCandidateStart.signals[0].meeting.platform, 'microsoft_teams');
+assert.equal(timelineCandidateStart.results[0].action, 'startMeeting');
+assert.equal(clientCalls[2].method, 'startMeeting');
 
 console.log('ok local meeting observer state machine');

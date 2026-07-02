@@ -96,6 +96,135 @@ function sameMeeting(left = {}, right = {}) {
     && String(left.meeting_id || '') === String(right.meeting_id || '');
 }
 
+function nestedBoolean(snapshot = {}, paths = []) {
+  for (const path of paths) {
+    const value = getPath(snapshot, path);
+    if (typeof value === 'boolean') return value;
+  }
+  return undefined;
+}
+
+function numericTime(value) {
+  if (value == null || value === '') return null;
+  try {
+    return normalizeAbsoluteMs(value, 'candidate_time');
+  } catch {
+    const parsed = Date.parse(String(value));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+}
+
+function candidateList(input = {}) {
+  const rows = Array.isArray(input)
+    ? input
+    : firstPath(input, ['snapshots', 'candidates', 'items', 'tabs', 'windows']) ?? [];
+  return rows.flatMap((item) => {
+    if (Array.isArray(item?.tabs)) {
+      const { tabs, ...windowSnapshot } = item;
+      return tabs.map((tab) => compactObject({
+        ...tab,
+        window: windowSnapshot,
+        url: tab.url ?? windowSnapshot.url,
+        title: tab.title ?? windowSnapshot.title,
+      }));
+    }
+    return [item];
+  });
+}
+
+function candidateRecencyMs(snapshot = {}) {
+  return numericTime(firstPath(snapshot, [
+    'lastFocusedAtMs',
+    'last_focused_at_ms',
+    'window.lastFocusedAtMs',
+    'window.last_focused_at_ms',
+    'tab.lastAccessed',
+    'tab.last_accessed',
+    'observedAtMs',
+    'observed_at_ms',
+    'timestampMs',
+    'timestamp_ms',
+  ]));
+}
+
+function confidenceScore(confidence) {
+  if (confidence === 'explicit') return 45;
+  if (confidence === 'high') return 35;
+  if (confidence === 'medium') return 20;
+  if (confidence === 'low') return 5;
+  return 10;
+}
+
+function scoreMeetingCandidate(snapshot = {}, detected = {}, options = {}) {
+  let score = confidenceScore(detected.confidence);
+  if (sameMeeting(detected, options.preferredMeeting ?? options.activeMeeting)) score += 30;
+  if (detected.platform === options.preferredPlatform) score += 12;
+  if (String(detected.meeting_id) === String(options.preferredMeetingId ?? '')) score += 18;
+  if (nestedBoolean(snapshot, ['focused', 'window.focused', 'tab.highlighted']) === true) score += 18;
+  if (nestedBoolean(snapshot, ['tab.active', 'window.active', 'selected']) === true) score += 16;
+  if (snapshot.active === true) score += 8;
+  if (nestedBoolean(snapshot, ['audible', 'tab.audible', 'speaking']) === true) score += 6;
+  if (nestedBoolean(snapshot, ['visible', 'window.visible', 'tab.visible']) !== false) score += 4;
+  if (snapshot.active === false) score -= 2;
+  const recency = candidateRecencyMs(snapshot);
+  if (recency != null) score += Math.min(10, Math.max(0, (recency - Number(options.recencyBaseMs ?? 0)) / 60_000));
+  return score;
+}
+
+function closedCandidate(snapshot = {}) {
+  return snapshot.closed === true
+    || snapshot.in_meeting === false
+    || snapshot.inMeeting === false
+    || snapshot.visible === false
+    || snapshot.window?.visible === false
+    || snapshot.tab?.visible === false
+    || snapshot.discarded === true
+    || snapshot.tab?.discarded === true;
+}
+
+function safeCandidateSnapshot(snapshot = {}, selected = {}) {
+  const safe = {
+    ...snapshot,
+    active: snapshot.in_meeting ?? snapshot.inMeeting ?? undefined,
+    selected_from_candidates: true,
+    selection: {
+      score: selected.score,
+      rank: selected.rank,
+      candidate_count: selected.candidate_count,
+    },
+    candidate_raw: snapshot,
+  };
+  return compactObject(safe);
+}
+
+export function selectMeetingSnapshot(input = {}, options = {}) {
+  const rows = candidateList(input);
+  const candidates = rows
+    .map((snapshot, index) => {
+      const detectedMeeting = meetingFromSnapshot(snapshot);
+      if (!detectedMeeting || closedCandidate(snapshot)) return null;
+      return {
+        index,
+        snapshot,
+        detectedMeeting,
+        score: scoreMeetingCandidate(snapshot, detectedMeeting, options),
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .map((candidate, rank, all) => ({
+      ...candidate,
+      rank,
+      candidate_count: all.length,
+    }));
+  const selected = candidates[0] ?? null;
+  return {
+    selectedSnapshot: selected ? safeCandidateSnapshot(selected.snapshot, selected) : null,
+    detectedMeeting: selected?.detectedMeeting ?? null,
+    candidates,
+  };
+}
+
 function observerSignal(type, meeting, atMs, snapshot = {}, options = {}) {
   return compactObject({
     type,
@@ -208,6 +337,27 @@ export function createLocalMeetingObserver(options = {}) {
       state = result.state;
       return result;
     },
+    observeCandidates(candidates = [], observeOptions = {}) {
+      const selected = selectMeetingSnapshot(candidates, {
+        ...options,
+        ...observeOptions,
+        activeMeeting: state.activeMeeting,
+      });
+      const snapshot = selected.selectedSnapshot ?? {
+        active: false,
+        observedAtMs: observeOptions.observedAtMs ?? observeOptions.receivedAtMs,
+        candidate_count: selected.candidates.length,
+      };
+      const result = observeMeetingSnapshot(state, snapshot, {
+        ...options,
+        ...observeOptions,
+      });
+      state = result.state;
+      return {
+        ...result,
+        selection: selected,
+      };
+    },
     getState() {
       return state;
     },
@@ -229,6 +379,20 @@ export function createLocalMeetingTimelineObserver(client, options = {}) {
     async observe(snapshot = {}, observeOptions = {}) {
       const next = splitTimelineObserverOptions(observeOptions);
       const observed = observer.observe(snapshot, next.observerOptions);
+      const results = observed.signals.length === 0
+        ? []
+        : await applyMeetingSignals(client, observed.signals, {
+          ...base.applyOptions,
+          ...next.applyOptions,
+        });
+      return {
+        ...observed,
+        results,
+      };
+    },
+    async observeCandidates(candidates = [], observeOptions = {}) {
+      const next = splitTimelineObserverOptions(observeOptions);
+      const observed = observer.observeCandidates(candidates, next.observerOptions);
       const results = observed.signals.length === 0
         ? []
         : await applyMeetingSignals(client, observed.signals, {
