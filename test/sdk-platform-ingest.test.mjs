@@ -52,6 +52,7 @@ assert.equal(normalizedLocalDetector.source, 'local_detector');
 assert.equal(normalizedLocalDetector.signals[0].type, 'meeting_started');
 assert.equal(normalizedLocalDetector.signals[0].meeting.platform, 'google_meet');
 assert.equal(normalizedLocalDetector.signals[0].meeting.meeting_id, 'local-google-meet-001');
+assert.equal(normalizedLocalDetector.signals[0].occurred_at_ms, startMs);
 
 const normalized = normalizePlatformEvent('meet', googleStartEvent);
 assert.equal(normalized.platform, 'google_meet');
@@ -97,6 +98,7 @@ assert.equal(localDetectorStartResult.platform, 'local_detector');
 assert.equal(localDetectorStartResult.results[0].action, 'startMeeting');
 assert.equal(calls.at(-1).input.platform, 'google_meet');
 assert.equal(calls.at(-1).input.detector_source, 'google_meet_local_detector');
+assert.equal(calls.at(-1).input.start_time_ms, startMs);
 
 const larkStartResult = await ingestPlatformEvent(client, 'lark-suite', larkStartEvent);
 assert.equal(larkStartResult.platform, 'lark');

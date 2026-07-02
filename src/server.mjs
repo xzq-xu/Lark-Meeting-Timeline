@@ -2192,8 +2192,8 @@ function rebasePendingSequence(sequence = [], meeting = {}) {
   return rebaseAnnotationSequence(sequence, meeting);
 }
 
-function canOpenSessionCarryIntoMeeting(current = {}, meeting = {}) {
-  if (current.meeting?.source !== 'open_meeting_session') return false;
+function canLocalSessionCarryIntoMeeting(current = {}, meeting = {}) {
+  if (!['open_meeting_session', 'local_detector'].includes(current.meeting?.source)) return false;
   if (current.meeting?.end_time) return false;
   if (sameMeeting(current.meeting, meeting)) return true;
   const currentStartMs = parseAbsoluteMs(current.meeting?.start_time);
@@ -2207,7 +2207,7 @@ function shouldCarrySequenceIntoNewAxis(current = {}, meeting = {}) {
   if (current.meeting?.pending_binding) return true;
   if (current.meeting?.source === 'local_simulation') return true;
   if (current.meeting?.source === 'lark_reserve_pending') return true;
-  if (current.meeting?.source === 'open_meeting_session') return canOpenSessionCarryIntoMeeting(current, meeting);
+  if (['open_meeting_session', 'local_detector'].includes(current.meeting?.source)) return canLocalSessionCarryIntoMeeting(current, meeting);
   if (isRealMeetingAxis(current.meeting)) return sameMeeting(current.meeting, meeting);
   return false;
 }
@@ -3643,6 +3643,7 @@ function isRealMeetingAxis(meeting = {}) {
     'lark_meeting_lookup_api',
     'lark_probe_auto_search',
     'lark_passive_meeting_scan',
+    'local_detector',
     'google_meet_webhook',
     'microsoft_teams_webhook',
     'zoom_webhook',

@@ -57,7 +57,9 @@ function eventTypeOf(raw = {}) {
 function eventTimestampMs(raw = {}, type = eventTypeOf(raw), options = {}) {
   const input = firstNonEmpty(
     type === 'meeting_started' ? firstPath(raw, ['meeting.start_time_ms', 'meeting.startTimeMs', 'meeting.start_time', 'meeting.startTime']) : undefined,
+    type === 'meeting_started' ? firstPath(raw, ['start_time_ms', 'startTimeMs', 'start_time', 'startTime', 'meeting_start_time_ms', 'meetingStartTimeMs']) : undefined,
     type === 'meeting_ended' ? firstPath(raw, ['meeting.end_time_ms', 'meeting.endTimeMs', 'meeting.end_time', 'meeting.endTime']) : undefined,
+    type === 'meeting_ended' ? firstPath(raw, ['end_time_ms', 'endTimeMs', 'end_time', 'endTime', 'meeting_end_time_ms', 'meetingEndTimeMs']) : undefined,
     firstPath(raw, [
       'occurred_at_ms',
       'occurredAtMs',
