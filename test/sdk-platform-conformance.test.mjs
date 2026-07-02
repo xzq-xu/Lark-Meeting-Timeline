@@ -68,6 +68,7 @@ for (const platform of MEETING_PLATFORM_KEYS) {
   assert.equal(plan.realtime_axis.signal_types.includes('meeting_started'), true);
   assert.equal(plan.realtime_axis.signal_types.includes('meeting_ended'), true);
   assert.equal(plan.realtime_axis.local_observer.session_discovery_module, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-session-discovery');
+  assert.equal(plan.realtime_axis.local_observer.browser_meeting_module, '@ai-annotation/meeting-timeline-sdk/adapters/browser-meeting');
   assert.equal(plan.speaker_activity.active_speaker_module, '@ai-annotation/meeting-timeline-sdk/adapters/active-speaker');
   assert.equal(plan.realtime_annotations.required_field, 'captured_at_ms');
   assert.equal(typeof plan.post_meeting_transcript.strategy, 'string');
@@ -77,6 +78,7 @@ for (const platform of MEETING_PLATFORM_KEYS) {
   assert.equal(capability.sdk_modules.local_observer, '@ai-annotation/meeting-timeline-sdk/adapters/local-observer');
   assert.equal(capability.sdk_modules.session_discovery, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-session-discovery');
   assert.equal(capability.sdk_modules.active_speaker, '@ai-annotation/meeting-timeline-sdk/adapters/active-speaker');
+  assert.equal(capability.sdk_modules.browser_meeting, '@ai-annotation/meeting-timeline-sdk/adapters/browser-meeting');
   assert.equal(capability.sdk_modules.ingest, '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest');
   assert.equal(capability.sdk_modules.timeline_bridge, '@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge');
   assert.equal(capability.sdk_modules.signal_reconciler, '@ai-annotation/meeting-timeline-sdk/adapters/signal-reconciler');

@@ -91,6 +91,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/local-observer`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-session-discovery`
 - `@ai-annotation/meeting-timeline-sdk/adapters/active-speaker`
+- `@ai-annotation/meeting-timeline-sdk/adapters/browser-meeting`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
 - `@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge`
@@ -162,6 +163,43 @@ await discovery.observeEnvironment({
 ```
 
 `meeting-session-discovery` 会优先使用 URL 中的真实会议 ID；如果 native app 没有 URL，会在明确 `inMeeting: true` 或标题/进程足够像会议窗口时生成稳定的本地 `native-{platform}-...` 会话 ID。后续收到官方 webhook 时可以继续用 `signal-reconciler` 或 `platform-ingest` 做校准/回填。
+
+浏览器会议推荐用更高层的 `browser-meeting`。它面向浏览器扩展、Electron wrapper、自动化采集器或桌面宿主进程，输入可以是 tabs/windows/page/dom 快照；SDK 会同时完成会议会话发现和 active speaker 滤波：
+
+```js
+import { createBrowserMeetingTimelineObserver } from '@ai-annotation/meeting-timeline-sdk/adapters/browser-meeting';
+
+const browserMeetings = createBrowserMeetingTimelineObserver(timeline, {
+  source: 'browser_extension',
+  speakerOptions: {
+    minStableMs: 300,
+    switchStableMs: 400,
+    endIdleMs: 1500,
+  },
+  applyOptions: { speakerAsAnnotation: true },
+});
+
+await browserMeetings.observe({
+  windows: [{
+    id: 'win-1',
+    focused: true,
+    tabs: [{
+      id: 'meet-tab',
+      active: true,
+      audible: true,
+      url: 'https://meet.google.com/abc-defg-hij',
+      title: 'Review - Google Meet',
+      page: {
+        inMeeting: true,
+        activeSpeaker: { id: 'speaker-ada', name: 'Ada', speaking: true },
+      },
+    }],
+  }],
+  observedAtMs: Date.now(),
+});
+```
+
+这条路径同样适用于 Teams Web、Zoom Web、Webex Web 和 Lark/Feishu Web：平台和会议 ID 优先从 URL 解析，`page.activeSpeaker` / `dom.activeSpeaker` / `participants[].speaking` 会归一化成 `speaker_started/ended`。如果官方 webhook 之后到达，再用 reconciler 校准；实时标注不要等待官方事件。
 
 如果业务项目要接入多个会议平台，推荐从 `platform-kit` 开始。它把 `timeline-bridge`、webhook router、平台 setup/onboarding、fixture acceptance 组合成一个入口；底层 normalizer、验签、artifact fetch 仍然可以按需单独 import：
 
