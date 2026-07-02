@@ -78,6 +78,7 @@ for (const platform of MEETING_PLATFORM_KEYS) {
   assert.equal(capability.sdk_modules.signal_reconciler, '@ai-annotation/meeting-timeline-sdk/adapters/signal-reconciler');
   assert.equal(capability.sdk_modules.webhook_handler, '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler');
   assert.equal(capability.sdk_modules.acceptance, '@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance');
+  assert.equal(capability.sdk_modules.artifact_plan, '@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan');
   assert.equal(typeof capability.sdk_modules.transcript, 'string');
   assert.equal(typeof capability.sdk_modules.setup, 'string');
   assert.equal(typeof capability.sdk_modules.security, 'string');

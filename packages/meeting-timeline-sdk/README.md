@@ -95,6 +95,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/signal-reconciler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance`
+- `@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan`
 - `@ai-annotation/meeting-timeline-sdk/adapters/transcript`
 - `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-setup`
@@ -341,7 +342,17 @@ await ingestPlatformEvent(timeline, 'local-detector', {
 
 ## 会后转写导入
 
-事件 adapter 只负责告诉你 transcript/recording 已生成；正文内容建议会后拉取后再导入。SDK 提供平台中性的 `importTranscript()`，也提供更高层的 `importPlatformTranscript()`，会按 `platform` 自动选择 normalizer 并导入：
+事件 adapter 只负责告诉你 transcript/recording 已生成；正文内容建议会后拉取后再导入。`artifact-plan` 可以把 `artifact_ready` signal 转成平台相关的补拉/导入计划，告诉宿主应该用哪个 provider API、哪个 transcript normalizer，以及是否只是录制 metadata：
+
+```js
+import { buildArtifactImportPlans } from '@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan';
+
+const plans = buildArtifactImportPlans(platformIngestResult);
+// plans[0].fetch.strategy === 'google_meet_rest_transcript_entries'
+// plans[0].transcript_import.normalizer === 'normalizeGoogleMeetTranscriptEntries'
+```
+
+SDK 提供平台中性的 `importTranscript()`，也提供更高层的 `importPlatformTranscript()`，会按 `platform` 自动选择 normalizer 并导入：
 
 ```js
 import { createMeetingTimelineClient } from '@ai-annotation/meeting-timeline-sdk';
