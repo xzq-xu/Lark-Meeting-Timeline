@@ -212,6 +212,22 @@ const result = await handleWebhook({
 res.status(result.status).set(result.headers).send(result.body);
 ```
 
+验收真实平台样本时可以走同一个 handler 的 dry-run 模式：传 `dryRun: true`、`diagnoseOnly: true`，或在 URL query 里加 `?diagnose=1` / `?dry_run=1`。handler 仍会先做平台验证，但只返回 `diagnostic`，不会调用 `startMeeting` / `endMeeting` / `insertMark`，也不会污染共享 reconciler 状态：
+
+```js
+const diagnosticResult = await handleWebhook({
+  platform: 'google-meet',
+  method: req.method,
+  url: `${req.url}?diagnose=1`,
+  headers: req.headers,
+  body: req.body,
+  rawBody: req.rawBody,
+});
+
+console.log(diagnosticResult.body.diagnostic.coverage);
+console.log(diagnosticResult.body.diagnostic.issues);
+```
+
 如果多个 HTTP endpoint 分别接 Google Meet、Teams、Zoom、Webex，但最终写同一个 timeline，可以把同一个 handler 或 `createReconciledPlatformEventIngestor()` 传给这些 endpoint，避免每个 endpoint 维护一份去重状态。`handleWebhook.getReconciliationState()` 可以用于诊断当前活跃会议、已处理 fingerprint 和最近发言人信号；测试或切换账号时可调用 `handleWebhook.resetReconciliationState()` 清空状态。
 
 本地观察器或汉王宿主 App 也可以走同一个 handler，只是默认验证结果会是 `platform_verification_not_configured`：

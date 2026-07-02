@@ -1,6 +1,7 @@
 import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
 import {
   createReconciledPlatformEventIngestor,
+  diagnosePlatformEvent,
   ingestPlatformEvent,
 } from './platform-ingest.mjs';
 import { meetingPlatformEventAdapterFor } from './platform-registry.mjs';
@@ -79,6 +80,12 @@ function requestSearchParams(input = {}) {
   return params;
 }
 
+function truthyFlag(value) {
+  if (value === true) return true;
+  if (value === false || value == null) return false;
+  return ['1', 'true', 'yes', 'y', 'on'].includes(String(value).trim().toLowerCase());
+}
+
 function platformEventPayload(body = {}) {
   if (Array.isArray(body)) return body;
   if (body?.raw_event !== undefined) return body.raw_event;
@@ -110,6 +117,34 @@ function publicIngestResult(result = {}, verification = null) {
     reconciliation: result.reconciliation,
     results: result.results,
   });
+}
+
+function publicDiagnosticResult(diagnostic = {}, verification = null) {
+  return compactObject({
+    ok: diagnostic.ok === true,
+    mode: 'diagnose',
+    verification,
+    diagnostic,
+  });
+}
+
+function diagnoseOnlyEnabled(input = {}, options = {}, searchParams = new URLSearchParams()) {
+  return Boolean(
+    truthyFlag(options.diagnoseOnly)
+      || truthyFlag(options.diagnose_only)
+      || truthyFlag(options.dryRun)
+      || truthyFlag(options.dry_run)
+      || truthyFlag(options.diagnose)
+      || truthyFlag(input.diagnoseOnly)
+      || truthyFlag(input.diagnose_only)
+      || truthyFlag(input.dryRun)
+      || truthyFlag(input.dry_run)
+      || truthyFlag(input.diagnose)
+      || truthyFlag(searchParams.get('diagnose'))
+      || truthyFlag(searchParams.get('diagnose_only'))
+      || truthyFlag(searchParams.get('dryRun'))
+      || truthyFlag(searchParams.get('dry_run')),
+  );
 }
 
 function reconcileEnabled(options = {}) {
@@ -263,6 +298,13 @@ export async function handlePlatformWebhookRequest(client, input = {}, options =
         reconcileOptions: options.reconcileOptions ?? options.reconcile_options,
       },
     };
+    if (diagnoseOnlyEnabled(input, options, searchParams)) {
+      const diagnostic = diagnosePlatformEvent(ingestInput, undefined, {
+        includeRawSignals: options.includeRawSignals,
+        include_raw_signals: options.include_raw_signals,
+      });
+      return jsonResponse(200, publicDiagnosticResult(diagnostic, verification));
+    }
     const reconciledIngestor = reconciledIngestorFor(client, options);
     const result = reconciledIngestor
       ? await reconciledIngestor.ingest(ingestInput)
@@ -297,7 +339,10 @@ export function createPlatformWebhookHandler(client, defaults = {}) {
       ...defaults,
       ...options,
     };
-    const reconciledIngestor = ensureReconciledIngestor(mergedOptions);
+    const searchParams = requestSearchParams(input);
+    const reconciledIngestor = diagnoseOnlyEnabled(input, mergedOptions, searchParams)
+      ? null
+      : ensureReconciledIngestor(mergedOptions);
     return handlePlatformWebhookRequest(client, {
       ...input,
       platform: firstNonEmpty(input.platform, defaults.platform),

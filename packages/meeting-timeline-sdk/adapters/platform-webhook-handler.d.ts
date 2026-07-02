@@ -2,6 +2,7 @@ import type { MeetingTimelineClient } from '../index.mjs';
 import type {
   PlatformEventIngestInput,
   PlatformEventIngestOptions,
+  PlatformEventDiagnosticResult,
   PlatformEventIngestResult,
   ReconciledPlatformEventIngestResult,
 } from './platform-ingest.mjs';
@@ -27,6 +28,11 @@ export interface PlatformWebhookRequestInput {
   receivedAtMs?: number | string | Date;
   received_at_ms?: number | string | Date;
   received_at?: number | string | Date;
+  diagnose?: boolean | string | number;
+  diagnoseOnly?: boolean | string | number;
+  diagnose_only?: boolean | string | number;
+  dryRun?: boolean | string | number;
+  dry_run?: boolean | string | number;
 }
 
 export interface PlatformWebhookSignalReconciler {
@@ -51,6 +57,13 @@ export interface PlatformWebhookReconciledIngestor {
 export interface PlatformWebhookHandlerOptions {
   platform?: string;
   verify?: boolean;
+  diagnose?: boolean | string | number;
+  diagnoseOnly?: boolean | string | number;
+  diagnose_only?: boolean | string | number;
+  dryRun?: boolean | string | number;
+  dry_run?: boolean | string | number;
+  includeRawSignals?: boolean;
+  include_raw_signals?: boolean;
   reconcile?: boolean;
   reconciled?: boolean;
   receivedAtMs?: number | string | Date;
@@ -110,6 +123,13 @@ export interface PlatformWebhookIngestBody extends Omit<PlatformEventIngestResul
   raw_signal_count?: number;
   signal_count: number;
   reconciliation?: MeetingSignalReconciliationResult;
+}
+
+export interface PlatformWebhookDiagnosticBody {
+  ok: boolean;
+  mode: 'diagnose';
+  verification?: WebhookVerificationResult | null;
+  diagnostic: PlatformEventDiagnosticResult;
 }
 
 export interface PlatformWebhookHandler {

@@ -143,6 +143,29 @@ assert.equal(googleStart.body.results[0].action, 'startMeeting');
 assert.equal(calls.at(-1).input.platform, 'google_meet');
 assert.equal(calls.at(-1).input.meeting_id, 'google-handler-001');
 
+const callCountBeforeGoogleDiagnostic = calls.length;
+const googleDiagnostic = await handlePlatformWebhookRequest(client, {
+  platform: 'google-meet',
+  method: 'POST',
+  url: 'https://timeline.example.com/api/platform-events/google-meet?diagnose=1',
+  headers: { authorization: 'Bearer google-handler-token' },
+  body: googleWrapped,
+}, {
+  googleMeet: {
+    preferBearer: true,
+    bearerToken: 'google-handler-token',
+  },
+  includeRawSignals: true,
+});
+assert.equal(googleDiagnostic.status, 200);
+assert.equal(googleDiagnostic.body.mode, 'diagnose');
+assert.equal(googleDiagnostic.body.verification.reason, 'verified');
+assert.equal(googleDiagnostic.body.diagnostic.ok, true);
+assert.equal(googleDiagnostic.body.diagnostic.signal_count, 1);
+assert.equal(googleDiagnostic.body.diagnostic.coverage.meeting_start, true);
+assert.equal(googleDiagnostic.body.diagnostic.raw_signals.length, 1);
+assert.equal(calls.length, callCountBeforeGoogleDiagnostic);
+
 const localDetector = await handler({
   platform: 'local-detector',
   method: 'POST',
@@ -208,6 +231,18 @@ const localStartBody = {
   start_time_ms: startMs + 20_000,
   title: 'SDK handler reconciled Google Meet',
 };
+const reconciledDryRun = await reconciledHandler({
+  platform: 'local-detector',
+  method: 'POST',
+  dryRun: true,
+  body: localStartBody,
+});
+assert.equal(reconciledDryRun.status, 200);
+assert.equal(reconciledDryRun.body.mode, 'diagnose');
+assert.equal(reconciledDryRun.body.diagnostic.signal_count, 1);
+assert.equal(reconciledCalls.length, 0);
+assert.equal(reconciledHandler.getReconciliationState(), null);
+
 const reconciledLocalStart = await reconciledHandler({
   platform: 'local-detector',
   method: 'POST',
