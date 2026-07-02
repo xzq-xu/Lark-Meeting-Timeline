@@ -131,6 +131,16 @@ export function platformCapabilityContract(platform: string, options?: PlatformS
 export function allPlatformCapabilityContracts(options?: PlatformSetupOptions): Record<string, unknown>[];
 export function platformSetupManifest(platform: string, options?: PlatformSetupOptions): Record<string, unknown>;
 export function allPlatformSetupManifests(options?: PlatformSetupOptions): Record<string, unknown>[];
+export function buildPlatformPermissionPlan(platform: string, options?: PlatformSetupOptions & {
+  features?: string[] | string;
+  featureSet?: string[] | string;
+  feature_set?: string[] | string;
+}): Record<string, unknown>;
+export function allPlatformPermissionPlans(options?: PlatformSetupOptions & {
+  features?: string[] | string;
+  featureSet?: string[] | string;
+  feature_set?: string[] | string;
+}): Record<string, unknown>[];
 export function buildPlatformIntegrationPlan(platform: string, options?: PlatformSetupOptions & {
   axisMode?: string;
   axis_mode?: string;

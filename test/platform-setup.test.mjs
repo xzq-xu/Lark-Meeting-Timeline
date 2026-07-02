@@ -10,10 +10,12 @@ import {
   ZOOM_MEETING_EVENT_TYPES,
   allPlatformCapabilityContracts,
   allPlatformIntegrationPlans,
+  allPlatformPermissionPlans,
   allPlatformSetupManifests,
   buildGoogleMeetWorkspaceSubscriptionRequest,
   buildGoogleWorkspaceSubscriptionRenewalRequest,
   buildPlatformIntegrationPlan,
+  buildPlatformPermissionPlan,
   buildMicrosoftTeamsMeetingCallSubscriptionRequest,
   buildMicrosoftGraphSubscriptionRenewalRequest,
   buildPlatformSetup,
@@ -65,6 +67,7 @@ assert.equal(googleManifest.endpoint, 'https://timeline.example.com/api/platform
 assert.equal(googleManifest.default_event_types.includes('google.workspace.meet.conference.v2.started'), true);
 assert.equal(googleManifest.lifecycle_event_types.includes('google.workspace.events.subscription.v1.expirationReminder'), true);
 assert.equal(googleManifest.required_security_env.includes('GOOGLE_PUBSUB_OIDC_AUDIENCE'), true);
+assert.equal(googleManifest.required_scopes.includes('https://www.googleapis.com/auth/meetings.space.readonly'), true);
 assert.equal(GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES.includes('google.workspace.events.subscription.v1.expired'), true);
 assert.equal(googleManifest.capabilities.realtime_axis.status, 'supported_best_effort');
 assert.equal(googleManifest.capabilities.speaker_activity.status, 'not_supported_by_workspace_events');
@@ -76,6 +79,26 @@ const googleCapabilities = platformCapabilityContract('google-meet', { baseUrl }
 assert.equal(googleCapabilities.endpoints.platform_events, 'https://timeline.example.com/api/platform-events/google-meet');
 assert.equal(googleCapabilities.realtime_transcript.status, 'not_supported');
 assert.equal(googleCapabilities.limitations.includes('transcript_entries_may_differ_from_google_docs_transcript'), true);
+
+const googlePermissionPlan = buildPlatformPermissionPlan('google-meet', {
+  baseUrl,
+  env: {
+    GOOGLE_PUBSUB_OIDC_AUDIENCE: 'https://timeline.example.com/api/platform-events/google-meet',
+  },
+  features: ['realtime-axis', 'participants', 'transcript', 'recording', 'security'],
+});
+assert.deepEqual(googlePermissionPlan.selected_features, [
+  'realtime_axis',
+  'participant_track',
+  'post_meeting_transcript',
+  'recording',
+  'webhook_security',
+]);
+assert.equal(googlePermissionPlan.required_scopes.includes('https://www.googleapis.com/auth/meetings.space.readonly'), true);
+assert.equal(googlePermissionPlan.required_scopes.some((item) => item.includes('drive.meet.readonly')), true);
+assert.equal(googlePermissionPlan.feature_plans.some((item) => item.event_types.includes('google.workspace.meet.transcript.v2.fileGenerated')), true);
+assert.deepEqual(googlePermissionPlan.missing_security_env, []);
+assert.equal(googlePermissionPlan.readiness.ready, true);
 
 const googlePlan = buildPlatformIntegrationPlan('google-meet', {
   baseUrl,
@@ -134,6 +157,15 @@ assert.equal(teamsManifest.lifecycle_events.includes('reauthorizationRequired'),
 assert.equal(MICROSOFT_GRAPH_LIFECYCLE_EVENTS.includes('subscriptionRemoved'), true);
 assert.equal(teamsManifest.capabilities.post_meeting_transcript.sdk_normalizer, 'normalizeMicrosoftTeamsTranscript');
 assert.equal(teamsManifest.capabilities.subscription_lifecycle.status, 'supported');
+const teamsPermissionPlan = buildPlatformPermissionPlan('teams', {
+  baseUrl,
+  env: { MICROSOFT_GRAPH_CLIENT_STATE: 'teams-state' },
+  features: ['axis', 'roster', 'transcript', 'recording'],
+});
+assert.equal(teamsPermissionPlan.required_permissions.includes('OnlineMeetings.Read.All or OnlineMeetings.ReadWrite.All'), true);
+assert.equal(teamsPermissionPlan.required_permissions.includes('OnlineMeetingTranscript.Read.All or OnlineMeetingTranscript.Read.Chat for resource-specific consent'), true);
+assert.equal(teamsPermissionPlan.required_permissions.includes('OnlineMeetingRecording.Read.All'), true);
+assert.deepEqual(teamsPermissionPlan.missing_security_env, []);
 
 const zoomRequest = buildZoomEventSubscriptionRequest({
   webhookUrl: 'https://timeline.example.com/api/platform-events/zoom',
@@ -146,6 +178,11 @@ assert.equal(zoomRequest.account_id, 'zoom-account-1');
 const zoomCapabilities = platformCapabilityContract('zoom', { baseUrl });
 assert.equal(zoomCapabilities.subscription_lifecycle.status, 'not_applicable');
 assert.equal(zoomCapabilities.post_meeting_transcript.sdk_normalizer, 'normalizeZoomTranscript');
+const zoomPermissionPlan = buildPlatformPermissionPlan('zoom', { baseUrl, env: {}, features: 'axis participants recording security' });
+assert.equal(zoomPermissionPlan.required_scopes.includes('meeting:read:meeting or meeting:read:meeting:admin'), true);
+assert.equal(zoomPermissionPlan.required_scopes.includes('meeting:read:participant or meeting:read:participant:admin'), true);
+assert.deepEqual(zoomPermissionPlan.missing_security_env, ['ZOOM_WEBHOOK_SECRET_TOKEN']);
+assert.equal(zoomPermissionPlan.readiness.ready, false);
 
 const zoomSetup = buildPlatformSetup('zoom', {
   baseUrl,
@@ -180,6 +217,14 @@ const webexManifest = platformSetupManifest('webex', { baseUrl });
 assert.equal(webexManifest.required_scopes.includes('meeting:transcripts_read'), true);
 assert.equal(webexManifest.capabilities.post_meeting_transcript.sdk_normalizer, 'normalizeWebexTranscript');
 assert.equal(webexManifest.capabilities.realtime_axis.status, 'supported_best_effort');
+const webexPermissionPlan = buildPlatformPermissionPlan('webex', {
+  baseUrl,
+  env: { WEBEX_WEBHOOK_SECRET: 'webex-secret' },
+  features: ['axis', 'participants', 'transcript', 'recording', 'security'],
+});
+assert.equal(webexPermissionPlan.required_scopes.includes('meeting:participants_read'), true);
+assert.equal(webexPermissionPlan.admin_scopes.includes('meeting:admin_participants_read'), true);
+assert.deepEqual(webexPermissionPlan.missing_security_env, []);
 
 const all = allPlatformSetupManifests({ baseUrl });
 assert.equal(all.length, 6);
@@ -191,6 +236,10 @@ const allPlans = allPlatformIntegrationPlans({ baseUrl });
 assert.deepEqual(allPlans.map((item) => item.platform), ['local_detector', 'lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex']);
 assert.equal(allPlans.every((item) => item.realtime_annotations.required_field === 'captured_at_ms'), true);
 assert.equal(allPlans.find((item) => item.platform === 'microsoft_teams').provider_events.event_types.includes('created'), true);
+const allPermissionPlans = allPlatformPermissionPlans({ baseUrl });
+assert.deepEqual(allPermissionPlans.map((item) => item.platform), ['local_detector', 'lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex']);
+assert.equal(allPermissionPlans.find((item) => item.platform === 'lark').required_permissions.includes('vc:meeting.all_meeting:readonly'), true);
+assert.equal(allPermissionPlans.find((item) => item.platform === 'local_detector').required_permissions.length, 0);
 
 const googleReady = evaluatePlatformSetupReadiness('google-meet', {
   baseUrl,

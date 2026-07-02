@@ -429,6 +429,189 @@ const platformCapabilityContracts = Object.freeze({
 
 const platformAliases = new Map(Object.entries(MEETING_PLATFORM_ALIASES));
 
+const PLATFORM_PERMISSION_FEATURE_ALIASES = Object.freeze({
+  realtime: 'realtime_axis',
+  realtime_axis: 'realtime_axis',
+  axis: 'realtime_axis',
+  meeting_axis: 'realtime_axis',
+  meeting_lifecycle: 'realtime_axis',
+  lifecycle: 'subscription_lifecycle',
+  subscription: 'subscription_lifecycle',
+  subscription_lifecycle: 'subscription_lifecycle',
+  participant: 'participant_track',
+  participants: 'participant_track',
+  participant_track: 'participant_track',
+  roster: 'participant_track',
+  speaker: 'speaker_activity',
+  speakers: 'speaker_activity',
+  speaker_activity: 'speaker_activity',
+  active_speaker: 'speaker_activity',
+  transcript: 'post_meeting_transcript',
+  transcripts: 'post_meeting_transcript',
+  minutes: 'post_meeting_transcript',
+  post_meeting_transcript: 'post_meeting_transcript',
+  recording: 'recording',
+  recordings: 'recording',
+  artifact: 'artifact',
+  artifacts: 'artifact',
+  security: 'webhook_security',
+  webhook_security: 'webhook_security',
+  acceptance: 'acceptance',
+  diagnostics: 'acceptance',
+});
+
+const PLATFORM_DEFAULT_PERMISSION_FEATURES = Object.freeze([
+  'realtime_axis',
+  'participant_track',
+  'speaker_activity',
+  'post_meeting_transcript',
+  'recording',
+  'subscription_lifecycle',
+  'webhook_security',
+]);
+
+const PLATFORM_PERMISSION_REQUIREMENTS = Object.freeze({
+  local_detector: {
+    realtime_axis: {
+      signal_types: ['meeting_started', 'meeting_ended'],
+      event_types: ['meeting_started', 'meeting_ended'],
+      setup: ['Host app must send absolute meeting start/end timestamps.'],
+    },
+    participant_track: {
+      signal_types: ['participant_joined', 'participant_left'],
+      event_types: ['participant_joined', 'participant_left'],
+      setup: ['Optional: host observer must expose roster changes.'],
+    },
+    speaker_activity: {
+      signal_types: ['speaker_started', 'speaker_ended'],
+      event_types: ['speaker_started', 'speaker_ended'],
+      setup: ['Optional: host observer must expose active-speaker changes.'],
+    },
+  },
+  lark: {
+    realtime_axis: {
+      permissions: ['vc:meeting.all_meeting:readonly'],
+      event_types: [
+        'vc.meeting.all_meeting_started_v1',
+        'vc.meeting.all_meeting_ended_v1',
+        'vc.meeting.meeting_started_v1',
+        'vc.meeting.meeting_ended_v1',
+      ],
+    },
+    participant_track: {
+      permissions: ['vc:meeting.all_meeting:readonly'],
+      event_types: ['vc.meeting.join_meeting_v1', 'vc.meeting.leave_meeting_v1'],
+    },
+    post_meeting_transcript: {
+      permissions: [
+        'minutes:minutes.search:read',
+        'minutes:minutes.basic:read',
+        'minutes:minutes.transcript:export',
+      ],
+    },
+  },
+  google_meet: {
+    realtime_axis: {
+      scopes: ['https://www.googleapis.com/auth/meetings.space.readonly'],
+      event_types: [
+        'google.workspace.meet.conference.v2.started',
+        'google.workspace.meet.conference.v2.ended',
+      ],
+    },
+    participant_track: {
+      scopes: ['https://www.googleapis.com/auth/meetings.space.readonly'],
+      event_types: [
+        'google.workspace.meet.participant.v2.joined',
+        'google.workspace.meet.participant.v2.left',
+      ],
+    },
+    post_meeting_transcript: {
+      scopes: [
+        'https://www.googleapis.com/auth/meetings.space.readonly',
+        'https://www.googleapis.com/auth/drive.meet.readonly',
+      ],
+      event_types: ['google.workspace.meet.transcript.v2.fileGenerated'],
+      setup: ['Use the Meet event to know an artifact exists; use Drive meet-readonly scope to fetch the transcript file.'],
+    },
+    recording: {
+      scopes: [
+        'https://www.googleapis.com/auth/meetings.space.readonly',
+        'https://www.googleapis.com/auth/drive.meet.readonly',
+      ],
+      event_types: ['google.workspace.meet.recording.v2.fileGenerated'],
+      setup: ['Use Drive meet-readonly scope for generated Meet recording artifacts.'],
+    },
+    subscription_lifecycle: {
+      scopes: ['https://www.googleapis.com/auth/meetings.space.readonly'],
+      event_types: GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES,
+    },
+  },
+  microsoft_teams: {
+    realtime_axis: {
+      permissions: ['OnlineMeetings.Read.All or OnlineMeetings.ReadWrite.All'],
+      event_types: ['meetingCallEvents.created', 'meetingCallEvents.updated'],
+    },
+    participant_track: {
+      permissions: ['OnlineMeetings.Read.All or OnlineMeetings.ReadWrite.All'],
+      event_types: ['meetingCallEvents.updated'],
+      setup: ['Use rich notifications when possible to avoid follow-up reads for roster changes.'],
+    },
+    post_meeting_transcript: {
+      permissions: ['OnlineMeetingTranscript.Read.All or OnlineMeetingTranscript.Read.Chat for resource-specific consent'],
+      event_types: ['callTranscript.created'],
+    },
+    recording: {
+      permissions: ['OnlineMeetingRecording.Read.All'],
+      event_types: ['callRecording.created'],
+    },
+    subscription_lifecycle: {
+      permissions: ['OnlineMeetings.Read.All or OnlineMeetings.ReadWrite.All'],
+      event_types: MICROSOFT_GRAPH_LIFECYCLE_EVENTS,
+    },
+  },
+  zoom: {
+    realtime_axis: {
+      scopes: ['meeting:read:meeting or meeting:read:meeting:admin'],
+      event_types: ['meeting.started', 'meeting.ended'],
+    },
+    participant_track: {
+      scopes: ['meeting:read:participant or meeting:read:participant:admin'],
+      event_types: ['meeting.participant_joined', 'meeting.participant_left'],
+    },
+    post_meeting_transcript: {
+      scopes: ['cloud_recording:read:recording or cloud_recording:read:recording:admin'],
+      event_types: ['recording.completed'],
+      setup: ['Treat transcript files as post-meeting recording artifacts; do not block realtime annotation on this event.'],
+    },
+    recording: {
+      scopes: ['cloud_recording:read:recording or cloud_recording:read:recording:admin'],
+      event_types: ['recording.completed'],
+    },
+  },
+  webex: {
+    realtime_axis: {
+      scopes: ['meeting:schedules_read'],
+      admin_scopes: ['meeting:admin_schedule_read'],
+      event_types: ['meetings.started', 'meetings.ended'],
+    },
+    participant_track: {
+      scopes: ['meeting:participants_read'],
+      admin_scopes: ['meeting:admin_participants_read'],
+      event_types: ['meetingParticipants.joined', 'meetingParticipants.left'],
+    },
+    post_meeting_transcript: {
+      scopes: ['meeting:transcripts_read'],
+      admin_scopes: ['meeting:admin_transcripts_read'],
+      event_types: ['meetingTranscripts.created'],
+    },
+    recording: {
+      scopes: ['meeting:recordings_read'],
+      admin_scopes: ['meeting:admin_recordings_read'],
+      event_types: ['recordings.created', 'recordings.updated'],
+    },
+  },
+});
+
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
 }
@@ -501,6 +684,60 @@ function endpointReadiness(endpoint) {
 
 function missingEnv(env = {}, names = []) {
   return names.filter((name) => !hasEnv(env, name));
+}
+
+function presentEnv(env = {}, names = []) {
+  return names.filter((name) => hasEnv(env, name));
+}
+
+function uniqueList(values = []) {
+  return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
+}
+
+function normalizePermissionFeature(feature) {
+  const key = String(feature ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const normalized = PLATFORM_PERMISSION_FEATURE_ALIASES[key] ?? key;
+  if (!normalized) {
+    throw new MeetingTimelineSdkError(`Unsupported platform permission feature: ${feature}`);
+  }
+  return normalized;
+}
+
+function selectedPermissionFeatures(platform, options = {}) {
+  const raw = firstNonEmpty(options.features, options.featureSet, options.feature_set);
+  if (raw == null) {
+    return platform === 'local_detector'
+      ? ['realtime_axis', 'participant_track', 'speaker_activity']
+      : [...PLATFORM_DEFAULT_PERMISSION_FEATURES];
+  }
+  const values = Array.isArray(raw) ? raw : String(raw).split(/[,\s]+/);
+  return uniqueList(values.map((item) => normalizePermissionFeature(item)));
+}
+
+function platformFeatureRequirement(platform, manifest, feature) {
+  const requirements = PLATFORM_PERMISSION_REQUIREMENTS[platform]?.[feature] ?? {};
+  const capability = manifest.capabilities?.[feature];
+  const requiredSecurity = feature === 'webhook_security'
+    ? manifest.required_security_env ?? []
+    : [];
+  const optionalSecurity = feature === 'webhook_security'
+    ? manifest.optional_security_env ?? []
+    : [];
+  return compactObject({
+    feature,
+    status: capability?.status ?? (Object.keys(requirements).length > 0 ? 'supported' : 'not_declared'),
+    source: capability?.source,
+    permissions: uniqueList(requirements.permissions ?? []),
+    scopes: uniqueList(requirements.scopes ?? []),
+    admin_scopes: uniqueList(requirements.admin_scopes ?? []),
+    event_types: uniqueList(requirements.event_types ?? []),
+    signal_types: uniqueList(requirements.signal_types ?? capability?.signal_types ?? []),
+    required_security_env: uniqueList(requiredSecurity),
+    optional_security_env: uniqueList(optionalSecurity),
+    setup: requirements.setup,
+    fallback: capability?.fallback,
+    detail: capability?.detail,
+  });
 }
 
 function platformReadinessChecks(platform, manifest = {}, env = {}) {
@@ -774,6 +1011,10 @@ export function platformSetupManifest(platform, options = {}) {
       capabilities: platformCapabilityContract('google_meet', options),
       default_event_types: GOOGLE_MEET_EVENT_TYPES,
       lifecycle_event_types: GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES,
+      required_scopes: [
+        'https://www.googleapis.com/auth/meetings.space.readonly',
+        'https://www.googleapis.com/auth/drive.meet.readonly',
+      ],
       required_security_env: ['GOOGLE_PUBSUB_OIDC_AUDIENCE'],
       optional_security_env: ['GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL', 'GOOGLE_PUBSUB_BEARER_TOKEN'],
       required_setup: [
@@ -864,6 +1105,63 @@ export function platformSetupManifest(platform, options = {}) {
 
 export function allPlatformSetupManifests(options = {}) {
   return MEETING_PLATFORM_KEYS.map((platform) => platformSetupManifest(platform, options));
+}
+
+export function buildPlatformPermissionPlan(platform, options = {}) {
+  const key = normalizePlatform(platform);
+  const manifest = platformSetupManifest(key, options);
+  const env = options.env ?? {};
+  const features = selectedPermissionFeatures(key, options);
+  const featurePlans = features.map((feature) => platformFeatureRequirement(key, manifest, feature));
+  const requiredPermissions = uniqueList([
+    ...(manifest.required_permissions ?? []),
+    ...featurePlans.flatMap((item) => item.permissions ?? []),
+  ]);
+  const requiredScopes = uniqueList([
+    ...(manifest.required_scopes ?? []),
+    ...featurePlans.flatMap((item) => item.scopes ?? []),
+  ]);
+  const adminScopes = uniqueList([
+    ...(manifest.admin_scopes ?? []),
+    ...featurePlans.flatMap((item) => item.admin_scopes ?? []),
+  ]);
+  const requiredSecurityEnv = uniqueList([
+    ...(manifest.required_security_env ?? []),
+    ...featurePlans.flatMap((item) => item.required_security_env ?? []),
+  ]);
+  const optionalSecurityEnv = uniqueList([
+    ...(manifest.optional_security_env ?? []),
+    ...featurePlans.flatMap((item) => item.optional_security_env ?? []),
+  ]);
+  const readiness = evaluatePlatformSetupReadiness(key, options);
+  return compactObject({
+    platform: key,
+    display_name: manifest.display_name,
+    endpoint: manifest.endpoint,
+    status_endpoint: manifest.status_endpoint,
+    selected_features: features,
+    feature_plans: featurePlans,
+    required_permissions: requiredPermissions,
+    required_scopes: requiredScopes,
+    admin_scopes: adminScopes,
+    required_security_env: requiredSecurityEnv,
+    optional_security_env: optionalSecurityEnv,
+    present_security_env: presentEnv(env, uniqueList([...requiredSecurityEnv, ...optionalSecurityEnv])),
+    missing_security_env: missingEnv(env, requiredSecurityEnv),
+    readiness,
+    setup_steps: manifest.required_setup ?? [],
+    builders: manifest.builders ?? [],
+    notes: [
+      'Use this plan before enabling provider webhooks so scope, event subscription, and signature verification requirements are reviewed together.',
+      key === 'local_detector'
+        ? 'Local detector has no remote provider permissions; its risk is timestamp quality and observer coverage.'
+        : 'Provider webhooks should reconcile or backfill the low-latency local observer axis instead of blocking realtime annotation.',
+    ],
+  });
+}
+
+export function allPlatformPermissionPlans(options = {}) {
+  return MEETING_PLATFORM_KEYS.map((platform) => buildPlatformPermissionPlan(platform, options));
 }
 
 function providerEventNames(manifest = {}) {
@@ -1102,6 +1400,8 @@ export const MEETING_PLATFORM_SETUP_BUILDERS = Object.freeze({
   buildGoogleWorkspaceSubscriptionRenewalRequest,
   platformSetupManifest,
   allPlatformSetupManifests,
+  buildPlatformPermissionPlan,
+  allPlatformPermissionPlans,
   buildPlatformSetup,
   evaluatePlatformSetupReadiness,
   evaluateAllPlatformSetupReadiness,

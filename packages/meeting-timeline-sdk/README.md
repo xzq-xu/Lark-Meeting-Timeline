@@ -388,7 +388,9 @@ await importPlatformTranscript(timeline, {
 import {
   MEETING_PLATFORM_KEYS,
   allPlatformCapabilityContracts,
+  allPlatformPermissionPlans,
   buildPlatformIntegrationPlan,
+  buildPlatformPermissionPlan,
   buildGoogleMeetWorkspaceSubscriptionRequest,
   buildMicrosoftGraphSubscriptionRenewalRequest,
   buildMicrosoftTeamsMeetingCallSubscriptionRequest,
@@ -451,6 +453,20 @@ const googlePlan = buildPlatformIntegrationPlan('google-meet', {
 // googlePlan.provider_events.endpoint === 'https://timeline.example.com/api/platform-events/google-meet'
 // googlePlan.post_meeting_transcript.strategy === 'import_after_meeting_ends'
 
+const permissionPlan = buildPlatformPermissionPlan('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+  env: process.env,
+  features: ['realtime-axis', 'participants', 'transcript', 'recording', 'security'],
+});
+
+// permissionPlan.required_scopes includes meetings.space.readonly and drive.meet.readonly
+// permissionPlan.missing_security_env shows whether GOOGLE_PUBSUB_OIDC_AUDIENCE is still missing
+
+const permissionPlans = allPlatformPermissionPlans({
+  baseUrl: 'https://timeline.example.com',
+  env: process.env,
+});
+
 const readiness = evaluatePlatformSetupReadiness('google-meet', {
   baseUrl: 'https://timeline.example.com',
   env: process.env,
@@ -471,7 +487,7 @@ if (teamsMaintenance.renewal_due) {
 
 `platformSetupManifest()` 会暴露 Google Workspace subscription lifecycle event types、Microsoft Graph lifecycle events、Webex webhook resources。Teams 订阅 request 默认把 `lifecycleNotificationUrl` 指向同一个 webhook endpoint；如果宿主项目用独立 lifecycle endpoint，可以显式传 `lifecycleNotificationUrl` 覆盖。Webex 的 `buildWebexWebhookRequests()` 会按默认资源生成多条 webhook 创建请求，因为 Webex firehose 不覆盖 meetings started/ended 和 meetingParticipants joined/left。
 
-`platformCapabilityContract()` 是给宿主项目做接入决策的机器可读能力表：每个平台会声明实时建轴、参会人轨、发言人轨、会后转写、录制、订阅生命周期、实时转写是否可用，以及对应 SDK normalizer 和 fallback 建议。`buildPlatformIntegrationPlan()` 会进一步把 capability、manifest、readiness 和 subscription maintenance 合成推荐接入路径：默认策略是 `hybrid_local_observer_first`，也就是本地 URL/window 观察优先建立低延迟会议轴，Google Meet / Teams / Zoom / Webex / Lark 官方事件随后校准或补充 participant/artifact，转写统一在会后导入，不把 transcript 当作实时标注前置依赖。
+`platformCapabilityContract()` 是给宿主项目做接入决策的机器可读能力表：每个平台会声明实时建轴、参会人轨、发言人轨、会后转写、录制、订阅生命周期、实时转写是否可用，以及对应 SDK normalizer 和 fallback 建议。`buildPlatformPermissionPlan()` 用目标能力反推需要开启的 provider 权限、OAuth scope、webhook 安全环境变量和事件类型，适合配置页或验收脚本先检查“scope/事件/签名密钥是否和目标功能匹配”。`buildPlatformIntegrationPlan()` 会进一步把 capability、manifest、readiness 和 subscription maintenance 合成推荐接入路径：默认策略是 `hybrid_local_observer_first`，也就是本地 URL/window 观察优先建立低延迟会议轴，Google Meet / Teams / Zoom / Webex / Lark 官方事件随后校准或补充 participant/artifact，转写统一在会后导入，不把 transcript 当作实时标注前置依赖。
 
 ## Webhook 验证工具
 
