@@ -92,6 +92,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-session-discovery`
 - `@ai-annotation/meeting-timeline-sdk/adapters/active-speaker`
 - `@ai-annotation/meeting-timeline-sdk/adapters/browser-meeting`
+- `@ai-annotation/meeting-timeline-sdk/adapters/native-meeting`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
 - `@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge`
@@ -200,6 +201,42 @@ await browserMeetings.observe({
 ```
 
 这条路径同样适用于 Teams Web、Zoom Web、Webex Web 和 Lark/Feishu Web：平台和会议 ID 优先从 URL 解析，`page.activeSpeaker` / `dom.activeSpeaker` / `participants[].speaking` 会归一化成 `speaker_started/ended`。如果官方 webhook 之后到达，再用 reconciler 校准；实时标注不要等待官方事件。
+
+桌面客户端推荐用 `native-meeting`。它面向 macOS Accessibility、Windows UI Automation、Electron shell 或宿主进程采集到的 app/window/process/audio 快照；适合 Zoom、Teams、Lark/Feishu、Webex 桌面端：
+
+```js
+import { createNativeMeetingTimelineObserver } from '@ai-annotation/meeting-timeline-sdk/adapters/native-meeting';
+
+const nativeMeetings = createNativeMeetingTimelineObserver(timeline, {
+  source: 'native_desktop_observer',
+  speakerOptions: {
+    minStableMs: 300,
+    switchStableMs: 400,
+    endIdleMs: 1500,
+  },
+  applyOptions: { speakerAsAnnotation: true },
+});
+
+await nativeMeetings.observe({
+  applications: [{
+    name: 'zoom.us',
+    bundleId: 'us.zoom.xos',
+    windows: [{
+      id: 'zoom-call-1',
+      title: 'Daily Standup - Zoom Meeting',
+      focused: true,
+      inMeeting: true,
+      accessibility: {
+        callActive: true,
+        activeSpeaker: { id: 'speaker-ada', name: 'Ada', speaking: true },
+      },
+    }],
+  }],
+  observedAtMs: Date.now(),
+});
+```
+
+没有 URL 的 native app 会优先使用显式 `meetingId`；如果宿主拿不到会议 ID，SDK 会基于平台、会议窗口标题或窗口 ID 生成 `native-{platform}-...` 会话 ID。这个 ID 可以先保证实时标注落轴，后续官方 webhook 或会后转写到达后再做 reconcile。
 
 如果业务项目要接入多个会议平台，推荐从 `platform-kit` 开始。它把 `timeline-bridge`、webhook router、平台 setup/onboarding、fixture acceptance 组合成一个入口；底层 normalizer、验签、artifact fetch 仍然可以按需单独 import：
 
