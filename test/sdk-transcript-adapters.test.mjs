@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildPlatformTranscriptImportPayload,
+  importPlatformTranscript,
   normalizeGoogleMeetTranscriptEntries,
   normalizeMicrosoftTeamsTranscript,
   normalizeWebexTranscript,
@@ -124,5 +125,35 @@ const webexPayload = buildPlatformTranscriptImportPayload({
 assert.equal(webexPayload.meeting.platform, 'webex');
 assert.equal(webexPayload.transcript[0].source, 'webex_transcript');
 assert.equal(webexPayload.transcript[0].speaker_name, 'Lin');
+
+const importCalls = [];
+const client = {
+  async importTranscript(input, options) {
+    importCalls.push({ input, options });
+    return { ok: true, imported: input.transcript.length };
+  },
+};
+
+const importedZoom = await importPlatformTranscript(client, {
+  platform: 'zoom',
+  meeting: {
+    platform: 'zoom',
+    meetingId: 'zoom-meeting-001',
+    startTimeMs: startMs,
+  },
+  raw: timedText,
+});
+assert.equal(importedZoom.platform, 'zoom');
+assert.equal(importedZoom.meeting_id, 'zoom-meeting-001');
+assert.equal(importedZoom.segment_count, 2);
+assert.equal(importedZoom.response.imported, 2);
+assert.equal(importCalls.at(-1).options.raw, true);
+assert.equal(importCalls.at(-1).input.transcript[0].source, 'zoom_transcript_vtt');
+assert.equal(importCalls.at(-1).input.transcript[0].speaker_name, 'Ada');
+
+await assert.rejects(
+  () => importPlatformTranscript({}, { platform: 'zoom', raw: timedText }),
+  /importTranscript/,
+);
 
 console.log('ok meeting transcript adapters');

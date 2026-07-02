@@ -203,23 +203,22 @@ await ingestPlatformEvent(timeline, 'local-detector', {
 
 ## 会后转写导入
 
-事件 adapter 只负责告诉你 transcript/recording 已生成；正文内容建议会后拉取后再导入。SDK 提供平台中性的 `importTranscript()` 和 transcript adapter：
+事件 adapter 只负责告诉你 transcript/recording 已生成；正文内容建议会后拉取后再导入。SDK 提供平台中性的 `importTranscript()`，也提供更高层的 `importPlatformTranscript()`，会按 `platform` 自动选择 normalizer 并导入：
 
 ```js
 import { createMeetingTimelineClient } from '@ai-annotation/meeting-timeline-sdk';
-import { normalizeGoogleMeetTranscriptEntries } from '@ai-annotation/meeting-timeline-sdk/adapters/transcript';
+import { importPlatformTranscript } from '@ai-annotation/meeting-timeline-sdk/adapters/transcript';
 
 const timeline = createMeetingTimelineClient({ baseUrl: 'http://localhost:8787' });
-const transcript = normalizeGoogleMeetTranscriptEntries(googleMeetTranscriptEntryList);
 
-await timeline.importTranscript({
+await importPlatformTranscript(timeline, {
   platform: 'google_meet',
   meeting: {
     platform: 'google_meet',
     meetingId: 'conference-record-id',
     startTimeMs: meetingStartMs,
   },
-  transcript,
+  raw: googleMeetTranscriptEntryList,
 });
 ```
 
@@ -230,6 +229,7 @@ await timeline.importTranscript({
 - `normalizeZoomTranscript(raw)`，支持 Zoom VTT 或 JSON segments
 - `normalizeWebexTranscript(raw)`，支持 Webex VTT/text 或 JSON snippets/segments
 - `buildPlatformTranscriptImportPayload(input)`，按 `platform` 自动选择 normalizer 并生成导入 body
+- `importPlatformTranscript(client, input)`，按 `platform` 自动选择 normalizer，并调用 `client.importTranscript()` 导入
 
 ## 平台接入配置
 

@@ -1,4 +1,4 @@
-import type { TranscriptImportInput, TranscriptSegmentInput } from '../index.mjs';
+import type { MeetingTimelineClient, TranscriptImportInput, TranscriptSegmentInput } from '../index.mjs';
 
 export interface TranscriptNormalizeOptions {
   source?: string;
@@ -19,3 +19,25 @@ export function buildPlatformTranscriptImportPayload(input?: TranscriptImportInp
   content?: unknown;
   platform?: string;
 }): Record<string, unknown>;
+
+export function importPlatformTranscript(
+  client: MeetingTimelineClient,
+  input?: TranscriptImportInput & {
+    raw?: unknown;
+    content?: unknown;
+    platform?: string;
+  },
+  options?: {
+    raw?: boolean;
+    path?: string;
+    platform?: string;
+    source?: string;
+    [key: string]: unknown;
+  },
+): Promise<{
+  platform?: string;
+  meeting_id?: string;
+  segment_count?: number;
+  payload: Record<string, unknown>;
+  response: unknown;
+}>;

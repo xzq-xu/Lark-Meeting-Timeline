@@ -1,4 +1,8 @@
-import { buildTranscriptImportPayload, compactObject } from '../index.mjs';
+import {
+  MeetingTimelineSdkError,
+  buildTranscriptImportPayload,
+  compactObject,
+} from '../index.mjs';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -235,5 +239,33 @@ export function buildPlatformTranscriptImportPayload(input = {}) {
     ...input,
     source: input.source ?? (platform ? `${platform}_transcript` : 'platform_transcript'),
     transcript,
+  });
+}
+
+export async function importPlatformTranscript(client, input = {}, options = {}) {
+  if (!client) {
+    throw new MeetingTimelineSdkError('Meeting timeline client is required for importPlatformTranscript');
+  }
+  const importTranscript = client.importTranscript ?? client.importMeetingTranscript;
+  if (typeof importTranscript !== 'function') {
+    throw new MeetingTimelineSdkError('Meeting timeline client is missing importTranscript()');
+  }
+  const payload = options.raw === true
+    ? input
+    : buildPlatformTranscriptImportPayload({
+      ...input,
+      platform: firstNonEmpty(options.platform, input.platform),
+      source: firstNonEmpty(options.source, input.source),
+    });
+  const response = await importTranscript.call(client, payload, {
+    raw: true,
+    path: options.path,
+  });
+  return compactObject({
+    platform: payload.meeting?.platform ?? input.platform,
+    meeting_id: payload.meeting?.meeting_id,
+    segment_count: Array.isArray(payload.transcript) ? payload.transcript.length : undefined,
+    payload,
+    response,
   });
 }
