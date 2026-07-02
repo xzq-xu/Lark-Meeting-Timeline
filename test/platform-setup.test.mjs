@@ -79,6 +79,7 @@ const googleCapabilities = platformCapabilityContract('google-meet', { baseUrl }
 assert.equal(googleCapabilities.endpoints.platform_events, 'https://timeline.example.com/api/platform-events/google-meet');
 assert.equal(googleCapabilities.realtime_transcript.status, 'not_supported');
 assert.equal(googleCapabilities.limitations.includes('transcript_entries_may_differ_from_google_docs_transcript'), true);
+assert.equal(googleCapabilities.sdk_modules.meeting_app_gate, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate');
 
 const googlePermissionPlan = buildPlatformPermissionPlan('google-meet', {
   baseUrl,

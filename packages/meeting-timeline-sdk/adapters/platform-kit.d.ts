@@ -8,6 +8,7 @@ import type { MeetingPlatformFetchHandler, PlatformWebhookHttpOptions } from './
 import type { MeetingPlatformNodeHandler, PlatformWebhookNodeOptions } from './platform-node.mjs';
 import type { PlatformCaptureOptions, PlatformCaptureRecord } from './platform-capture.mjs';
 import type { PlatformLaunchGateOptions } from './platform-gate.mjs';
+import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { PlatformEventDiagnosticResult, PlatformEventIngestInput, PlatformEventIngestOptions, ReconciledPlatformEventIngestResult } from './platform-ingest.mjs';
 import type {
   MeetingAppFixtureDiagnosis,
@@ -56,6 +57,10 @@ export interface MeetingPlatformTimelineKit {
   launchGateSummary(gateOptions?: PlatformLaunchGateOptions): Record<string, unknown>;
   assertLaunchGate(platform: string, gateOptions?: PlatformLaunchGateOptions): Record<string, unknown>;
   assertAllLaunchGates(gateOptions?: PlatformLaunchGateOptions): Record<string, unknown>;
+  meetingAppLaunchGate(platform: string, gateOptions?: MeetingAppLaunchGateOptions): MeetingAppLaunchGate;
+  meetingAppLaunchGateSummary(gateOptions?: MeetingAppLaunchGateOptions): MeetingAppLaunchGateSummary;
+  assertMeetingAppLaunchGate(platform: string, gateOptions?: MeetingAppLaunchGateOptions): MeetingAppLaunchGate;
+  assertAllMeetingAppLaunchGates(gateOptions?: MeetingAppLaunchGateOptions): MeetingAppLaunchGateSummary;
   diagnose(platform: string, payload?: unknown, diagnosticOptions?: Record<string, unknown>): PlatformEventDiagnosticResult;
   platform(platform: string, platformOptions?: MeetingPlatformTimelineKitOptions): Record<string, unknown>;
   allPlatforms(platformOptions?: MeetingPlatformTimelineKitOptions): Record<string, unknown>[];

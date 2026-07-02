@@ -946,6 +946,7 @@ export function platformCapabilityContract(platform, options = {}) {
       meeting_app_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime',
       meeting_app_browser_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime',
       meeting_app_fixtures: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures',
+      meeting_app_gate: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate',
       meeting_source: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-source',
       acceptance: '@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance',
       artifact_plan: '@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan',

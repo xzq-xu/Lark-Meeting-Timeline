@@ -97,6 +97,31 @@ assert.equal(appFixtureAcceptance.accepted_count, 5);
 assert.equal(appFixtureAcceptance.coverage_by_platform.google_meet.meeting_started, true);
 assert.equal(appFixtureAcceptance.coverage_by_platform.google_meet.meeting_ended, true);
 
+const appGate = kit.meetingAppLaunchGate('google-meet', {
+  allowFixtureProduction: true,
+  requireProductionReady: false,
+});
+assert.equal(appGate.platform, 'google_meet');
+assert.equal(appGate.passed, true);
+assert.equal(appGate.runtime_ready, true);
+assert.equal(appGate.evidence_level, 'fixture_dom');
+
+const appGateSummary = kit.meetingAppLaunchGateSummary({
+  allowFixtureProduction: true,
+  requireProductionReady: false,
+});
+assert.equal(appGateSummary.ok, true);
+assert.equal(appGateSummary.gates.length, 5);
+
+assert.equal(kit.assertMeetingAppLaunchGate('webex', {
+  allowFixtureProduction: true,
+  requireProductionReady: false,
+}).passed, true);
+assert.equal(kit.assertAllMeetingAppLaunchGates({
+  allowFixtureProduction: true,
+  requireProductionReady: false,
+}).ok, true);
+
 const googleStart = await kit.handleWebhook({
   method: 'POST',
   url: `${baseUrl}${basePath}/google-meet`,
@@ -132,5 +157,7 @@ assert.equal(report.webhook_router.base_path, basePath);
 assert.equal(report.fixture_acceptance.accepted_count, 6);
 assert.equal(report.meeting_app_fixture_acceptance.accepted, true);
 assert.equal(report.meeting_app_fixture_acceptance.accepted_count, 5);
+assert.equal(report.meeting_app_launch_gate.ok, false);
+assert.equal(report.meeting_app_launch_gate.gates.length, 5);
 
 console.log('ok meeting platform timeline kit');

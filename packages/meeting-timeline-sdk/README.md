@@ -99,6 +99,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-source`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
@@ -335,6 +336,27 @@ const report = buildMeetingAppFixtureAcceptanceReport();
 // report.accepted === true 表示本地 DOM/AX 归一化链路基线通过
 ```
 
+正式接入 Google Meet / Teams Web / Zoom Web / Webex Web / Lark Web 前，建议再跑 `meeting-app-gate`。它不检查官方 webhook 权限，而是检查本地会议 App 路径是否满足实时标注：browser runtime preset、DOM capture profile、MutationObserver track/ignore selectors、建轴、发言人位置和结束信号。fixture-only 只能证明 SDK wiring；要证明生产可用，需要传入真实采集到的 DOM snapshots：
+
+```js
+import {
+  buildMeetingAppLaunchGate,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate';
+
+const fixtureGate = buildMeetingAppLaunchGate('google-meet', {
+  allowFixtureProduction: true,
+  requireProductionReady: false,
+});
+// fixtureGate.status === 'warning'
+
+const liveGate = buildMeetingAppLaunchGate('google-meet', {
+  snapshots: {
+    google_meet: [liveActiveSnapshot, liveEndedSnapshot],
+  },
+});
+// liveGate.production_ready === true 时，才表示真实 Google Meet DOM 适配已验收。
+```
+
 如果希望 SDK 帮你管理轮询、去重和 keep-alive，可以直接用 `meeting-app-monitor`。它会高频低成本采集 DOM，但只有在页面状态变化、或到达 keep-alive 间隔时才把样本送给 `meeting-source`；即使 DOM 不变，也会按间隔继续送样本，避免 active speaker 的 `minStableMs` 因过度去重而无法触发：
 
 ```js
@@ -439,6 +461,12 @@ const fixtureReport = meetingKit.fixtureAcceptance('google-meet', {
 
 const localAppReport = meetingKit.meetingAppFixtureAcceptance();
 // localAppReport.accepted === true 表示五个平台的本地 DOM/AX 建轴和发言人标注基线通过
+
+const appGate = meetingKit.meetingAppLaunchGate('google-meet', {
+  allowFixtureProduction: true,
+  requireProductionReady: false,
+});
+// appGate.runtime_ready === true 表示 browser runtime preset、capture profile 和 mutation 配置齐备。
 
 await meetingKit.handleWebhook({
   method: req.method,

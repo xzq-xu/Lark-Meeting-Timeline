@@ -49,6 +49,12 @@ import {
   buildMeetingPlatformLaunchGateSummary,
   buildPlatformLaunchGate,
 } from './platform-gate.mjs';
+import {
+  assertAllMeetingAppLaunchGates,
+  assertMeetingAppLaunchGate,
+  buildMeetingAppLaunchGate,
+  buildMeetingAppLaunchGateSummary,
+} from './meeting-app-gate.mjs';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -137,6 +143,7 @@ function platformOverview(platform, defaults = {}, options = {}) {
 export function buildMeetingPlatformKitReport(options = {}) {
   const fixtureInput = buildPlatformFixtureAcceptanceInput(options);
   const meetingAppFixtureAcceptance = buildMeetingAppFixtureAcceptanceReport(options);
+  const meetingAppLaunchGateSummary = buildMeetingAppLaunchGateSummary(options);
   return {
     base_url: options.baseUrl ?? options.base_url,
     base_path: options.basePath ?? options.base_path ?? '/api/platform-events',
@@ -153,6 +160,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
       env: fixtureInput.env,
     }),
     meeting_app_fixture_acceptance: meetingAppFixtureAcceptance,
+    meeting_app_launch_gate: meetingAppLaunchGateSummary,
   };
 }
 
@@ -235,6 +243,18 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertAllLaunchGates(gateOptions = {}) {
       return assertAllPlatformLaunchGates(withDefaults(defaults, gateOptions));
+    },
+    meetingAppLaunchGate(platform, gateOptions = {}) {
+      return buildMeetingAppLaunchGate(platform, withDefaults(defaults, gateOptions));
+    },
+    meetingAppLaunchGateSummary(gateOptions = {}) {
+      return buildMeetingAppLaunchGateSummary(withDefaults(defaults, gateOptions));
+    },
+    assertMeetingAppLaunchGate(platform, gateOptions = {}) {
+      return assertMeetingAppLaunchGate(platform, withDefaults(defaults, gateOptions));
+    },
+    assertAllMeetingAppLaunchGates(gateOptions = {}) {
+      return assertAllMeetingAppLaunchGates(withDefaults(defaults, gateOptions));
     },
     diagnose(platform, payload, diagnosticOptions = {}) {
       return diagnosePlatformEvent(platform, payload, diagnosticOptions);
