@@ -98,6 +98,7 @@ try {
   assert.equal(teamsSetup.maintenance.status, 'renewal_due');
   assert.equal(teamsSetup.maintenance.renewal_request.path, '/subscriptions/graph-sub-1');
   assert.equal(teamsSetup.setup.graph_subscription_request.notificationUrl, `${baseUrl}/api/platform-events/teams`);
+  assert.equal(teamsSetup.setup.graph_subscription_request.lifecycleNotificationUrl, `${baseUrl}/api/platform-events/teams`);
   assert.equal(teamsSetup.setup.graph_subscription_request.clientState, 'test-state');
   assert.match(teamsSetup.setup.graph_subscription_request.resource, /meetingCallEvents$/);
 

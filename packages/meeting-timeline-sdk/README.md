@@ -143,6 +143,8 @@ if (teamsMaintenance.renewal_due) {
 }
 ```
 
+`platformSetupManifest()` 会暴露 Google Workspace subscription lifecycle event types 和 Microsoft Graph lifecycle events。Teams 订阅 request 默认把 `lifecycleNotificationUrl` 指向同一个 webhook endpoint；如果宿主项目用独立 lifecycle endpoint，可以显式传 `lifecycleNotificationUrl` 覆盖。
+
 ## Webhook 验证工具
 
 真实接 Zoom / Microsoft Graph / Google Pub/Sub push 时，建议先在 webhook 层完成平台验证，再把 payload 交给 normalizer：

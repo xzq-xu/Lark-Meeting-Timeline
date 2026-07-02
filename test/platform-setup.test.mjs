@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 
 import {
   GOOGLE_MEET_EVENT_TYPES,
+  GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES,
+  MICROSOFT_GRAPH_LIFECYCLE_EVENTS,
   ZOOM_MEETING_EVENT_TYPES,
   allPlatformSetupManifests,
   buildGoogleMeetWorkspaceSubscriptionRequest,
@@ -27,7 +29,9 @@ assert.equal(platformEventEndpoint(baseUrl, 'zoom'), 'https://timeline.example.c
 const googleManifest = platformSetupManifest('google_meet', { baseUrl });
 assert.equal(googleManifest.endpoint, 'https://timeline.example.com/api/platform-events/google-meet');
 assert.equal(googleManifest.default_event_types.includes('google.workspace.meet.conference.v2.started'), true);
+assert.equal(googleManifest.lifecycle_event_types.includes('google.workspace.events.subscription.v1.expirationReminder'), true);
 assert.equal(googleManifest.required_security_env.includes('GOOGLE_PUBSUB_OIDC_AUDIENCE'), true);
+assert.equal(GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES.includes('google.workspace.events.subscription.v1.expired'), true);
 
 const googleRequest = buildGoogleMeetWorkspaceSubscriptionRequest({
   targetResource: '//cloudidentity.googleapis.com/users/me',
@@ -46,9 +50,14 @@ const teamsRequest = buildMicrosoftTeamsMeetingCallSubscriptionRequest({
 });
 assert.equal(teamsRequest.changeType, 'created,updated');
 assert.equal(teamsRequest.notificationUrl, 'https://timeline.example.com/api/platform-events/teams');
+assert.equal(teamsRequest.lifecycleNotificationUrl, 'https://timeline.example.com/api/platform-events/teams');
 assert.match(teamsRequest.resource, /^\/communications\/onlineMeetings\(joinWebUrl='/);
 assert.equal(teamsRequest.clientState, 'client-state');
 assert.equal(teamsRequest.expirationDateTime, '2026-06-28T02:00:00.000Z');
+
+const teamsManifest = platformSetupManifest('teams', { baseUrl });
+assert.equal(teamsManifest.lifecycle_events.includes('reauthorizationRequired'), true);
+assert.equal(MICROSOFT_GRAPH_LIFECYCLE_EVENTS.includes('subscriptionRemoved'), true);
 
 const zoomRequest = buildZoomEventSubscriptionRequest({
   webhookUrl: 'https://timeline.example.com/api/platform-events/zoom',

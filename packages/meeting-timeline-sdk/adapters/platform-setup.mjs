@@ -10,7 +10,19 @@ export const GOOGLE_MEET_EVENT_TYPES = Object.freeze([
   'google.workspace.meet.smartNote.v2.fileGenerated',
 ]);
 
+export const GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES = Object.freeze([
+  'google.workspace.events.subscription.v1.suspended',
+  'google.workspace.events.subscription.v1.expirationReminder',
+  'google.workspace.events.subscription.v1.expired',
+]);
+
 export const MICROSOFT_TEAMS_CHANGE_TYPES = Object.freeze(['created', 'updated']);
+
+export const MICROSOFT_GRAPH_LIFECYCLE_EVENTS = Object.freeze([
+  'reauthorizationRequired',
+  'subscriptionRemoved',
+  'missed',
+]);
 
 export const ZOOM_MEETING_EVENT_TYPES = Object.freeze([
   'meeting.started',
@@ -198,7 +210,7 @@ export function buildMicrosoftTeamsMeetingCallSubscriptionRequest(input = {}) {
     includeResourceData: input.includeResourceData ?? input.include_resource_data ?? false,
     encryptionCertificate: input.encryptionCertificate ?? input.encryption_certificate,
     encryptionCertificateId: input.encryptionCertificateId ?? input.encryption_certificate_id,
-    lifecycleNotificationUrl: input.lifecycleNotificationUrl ?? input.lifecycle_notification_url,
+    lifecycleNotificationUrl: input.lifecycleNotificationUrl ?? input.lifecycle_notification_url ?? notificationUrl,
   });
 }
 
@@ -274,6 +286,7 @@ export function platformSetupManifest(platform, options = {}) {
       status_endpoint: statusEndpoint,
       transport: 'Google Workspace Events API -> Google Cloud Pub/Sub push',
       default_event_types: GOOGLE_MEET_EVENT_TYPES,
+      lifecycle_event_types: GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES,
       required_security_env: ['GOOGLE_PUBSUB_OIDC_AUDIENCE'],
       optional_security_env: ['GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL', 'GOOGLE_PUBSUB_BEARER_TOKEN'],
       required_setup: [
@@ -281,6 +294,7 @@ export function platformSetupManifest(platform, options = {}) {
         'Create a Pub/Sub topic and push subscription targeting the endpoint.',
         'Configure Pub/Sub authenticated push OIDC audience to match GOOGLE_PUBSUB_OIDC_AUDIENCE.',
         'Create a Workspace Events subscription for a Meet space or user target resource.',
+        'Monitor subscription lifecycle events for suspension, expiration reminders, and expiration.',
       ],
       builders: ['buildGoogleMeetWorkspaceSubscriptionRequest'],
     },
@@ -291,12 +305,14 @@ export function platformSetupManifest(platform, options = {}) {
       status_endpoint: statusEndpoint,
       transport: 'Microsoft Graph change notifications',
       default_change_types: MICROSOFT_TEAMS_CHANGE_TYPES,
+      lifecycle_events: MICROSOFT_GRAPH_LIFECYCLE_EVENTS,
       resource_template: "/communications/onlineMeetings(joinWebUrl='{encodedJoinWebUrl}')/meetingCallEvents",
       required_permissions: ['OnlineMeetings.Read.All or OnlineMeetings.ReadWrite.All'],
       required_security_env: ['MICROSOFT_GRAPH_CLIENT_STATE'],
       required_setup: [
         'Create a Graph application permission grant for OnlineMeetings.Read.All or OnlineMeetings.ReadWrite.All.',
         'Create a change notification subscription for the meeting joinWebUrl.',
+        'Set lifecycleNotificationUrl to the same endpoint or another endpoint that forwards lifecycle notifications here.',
         'Renew the subscription before its maximum 3 day expiration.',
         'Use rich notifications with includeResourceData for active meeting call changes when available.',
       ],
