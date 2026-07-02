@@ -127,12 +127,14 @@ await timeline.importTranscript({
 
 ```js
 import {
+  allPlatformCapabilityContracts,
   buildGoogleMeetWorkspaceSubscriptionRequest,
   buildMicrosoftGraphSubscriptionRenewalRequest,
   buildMicrosoftTeamsMeetingCallSubscriptionRequest,
   buildZoomEventSubscriptionRequest,
   evaluatePlatformSubscriptionMaintenance,
   evaluatePlatformSetupReadiness,
+  platformCapabilityContract,
   platformSetupManifest,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup';
 
@@ -155,6 +157,14 @@ const manifest = platformSetupManifest('google-meet', {
   baseUrl: 'https://timeline.example.com',
 });
 
+const googleCapabilities = platformCapabilityContract('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+});
+
+const allCapabilities = allPlatformCapabilityContracts({
+  baseUrl: 'https://timeline.example.com',
+});
+
 const readiness = evaluatePlatformSetupReadiness('google-meet', {
   baseUrl: 'https://timeline.example.com',
   env: process.env,
@@ -174,6 +184,8 @@ if (teamsMaintenance.renewal_due) {
 ```
 
 `platformSetupManifest()` 会暴露 Google Workspace subscription lifecycle event types 和 Microsoft Graph lifecycle events。Teams 订阅 request 默认把 `lifecycleNotificationUrl` 指向同一个 webhook endpoint；如果宿主项目用独立 lifecycle endpoint，可以显式传 `lifecycleNotificationUrl` 覆盖。
+
+`platformCapabilityContract()` 是给宿主项目做接入决策的机器可读能力表：每个平台会声明实时建轴、参会人轨、会后转写、录制、订阅生命周期、实时转写是否可用，以及对应 SDK normalizer 和 fallback 建议。当前策略是实时标注只依赖 meeting axis，转写统一标记为 `post_meeting` 导入，不把 transcript 当作实时链路前置依赖。
 
 ## Webhook 验证工具
 

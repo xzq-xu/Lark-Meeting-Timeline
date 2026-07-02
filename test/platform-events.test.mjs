@@ -83,6 +83,11 @@ try {
   assert.equal(info.platform_events.supported, true);
   assert.equal(info.transcript_import.supported, true);
   assert.equal(info.transcript_import.endpoint, `${baseUrl}/api/import/transcript`);
+  assert.equal(info.platform_events.capability_contracts.some((item) => (
+    item.platform === 'google_meet'
+      && item.post_meeting_transcript.import_endpoint === '/api/import/transcript'
+      && item.realtime_axis.status === 'supported_best_effort'
+  )), true);
   assert.equal(typeof info.platform_events.setup_endpoint, 'string');
   assert.equal(info.platform_events.platforms.some((item) => item.platform === 'google_meet'), true);
 

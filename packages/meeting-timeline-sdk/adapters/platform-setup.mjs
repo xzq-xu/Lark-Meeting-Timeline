@@ -32,6 +32,152 @@ export const ZOOM_MEETING_EVENT_TYPES = Object.freeze([
   'recording.completed',
 ]);
 
+const platformCapabilityContracts = Object.freeze({
+  google_meet: {
+    platform: 'google_meet',
+    display_name: 'Google Meet',
+    realtime_axis: {
+      status: 'supported_best_effort',
+      source: 'Google Workspace Events conference started/ended',
+      signal_types: ['meeting_started', 'meeting_ended'],
+      fallback: 'local_detector_recommended_for_low_latency_axis',
+    },
+    participant_track: {
+      status: 'supported_best_effort',
+      source: 'Google Workspace Events participant joined/left',
+      signal_types: ['participant_joined', 'participant_left'],
+    },
+    post_meeting_transcript: {
+      status: 'supported',
+      availability: 'post_meeting',
+      source: 'Google Meet REST conferenceRecords.transcripts.entries',
+      import_endpoint: '/api/import/transcript',
+      sdk_normalizer: 'normalizeGoogleMeetTranscriptEntries',
+    },
+    recording: {
+      status: 'metadata_supported',
+      availability: 'post_meeting',
+      source: 'Google Meet REST conferenceRecords.recordings and Workspace Events recording fileGenerated',
+      signal_types: ['artifact_ready'],
+    },
+    subscription_lifecycle: {
+      status: 'supported',
+      signal_types: ['subscription_lifecycle'],
+      events: GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES,
+    },
+    realtime_transcript: {
+      status: 'not_supported',
+      detail: 'native_path_is_post_meeting_transcript_import',
+    },
+    sdk_modules: {
+      events: '@ai-annotation/meeting-timeline-sdk/adapters/google-meet',
+      transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
+      setup: '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup',
+      security: '@ai-annotation/meeting-timeline-sdk/adapters/webhook-security',
+    },
+    limitations: [
+      'workspace_event_delivery_can_lag_or_depend_on_subscription_scope',
+      'transcript_entries_may_differ_from_google_docs_transcript',
+      'low_latency_annotation_should_not_wait_for_transcript',
+    ],
+  },
+  microsoft_teams: {
+    platform: 'microsoft_teams',
+    display_name: 'Microsoft Teams',
+    realtime_axis: {
+      status: 'supported_best_effort',
+      source: 'Microsoft Graph meetingCallEvents callStarted/callEnded',
+      signal_types: ['meeting_started', 'meeting_ended'],
+      fallback: 'local_detector_recommended_when_graph_subscription_is_unavailable',
+    },
+    participant_track: {
+      status: 'supported_best_effort',
+      source: 'Microsoft Graph meetingCallEvents rosterUpdated',
+      signal_types: ['participant_joined', 'participant_left'],
+    },
+    post_meeting_transcript: {
+      status: 'supported',
+      availability: 'post_meeting',
+      source: 'Microsoft Graph callTranscript content',
+      import_endpoint: '/api/import/transcript',
+      sdk_normalizer: 'normalizeMicrosoftTeamsTranscript',
+    },
+    recording: {
+      status: 'metadata_supported',
+      availability: 'post_meeting',
+      source: 'Microsoft Graph recording notifications and recording content APIs',
+      signal_types: ['artifact_ready'],
+    },
+    subscription_lifecycle: {
+      status: 'supported',
+      signal_types: ['subscription_lifecycle'],
+      events: MICROSOFT_GRAPH_LIFECYCLE_EVENTS,
+    },
+    realtime_transcript: {
+      status: 'not_supported',
+      detail: 'native_path_is_post_meeting_transcript_import',
+    },
+    sdk_modules: {
+      events: '@ai-annotation/meeting-timeline-sdk/adapters/microsoft-teams',
+      transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
+      setup: '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup',
+      security: '@ai-annotation/meeting-timeline-sdk/adapters/webhook-security',
+    },
+    limitations: [
+      'graph_subscription_requires_tenant_admin_permissions',
+      'subscription_renewal_is_required',
+      'transcript_api_can_be_disabled_by_tenant_policy',
+    ],
+  },
+  zoom: {
+    platform: 'zoom',
+    display_name: 'Zoom',
+    realtime_axis: {
+      status: 'supported_best_effort',
+      source: 'Zoom Meeting webhooks meeting.started/meeting.ended',
+      signal_types: ['meeting_started', 'meeting_ended'],
+      fallback: 'local_detector_recommended_for_desktop_or_browser_join',
+    },
+    participant_track: {
+      status: 'supported_best_effort',
+      source: 'Zoom Meeting webhooks participant_joined/participant_left',
+      signal_types: ['participant_joined', 'participant_left'],
+    },
+    post_meeting_transcript: {
+      status: 'supported_when_cloud_recording_transcript_enabled',
+      availability: 'post_meeting',
+      source: 'Zoom recording transcript VTT downloaded from recording files',
+      import_endpoint: '/api/import/transcript',
+      sdk_normalizer: 'normalizeZoomTranscript',
+    },
+    recording: {
+      status: 'supported',
+      availability: 'post_meeting',
+      source: 'Zoom recording.completed webhook',
+      signal_types: ['artifact_ready'],
+    },
+    subscription_lifecycle: {
+      status: 'not_applicable',
+      detail: 'zoom_event_subscriptions_do_not_use_short_lived_graph_workspace_style_subscriptions',
+    },
+    realtime_transcript: {
+      status: 'not_supported',
+      detail: 'native_path_is_post_meeting_transcript_import',
+    },
+    sdk_modules: {
+      events: '@ai-annotation/meeting-timeline-sdk/adapters/zoom',
+      transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
+      setup: '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup',
+      security: '@ai-annotation/meeting-timeline-sdk/adapters/webhook-security',
+    },
+    limitations: [
+      'webhook_endpoint_must_ack_quickly',
+      'cloud_recording_and_transcript_must_be_enabled',
+      'download_url_access_can_require_zoom_auth_context',
+    ],
+  },
+});
+
 const platformAliases = new Map([
   ['google-meet', 'google_meet'],
   ['google_meet', 'google_meet'],
@@ -272,6 +418,23 @@ export function platformEventEndpoint(baseUrl, platform) {
   return absoluteEndpoint(baseUrl, path);
 }
 
+export function platformCapabilityContract(platform, options = {}) {
+  const key = normalizePlatform(platform);
+  const contract = platformCapabilityContracts[key];
+  return compactObject({
+    ...contract,
+    endpoints: options.baseUrl ? {
+      platform_events: platformEventEndpoint(options.baseUrl, key),
+      transcript_import: absoluteEndpoint(options.baseUrl, '/api/import/transcript'),
+      status: `${platformEventEndpoint(options.baseUrl, key)}/status`,
+    } : undefined,
+  });
+}
+
+export function allPlatformCapabilityContracts(options = {}) {
+  return ['google_meet', 'microsoft_teams', 'zoom'].map((platform) => platformCapabilityContract(platform, options));
+}
+
 export function platformSetupManifest(platform, options = {}) {
   const key = normalizePlatform(platform);
   const endpoint = options.baseUrl ? platformEventEndpoint(options.baseUrl, key) : null;
@@ -285,6 +448,7 @@ export function platformSetupManifest(platform, options = {}) {
       endpoint,
       status_endpoint: statusEndpoint,
       transport: 'Google Workspace Events API -> Google Cloud Pub/Sub push',
+      capabilities: platformCapabilityContract('google_meet', options),
       default_event_types: GOOGLE_MEET_EVENT_TYPES,
       lifecycle_event_types: GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES,
       required_security_env: ['GOOGLE_PUBSUB_OIDC_AUDIENCE'],
@@ -304,6 +468,7 @@ export function platformSetupManifest(platform, options = {}) {
       endpoint,
       status_endpoint: statusEndpoint,
       transport: 'Microsoft Graph change notifications',
+      capabilities: platformCapabilityContract('microsoft_teams', options),
       default_change_types: MICROSOFT_TEAMS_CHANGE_TYPES,
       lifecycle_events: MICROSOFT_GRAPH_LIFECYCLE_EVENTS,
       resource_template: "/communications/onlineMeetings(joinWebUrl='{encodedJoinWebUrl}')/meetingCallEvents",
@@ -324,6 +489,7 @@ export function platformSetupManifest(platform, options = {}) {
       endpoint,
       status_endpoint: statusEndpoint,
       transport: 'Zoom Meeting webhooks',
+      capabilities: platformCapabilityContract('zoom', options),
       default_event_types: ZOOM_MEETING_EVENT_TYPES,
       required_security_env: ['ZOOM_WEBHOOK_SECRET_TOKEN'],
       required_scopes: [
@@ -478,4 +644,6 @@ export const MEETING_PLATFORM_SETUP_BUILDERS = Object.freeze({
   evaluateAllPlatformSetupReadiness,
   evaluatePlatformSubscriptionMaintenance,
   evaluateAllPlatformSubscriptionMaintenance,
+  platformCapabilityContract,
+  allPlatformCapabilityContracts,
 });

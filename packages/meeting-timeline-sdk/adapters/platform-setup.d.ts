@@ -103,6 +103,8 @@ export function buildGoogleWorkspaceSubscriptionRenewalRequest(input?: {
 }): Record<string, unknown>;
 
 export function platformEventEndpoint(baseUrl: string, platform: string): string;
+export function platformCapabilityContract(platform: string, options?: PlatformSetupOptions): Record<string, unknown>;
+export function allPlatformCapabilityContracts(options?: PlatformSetupOptions): Record<string, unknown>[];
 export function platformSetupManifest(platform: string, options?: PlatformSetupOptions): Record<string, unknown>;
 export function allPlatformSetupManifests(options?: PlatformSetupOptions): Record<string, unknown>[];
 export function buildPlatformSetup(platform: string, options?: PlatformSetupOptions): Record<string, unknown>;

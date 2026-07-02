@@ -5,6 +5,7 @@ import {
   GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES,
   MICROSOFT_GRAPH_LIFECYCLE_EVENTS,
   ZOOM_MEETING_EVENT_TYPES,
+  allPlatformCapabilityContracts,
   allPlatformSetupManifests,
   buildGoogleMeetWorkspaceSubscriptionRequest,
   buildGoogleWorkspaceSubscriptionRenewalRequest,
@@ -16,6 +17,7 @@ import {
   evaluateAllPlatformSubscriptionMaintenance,
   evaluatePlatformSetupReadiness,
   evaluatePlatformSubscriptionMaintenance,
+  platformCapabilityContract,
   platformEventEndpoint,
   platformSetupManifest,
 } from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
@@ -32,6 +34,14 @@ assert.equal(googleManifest.default_event_types.includes('google.workspace.meet.
 assert.equal(googleManifest.lifecycle_event_types.includes('google.workspace.events.subscription.v1.expirationReminder'), true);
 assert.equal(googleManifest.required_security_env.includes('GOOGLE_PUBSUB_OIDC_AUDIENCE'), true);
 assert.equal(GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES.includes('google.workspace.events.subscription.v1.expired'), true);
+assert.equal(googleManifest.capabilities.realtime_axis.status, 'supported_best_effort');
+assert.equal(googleManifest.capabilities.post_meeting_transcript.import_endpoint, '/api/import/transcript');
+assert.equal(googleManifest.capabilities.sdk_modules.events, '@ai-annotation/meeting-timeline-sdk/adapters/google-meet');
+
+const googleCapabilities = platformCapabilityContract('google-meet', { baseUrl });
+assert.equal(googleCapabilities.endpoints.platform_events, 'https://timeline.example.com/api/platform-events/google-meet');
+assert.equal(googleCapabilities.realtime_transcript.status, 'not_supported');
+assert.equal(googleCapabilities.limitations.includes('transcript_entries_may_differ_from_google_docs_transcript'), true);
 
 const googleRequest = buildGoogleMeetWorkspaceSubscriptionRequest({
   targetResource: '//cloudidentity.googleapis.com/users/me',
@@ -58,6 +68,8 @@ assert.equal(teamsRequest.expirationDateTime, '2026-06-28T02:00:00.000Z');
 const teamsManifest = platformSetupManifest('teams', { baseUrl });
 assert.equal(teamsManifest.lifecycle_events.includes('reauthorizationRequired'), true);
 assert.equal(MICROSOFT_GRAPH_LIFECYCLE_EVENTS.includes('subscriptionRemoved'), true);
+assert.equal(teamsManifest.capabilities.post_meeting_transcript.sdk_normalizer, 'normalizeMicrosoftTeamsTranscript');
+assert.equal(teamsManifest.capabilities.subscription_lifecycle.status, 'supported');
 
 const zoomRequest = buildZoomEventSubscriptionRequest({
   webhookUrl: 'https://timeline.example.com/api/platform-events/zoom',
@@ -67,6 +79,9 @@ assert.equal(zoomRequest.event_webhook_url, 'https://timeline.example.com/api/pl
 assert.deepEqual(zoomRequest.events, ZOOM_MEETING_EVENT_TYPES);
 assert.equal(zoomRequest.subscription_scope, 'account');
 assert.equal(zoomRequest.account_id, 'zoom-account-1');
+const zoomCapabilities = platformCapabilityContract('zoom', { baseUrl });
+assert.equal(zoomCapabilities.subscription_lifecycle.status, 'not_applicable');
+assert.equal(zoomCapabilities.post_meeting_transcript.sdk_normalizer, 'normalizeZoomTranscript');
 
 const zoomSetup = buildPlatformSetup('zoom', {
   baseUrl,
@@ -80,6 +95,9 @@ assert.equal(zoomSetup.zoom_event_subscription_request.event_subscription_name, 
 const all = allPlatformSetupManifests({ baseUrl });
 assert.equal(all.length, 3);
 assert.deepEqual(all.map((item) => item.platform), ['google_meet', 'microsoft_teams', 'zoom']);
+const allCapabilities = allPlatformCapabilityContracts({ baseUrl });
+assert.deepEqual(allCapabilities.map((item) => item.platform), ['google_meet', 'microsoft_teams', 'zoom']);
+assert.equal(allCapabilities.every((item) => item.endpoints.transcript_import === 'https://timeline.example.com/api/import/transcript'), true);
 
 const googleReady = evaluatePlatformSetupReadiness('google-meet', {
   baseUrl,

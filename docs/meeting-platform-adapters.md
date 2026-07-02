@@ -322,6 +322,24 @@ GET  /api/platform-events/status
 
 `POST /api/platform-events/:platform` 当前支持 `google-meet`、`teams`、`zoom` 及其别名。服务端会用 SDK adapter 归一化原始事件，`meeting_started` 进入 `POST /api/meeting-session/start` 同一套建轴逻辑，`meeting_ended` 进入 `POST /api/meeting-session/end` 同一套结束逻辑。`participant_joined/left` 会进入会议 `events` 轨道，不写入用户标注流；同一平台、同一参会人、同一 join/leave 类型在默认 3 秒窗口内会被过滤为重复事件。会后 transcript/recording/smart notes 的 `artifact_ready` signal 也会进入会议 `events` 轨道，默认 5 秒窗口内按 artifact id/url 去重；transcript 正文通过 SDK `adapters/transcript` 归一化后调用 `POST /api/import/transcript` 导入。`subscription_lifecycle` 只更新平台状态，不会创建会议轴，也不会写入用户标注或会议事件轨道。
 
+`platformCapabilityContract(platform)` 会输出平台能力契约，供宿主项目决定接入路径：
+
+```ts
+{
+  platform: 'google_meet' | 'microsoft_teams' | 'zoom',
+  realtime_axis: { status: 'supported_best_effort', fallback: 'local_detector_recommended_...' },
+  participant_track: { status: 'supported_best_effort' },
+  post_meeting_transcript: { status: 'supported', availability: 'post_meeting', import_endpoint: '/api/import/transcript' },
+  recording: { status: 'supported' | 'metadata_supported' },
+  subscription_lifecycle: { status: 'supported' | 'not_applicable' },
+  realtime_transcript: { status: 'not_supported' },
+  sdk_modules: { events, transcript, setup, security },
+  limitations: string[]
+}
+```
+
+关键约束是：实时标注只依赖 `realtime_axis`，转写统一通过 `post_meeting_transcript` 会后导入；任何平台的实时 transcript 都不作为 P0/P1 链路前置条件。
+
 真实 webhook 接入的安全层也已经放进 SDK：
 
 - `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`

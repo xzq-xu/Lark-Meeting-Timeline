@@ -9,6 +9,7 @@ import { applyMeetingSignals } from '../packages/meeting-timeline-sdk/adapters/c
 import { normalizeGoogleMeetEvent } from '../packages/meeting-timeline-sdk/adapters/google-meet.mjs';
 import { normalizeMicrosoftTeamsEvent } from '../packages/meeting-timeline-sdk/adapters/microsoft-teams.mjs';
 import {
+  allPlatformCapabilityContracts,
   allPlatformSetupManifests,
   buildPlatformSetup,
   evaluateAllPlatformSetupReadiness,
@@ -5950,6 +5951,7 @@ async function annotationIngestInfoPayload(req) {
       supported: true,
       status_endpoint: localUrlFor(req, '/api/platform-events/status'),
       setup_endpoint: localUrlFor(req, '/api/platform-events/setup'),
+      capability_contracts: allPlatformCapabilityContracts({ baseUrl: localUrlFor(req, '') }),
       description: 'Server-side adapters can ingest Google Meet, Microsoft Teams, and Zoom event payloads, normalize them into meeting timeline signals, start/end the same meeting axis contract, and append participant join/leave plus artifact-ready events with duplicate filtering.',
       platforms: platformEventAdapterDefinitions.map((item) => ({
         platform: item.key,
