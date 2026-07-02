@@ -93,6 +93,7 @@ const platformCapabilityContracts = Object.freeze({
     },
     sdk_modules: {
       events: '@ai-annotation/meeting-timeline-sdk/adapters/google-meet',
+      ingest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest',
       transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
       setup: '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup',
       security: '@ai-annotation/meeting-timeline-sdk/adapters/webhook-security',
@@ -141,6 +142,7 @@ const platformCapabilityContracts = Object.freeze({
     },
     sdk_modules: {
       events: '@ai-annotation/meeting-timeline-sdk/adapters/microsoft-teams',
+      ingest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest',
       transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
       setup: '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup',
       security: '@ai-annotation/meeting-timeline-sdk/adapters/webhook-security',
@@ -188,6 +190,7 @@ const platformCapabilityContracts = Object.freeze({
     },
     sdk_modules: {
       events: '@ai-annotation/meeting-timeline-sdk/adapters/zoom',
+      ingest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest',
       transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
       setup: '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup',
       security: '@ai-annotation/meeting-timeline-sdk/adapters/webhook-security',
@@ -235,6 +238,7 @@ const platformCapabilityContracts = Object.freeze({
     },
     sdk_modules: {
       events: '@ai-annotation/meeting-timeline-sdk/adapters/webex',
+      ingest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest',
       transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
       setup: '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup',
       security: '@ai-annotation/meeting-timeline-sdk/adapters/webhook-security',

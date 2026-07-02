@@ -406,8 +406,12 @@ packages/meeting-timeline-sdk/
     platform-setup.d.ts
     platform-registry.mjs
     platform-registry.d.ts
+    platform-ingest.mjs
+    platform-ingest.d.ts
     webhook-security.mjs
     webhook-security.d.ts
+    transcript.mjs
+    transcript.d.ts
     core.mjs
     core.d.ts
     google-meet.mjs
@@ -434,6 +438,22 @@ for (const signal of signals) {
   await applyMeetingSignal(timeline, signal);
 }
 ```
+
+对外部宿主项目，推荐优先使用更高层的 `platform-ingest`，把“平台名 + 原始事件”直接接入时间轴：
+
+```js
+import { createMeetingTimelineClient } from '@ai-annotation/meeting-timeline-sdk';
+import { ingestPlatformEvent } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest';
+
+const timeline = createMeetingTimelineClient({ baseUrl: 'http://localhost:8787' });
+
+await ingestPlatformEvent(timeline, req.params.platform, req.body, {
+  receivedAtMs: Date.now(),
+  participantAsAnnotation: true,
+});
+```
+
+这层只负责选择平台 adapter、归一化事件并调用 `startMeeting` / `endMeeting` / 可选参会人标注。平台验签、OAuth、REST 补拉和会后 artifact 下载仍由宿主 webhook 层处理。
 
 ## 诊断字段
 

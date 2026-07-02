@@ -86,6 +86,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/zoom`
 - `@ai-annotation/meeting-timeline-sdk/adapters/webex`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
 - `@ai-annotation/meeting-timeline-sdk/adapters/transcript`
 - `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-setup`
@@ -102,6 +103,22 @@ import { meetingPlatformEventAdapterFor } from '@ai-annotation/meeting-timeline-
 const adapter = meetingPlatformEventAdapterFor(req.params.platform);
 const signals = adapter.normalize(req.body, { receivedAtMs: Date.now() });
 ```
+
+如果外部项目只想“收到平台 webhook 后直接落到会议轴”，可以用更高层的 `platform-ingest`：
+
+```js
+import { createMeetingTimelineClient } from '@ai-annotation/meeting-timeline-sdk';
+import { ingestPlatformEvent } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest';
+
+const timeline = createMeetingTimelineClient({ baseUrl: 'http://localhost:8787' });
+
+await ingestPlatformEvent(timeline, 'google-meet', req.body, {
+  receivedAtMs: Date.now(),
+  participantAsAnnotation: true,
+});
+```
+
+`ingestPlatformEvent()` 内部会按平台名选择 normalizer，把原始事件转成 `NormalizedMeetingSignal[]`，再调用 `startMeeting`、`endMeeting` 或可选的 participant/artifact handler。对于 Google Meet / Teams / Zoom / Webex，新项目可以优先接这一层，只有需要自定义事件验签、补拉详情或 artifact 导入时再下钻到 registry/core。
 
 ## 会后转写导入
 
