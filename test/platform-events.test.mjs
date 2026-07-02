@@ -164,12 +164,53 @@ try {
   assert.equal(googleEnd.state.meeting.end_time, endIso);
   assert.equal(googleEnd.state.events.some((event) => event.source === 'google_meet_webhook' && event.type === 'meeting_end'), true);
 
+  const googleTranscript = await postJson(baseUrl, '/api/platform-events/google-meet', {
+    id: 'google-transcript-001',
+    type: 'google.workspace.meet.transcript.v2.fileGenerated',
+    time: new Date(startMs + 90_000).toISOString(),
+    data: {
+      transcript: {
+        name: 'conferenceRecords/google-record-001/transcripts/transcript-1',
+        docsDestination: { document: 'https://docs.google.com/document/d/transcript-1' },
+      },
+    },
+  });
+  assert.equal(googleTranscript.results[0].action, 'onArtifactSignal');
+  assert.equal(googleTranscript.results[0].response.skipped, false);
+  const googleTranscriptEvents = googleTranscript.state.events.filter((event) => (
+    event.source === 'google_meet_webhook'
+      && event.type === 'transcript_ready'
+      && event.metadata?.artifact_id === 'transcript-1'
+  ));
+  assert.equal(googleTranscriptEvents.length, 1);
+  assert.equal(googleTranscriptEvents[0].time_ms, 90_000);
+  assert.equal(googleTranscriptEvents[0].metadata.artifact_url, 'https://docs.google.com/document/d/transcript-1');
+
+  const duplicateGoogleTranscript = await postJson(baseUrl, '/api/platform-events/google-meet', {
+    id: 'google-transcript-duplicate',
+    type: 'google.workspace.meet.transcript.v2.fileGenerated',
+    time: new Date(startMs + 91_000).toISOString(),
+    data: {
+      transcript: {
+        name: 'conferenceRecords/google-record-001/transcripts/transcript-1',
+        docsDestination: { document: 'https://docs.google.com/document/d/transcript-1' },
+      },
+    },
+  });
+  assert.equal(duplicateGoogleTranscript.results[0].response.skipped, true);
+  assert.equal(duplicateGoogleTranscript.results[0].response.reason, 'duplicate_artifact_signal_filtered');
+  assert.equal(duplicateGoogleTranscript.state.events.filter((event) => (
+    event.source === 'google_meet_webhook'
+      && event.type === 'transcript_ready'
+      && event.metadata?.artifact_id === 'transcript-1'
+  )).length, 1);
+
   const status = await getJson(baseUrl, '/api/platform-events/google-meet/status');
   assert.equal(status.status.platform, 'google_meet');
-  assert.equal(status.status.received_count, 4);
-  assert.equal(status.status.applied_signal_count, 3);
-  assert.equal(status.status.skipped_signal_count, 1);
-  assert.equal(status.status.last_signal_type, 'meeting_ended');
+  assert.equal(status.status.received_count, 6);
+  assert.equal(status.status.applied_signal_count, 4);
+  assert.equal(status.status.skipped_signal_count, 2);
+  assert.equal(status.status.last_signal_type, 'artifact_ready');
 
   const teamsStart = await postJson(baseUrl, '/api/platform-events/teams', {
     id: 'teams-start-001',
@@ -227,10 +268,30 @@ try {
   assert.equal(zoomStart.state.meeting.platform, 'zoom');
   assert.equal(zoomStart.state.meeting.meeting_id, 'zoom-uuid-001');
 
+  const zoomRecording = await postJson(baseUrl, '/api/platform-events/zoom', {
+    event: 'recording.completed',
+    event_ts: startMs + 120_000,
+    payload: {
+      object: {
+        uuid: 'zoom-uuid-001',
+        id: 987654321,
+        topic: 'Zoom platform event test',
+        recording_files: [{ download_url: 'https://zoom.us/recording/download/1' }],
+      },
+    },
+  });
+  assert.equal(zoomRecording.results[0].action, 'onArtifactSignal');
+  assert.equal(zoomRecording.results[0].response.skipped, false);
+  assert.equal(zoomRecording.state.events.some((event) => (
+    event.source === 'zoom_webhook'
+      && event.type === 'recording_completed'
+      && event.metadata?.artifact_url === 'https://zoom.us/recording/download/1'
+  )), true);
+
   const allStatus = await getJson(baseUrl, '/api/platform-events/status');
-  assert.equal(allStatus.status.google_meet.received_count, 4);
+  assert.equal(allStatus.status.google_meet.received_count, 6);
   assert.equal(allStatus.status.microsoft_teams.received_count, 2);
-  assert.equal(allStatus.status.zoom.received_count, 1);
+  assert.equal(allStatus.status.zoom.received_count, 2);
 
   console.log('ok meeting platform event endpoints');
 } finally {

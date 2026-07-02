@@ -5907,7 +5907,7 @@ async function annotationIngestInfoPayload(req) {
     platform_events: {
       supported: true,
       status_endpoint: localUrlFor(req, '/api/platform-events/status'),
-      description: 'Server-side adapters can ingest Google Meet, Microsoft Teams, and Zoom event payloads, normalize them into meeting timeline signals, start/end the same meeting axis contract, and append participant join/leave events with duplicate filtering.',
+      description: 'Server-side adapters can ingest Google Meet, Microsoft Teams, and Zoom event payloads, normalize them into meeting timeline signals, start/end the same meeting axis contract, and append participant join/leave plus artifact-ready events with duplicate filtering.',
       platforms: platformEventAdapterDefinitions.map((item) => ({
         platform: item.key,
         aliases: item.aliases,
@@ -6304,6 +6304,88 @@ function shouldSkipPlatformParticipantEvent(existingEvents = [], event = {}, fil
   ));
 }
 
+function platformArtifactKey(signal = {}) {
+  return String(
+    signal.artifact_id
+      ?? signal.artifact_url
+      ?? signal.source_event_id
+      ?? signal.artifact_kind
+      ?? 'unknown_artifact',
+  );
+}
+
+function platformArtifactEventId(signal = {}, adapter = {}) {
+  const kind = String(signal.artifact_kind || 'artifact')
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'artifact';
+  const artifact = platformArtifactKey(signal)
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'unknown-artifact';
+  if (signal.source_event_id) return `evt-${adapter.source}-${signal.source_event_id}-${kind}-${artifact}`;
+  return `evt-${adapter.source}-artifact-${kind}-${artifact}-${signal.occurred_at_ms}`;
+}
+
+function platformArtifactEventType(signal = {}) {
+  const kind = String(signal.artifact_kind || '').toLowerCase();
+  if (kind === 'recording') return 'recording_completed';
+  if (kind === 'transcript') return 'transcript_ready';
+  if (kind === 'smart_notes' || kind === 'smart_note') return 'smart_notes_ready';
+  return 'artifact_ready';
+}
+
+function platformArtifactEventLabel(signal = {}) {
+  const kind = String(signal.artifact_kind || '').toLowerCase();
+  if (kind === 'recording') return '录制已生成';
+  if (kind === 'transcript') return '转写已生成';
+  if (kind === 'smart_notes' || kind === 'smart_note') return '智能纪要已生成';
+  return '会议产物已生成';
+}
+
+function platformArtifactEventFromSignal(signal = {}, current = {}, adapter = {}) {
+  const startMs = parseAbsoluteMs(current.meeting?.start_time);
+  const occurredAtMs = parseAbsoluteMs(signal.occurred_at_ms);
+  const timeMs = startMs != null && occurredAtMs != null
+    ? Math.max(0, occurredAtMs - startMs)
+    : 0;
+  return {
+    id: platformArtifactEventId(signal, adapter),
+    time_ms: timeMs,
+    type: platformArtifactEventType(signal),
+    label: platformArtifactEventLabel(signal),
+    source: adapter.source,
+    metadata: {
+      raw_type: `platform.${adapter.source}.${signal.artifact_kind ?? 'artifact'}.ready`,
+      platform: adapter.key,
+      meeting_id: signal.meeting?.meeting_id ?? null,
+      source_event_id: signal.source_event_id ?? null,
+      artifact_kind: signal.artifact_kind ?? null,
+      artifact_id: signal.artifact_id ?? null,
+      artifact_url: signal.artifact_url ?? null,
+    },
+  };
+}
+
+function shouldSkipPlatformArtifactEvent(existingEvents = [], event = {}, filterWindowMs = 5000) {
+  if (existingEvents.some((item) => item.id === event.id)) return true;
+  const artifactId = event.metadata?.artifact_id;
+  const artifactUrl = event.metadata?.artifact_url;
+  const artifactKind = event.metadata?.artifact_kind;
+  return existingEvents.some((item) => (
+    item.source === event.source
+      && item.type === event.type
+      && Math.abs(Number(item.time_ms ?? 0) - Number(event.time_ms ?? 0)) <= filterWindowMs
+      && (
+        (artifactId && item.metadata?.artifact_id === artifactId)
+          || (!artifactId && artifactUrl && item.metadata?.artifact_url === artifactUrl)
+          || (!artifactId && !artifactUrl && artifactKind && item.metadata?.artifact_kind === artifactKind)
+      )
+  ));
+}
+
 async function appendPlatformParticipantSignal(signal = {}, body = {}, adapter = {}) {
   const current = await store.load();
   if (!isRealMeetingAxis(current.meeting)) {
@@ -6330,6 +6412,48 @@ async function appendPlatformParticipantSignal(signal = {}, body = {}, adapter =
     return {
       skipped: true,
       reason: 'duplicate_participant_signal_filtered',
+      filter_window_ms: filterWindowMs,
+      event,
+      state: current,
+    };
+  }
+  const next = mergeTimelineWithRebasedAnnotations(current, {
+    events: [...existingEvents, event],
+  });
+  const state = await saveAndBroadcast(next, 'state');
+  return {
+    skipped: false,
+    event,
+    state,
+  };
+}
+
+async function appendPlatformArtifactSignal(signal = {}, body = {}, adapter = {}) {
+  const current = await store.load();
+  if (!isRealMeetingAxis(current.meeting)) {
+    return { skipped: true, reason: 'no_real_meeting_axis', state: current };
+  }
+  if (!sameMeeting(current.meeting, signal.meeting)) {
+    return {
+      skipped: true,
+      reason: 'artifact_signal_meeting_mismatch',
+      meeting_id: current.meeting?.meeting_id ?? null,
+      signal_meeting_id: signal.meeting?.meeting_id ?? null,
+      state: current,
+    };
+  }
+  const filterWindowMs = boundedNumber(
+    body.artifact_filter_window_ms ?? body.artifactFilterWindowMs,
+    5000,
+    0,
+    300_000,
+  );
+  const event = platformArtifactEventFromSignal(signal, current, adapter);
+  const existingEvents = current.events ?? [];
+  if (shouldSkipPlatformArtifactEvent(existingEvents, event, filterWindowMs)) {
+    return {
+      skipped: true,
+      reason: 'duplicate_artifact_signal_filtered',
       filter_window_ms: filterWindowMs,
       event,
       state: current,
@@ -6378,7 +6502,7 @@ async function ingestPlatformEvent(platform, body = {}, req = {}) {
       : (signal) => appendPlatformParticipantSignal(signal, body, adapter),
     onArtifactSignal: body.artifact_callback === 'status_only'
       ? async (signal) => signal
-      : undefined,
+      : (signal) => appendPlatformArtifactSignal(signal, body, adapter),
   });
   const appliedCount = results.filter((item) => item.applied && item.response?.skipped !== true).length;
   const skippedCount = results.length - appliedCount;
