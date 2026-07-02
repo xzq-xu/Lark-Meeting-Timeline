@@ -15,6 +15,21 @@ function firstPath(raw, paths) {
   return firstNonEmpty(...paths.map((path) => getPath(raw, path)));
 }
 
+function decodeMaybeUri(value) {
+  if (!value) return undefined;
+  try {
+    return decodeURIComponent(String(value));
+  } catch {
+    return String(value);
+  }
+}
+
+function joinWebUrlFromGraphResource(raw = {}, data = {}) {
+  const resource = firstNonEmpty(data.resource, raw.resource);
+  const match = String(resource || '').match(/onlineMeetings\(joinWebUrl='?([^')]+)'?\)/i);
+  return match ? decodeMaybeUri(match[1]) : undefined;
+}
+
 function normalizeLifecycleType(value) {
   return String(value || 'unknown')
     .trim()
@@ -85,7 +100,13 @@ function meetingIdentity(raw = {}, data = dataOf(raw)) {
     platform: 'microsoft_teams',
     meeting_id: String(meetingId),
     external_meeting_id: String(firstNonEmpty(data.onlineMeetingId, data.meetingId, data.id, raw.resource, meetingId)),
-    meeting_url: firstNonEmpty(data.joinWebUrl, data.join_url, data.meeting?.joinWebUrl, raw.joinWebUrl),
+    meeting_url: firstNonEmpty(
+      data.joinWebUrl,
+      data.join_url,
+      data.meeting?.joinWebUrl,
+      raw.joinWebUrl,
+      joinWebUrlFromGraphResource(raw, data),
+    ),
     title: firstNonEmpty(data.subject, data.title, data.meeting?.subject, raw.subject),
     organizer_id: firstPath(data, [
       'organizer.id',

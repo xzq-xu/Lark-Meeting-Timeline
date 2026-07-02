@@ -40,13 +40,22 @@ function meetingRef(signal = {}) {
   return compactObject({
     platform: meeting.platform ?? signal.platform,
     meeting_id: meeting.meeting_id,
+    external_meeting_id: meeting.external_meeting_id,
     meeting_url: normalizeUrl(meeting.meeting_url),
   });
 }
 
+function meetingIds(ref = {}) {
+  return [ref.meeting_id, ref.external_meeting_id]
+    .filter((value) => value != null && value !== '')
+    .map((value) => String(value));
+}
+
 function sameMeetingRef(left = {}, right = {}) {
   if (!left.platform || !right.platform || String(left.platform) !== String(right.platform)) return false;
-  if (left.meeting_id && right.meeting_id && String(left.meeting_id) === String(right.meeting_id)) return true;
+  const leftIds = meetingIds(left);
+  const rightIds = meetingIds(right);
+  if (leftIds.some((leftId) => rightIds.includes(leftId))) return true;
   return Boolean(left.meeting_url && right.meeting_url && left.meeting_url === right.meeting_url);
 }
 
@@ -74,7 +83,7 @@ export function meetingSignalFingerprint(signalInput = {}) {
   return [
     signal.type,
     ref.platform ?? signal.platform ?? 'unknown',
-    ref.meeting_id ?? ref.meeting_url ?? 'unknown',
+    ref.meeting_id ?? ref.external_meeting_id ?? ref.meeting_url ?? 'unknown',
     signalTime(signal),
     subjectKey(signal),
   ].join('|');
@@ -198,7 +207,7 @@ function speakerStateKey(signal) {
   const ref = meetingRef(signal);
   return [
     ref.platform,
-    ref.meeting_id ?? ref.meeting_url,
+    ref.meeting_id ?? ref.external_meeting_id ?? ref.meeting_url,
     signal.speaker_id ?? signal.speaker_name ?? signal.participant_id ?? signal.participant_name ?? 'speaker',
   ].join('|');
 }

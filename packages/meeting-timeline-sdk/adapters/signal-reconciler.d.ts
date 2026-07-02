@@ -6,6 +6,7 @@ export interface MeetingSignalReconcilerStateEntry {
   source?: string;
   platform?: string;
   meeting_id?: string;
+  external_meeting_id?: string;
   meeting_url?: string;
   source_event_id?: string;
   occurred_at_ms?: number;

@@ -33,6 +33,46 @@ const googleStart = {
   },
 };
 
+const zoomJoinUrl = 'https://us06web.zoom.us/j/987654321';
+const zoomLocalStart = {
+  id: 'zoom-local-start-1',
+  type: 'meeting_started',
+  detected_platform: 'zoom',
+  meeting_id: '987654321',
+  meeting_url: zoomJoinUrl,
+  start_time_ms: startMs,
+};
+const zoomProviderStart = {
+  event: 'meeting.started',
+  event_id: 'zoom-start-1',
+  event_ts: startMs + 2_000,
+  payload: {
+    object: {
+      uuid: 'zoom-uuid-001',
+      id: 987654321,
+      topic: 'Zoom product review',
+      start_time: new Date(startMs + 2_000).toISOString(),
+    },
+  },
+};
+
+const teamsJoinUrl = 'https://teams.microsoft.com/l/meetup-join/19%3Ameeting_TEAMS%40thread.v2/0';
+const teamsLocalStart = {
+  id: 'teams-local-start-1',
+  type: 'meeting_started',
+  url: teamsJoinUrl,
+  start_time_ms: startMs,
+};
+const teamsProviderStart = {
+  id: 'teams-start-1',
+  resource: `/communications/onlineMeetings(joinWebUrl='${encodeURIComponent(teamsJoinUrl)}')/meetingCallEvents`,
+  resourceData: {
+    id: 'teams-call-event-1',
+    eventType: 'callStarted',
+    eventDateTime: new Date(startMs + 2_000).toISOString(),
+  },
+};
+
 const fingerprint = meetingSignalFingerprint({
   type: 'meeting_started',
   meeting: {
@@ -114,6 +154,32 @@ const localAfterProvider = reconciler.reconcile({
 assert.equal(localAfterProvider.signals.length, 0);
 assert.equal(localAfterProvider.skipped[0].reason, 'provider_axis_already_active');
 
+const zoomReconciler = createMeetingSignalReconciler();
+assert.equal(zoomReconciler.reconcile({
+  type: 'meeting_started',
+  meeting: {
+    platform: 'zoom',
+    meeting_id: '987654321',
+    meeting_url: zoomJoinUrl,
+  },
+  occurred_at_ms: startMs,
+  source_event_id: 'zoom-local-start-1',
+  source: 'local_detector',
+}).signals.length, 1);
+const zoomProviderAxis = zoomReconciler.reconcile({
+  type: 'meeting_started',
+  meeting: {
+    platform: 'zoom',
+    meeting_id: 'zoom-uuid-001',
+    external_meeting_id: '987654321',
+  },
+  occurred_at_ms: startMs + 2_000,
+  source_event_id: 'zoom-start-1',
+  source: 'webhook',
+});
+assert.equal(zoomProviderAxis.signals.length, 1);
+assert.equal(zoomProviderAxis.decisions[0].reason, 'provider_reconciles_local_axis');
+
 const speakerStart = reconciler.reconcile({
   type: 'speaker_started',
   meeting: {
@@ -180,5 +246,24 @@ const localAfterOfficial = await ingestor.ingest('local-detector', {
 });
 assert.equal(localAfterOfficial.results.length, 0);
 assert.equal(localAfterOfficial.reconciliation.skipped[0].reason, 'provider_axis_already_active');
+
+const zoomIngestor = createReconciledPlatformEventIngestor(client);
+const zoomLocalIngest = await zoomIngestor.ingest('local-detector', zoomLocalStart);
+assert.equal(zoomLocalIngest.results.length, 1);
+assert.equal(calls.at(-1).input.meeting_id, '987654321');
+const zoomProviderIngest = await zoomIngestor.ingest('zoom', zoomProviderStart);
+assert.equal(zoomProviderIngest.results.length, 1);
+assert.equal(zoomProviderIngest.reconciliation.decisions[0].reason, 'provider_reconciles_local_axis');
+assert.equal(calls.at(-1).input.meeting_id, 'zoom-uuid-001');
+assert.equal(calls.at(-1).input.external_meeting_id, '987654321');
+
+const teamsIngestor = createReconciledPlatformEventIngestor(client);
+const teamsLocalIngest = await teamsIngestor.ingest('local-detector', teamsLocalStart);
+assert.equal(teamsLocalIngest.results.length, 1);
+assert.equal(teamsLocalIngest.results[0].signal.meeting.platform, 'microsoft_teams');
+const teamsProviderIngest = await teamsIngestor.ingest('teams', teamsProviderStart);
+assert.equal(teamsProviderIngest.results.length, 1);
+assert.equal(teamsProviderIngest.reconciliation.decisions[0].reason, 'provider_reconciles_local_axis');
+assert.equal(teamsProviderIngest.results[0].signal.meeting.meeting_url, teamsJoinUrl);
 
 console.log('ok meeting signal reconciler');

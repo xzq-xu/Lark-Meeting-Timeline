@@ -374,6 +374,21 @@ assert.equal(teamsStart[0].type, 'meeting_started');
 assert.equal(teamsStart[0].meeting.platform, 'microsoft_teams');
 assert.equal(teamsStart[0].meeting.meeting_id, 'teams-meeting-001');
 
+const teamsStartFromResource = normalizeMicrosoftTeamsEvent({
+  id: 'teams-notification-resource-1',
+  resource: `communications/onlineMeetings(joinWebUrl='${encodeURIComponent('https://teams.microsoft.com/l/meetup-join/19%3Ameeting_TEAMS%40thread.v2/0')}')/meetingCallEvents`,
+  resourceData: {
+    id: 'teams-call-event-1',
+    eventType: 'callStarted',
+    eventDateTime: startIso,
+  },
+});
+assert.equal(teamsStartFromResource[0].type, 'meeting_started');
+assert.equal(
+  teamsStartFromResource[0].meeting.meeting_url,
+  'https://teams.microsoft.com/l/meetup-join/19%3Ameeting_TEAMS%40thread.v2/0',
+);
+
 const teamsRoster = normalizeMicrosoftTeamsEvent({
   id: 'teams-roster-1',
   resourceData: {
