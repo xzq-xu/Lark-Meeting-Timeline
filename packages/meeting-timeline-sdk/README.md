@@ -129,6 +129,7 @@ await timeline.importTranscript({
 
 ```js
 import {
+  MEETING_PLATFORM_KEYS,
   allPlatformCapabilityContracts,
   buildGoogleMeetWorkspaceSubscriptionRequest,
   buildMicrosoftGraphSubscriptionRenewalRequest,
@@ -137,9 +138,13 @@ import {
   buildZoomEventSubscriptionRequest,
   evaluatePlatformSubscriptionMaintenance,
   evaluatePlatformSetupReadiness,
+  normalizeMeetingPlatform,
   platformCapabilityContract,
   platformSetupManifest,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup';
+
+const platform = normalizeMeetingPlatform('google-meet'); // google_meet
+const supportedPlatforms = MEETING_PLATFORM_KEYS; // google_meet, microsoft_teams, zoom, webex
 
 const google = buildGoogleMeetWorkspaceSubscriptionRequest({
   targetResource: '//cloudidentity.googleapis.com/users/me',

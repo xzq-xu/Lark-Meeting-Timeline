@@ -39,7 +39,20 @@ export const WEBEX_WEBHOOK_RESOURCES = Object.freeze([
   { resource: 'meetingTranscripts', events: ['created'] },
 ]);
 
-const supportedPlatforms = Object.freeze(['google_meet', 'microsoft_teams', 'zoom', 'webex']);
+export const MEETING_PLATFORM_KEYS = Object.freeze(['google_meet', 'microsoft_teams', 'zoom', 'webex']);
+
+export const MEETING_PLATFORM_ALIASES = Object.freeze({
+  'google-meet': 'google_meet',
+  google_meet: 'google_meet',
+  meet: 'google_meet',
+  'microsoft-teams': 'microsoft_teams',
+  microsoft_teams: 'microsoft_teams',
+  teams: 'microsoft_teams',
+  zoom: 'zoom',
+  webex: 'webex',
+  'cisco-webex': 'webex',
+  cisco_webex: 'webex',
+});
 
 const platformCapabilityContracts = Object.freeze({
   google_meet: {
@@ -234,18 +247,7 @@ const platformCapabilityContracts = Object.freeze({
   },
 });
 
-const platformAliases = new Map([
-  ['google-meet', 'google_meet'],
-  ['google_meet', 'google_meet'],
-  ['meet', 'google_meet'],
-  ['microsoft-teams', 'microsoft_teams'],
-  ['microsoft_teams', 'microsoft_teams'],
-  ['teams', 'microsoft_teams'],
-  ['zoom', 'zoom'],
-  ['webex', 'webex'],
-  ['cisco-webex', 'webex'],
-  ['cisco_webex', 'webex'],
-]);
+const platformAliases = new Map(Object.entries(MEETING_PLATFORM_ALIASES));
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -274,14 +276,18 @@ function parseTimeMs(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function normalizePlatform(platform) {
+export function normalizeMeetingPlatform(platform) {
   const key = platformAliases.get(String(platform ?? '').toLowerCase().replace(/\s+/g, '-'));
   if (!key) {
     throw new MeetingTimelineSdkError(`Unsupported meeting platform: ${platform}`, {
-      supportedPlatforms: Array.from(new Set(platformAliases.values())),
+      supportedPlatforms: MEETING_PLATFORM_KEYS,
     });
   }
   return key;
+}
+
+function normalizePlatform(platform) {
+  return normalizeMeetingPlatform(platform);
 }
 
 function urlEncode(value) {
@@ -515,7 +521,7 @@ export function platformCapabilityContract(platform, options = {}) {
 }
 
 export function allPlatformCapabilityContracts(options = {}) {
-  return supportedPlatforms.map((platform) => platformCapabilityContract(platform, options));
+  return MEETING_PLATFORM_KEYS.map((platform) => platformCapabilityContract(platform, options));
 }
 
 export function platformSetupManifest(platform, options = {}) {
@@ -623,7 +629,7 @@ export function platformSetupManifest(platform, options = {}) {
 }
 
 export function allPlatformSetupManifests(options = {}) {
-  return supportedPlatforms.map((platform) => platformSetupManifest(platform, options));
+  return MEETING_PLATFORM_KEYS.map((platform) => platformSetupManifest(platform, options));
 }
 
 export function buildPlatformSetup(platform, options = {}) {
@@ -675,7 +681,7 @@ export function evaluatePlatformSetupReadiness(platform, options = {}) {
 }
 
 export function evaluateAllPlatformSetupReadiness(options = {}) {
-  return supportedPlatforms.map((platform) => (
+  return MEETING_PLATFORM_KEYS.map((platform) => (
     evaluatePlatformSetupReadiness(platform, options)
   ));
 }
@@ -747,12 +753,15 @@ export function evaluatePlatformSubscriptionMaintenance(platform, subscription =
 }
 
 export function evaluateAllPlatformSubscriptionMaintenance(subscriptions = {}, options = {}) {
-  return supportedPlatforms.map((platform) => (
+  return MEETING_PLATFORM_KEYS.map((platform) => (
     evaluatePlatformSubscriptionMaintenance(platform, subscriptions[platform] ?? {}, options)
   ));
 }
 
 export const MEETING_PLATFORM_SETUP_BUILDERS = Object.freeze({
+  MEETING_PLATFORM_KEYS,
+  MEETING_PLATFORM_ALIASES,
+  normalizeMeetingPlatform,
   buildGoogleMeetWorkspaceSubscriptionRequest,
   buildMicrosoftTeamsMeetingCallSubscriptionRequest,
   buildZoomEventSubscriptionRequest,

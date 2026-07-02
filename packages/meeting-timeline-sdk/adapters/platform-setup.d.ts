@@ -4,6 +4,8 @@ export const MICROSOFT_TEAMS_CHANGE_TYPES: readonly string[];
 export const MICROSOFT_GRAPH_LIFECYCLE_EVENTS: readonly string[];
 export const ZOOM_MEETING_EVENT_TYPES: readonly string[];
 export const WEBEX_WEBHOOK_RESOURCES: readonly { resource: string; events: readonly string[]; filter?: string }[];
+export const MEETING_PLATFORM_KEYS: readonly string[];
+export const MEETING_PLATFORM_ALIASES: Readonly<Record<string, string>>;
 
 export interface PlatformSetupOptions {
   baseUrl?: string;
@@ -121,6 +123,7 @@ export function buildGoogleWorkspaceSubscriptionRenewalRequest(input?: {
   [key: string]: unknown;
 }): Record<string, unknown>;
 
+export function normalizeMeetingPlatform(platform: string): string;
 export function platformEventEndpoint(baseUrl: string, platform: string): string;
 export function platformCapabilityContract(platform: string, options?: PlatformSetupOptions): Record<string, unknown>;
 export function allPlatformCapabilityContracts(options?: PlatformSetupOptions): Record<string, unknown>[];

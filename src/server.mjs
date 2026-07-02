@@ -5947,7 +5947,7 @@ async function annotationIngestInfoPayload(req) {
       supported: true,
       endpoint: localUrlFor(req, '/api/import/transcript'),
       legacy_lark_endpoint: localUrlFor(req, '/api/import/lark-transcript'),
-      description: 'Post-meeting transcript segments can be imported after platform adapters fetch Google Meet, Microsoft Teams, Zoom, or Lark transcript content.',
+      description: 'Post-meeting transcript segments can be imported after platform adapters fetch Google Meet, Microsoft Teams, Zoom, Webex, or Lark transcript content.',
       accepted_fields: [
         'meeting.platform',
         'meeting.meeting_id',
@@ -5961,7 +5961,7 @@ async function annotationIngestInfoPayload(req) {
       status_endpoint: localUrlFor(req, '/api/platform-events/status'),
       setup_endpoint: localUrlFor(req, '/api/platform-events/setup'),
       capability_contracts: allPlatformCapabilityContracts({ baseUrl: localUrlFor(req, '') }),
-      description: 'Server-side adapters can ingest Google Meet, Microsoft Teams, and Zoom event payloads, normalize them into meeting timeline signals, start/end the same meeting axis contract, and append participant join/leave plus artifact-ready events with duplicate filtering.',
+      description: 'Server-side adapters can ingest Google Meet, Microsoft Teams, Zoom, and Webex event payloads, normalize them into meeting timeline signals, start/end the same meeting axis contract, and append participant join/leave plus artifact-ready events with duplicate filtering.',
       platforms: platformEventAdapterDefinitions.map((item) => ({
         platform: item.key,
         aliases: item.aliases,
@@ -5974,6 +5974,7 @@ async function annotationIngestInfoPayload(req) {
         microsoft_graph_client_state_configured: Boolean(process.env.MICROSOFT_GRAPH_CLIENT_STATE),
         google_pubsub_bearer_configured: Boolean(process.env.GOOGLE_PUBSUB_BEARER_TOKEN),
         google_pubsub_oidc_configured: Boolean(process.env.GOOGLE_PUBSUB_OIDC_AUDIENCE || process.env.GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL),
+        webex_secret_configured: Boolean(process.env.WEBEX_WEBHOOK_SECRET),
       },
     },
     meeting_session_inline_annotation: {

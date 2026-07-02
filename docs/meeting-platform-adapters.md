@@ -381,6 +381,8 @@ GET  /api/platform-events/status
 
 关键约束是：实时标注只依赖 `realtime_axis`，转写统一通过 `post_meeting_transcript` 会后导入；任何平台的实时 transcript 都不作为 P0/P1 链路前置条件。
 
+SDK 还导出 `MEETING_PLATFORM_KEYS`、`MEETING_PLATFORM_ALIASES` 和 `normalizeMeetingPlatform()`，宿主项目应从这里读取平台列表和别名映射。新增平台时必须同时补齐 event adapter、setup manifest、capability contract、endpoint、安全配置、transcript normalizer，并通过 `test/sdk-platform-conformance.test.mjs`。
+
 真实 webhook 接入的安全层也已经放进 SDK：
 
 - `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
