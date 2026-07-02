@@ -97,6 +97,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-capture`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-monitor`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-source`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
@@ -286,6 +287,26 @@ await runtime.insertMark({
 
 // 官方 provider 事件晚到后仍可进入同一个 reconciler 校准：
 await runtime.ingestProvider('google-meet', googleWorkspaceEventBody);
+```
+
+如果是在浏览器扩展 content script、内嵌浏览器或 Electron WebView 里运行，可以用 `meeting-app-browser-runtime` 少写一层宿主胶水。它会自动读取当前 `document/location/window`，在 `pagehide` / `beforeunload` 时停止 monitor，并提供一个简单 message handler 给 background script 或宿主转发标注：
+
+```js
+import { createMeetingAppBrowserRuntime } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime';
+
+const browserRuntime = createMeetingAppBrowserRuntime({
+  baseUrl: 'http://localhost:8787',
+}, {
+  applyOptions: { speakerAsAnnotation: true },
+  speakerOptions: { minStableMs: 300, switchStableMs: 400, endIdleMs: 1500 },
+});
+
+browserRuntime.start();
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  browserRuntime.handleMessage(message).then(sendResponse);
+  return true;
+});
 ```
 
 接入浏览器扩展、Electron WebView 或桌面 Accessibility 采集器前，可以先跑 `meeting-app-fixtures` 的本地验收样本。它覆盖 Google Meet、Teams Web、Zoom Web、Webex Web、Lark/Feishu Web，并验证平台识别、会议 ID、入会态、active speaker、`meeting_started` 和 `speaker_started`：

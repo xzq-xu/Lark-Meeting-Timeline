@@ -182,7 +182,7 @@ type NormalizedMeetingSignal =
 
 推荐接入方式：
 
-1. P0：先支持本地/桌面检测器建轴。浏览器扩展或 WebView 优先用 `adapters/meeting-app-runtime` 一体化入口；runtime 内部由 `meeting-app-monitor` 驱动 `meeting-app-capture` 低成本读取 Google Meet 的 URL、按钮文案、tile/ariaLabel、active speaker 信息，再交给 `adapters/meeting-apps` preset 归一成 `meeting_started` / `speaker_started`，最后通过 `meeting-source` 调用 `startMeeting({ platform: 'google_meet', start_time_ms })`。monitor 负责轮询、去重、限流和 keep-alive，避免调用方自己处理 active speaker 稳定窗口。
+1. P0：先支持本地/桌面检测器建轴。浏览器扩展 content script 优先用 `adapters/meeting-app-browser-runtime`，Electron WebView 或自定义宿主可直接用 `adapters/meeting-app-runtime`；runtime 内部由 `meeting-app-monitor` 驱动 `meeting-app-capture` 低成本读取 Google Meet 的 URL、按钮文案、tile/ariaLabel、active speaker 信息，再交给 `adapters/meeting-apps` preset 归一成 `meeting_started` / `speaker_started`，最后通过 `meeting-source` 调用 `startMeeting({ platform: 'google_meet', start_time_ms })`。monitor 负责轮询、去重、限流和 keep-alive，避免调用方自己处理 active speaker 稳定窗口。
 2. P1：接 Google Workspace Events API，处理：
    - `google.workspace.meet.conference.v2.started`
    - `google.workspace.meet.conference.v2.ended`
@@ -327,7 +327,7 @@ Teams SDK 可以让会议内 app/bot 接收 meetingStart、meetingEnd、particip
 
 1. **保留并强化 local detector path**
    - 宿主应用、桌面观察器、电子纸 companion app 发现“用户已经在会议中”时，直接调用本地 `startMeeting`。
-   - 对 Google Meet / Teams / Zoom / Lark / Webex 的浏览器 DOM，优先用 `adapters/meeting-app-runtime` 作为宿主入口；内部用 `meeting-app-monitor` 管理轮询和 keep-alive，用 `meeting-app-capture` 采集按钮、participant tile、ariaLabel 和音量/发言状态，再用 `meeting-apps` preset 归一化。
+   - 对 Google Meet / Teams / Zoom / Lark / Webex 的浏览器 DOM，浏览器扩展优先用 `adapters/meeting-app-browser-runtime`，其他宿主用 `adapters/meeting-app-runtime`；内部用 `meeting-app-monitor` 管理轮询和 keep-alive，用 `meeting-app-capture` 采集按钮、participant tile、ariaLabel 和音量/发言状态，再用 `meeting-apps` preset 归一化。
    - 对桌面 Accessibility 快照，直接交给 `adapters/meeting-apps` 或 `adapters/native-meeting`；它们负责识别 Leave/Join 按钮、participant tile、ariaLabel 和 active speaker。
    - 这是跨平台最低延迟、最低权限依赖的路径。
 
