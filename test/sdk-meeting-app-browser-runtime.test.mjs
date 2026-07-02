@@ -276,6 +276,28 @@ mutationRuntime.stop();
 assert.equal(FakeMutationObserver.instances[0].connected, false);
 
 FakeMutationObserver.instances = [];
+const filteredWindow = fakeWindow(fakeDocument(), { MutationObserver: FakeMutationObserver });
+const filteredRuntime = createMeetingAppBrowserRuntime(mutationClient, {
+  window: filteredWindow,
+  now: () => clock,
+  applyOptions: { speakerAsAnnotation: true },
+  speakerOptions: { minStableMs: 0 },
+  mutationIgnoreSelectors: ['.caption-line'],
+  mutationTrackSelectors: ['[data-participant-id]', '[aria-label*="Leave call" i]'],
+});
+filteredRuntime.installMutationObserver({ mutationDebounceMs: 0 });
+FakeMutationObserver.instances[0].trigger([
+  { type: 'characterData', target: node('span', { class: 'caption-line' }, 'live caption noise') },
+  { type: 'attributes', target: node('div', { 'data-participant-id': 'ada' }) },
+]);
+const filteredState = filteredRuntime.getState().browser_runtime.mutation_observer;
+assert.equal(filteredState.pending_count, 1);
+assert.equal(filteredState.ignored_count, 1);
+await filteredRuntime.flushMutationObserver();
+assert.equal(filteredRuntime.getState().browser_runtime.mutation_observer.sample_count, 1);
+filteredRuntime.dispose();
+
+FakeMutationObserver.instances = [];
 let followupClock = startMs;
 const followupCalls = [];
 const followupClient = {

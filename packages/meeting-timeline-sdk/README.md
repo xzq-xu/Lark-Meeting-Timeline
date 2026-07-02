@@ -304,6 +304,8 @@ const browserRuntime = createMeetingAppBrowserRuntime({
   captureOptions: { platform: 'google_meet' },
   observeMutations: true,
   mutationDebounceMs: 150,
+  mutationTrackSelectors: ['[data-participant-id]', '[aria-label*="Leave call" i]'],
+  mutationIgnoreSelectors: ['.caption-line', '[data-transcript-line]', '[data-chat-message]'],
   speakerStableFollowupMs: 300,
   sampleIntervalMs: 10000, // MutationObserver 负责低延迟触发，低频轮询只做兜底。
 });

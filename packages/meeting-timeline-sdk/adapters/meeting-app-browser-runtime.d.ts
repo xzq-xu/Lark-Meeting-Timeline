@@ -30,6 +30,14 @@ export interface MeetingAppBrowserRuntimeOptions extends MeetingAppTimelineRunti
   mutation_root?: unknown;
   mutationObserverOptions?: Record<string, unknown>;
   mutation_observer_options?: Record<string, unknown>;
+  mutationFilter?: (record: Record<string, unknown>, options?: MeetingAppBrowserRuntimeOptions) => boolean;
+  mutation_filter?: (record: Record<string, unknown>, options?: MeetingAppBrowserRuntimeOptions) => boolean;
+  mutationTrackSelectors?: string[];
+  mutation_track_selectors?: string[];
+  mutationIgnoreSelectors?: string[];
+  mutation_ignore_selectors?: string[];
+  mutationIgnoreAttributes?: string[];
+  mutation_ignore_attributes?: string[];
   debounceMs?: number;
   debounce_ms?: number;
   mutationDebounceMs?: number;

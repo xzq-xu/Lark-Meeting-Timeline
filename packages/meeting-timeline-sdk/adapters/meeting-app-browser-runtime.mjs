@@ -92,6 +92,89 @@ function debounceMs(options = {}, fallback = 150) {
   return Number.isFinite(numeric) ? Math.max(0, numeric) : fallback;
 }
 
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value !== 'string' && typeof value[Symbol.iterator] === 'function') return Array.from(value);
+  return value == null ? [] : [value];
+}
+
+function selectorList(options = {}, camel, snake) {
+  return asArray(firstNonEmpty(options[camel], options[snake])).filter(Boolean).map(String);
+}
+
+function nodeParent(node) {
+  return node?.parentElement ?? node?.parentNode ?? node?.host ?? null;
+}
+
+function nodeMatchesSelector(node, selector) {
+  if (!node || !selector) return false;
+  if (typeof node.matches === 'function') {
+    try {
+      if (node.matches(selector)) return true;
+    } catch {
+      return false;
+    }
+  }
+  const text = String(selector).trim();
+  if (!text) return false;
+  const tag = String(node.tagName ?? node.nodeName ?? '').toLowerCase();
+  if (/^[a-z][a-z0-9-]*$/i.test(text)) return tag === text.toLowerCase();
+  if (text.startsWith('.')) {
+    return String(node.className ?? node.getAttribute?.('class') ?? '').split(/\s+/).includes(text.slice(1));
+  }
+  const attr = text.match(/^\[([a-zA-Z0-9_-]+)([*]?=)?(?:"([^"]*)"|'([^']*)'|([^\]\s]+))?(?:\s+i)?\]$/);
+  if (!attr) return false;
+  const [, name, operator, doubleQuoted, singleQuoted, bare] = attr;
+  const actual = node.getAttribute?.(name) ?? node[name];
+  if (operator == null) return actual != null && actual !== '';
+  if (actual == null) return false;
+  const expected = doubleQuoted ?? singleQuoted ?? bare ?? '';
+  if (operator === '*=') return String(actual).toLowerCase().includes(String(expected).toLowerCase());
+  return String(actual) === String(expected);
+}
+
+function nodeOrAncestorMatches(node, selectors = [], root = null, maxDepth = 6) {
+  let current = node;
+  let depth = 0;
+  while (current && depth <= maxDepth) {
+    if (selectors.some((selector) => nodeMatchesSelector(current, selector))) return true;
+    if (current === root) break;
+    current = nodeParent(current);
+    depth += 1;
+  }
+  return false;
+}
+
+function mutationRecordNodes(record = {}) {
+  return [
+    record.target,
+    ...asArray(record.addedNodes),
+    ...asArray(record.removedNodes),
+  ].filter(Boolean);
+}
+
+function mutationRecordAllowed(record = {}, filterOptions = {}) {
+  const customFilter = filterOptions.mutationFilter ?? filterOptions.mutation_filter;
+  if (typeof customFilter === 'function') {
+    return customFilter(record, filterOptions) !== false;
+  }
+  const root = filterOptions.mutationRoot ?? filterOptions.mutation_root ?? null;
+  const trackSelectors = selectorList(filterOptions, 'mutationTrackSelectors', 'mutation_track_selectors');
+  const ignoreSelectors = selectorList(filterOptions, 'mutationIgnoreSelectors', 'mutation_ignore_selectors');
+  const ignoreAttributes = selectorList(filterOptions, 'mutationIgnoreAttributes', 'mutation_ignore_attributes');
+  const nodes = mutationRecordNodes(record);
+  if (ignoreAttributes.length && record.type === 'attributes' && ignoreAttributes.includes(String(record.attributeName ?? ''))) {
+    return false;
+  }
+  if (ignoreSelectors.length && nodes.some((node) => nodeOrAncestorMatches(node, ignoreSelectors, root))) {
+    return false;
+  }
+  if (trackSelectors.length) {
+    return nodes.some((node) => nodeOrAncestorMatches(node, trackSelectors, root));
+  }
+  return true;
+}
+
 function speakerStableFollowupEnabled(options = {}) {
   return options.speakerStableFollowup !== false
     && options.speaker_stable_followup !== false
@@ -172,6 +255,7 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
   let mutationObserver = null;
   let mutationTimer = null;
   let mutationPendingCount = 0;
+  let mutationIgnoredCount = 0;
   let mutationSampleCount = 0;
   let mutationLastResult = null;
   let mutationLastError = null;
@@ -220,6 +304,7 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
     return {
       installed: mutationObserver != null,
       pending_count: mutationPendingCount,
+      ignored_count: mutationIgnoredCount,
       sample_count: mutationSampleCount,
       last_observed_at_ms: mutationLastObservedAtMs,
       last_result: mutationLastResult,
@@ -348,9 +433,17 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
     const root = mutationRoot(merged);
     if (!Observer) return { installed: false, reason: 'missing_mutation_observer', state: mutationState() };
     if (!root) return { installed: false, reason: 'missing_mutation_root', state: mutationState() };
-    mutationLastOptions = merged;
+    mutationLastOptions = {
+      ...merged,
+      mutationRoot: root,
+      mutation_root: root,
+    };
     mutationObserver = new Observer((records = []) => {
-      mutationPendingCount += Math.max(1, Array.isArray(records) ? records.length : 1);
+      const rows = Array.isArray(records) ? records : [records];
+      const allowed = rows.filter((record) => mutationRecordAllowed(record, mutationLastOptions));
+      mutationIgnoredCount += Math.max(0, rows.length - allowed.length);
+      if (allowed.length === 0) return;
+      mutationPendingCount += Math.max(1, allowed.length);
       scheduleMutationSample(mutationLastOptions);
     });
     mutationObserver.observe(root, mutationObserveOptions(merged));
@@ -368,6 +461,7 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
     if (mutationObserver?.disconnect) mutationObserver.disconnect();
     mutationObserver = null;
     mutationPendingCount = 0;
+    mutationIgnoredCount = 0;
     mutationLastOptions = null;
     return mutationState();
   }
