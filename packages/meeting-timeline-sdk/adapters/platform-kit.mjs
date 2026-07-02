@@ -1,0 +1,229 @@
+import {
+  MeetingTimelineSdkError,
+  compactObject,
+} from '../index.mjs';
+import { buildPlatformAcceptanceReport, buildMeetingPlatformAcceptanceSummary } from './platform-acceptance.mjs';
+import {
+  buildPlatformFixtureAcceptanceInput,
+  buildPlatformFixtureSamples,
+} from './platform-fixtures.mjs';
+import { diagnosePlatformEvent } from './platform-ingest.mjs';
+import { buildMeetingPlatformOnboardingReport, buildMeetingPlatformOnboardingSummary } from './platform-onboarding.mjs';
+import {
+  MEETING_PLATFORM_KEYS,
+  allPlatformCapabilityContracts,
+  buildPlatformIntegrationPlan,
+  buildPlatformPermissionPlan,
+  buildPlatformSetup,
+  normalizeMeetingPlatform,
+  platformCapabilityContract,
+} from './platform-setup.mjs';
+import { createMeetingTimelineBridge } from './timeline-bridge.mjs';
+import {
+  buildPlatformWebhookRouteTable,
+  buildPlatformWebhookRouterSetup,
+  buildPlatformWebhookRouterStatus,
+  createMeetingPlatformWebhookRouter,
+  platformWebhookRoutePath,
+} from './platform-webhook-router.mjs';
+
+function firstNonEmpty(...values) {
+  return values.find((value) => value != null && value !== '');
+}
+
+function isTimelineClient(value) {
+  return Boolean(value)
+    && typeof value === 'object'
+    && typeof value.startMeeting === 'function'
+    && typeof value.endMeeting === 'function'
+    && typeof value.insertMark === 'function';
+}
+
+function kitDefaults(clientOrOptions, options = {}) {
+  const baseOptions = isTimelineClient(clientOrOptions) ? {} : (clientOrOptions ?? {});
+  const clientOptions = {
+    ...(baseOptions.clientOptions ?? baseOptions.client_options ?? {}),
+    ...(options.clientOptions ?? options.client_options ?? {}),
+  };
+  return compactObject({
+    ...baseOptions,
+    ...options,
+    clientOptions,
+    baseUrl: firstNonEmpty(options.baseUrl, options.base_url, baseOptions.baseUrl, baseOptions.base_url, clientOptions.baseUrl, clientOptions.base_url),
+    basePath: firstNonEmpty(options.basePath, options.base_path, baseOptions.basePath, baseOptions.base_path, '/api/platform-events'),
+    env: {
+      ...(baseOptions.env ?? {}),
+      ...(options.env ?? {}),
+    },
+  });
+}
+
+function withDefaults(defaults = {}, options = {}) {
+  return compactObject({
+    ...defaults,
+    ...options,
+    clientOptions: {
+      ...(defaults.clientOptions ?? defaults.client_options ?? {}),
+      ...(options.clientOptions ?? options.client_options ?? {}),
+    },
+    env: {
+      ...(defaults.env ?? {}),
+      ...(options.env ?? {}),
+    },
+  });
+}
+
+function bridgeInput(clientOrOptions, defaults = {}) {
+  if (isTimelineClient(clientOrOptions)) return clientOrOptions;
+  const clientOptions = {
+    ...(clientOrOptions ?? {}),
+    ...(defaults.clientOptions ?? defaults.client_options ?? {}),
+    baseUrl: firstNonEmpty(defaults.baseUrl, defaults.base_url, clientOrOptions?.baseUrl, clientOrOptions?.base_url),
+  };
+  if (!clientOptions.baseUrl && !clientOptions.base_url) {
+    throw new MeetingTimelineSdkError('baseUrl or MeetingTimelineClient is required for createMeetingPlatformTimelineKit');
+  }
+  return clientOptions;
+}
+
+function acceptanceOptions(defaults = {}, options = {}) {
+  const merged = withDefaults(defaults, options);
+  return {
+    ...merged,
+    requireEndEvent: firstNonEmpty(options.requireEndEvent, options.require_end_event, true),
+  };
+}
+
+function platformOverview(platform, defaults = {}, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  const merged = withDefaults(defaults, options);
+  return {
+    platform: key,
+    capabilities: platformCapabilityContract(key, merged),
+    setup: buildPlatformSetup(key, merged),
+    permission_plan: buildPlatformPermissionPlan(key, merged),
+    integration_plan: buildPlatformIntegrationPlan(key, merged),
+    webhook_route: platformWebhookRoutePath(key, merged),
+    fixture_samples: buildPlatformFixtureSamples(key, merged),
+  };
+}
+
+export function buildMeetingPlatformKitReport(options = {}) {
+  const fixtureInput = buildPlatformFixtureAcceptanceInput(options);
+  return {
+    base_url: options.baseUrl ?? options.base_url,
+    base_path: options.basePath ?? options.base_path ?? '/api/platform-events',
+    supported_platforms: MEETING_PLATFORM_KEYS,
+    capabilities: allPlatformCapabilityContracts(options),
+    webhook_router: buildPlatformWebhookRouterStatus(options),
+    onboarding: buildMeetingPlatformOnboardingSummary(options),
+    fixture_acceptance: buildMeetingPlatformAcceptanceSummary({
+      ...fixtureInput,
+      requireEndEvent: true,
+      ...options,
+      samples: fixtureInput.samples,
+      env: fixtureInput.env,
+    }),
+  };
+}
+
+export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) {
+  const defaults = kitDefaults(clientOrOptions, options);
+  const bridge = createMeetingTimelineBridge(bridgeInput(clientOrOptions, defaults), defaults);
+  const router = createMeetingPlatformWebhookRouter(bridge.client, {
+    ...defaults,
+    reconcile: firstNonEmpty(defaults.reconcile, defaults.reconciled, true),
+  });
+
+  return {
+    client: bridge.client,
+    bridge,
+    webhookRouter: router,
+    platforms: MEETING_PLATFORM_KEYS,
+    observe(snapshot = {}, observeOptions = {}) {
+      return bridge.observe(snapshot, observeOptions);
+    },
+    observeCandidates(candidates = [], observeOptions = {}) {
+      return bridge.observeCandidates(candidates, observeOptions);
+    },
+    ingest(platformOrInput, payload, ingestOptions = {}) {
+      return bridge.ingest(platformOrInput, payload, ingestOptions);
+    },
+    insertMark(input = {}, markOptions = {}) {
+      return bridge.insertMark(input, markOptions);
+    },
+    insertAnnotation(input = {}, markOptions = {}) {
+      return bridge.insertAnnotation(input, markOptions);
+    },
+    insertMarks(inputs = [], markOptions = {}) {
+      return bridge.insertMarks(inputs, markOptions);
+    },
+    importTranscript(input = {}, transcriptOptions = {}) {
+      return bridge.importTranscript(input, transcriptOptions);
+    },
+    startMeeting(input = {}) {
+      return bridge.startMeeting(input);
+    },
+    endMeeting(input = {}) {
+      return bridge.endMeeting(input);
+    },
+    handleWebhook(input = {}, webhookOptions = {}) {
+      return router(input, webhookOptions);
+    },
+    diagnose(platform, payload, diagnosticOptions = {}) {
+      return diagnosePlatformEvent(platform, payload, diagnosticOptions);
+    },
+    platform(platform, platformOptions = {}) {
+      return platformOverview(platform, defaults, platformOptions);
+    },
+    allPlatforms(platformOptions = {}) {
+      return MEETING_PLATFORM_KEYS.map((platform) => platformOverview(platform, defaults, platformOptions));
+    },
+    capability(platform, platformOptions = {}) {
+      return platformCapabilityContract(platform, withDefaults(defaults, platformOptions));
+    },
+    routeTable(routeOptions = {}) {
+      return buildPlatformWebhookRouteTable(withDefaults(defaults, routeOptions));
+    },
+    routerStatus(routeOptions = {}) {
+      return buildPlatformWebhookRouterStatus(withDefaults(defaults, routeOptions));
+    },
+    routerSetup(routeOptions = {}) {
+      return buildPlatformWebhookRouterSetup(withDefaults(defaults, routeOptions));
+    },
+    acceptance(platform, reportOptions = {}) {
+      return buildPlatformAcceptanceReport(platform, acceptanceOptions(defaults, reportOptions));
+    },
+    fixtureAcceptance(platform, reportOptions = {}) {
+      const fixtureInput = buildPlatformFixtureAcceptanceInput(withDefaults(defaults, reportOptions));
+      return buildPlatformAcceptanceReport(platform, {
+        ...fixtureInput,
+        requireEndEvent: true,
+        ...reportOptions,
+        samples: fixtureInput.samples,
+        env: fixtureInput.env,
+      });
+    },
+    fixtureInput(fixtureOptions = {}) {
+      return buildPlatformFixtureAcceptanceInput(withDefaults(defaults, fixtureOptions));
+    },
+    onboarding(platform, onboardingOptions = {}) {
+      return buildMeetingPlatformOnboardingReport(platform, withDefaults(defaults, onboardingOptions));
+    },
+    report(reportOptions = {}) {
+      return buildMeetingPlatformKitReport(withDefaults(defaults, reportOptions));
+    },
+    getState() {
+      return {
+        bridge: bridge.getBridgeState(),
+        webhook_router: router.getReconciliationState(),
+      };
+    },
+    reset(nextState = {}) {
+      return {
+        bridge: bridge.reset(nextState.bridge ?? nextState),
+        webhook_router: router.resetReconciliationState(nextState.webhook_router ?? nextState.webhookRouter ?? {}),
+      };
+    },
+  };
+}

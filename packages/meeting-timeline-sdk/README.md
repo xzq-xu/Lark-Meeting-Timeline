@@ -92,6 +92,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
 - `@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-kit`
 - `@ai-annotation/meeting-timeline-sdk/adapters/signal-reconciler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-router`
@@ -125,6 +126,39 @@ await bridge.importTranscript({
   meeting: { meetingId: 'conference-record-id' },
   raw: googleTranscriptEntries,
 });
+```
+
+如果业务项目要接入多个会议平台，推荐从 `platform-kit` 开始。它把 `timeline-bridge`、webhook router、平台 setup/onboarding、fixture acceptance 组合成一个入口；底层 normalizer、验签、artifact fetch 仍然可以按需单独 import：
+
+```js
+import { createMeetingPlatformTimelineKit } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit';
+
+const meetingKit = createMeetingPlatformTimelineKit({
+  baseUrl: 'https://timeline.example.com',
+  basePath: '/api/platform-events',
+  env: process.env,
+  source: 'desktop_meeting_observer',
+  verify: true,
+  reconcile: true,
+});
+
+const setup = meetingKit.platform('google-meet');
+// setup.webhook_route === '/api/platform-events/google-meet'
+// setup.integration_plan.recommended_mode === 'hybrid_local_observer_first'
+
+const fixtureReport = meetingKit.fixtureAcceptance('google-meet', {
+  requiredCoverage: ['meeting_start', 'meeting_end', 'participant_track', 'artifact_ready'],
+});
+
+await meetingKit.handleWebhook({
+  method: req.method,
+  url: req.url,
+  headers: req.headers,
+  body: req.body,
+  rawBody: req.rawBody,
+});
+
+await meetingKit.insertMark({ capturedAtMs: Date.now(), label: 'why?' });
 ```
 
 Local detector adapter 支持桌面观察器、浏览器扩展、汉王宿主 App 或人工控制器上报 `meeting_started` / `meeting_ended`，payload 可以带 `detected_platform: 'google_meet'` 或 `meeting.platform: 'zoom'` 表示真实会议来源；如果只传窗口 URL，SDK 会用 `meeting-url` 自动识别 Google Meet / Teams / Zoom / Lark / Webex 的平台和会议 ID。Local detector 也支持 `active_speaker`、`speaker_started`、`speaker_ended` 这类发言人信号，用来低延迟标出发言人位置。Lark adapter 支持 `vc.meeting.all_meeting_started_v1`、`vc.meeting.all_meeting_ended_v1`、`vc.meeting.meeting_started_v1`、`vc.meeting.meeting_ended_v1`、`vc.meeting.join_meeting_v1`、`vc.meeting.leave_meeting_v1`，并会把 `minute_token` 透传到会议轴，便于会后妙记导入。Google Meet adapter 同时支持已经解包的 Workspace Events CloudEvent，以及 Pub/Sub 默认 wrapped push body。wrapped body 会自动 base64 解码 `message.data`，所以 webhook handler 可以直接把 `req.body` 传给 `normalizeGoogleMeetEvent(req.body)`。Google Workspace Events 的 `subscription.v1.suspended`、`subscription.v1.expirationReminder`、`subscription.v1.expired` 会归一化为 `subscription_lifecycle`。Microsoft Graph change notifications 的 `lifecycleEvent` 值 `reauthorizationRequired`、`subscriptionRemoved`、`missed` 也会归一化为 `subscription_lifecycle`。Webex adapter 支持 `meetings` started/ended、`meetingParticipants` joined/left、`recordings` created/updated、`meetingTranscripts` created。
