@@ -1,0 +1,42 @@
+export interface ArtifactFetchOptions {
+  endpoint?: string;
+  baseUrl?: string;
+  base_url?: string;
+  endpoints?: Record<string, string>;
+  token?: string;
+  accessToken?: string;
+  access_token?: string;
+  oauthToken?: string;
+  oauth_token?: string;
+  tokens?: Record<string, string>;
+  headers?: Record<string, string>;
+  accept?: string;
+  contentType?: string;
+  content_type?: string;
+  pageSize?: number;
+  page_size?: number;
+  pageToken?: string;
+  page_token?: string;
+  userId?: string;
+  user_id?: string;
+  meetingId?: string;
+  meeting_id?: string;
+  transcriptId?: string;
+  transcript_id?: string;
+  artifactId?: string;
+  artifact_id?: string;
+  url?: string;
+  resource?: string;
+  fetchImpl?: typeof fetch;
+  fetch?: typeof fetch;
+  raw?: unknown;
+  source?: string;
+  language?: string;
+  importOptions?: Record<string, unknown>;
+  import_options?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export function buildArtifactFetchRequest(input?: Record<string, unknown>, options?: ArtifactFetchOptions): Record<string, unknown>;
+export function fetchArtifactContent(input?: Record<string, unknown>, options?: ArtifactFetchOptions): Promise<Record<string, unknown>>;
+export function fetchAndImportArtifactTranscript(client: unknown, input?: Record<string, unknown>, options?: ArtifactFetchOptions): Promise<Record<string, unknown>>;

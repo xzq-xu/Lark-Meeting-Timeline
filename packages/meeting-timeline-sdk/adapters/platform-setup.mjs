@@ -938,6 +938,7 @@ export function platformCapabilityContract(platform, options = {}) {
       signal_reconciler: '@ai-annotation/meeting-timeline-sdk/adapters/signal-reconciler',
       acceptance: '@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance',
       artifact_plan: '@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan',
+      artifact_fetch: '@ai-annotation/meeting-timeline-sdk/adapters/artifact-fetch',
       onboarding: '@ai-annotation/meeting-timeline-sdk/adapters/platform-onboarding',
       webhook_router: '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-router',
     },

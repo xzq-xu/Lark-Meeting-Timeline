@@ -97,6 +97,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-router`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan`
+- `@ai-annotation/meeting-timeline-sdk/adapters/artifact-fetch`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-onboarding`
 - `@ai-annotation/meeting-timeline-sdk/adapters/transcript`
 - `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
@@ -405,6 +406,21 @@ import { buildArtifactImportPlans } from '@ai-annotation/meeting-timeline-sdk/ad
 const plans = buildArtifactImportPlans(platformIngestResult);
 // plans[0].fetch.strategy === 'google_meet_rest_transcript_entries'
 // plans[0].transcript_import.normalizer === 'normalizeGoogleMeetTranscriptEntries'
+```
+
+如果宿主已经有对应平台的 OAuth access token，可以继续用 `artifact-fetch` 生成请求或直接拉取并导入。它不会绑定 Google/Microsoft/Zoom/Webex 的官方 SDK，默认只用注入的 `fetch`：
+
+```js
+import { fetchAndImportArtifactTranscript } from '@ai-annotation/meeting-timeline-sdk/adapters/artifact-fetch';
+
+const result = await fetchAndImportArtifactTranscript(timeline, plans[0], {
+  accessToken: providerAccessToken,
+  fetchImpl: fetch,
+});
+
+// Google Meet 会请求 meet.googleapis.com/v2/.../transcripts/.../entries
+// Teams 会请求 graph.microsoft.com/v1.0/.../transcripts/.../content
+// Zoom/Webex 会优先使用 artifact_url / download_url 直链
 ```
 
 SDK 提供平台中性的 `importTranscript()`，也提供更高层的 `importPlatformTranscript()`，会按 `platform` 自动选择 normalizer 并导入：
