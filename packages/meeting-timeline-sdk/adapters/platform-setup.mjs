@@ -698,6 +698,7 @@ export function platformCapabilityContract(platform, options = {}) {
       ...contract.sdk_modules,
       timeline_bridge: '@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge',
       signal_reconciler: '@ai-annotation/meeting-timeline-sdk/adapters/signal-reconciler',
+      acceptance: '@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance',
     },
     endpoints: options.baseUrl ? {
       platform_events: platformEventEndpoint(options.baseUrl, key),

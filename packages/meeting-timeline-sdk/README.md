@@ -94,6 +94,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge`
 - `@ai-annotation/meeting-timeline-sdk/adapters/signal-reconciler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance`
 - `@ai-annotation/meeting-timeline-sdk/adapters/transcript`
 - `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-setup`
@@ -155,6 +156,29 @@ await ingestPlatformEvent(timeline, 'google-meet', req.body, {
 ```
 
 `diagnosePlatformEvent()` 不写入 timeline，只返回 adapter、`signal_types`、`coverage`、`meetings` 和 `issues`，用于验收真实样本事件是否能建轴、是否只是订阅生命周期事件、是否缺少 meeting URL 导致和本地观察器对齐变弱。`ingestPlatformEvent()` 内部会按平台名选择 normalizer，把原始事件转成 `NormalizedMeetingSignal[]`，再调用 `startMeeting`、`endMeeting` 或可选的 participant/artifact handler。对于 Google Meet / Teams / Zoom / Webex，新项目可以优先接这一层，只有需要自定义事件验签、补拉详情或 artifact 导入时再下钻到 registry/core。
+
+如果要验收一组真实平台样本，而不是单条事件，可以用 `platform-acceptance`。它会合并 setup readiness、integration plan 和样本事件诊断，输出 `accepted / blocked / pending_samples / missing_required_coverage`：
+
+```js
+import { buildPlatformAcceptanceReport } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance';
+
+const report = buildPlatformAcceptanceReport('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+  env: {
+    GOOGLE_PUBSUB_OIDC_AUDIENCE: 'https://timeline.example.com/api/platform-events/google-meet',
+    GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL: 'pubsub-pusher@demo.iam.gserviceaccount.com',
+  },
+  requireEndEvent: true,
+  samples: {
+    google_meet: [
+      { label: 'started', body: googleStartedWebhook },
+      { label: 'ended', body: googleEndedWebhook },
+    ],
+  },
+});
+
+console.log(report.status, report.missing_required_coverage, report.issues);
+```
 
 如果宿主同时接本地观察器和官方 webhook，建议用有状态的 `createReconciledPlatformEventIngestor()`。它会过滤 exact duplicate、重复 speaker 信号，并处理“本地观察先建轴，Google Meet / Teams / Zoom / Webex 官方事件后到用于校准”的优先级。匹配时会同时看 `meeting_url`、`meeting_id`、`external_meeting_id`，所以 Zoom 本地数字会议号和官方 `uuid`、Teams Graph resource 里的 `joinWebUrl` 都可以对齐到同一场会议：
 
