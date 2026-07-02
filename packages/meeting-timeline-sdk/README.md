@@ -98,6 +98,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-router`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-http`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-capture`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-fetch`
@@ -266,6 +267,32 @@ const googleFixtureReport = buildPlatformAcceptanceReport('google-meet', {
 
 // googleFixtureReport.accepted === true
 // fixtureInput.samples contains local_detector, lark, google_meet, microsoft_teams, zoom, webex
+```
+
+真实 webhook 接通后，建议同时用 `platform-capture` 捕获一小批原始事件做回放验收。默认记录 parsed body、脱敏 headers、raw body 的 SHA-256；只有显式传 `includeRawBody: true` 才保存 raw body：
+
+```js
+import {
+  buildPlatformCaptureAcceptanceReport,
+  capturePlatformWebRequest,
+  parsePlatformCaptureJsonl,
+  serializePlatformCaptureRecord,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-capture';
+
+export async function POST(request) {
+  const capture = await capturePlatformWebRequest(request, {
+    basePath: '/api/platform-events',
+  });
+  await appendLine('platform-events.jsonl', serializePlatformCaptureRecord(capture));
+  return meetingKit.handleFetchRequest(request);
+}
+
+const records = parsePlatformCaptureJsonl(await readText('platform-events.jsonl'));
+const googleReplay = buildPlatformCaptureAcceptanceReport('google-meet', records, {
+  baseUrl: 'https://timeline.example.com',
+  env: process.env,
+  requireEndEvent: true,
+});
 ```
 
 如果要给配置页、接入向导或 CI 验收生成一份“这个会议平台现在能不能接进 timeline”的总报告，可以用 `platform-onboarding`。它会合并 `permission plan`、`integration plan`、真实样本 `acceptance` 和 `artifact-plan`：

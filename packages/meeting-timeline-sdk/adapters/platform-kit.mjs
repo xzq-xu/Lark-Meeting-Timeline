@@ -27,6 +27,13 @@ import {
   platformWebhookRoutePath,
 } from './platform-webhook-router.mjs';
 import { createMeetingPlatformFetchHandler } from './platform-http.mjs';
+import {
+  buildMeetingPlatformCaptureAcceptanceSummary,
+  buildPlatformCaptureAcceptanceReport,
+  buildPlatformCaptureSamples,
+  capturePlatformWebRequest,
+  capturePlatformWebhookEvent,
+} from './platform-capture.mjs';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -175,6 +182,21 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     handleFetchRequest(request, fetchOptions = {}) {
       return fetchHandler(request, fetchOptions);
+    },
+    captureWebhook(input = {}, captureOptions = {}) {
+      return capturePlatformWebhookEvent(input, undefined, withDefaults(defaults, captureOptions));
+    },
+    captureFetchRequest(request, captureOptions = {}) {
+      return capturePlatformWebRequest(request, withDefaults(defaults, captureOptions));
+    },
+    capturedSamples(records = [], sampleOptions = {}) {
+      return buildPlatformCaptureSamples(records, withDefaults(defaults, sampleOptions));
+    },
+    capturedAcceptance(platform, records = [], reportOptions = {}) {
+      return buildPlatformCaptureAcceptanceReport(platform, records, withDefaults(defaults, reportOptions));
+    },
+    capturedAcceptanceSummary(records = [], reportOptions = {}) {
+      return buildMeetingPlatformCaptureAcceptanceSummary(records, withDefaults(defaults, reportOptions));
     },
     diagnose(platform, payload, diagnosticOptions = {}) {
       return diagnosePlatformEvent(platform, payload, diagnosticOptions);
