@@ -98,6 +98,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-monitor`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-source`
@@ -292,12 +293,12 @@ await runtime.insertMark({
 await runtime.ingestProvider('google-meet', googleWorkspaceEventBody);
 ```
 
-如果是在浏览器扩展 content script、内嵌浏览器或 Electron WebView 里运行，可以用 `meeting-app-browser-runtime` 少写一层宿主胶水。它会自动读取当前 `document/location/window`，在 `pagehide` / `beforeunload` 时停止 monitor，并提供一个简单 message handler 给 background script 或宿主转发标注：
+如果是在浏览器扩展 content script、内嵌浏览器或 Electron WebView 里运行，可以用 `meeting-app-content-script` 直接安装浏览器侧 bridge。它会创建 `meeting-app-browser-runtime`，自动读取当前 `document/location/window`，安装扩展消息监听，并把 background script 或宿主转发来的标注消息写入时间轴：
 
 ```js
-import { createMeetingAppBrowserRuntime } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime';
+import { installMeetingAppContentScriptBridge } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script';
 
-const browserRuntime = createMeetingAppBrowserRuntime({
+const bridge = installMeetingAppContentScriptBridge({
   baseUrl: 'http://localhost:8787',
 }, {
   runtimePreset: 'google_meet',
@@ -306,13 +307,21 @@ const browserRuntime = createMeetingAppBrowserRuntime({
   sampleIntervalMs: 10000, // MutationObserver 负责低延迟触发，低频轮询只做兜底。
 });
 
-browserRuntime.start();
+// background script 发送 { type: 'meeting_timeline.insert_mark', payload: { mark } } 即可。
+// 页面卸载或扩展停用时调用 bridge.dispose() 清理 listener 和 monitor。
+```
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  browserRuntime.handleMessage(message).then(sendResponse);
-  return true;
+如果宿主不是 Chrome/Firefox 扩展，而是 WebView 或页面内脚本，可以打开 `windowMessaging`，用 `window.postMessage()` 投递同样的 `meeting_timeline.*` 消息；默认只接收同源消息，避免误消费页面里的其他事件：
+
+```js
+const bridge = installMeetingAppContentScriptBridge({ baseUrl: 'http://localhost:8787' }, {
+  runtimePreset: 'microsoft_teams',
+  windowMessaging: true,
+  extensionMessaging: false,
 });
 ```
+
+底层仍可直接使用 `meeting-app-browser-runtime`；它提供 `handleMessage()`、`installMutationObserver()`、`flushMutationObserver()` 等低层控制点，适合需要自定义扩展生命周期的项目。
 
 `runtimePreset` 当前支持 `google_meet`、`microsoft_teams`、`zoom`、`lark` 和 `webex`。preset 会自动合并对应 `meeting-app-capture` DOM profile、MutationObserver track selectors、字幕/聊天/转写噪声过滤、发言人稳定 follow-up 和低频兜底轮询；调用方仍然可以覆盖 `mutationTrackSelectors`、`mutationIgnoreSelectors`、`mutationDebounceMs`、`speakerStableFollowupMs`、`captureOptions` 等字段。也可以单独读取预设用于浏览器扩展配置面板：
 
