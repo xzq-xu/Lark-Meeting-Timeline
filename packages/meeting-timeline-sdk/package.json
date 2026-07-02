@@ -9,6 +9,10 @@
     ".": {
       "types": "./index.d.ts",
       "import": "./index.mjs"
+    },
+    "./adapters/*": {
+      "types": "./adapters/*.d.ts",
+      "import": "./adapters/*.mjs"
     }
   },
   "sideEffects": false,
@@ -18,6 +22,7 @@
   "files": [
     "index.mjs",
     "index.d.ts",
+    "adapters",
     "README.md"
   ]
 }

@@ -64,6 +64,29 @@ await timeline.endMeeting({
 });
 ```
 
+## 平台 adapter
+
+SDK 还提供轻量 adapter，把不同会议平台事件归一化为统一 signal，再应用到同一条时间轴协议：
+
+```js
+import { createMeetingTimelineClient } from '@ai-annotation/meeting-timeline-sdk';
+import { applyMeetingSignals } from '@ai-annotation/meeting-timeline-sdk/adapters/core';
+import { normalizeGoogleMeetEvent } from '@ai-annotation/meeting-timeline-sdk/adapters/google-meet';
+
+const timeline = createMeetingTimelineClient({ baseUrl: 'http://localhost:8787' });
+
+const signals = normalizeGoogleMeetEvent(req.body);
+await applyMeetingSignals(timeline, signals);
+```
+
+当前内置归一化器：
+
+- `@ai-annotation/meeting-timeline-sdk/adapters/google-meet`
+- `@ai-annotation/meeting-timeline-sdk/adapters/microsoft-teams`
+- `@ai-annotation/meeting-timeline-sdk/adapters/zoom`
+
+`meeting_started` 会调用 `startMeeting`，`meeting_ended` 会调用 `endMeeting`。`participant_joined/left` 和 `artifact_ready` 默认不会写入用户标注流；如果需要临时显示参会人位置，可以给 `applyMeetingSignals` 传 `{ participantAsAnnotation: true }`，或者用 `onParticipantSignal` / `onArtifactSignal` 接到自己的服务端轨道。
+
 ## 首条标记内联建轴
 
 如果外部项目不方便单独调用 `startMeeting`，可以在第一条标记里带 `meetingSession`：

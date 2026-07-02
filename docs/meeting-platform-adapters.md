@@ -270,7 +270,7 @@ Teams SDK 可以让会议内 app/bot 接收 meetingStart、meetingEnd、particip
    - 这是跨平台最低延迟、最低权限依赖的路径。
 
 2. **抽出 adapter core**
-   - 在 SDK 中增加 `NormalizedMeetingSignal` 类型和 `applyMeetingSignal(client, signal)`。
+   - SDK 已增加 `NormalizedMeetingSignal` 的运行时归一化和 `applyMeetingSignal(client, signal)` / `applyMeetingSignals(client, signals)`。
    - 先不绑定任何具体平台，保证 server 和外部项目都可以复用。
 
 3. **Google Meet adapter**
@@ -306,8 +306,11 @@ packages/meeting-timeline-sdk/
     core.mjs
     core.d.ts
     google-meet.mjs
+    google-meet.d.ts
     microsoft-teams.mjs
+    microsoft-teams.d.ts
     zoom.mjs
+    zoom.d.ts
 ```
 
 `adapters/core` 只做平台无关的信号定义、校验和应用：
