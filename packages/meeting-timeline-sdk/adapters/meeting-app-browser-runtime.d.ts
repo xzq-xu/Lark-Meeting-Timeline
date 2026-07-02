@@ -34,6 +34,14 @@ export interface MeetingAppBrowserRuntimeOptions extends MeetingAppTimelineRunti
   debounce_ms?: number;
   mutationDebounceMs?: number;
   mutation_debounce_ms?: number;
+  speakerStableFollowup?: boolean;
+  speaker_stable_followup?: boolean;
+  mutationSpeakerFollowup?: boolean;
+  mutation_speaker_followup?: boolean;
+  speakerStableFollowupMs?: number;
+  speaker_stable_followup_ms?: number;
+  mutationStableFollowupMs?: number;
+  mutation_stable_followup_ms?: number;
   keepMutationObserverOnStop?: boolean;
   keep_mutation_observer_on_stop?: boolean;
   [key: string]: unknown;

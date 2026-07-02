@@ -92,6 +92,35 @@ function debounceMs(options = {}, fallback = 150) {
   return Number.isFinite(numeric) ? Math.max(0, numeric) : fallback;
 }
 
+function speakerStableFollowupEnabled(options = {}) {
+  return options.speakerStableFollowup !== false
+    && options.speaker_stable_followup !== false
+    && options.mutationSpeakerFollowup !== false
+    && options.mutation_speaker_followup !== false;
+}
+
+function speakerStableFollowupMs(options = {}) {
+  const speakerOptions = {
+    ...(options.speakerOptions ?? {}),
+    ...(options.speaker_options ?? {}),
+    ...(options.sampleOptions?.speakerOptions ?? {}),
+    ...(options.sample_options?.speakerOptions ?? {}),
+    ...(options.sampleOptions?.speaker_options ?? {}),
+    ...(options.sample_options?.speaker_options ?? {}),
+  };
+  const value = firstNonEmpty(
+    options.speakerStableFollowupMs,
+    options.speaker_stable_followup_ms,
+    options.mutationStableFollowupMs,
+    options.mutation_stable_followup_ms,
+    speakerOptions.minStableMs,
+    speakerOptions.min_stable_ms,
+    300,
+  );
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, numeric) : 300;
+}
+
 function normalizeStopEvents(options = {}) {
   const value = options.stopEvents ?? options.stop_events ?? ['pagehide', 'beforeunload'];
   return Array.isArray(value) ? value : [value].filter(Boolean);
@@ -148,6 +177,7 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
   let mutationLastError = null;
   let mutationLastObservedAtMs = null;
   let mutationLastOptions = null;
+  let speakerFollowupTimer = null;
 
   function inputProvider(extra = {}) {
     return meetingAppBrowserInput({
@@ -195,6 +225,7 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
       last_result: mutationLastResult,
       last_error: mutationLastError,
       debounce_ms: mutationLastOptions ? debounceMs(mutationLastOptions) : null,
+      speaker_followup_scheduled: speakerFollowupTimer != null,
     };
   }
 
@@ -203,6 +234,53 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
       clearTimeout(mutationTimer);
       mutationTimer = null;
     }
+  }
+
+  function clearSpeakerFollowupTimer() {
+    if (speakerFollowupTimer != null) {
+      clearTimeout(speakerFollowupTimer);
+      speakerFollowupTimer = null;
+    }
+  }
+
+  function signalTypesFromSampleResult(sampleResult = {}) {
+    const result = sampleResult.result ?? sampleResult;
+    return [
+      ...(result.signals ?? []),
+      ...(result.rawSignals ?? result.raw_signals ?? []),
+    ].map((signal) => signal?.type).filter(Boolean);
+  }
+
+  function hasPendingSpeakerCandidate(sampleResult = {}) {
+    const result = sampleResult.result ?? sampleResult;
+    const speakerState = result.state?.speakerState ?? result.state?.speaker_state;
+    if (speakerState?.activeSpeaker) return false;
+    if (speakerState?.candidateSpeaker) return true;
+    const snapshot = sampleResult.snapshot ?? {};
+    const participants = [
+      ...(snapshot.page?.participants ?? snapshot.page?.tiles ?? []),
+      ...(snapshot.dom?.participants ?? snapshot.dom?.tiles ?? []),
+    ];
+    return participants.some((participant) => (
+      participant?.speaking === true
+      || participant?.isSpeaking === true
+      || participant?.active_speaker === true
+      || participant?.activeSpeaker === true
+    ));
+  }
+
+  function scheduleSpeakerStableFollowup(sampleResult = {}, scheduleOptions = {}) {
+    if (!speakerStableFollowupEnabled(scheduleOptions)) return mutationState();
+    if (!hasPendingSpeakerCandidate(sampleResult)) return mutationState();
+    if (signalTypesFromSampleResult(sampleResult).includes('speaker_started')) return mutationState();
+    clearSpeakerFollowupTimer();
+    speakerFollowupTimer = setTimeout(() => {
+      speakerFollowupTimer = null;
+      flushMutationObserver({ force: true, stabilityFollowup: true, stability_followup: true }).catch((error) => {
+        mutationLastError = error?.message ?? String(error);
+      });
+    }, speakerStableFollowupMs(scheduleOptions));
+    return mutationState();
   }
 
   async function flushMutationObserver(flushOptions = {}) {
@@ -226,6 +304,12 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
       mutationSampleCount += 1;
       mutationLastResult = result;
       mutationLastError = null;
+      if (flushOptions.stabilityFollowup !== true && flushOptions.stability_followup !== true) {
+        scheduleSpeakerStableFollowup(result, {
+          ...mutationLastOptions,
+          ...sampleOptions,
+        });
+      }
       return {
         flushed: true,
         result,
@@ -280,6 +364,7 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
 
   function removeMutationObserver() {
     clearMutationTimer();
+    clearSpeakerFollowupTimer();
     if (mutationObserver?.disconnect) mutationObserver.disconnect();
     mutationObserver = null;
     mutationPendingCount = 0;

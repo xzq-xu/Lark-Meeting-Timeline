@@ -95,6 +95,10 @@ class FakeMutationObserver {
   }
 }
 
+function wait(ms = 0) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function fakeWindow(document, extra = {}) {
   const listeners = new Map();
   const win = {
@@ -270,5 +274,46 @@ assert.equal(flushMessage.result.flushed, false);
 
 mutationRuntime.stop();
 assert.equal(FakeMutationObserver.instances[0].connected, false);
+
+FakeMutationObserver.instances = [];
+let followupClock = startMs;
+const followupCalls = [];
+const followupClient = {
+  async startMeeting(input) {
+    followupCalls.push({ method: 'startMeeting', input });
+    return { ok: true, input };
+  },
+  async endMeeting(input) {
+    followupCalls.push({ method: 'endMeeting', input });
+    return { ok: true, input };
+  },
+  async insertMark(input, options) {
+    followupCalls.push({ method: 'insertMark', input, options });
+    return { ok: true, input };
+  },
+};
+const followupWindow = fakeWindow(fakeDocument(), { MutationObserver: FakeMutationObserver });
+const followupRuntime = createMeetingAppBrowserRuntime(followupClient, {
+  window: followupWindow,
+  now: () => followupClock,
+  applyOptions: { speakerAsAnnotation: true },
+  speakerOptions: { minStableMs: 300 },
+  speakerStableFollowupMs: 0,
+  sampleIntervalMs: 10_000,
+});
+followupRuntime.installMutationObserver({ mutationDebounceMs: 0 });
+FakeMutationObserver.instances[0].trigger([{ type: 'attributes' }]);
+const followupFirstFlush = await followupRuntime.flushMutationObserver();
+assert.equal(followupFirstFlush.flushed, true);
+assert.deepEqual(followupFirstFlush.result.result.signals.map((item) => item.type), ['meeting_started']);
+assert.equal(followupRuntime.getState().browser_runtime.mutation_observer.speaker_followup_scheduled, true);
+
+followupClock += 300;
+await wait(5);
+assert.deepEqual(followupCalls.map((item) => item.method), ['startMeeting', 'insertMark']);
+assert.equal(followupCalls.at(-1).input.kind, 'speaker_started');
+assert.equal(followupRuntime.getState().browser_runtime.mutation_observer.sample_count, 2);
+assert.equal(followupRuntime.getState().browser_runtime.mutation_observer.speaker_followup_scheduled, false);
+followupRuntime.dispose();
 
 console.log('ok meeting app browser runtime');
