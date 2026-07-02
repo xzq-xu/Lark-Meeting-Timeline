@@ -97,6 +97,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-capture`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-monitor`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-source`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
@@ -285,6 +286,15 @@ await runtime.insertMark({
 
 // 官方 provider 事件晚到后仍可进入同一个 reconciler 校准：
 await runtime.ingestProvider('google-meet', googleWorkspaceEventBody);
+```
+
+接入浏览器扩展、Electron WebView 或桌面 Accessibility 采集器前，可以先跑 `meeting-app-fixtures` 的本地验收样本。它覆盖 Google Meet、Teams Web、Zoom Web、Webex Web、Lark/Feishu Web，并验证平台识别、会议 ID、入会态、active speaker、`meeting_started` 和 `speaker_started`：
+
+```js
+import { buildMeetingAppFixtureAcceptanceReport } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures';
+
+const report = buildMeetingAppFixtureAcceptanceReport();
+// report.accepted === true 表示本地 DOM/AX 归一化链路基线通过
 ```
 
 如果希望 SDK 帮你管理轮询、去重和 keep-alive，可以直接用 `meeting-app-monitor`。它会高频低成本采集 DOM，但只有在页面状态变化、或到达 keep-alive 间隔时才把样本送给 `meeting-source`；即使 DOM 不变，也会按间隔继续送样本，避免 active speaker 的 `minStableMs` 因过度去重而无法触发：
