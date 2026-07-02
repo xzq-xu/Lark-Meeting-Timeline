@@ -5,6 +5,10 @@ import { extname, join, normalize } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as Lark from '@larksuiteoapi/node-sdk';
+import { applyMeetingSignals } from '../packages/meeting-timeline-sdk/adapters/core.mjs';
+import { normalizeGoogleMeetEvent } from '../packages/meeting-timeline-sdk/adapters/google-meet.mjs';
+import { normalizeMicrosoftTeamsEvent } from '../packages/meeting-timeline-sdk/adapters/microsoft-teams.mjs';
+import { normalizeZoomEvent } from '../packages/meeting-timeline-sdk/adapters/zoom.mjs';
 import { createLarkClient, extractMeetingNo, extractMinuteToken } from './larkClient.mjs';
 import {
   annotationCapturedAbsoluteMs,
@@ -122,6 +126,47 @@ const minuteOAuthScopes = [
   'minutes:minutes.basic:read',
   'minutes:minutes.transcript:export',
 ];
+const platformEventAdapterDefinitions = [
+  {
+    key: 'google_meet',
+    aliases: ['google-meet', 'google_meet', 'meet'],
+    source: 'google_meet_webhook',
+    normalize: normalizeGoogleMeetEvent,
+  },
+  {
+    key: 'microsoft_teams',
+    aliases: ['microsoft-teams', 'microsoft_teams', 'teams'],
+    source: 'microsoft_teams_webhook',
+    normalize: normalizeMicrosoftTeamsEvent,
+  },
+  {
+    key: 'zoom',
+    aliases: ['zoom'],
+    source: 'zoom_webhook',
+    normalize: normalizeZoomEvent,
+  },
+];
+const platformEventAdapters = new Map(
+  platformEventAdapterDefinitions.flatMap((adapter) => (
+    adapter.aliases.map((alias) => [alias, adapter])
+  )),
+);
+const platformEventStatus = Object.fromEntries(platformEventAdapterDefinitions.map((adapter) => [
+  adapter.key,
+  {
+    platform: adapter.key,
+    receiver_ready: true,
+    source: adapter.source,
+    received_count: 0,
+    normalized_signal_count: 0,
+    applied_signal_count: 0,
+    skipped_signal_count: 0,
+    last_received_at: null,
+    last_event_type: null,
+    last_signal_type: null,
+    last_error: null,
+  },
+]));
 
 function loadDotEnv() {
   const envPath = join(root, '.env');
@@ -2194,6 +2239,7 @@ function meetingStartTimeFromSessionBody(body = {}, nowMs = Date.now()) {
 
 function openMeetingSessionMeetingFromBody(body = {}, current = {}, nowMs = Date.now()) {
   const start = meetingStartTimeFromSessionBody(body, nowMs);
+  const axisSource = body.axis_source ?? 'open_meeting_session';
   return {
     platform: body.platform ?? 'lark',
     meeting_id: String(firstNonEmpty(
@@ -2219,7 +2265,7 @@ function openMeetingSessionMeetingFromBody(body = {}, current = {}, nowMs = Date
     end_time: body.end_time ?? null,
     timezone: body.timezone ?? current.meeting?.timezone ?? 'Asia/Shanghai',
     pending_binding: false,
-    source: 'open_meeting_session',
+    source: axisSource,
   };
 }
 
@@ -2320,6 +2366,7 @@ async function startOpenMeetingSession(body = {}) {
   const current = await store.load();
   const nowMs = Date.now();
   const meeting = openMeetingSessionMeetingFromBody(body, current, nowMs);
+  const axisSource = meeting.source ?? 'open_meeting_session';
   const currentIsActiveReal = hasActiveMeeting(current) && isRealMeetingAxis(current.meeting);
   if (currentIsActiveReal && !sameMeeting(current.meeting, meeting) && !body.force) {
     const error = new Error('Current real meeting axis is active; pass force=true to replace it with an open meeting session.');
@@ -2331,13 +2378,13 @@ async function startOpenMeetingSession(body = {}) {
     meeting,
     segments: body.keep_segments === true ? current.segments ?? [] : [],
     events: [{
-      id: `evt-open-session-${meeting.meeting_id}-start`,
+      id: body.event_id ?? `evt-${axisSource}-${meeting.meeting_id}-start`,
       time_ms: 0,
       type: 'meeting_start',
-      label: '开放会议会话开始',
-      source: 'open_meeting_session',
+      label: body.event_label ?? (axisSource === 'open_meeting_session' ? '开放会议会话开始' : '平台会议事件开始'),
+      source: axisSource,
       metadata: {
-        raw_type: 'local.open_meeting_session.started',
+        raw_type: body.raw_type ?? `local.${axisSource}.started`,
         detector_source: body.detector_source ?? body.source ?? null,
         note: body.note ?? null,
       },
@@ -2349,16 +2396,16 @@ async function startOpenMeetingSession(body = {}) {
     saveRealDemoSessionState({
       ...realDemoSession,
       last_real_axis_at: new Date().toISOString(),
-      last_real_axis_source: 'open_meeting_session',
+      last_real_axis_source: axisSource,
     });
   }
   const shouldSuppressDemoAnnotations = Boolean(body.suppress_auto_annotations || body.suppress_demo_annotations);
   const autoAnnotation = shouldSuppressDemoAnnotations
     ? { state: saved, annotation: null, skipped_reason: 'suppressed' }
-    : await maybeAppendAutoAcceptanceAnnotation(saved, 'open_meeting_session');
+    : await maybeAppendAutoAcceptanceAnnotation(saved, axisSource);
   const deviceAnnotation = shouldSuppressDemoAnnotations
     ? { state: autoAnnotation.state, annotation: null, skipped_reason: 'suppressed' }
-    : await maybeAppendDeviceSimulatorAnnotation(autoAnnotation.state, 'open_meeting_session');
+    : await maybeAppendDeviceSimulatorAnnotation(autoAnnotation.state, axisSource);
   return {
     ok: true,
     meeting: deviceAnnotation.state.meeting,
@@ -2366,7 +2413,7 @@ async function startOpenMeetingSession(body = {}) {
     auto_acceptance_annotation: autoAnnotation.annotation,
     device_simulator_annotation: deviceAnnotation.annotation,
     contract: {
-      source: 'open_meeting_session',
+      source: axisSource,
       strict_lark_event_axis: false,
       product_axis: true,
       note: 'This endpoint is the stable local meeting-session contract. Lark events, desktop observers, or e-ink host apps can all call it when a meeting actually starts.',
@@ -2392,15 +2439,17 @@ async function endOpenMeetingSession(body = {}) {
       : Number.isFinite(startMs)
         ? Math.max(0, now.getTime() - startMs)
         : 0;
+  const axisSource = body.axis_source ?? current.meeting?.source ?? 'open_meeting_session';
   const eventMap = new Map((current.events ?? []).map((item) => [item.id, item]));
-  eventMap.set('evt-open-session-end', {
-    id: 'evt-open-session-end',
+  const eventId = body.event_id ?? (axisSource === 'open_meeting_session' ? 'evt-open-session-end' : `evt-${axisSource}-end`);
+  eventMap.set(eventId, {
+    id: eventId,
     time_ms: offsetMs,
     type: 'meeting_end',
-    label: '开放会议会话结束',
-    source: 'open_meeting_session',
+    label: body.event_label ?? (axisSource === 'open_meeting_session' ? '开放会议会话结束' : '平台会议事件结束'),
+    source: axisSource,
     metadata: {
-      raw_type: 'local.open_meeting_session.ended',
+      raw_type: body.raw_type ?? `local.${axisSource}.ended`,
       detector_source: body.detector_source ?? body.source ?? null,
     },
   });
@@ -3595,6 +3644,9 @@ function isRealMeetingAxis(meeting = {}) {
     'lark_meeting_lookup_api',
     'lark_probe_auto_search',
     'lark_passive_meeting_scan',
+    'google_meet_webhook',
+    'microsoft_teams_webhook',
+    'zoom_webhook',
   ].includes(meeting.source)
     && !meeting.pending_binding
     && meeting.start_time_reliable !== false
@@ -5852,6 +5904,18 @@ async function annotationIngestInfoPayload(req) {
     stream_status_alias_url: localUrlFor(req, '/api/stream-status'),
     meeting_session_start_endpoint: meetingSessionStartEndpoint,
     meeting_session_end_endpoint: meetingSessionEndEndpoint,
+    platform_events: {
+      supported: true,
+      status_endpoint: localUrlFor(req, '/api/platform-events/status'),
+      description: 'Server-side adapters can ingest Google Meet, Microsoft Teams, and Zoom event payloads, normalize them into meeting timeline signals, then start/end the same meeting axis contract.',
+      platforms: platformEventAdapterDefinitions.map((item) => ({
+        platform: item.key,
+        aliases: item.aliases,
+        source: item.source,
+        ingest_endpoint: localUrlFor(req, `/api/platform-events/${item.aliases[0]}`),
+        status_endpoint: localUrlFor(req, `/api/platform-events/${item.aliases[0]}/status`),
+      })),
+    },
     meeting_session_inline_annotation: {
       supported: true,
       description: 'A single POST /api/annotations can start an open meeting session and append the mark when the payload includes meeting_session or start_meeting_session=true.',
@@ -6088,6 +6152,158 @@ function annotationBatchInputsFromBody(body = {}, req = {}) {
   return rows.map((item) => annotationInputWithRequestMetadata(item, req));
 }
 
+function parsePlatformEventRoute(pathname = '') {
+  const parts = pathname.split('/').filter(Boolean);
+  if (parts[0] !== 'api' || parts[1] !== 'platform-events') return null;
+  if (parts.length === 3 && parts[2] === 'status') return { action: 'status', platform: null };
+  if (parts.length === 3) return { action: 'ingest', platform: parts[2] };
+  if (parts.length === 4 && parts[3] === 'status') return { action: 'status', platform: parts[2] };
+  return null;
+}
+
+function platformEventAdapterFor(platform) {
+  return platformEventAdapters.get(String(platform ?? '').toLowerCase().replace(/\s+/g, '-')) ?? null;
+}
+
+function platformEventRawInput(body = {}) {
+  if (Array.isArray(body)) return body;
+  if (body.raw_event !== undefined) return body.raw_event;
+  if (body.rawEvent !== undefined) return body.rawEvent;
+  if (body.raw !== undefined) return body.raw;
+  if (Array.isArray(body.events)) return body.events;
+  if (Array.isArray(body.items)) return body.items;
+  return body;
+}
+
+function firstPlatformRawEvent(raw) {
+  if (Array.isArray(raw)) return raw[0] ?? {};
+  if (Array.isArray(raw?.value)) return raw.value[0] ?? raw;
+  return raw ?? {};
+}
+
+function platformRawEventType(raw) {
+  const first = firstPlatformRawEvent(raw);
+  return firstNonEmpty(
+    first.event,
+    first.type,
+    first.event_type,
+    first.eventType,
+    first.resourceData?.eventType,
+    first.resourceData?.callEventType,
+    first.payload?.object?.event,
+    'unknown',
+  );
+}
+
+function publicPlatformEventStatus(req, adapter = null) {
+  const rows = adapter
+    ? [platformEventStatus[adapter.key]]
+    : platformEventAdapterDefinitions.map((item) => platformEventStatus[item.key]);
+  return {
+    generated_at: new Date().toISOString(),
+    ready: true,
+    supported_platforms: platformEventAdapterDefinitions.map((item) => ({
+      platform: item.key,
+      aliases: item.aliases,
+      source: item.source,
+      ingest_endpoint: localUrlFor(req, `/api/platform-events/${item.aliases[0]}`),
+      status_endpoint: localUrlFor(req, `/api/platform-events/${item.aliases[0]}/status`),
+    })),
+    status: adapter ? rows[0] : Object.fromEntries(rows.map((item) => [item.platform, item])),
+  };
+}
+
+function updatePlatformEventStatus(adapter, patch = {}) {
+  const current = platformEventStatus[adapter.key];
+  platformEventStatus[adapter.key] = {
+    ...current,
+    ...patch,
+  };
+  return platformEventStatus[adapter.key];
+}
+
+function platformSignalStartBody(signalPayload = {}, body = {}, adapter = {}) {
+  return {
+    ...signalPayload,
+    axis_source: adapter.source,
+    detector_source: signalPayload.detector_source ?? signalPayload.detectorSource ?? adapter.source,
+    event_label: body.start_event_label ?? body.event_label,
+    raw_type: body.start_raw_type ?? `platform.${adapter.source}.started`,
+    force: signalPayload.force ?? body.force ?? false,
+    suppress_auto_annotations: body.suppress_auto_annotations ?? body.suppressAutoAnnotations ?? true,
+    suppress_demo_annotations: body.suppress_demo_annotations ?? body.suppressDemoAnnotations ?? true,
+  };
+}
+
+function platformSignalEndBody(signalPayload = {}, body = {}, adapter = {}) {
+  return {
+    ...signalPayload,
+    axis_source: adapter.source,
+    detector_source: signalPayload.detector_source ?? signalPayload.detectorSource ?? adapter.source,
+    event_label: body.end_event_label ?? body.event_label,
+    raw_type: body.end_raw_type ?? `platform.${adapter.source}.ended`,
+  };
+}
+
+function platformEventTimelineClient(body = {}, req = {}, adapter = {}) {
+  return {
+    startMeeting(input = {}) {
+      return startOpenMeetingSession(platformSignalStartBody(input, body, adapter));
+    },
+    endMeeting(input = {}) {
+      return endOpenMeetingSession(platformSignalEndBody(input, body, adapter));
+    },
+    insertMark(input = {}) {
+      return appendAnnotation(annotationInputWithRequestMetadata(input, req));
+    },
+  };
+}
+
+async function ingestPlatformEvent(platform, body = {}, req = {}) {
+  const adapter = platformEventAdapterFor(platform);
+  if (!adapter) {
+    const error = new Error(`Unsupported meeting platform: ${platform}`);
+    error.status = 404;
+    throw error;
+  }
+  const receivedAtMs = Date.now();
+  const rawInput = platformEventRawInput(body);
+  const signals = adapter.normalize(rawInput, { receivedAtMs });
+  const client = platformEventTimelineClient(body, req, adapter);
+  const results = await applyMeetingSignals(client, signals, {
+    participantAsAnnotation: body.participant_as_annotation === true || body.participantAsAnnotation === true,
+    onArtifactSignal: body.artifact_callback === 'status_only'
+      ? async (signal) => signal
+      : undefined,
+  });
+  const appliedCount = results.filter((item) => item.applied).length;
+  const skippedCount = results.length - appliedCount;
+  updatePlatformEventStatus(adapter, {
+    received_count: platformEventStatus[adapter.key].received_count + 1,
+    normalized_signal_count: platformEventStatus[adapter.key].normalized_signal_count + signals.length,
+    applied_signal_count: platformEventStatus[adapter.key].applied_signal_count + appliedCount,
+    skipped_signal_count: platformEventStatus[adapter.key].skipped_signal_count + skippedCount,
+    last_received_at: new Date(receivedAtMs).toISOString(),
+    last_event_type: String(platformRawEventType(rawInput)),
+    last_signal_type: signals.at(-1)?.type ?? null,
+    last_error: null,
+  });
+  return {
+    ok: true,
+    platform: adapter.key,
+    source: adapter.source,
+    received_at: new Date(receivedAtMs).toISOString(),
+    raw_event_type: platformRawEventType(rawInput),
+    signal_count: signals.length,
+    applied_signal_count: appliedCount,
+    skipped_signal_count: skippedCount,
+    signals,
+    results,
+    state: results.findLast((item) => item.response?.state)?.response?.state ?? await store.load(),
+    status: platformEventStatus[adapter.key],
+  };
+}
+
 async function handleApi(req, res, url) {
   if (req.method === 'OPTIONS') {
     return sendNoContent(res);
@@ -6099,6 +6315,38 @@ async function handleApi(req, res, url) {
 
   if (req.method === 'GET' && url.pathname === '/api/annotation-ingest-info') {
     return sendJson(res, 200, await annotationIngestInfoPayload(req));
+  }
+
+  const platformRoute = parsePlatformEventRoute(url.pathname);
+  if (platformRoute?.action === 'status' && req.method === 'GET') {
+    const adapter = platformRoute.platform ? platformEventAdapterFor(platformRoute.platform) : null;
+    if (platformRoute.platform && !adapter) {
+      return sendJson(res, 404, {
+        error: `Unsupported meeting platform: ${platformRoute.platform}`,
+        ...publicPlatformEventStatus(req),
+      });
+    }
+    return sendJson(res, 200, publicPlatformEventStatus(req, adapter));
+  }
+
+  if (platformRoute?.action === 'ingest' && req.method === 'POST') {
+    const adapter = platformEventAdapterFor(platformRoute.platform);
+    const body = await readJson(req);
+    try {
+      return sendJson(res, 200, await ingestPlatformEvent(platformRoute.platform, body, req));
+    } catch (error) {
+      if (adapter) {
+        updatePlatformEventStatus(adapter, {
+          last_received_at: new Date().toISOString(),
+          last_error: error.message ?? String(error),
+        });
+      }
+      return sendJson(res, error.status ?? 400, {
+        error: error.message ?? String(error),
+        platform: adapter?.key ?? platformRoute.platform,
+        status: adapter ? platformEventStatus[adapter.key] : null,
+      });
+    }
   }
 
   if (req.method === 'GET' && url.pathname === '/api/meeting-session/status') {

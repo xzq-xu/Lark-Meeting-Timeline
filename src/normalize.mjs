@@ -680,7 +680,7 @@ export function alignSequence(timeline, options = {}) {
 
 export function buildTimeline({ meeting = {}, segments = [], events = [], sequence = [] } = {}) {
   const normalizedMeeting = {
-    platform: 'lark',
+    platform: meeting.platform ?? 'lark',
     meeting_id: meeting.meeting_id ?? meeting.id ?? 'unknown-meeting',
     external_meeting_id: meeting.external_meeting_id ?? meeting.lark_meeting_id ?? null,
     meeting_url: meeting.meeting_url ?? meeting.url ?? null,

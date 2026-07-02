@@ -15,6 +15,9 @@ export function sourceLabelForMeeting(meeting = {}) {
     lark_meeting_lookup_api: '飞书会议号绑定轴',
     lark_probe_auto_search: '飞书 probe 自动扫描轴',
     lark_passive_meeting_scan: '飞书被动扫描轴',
+    google_meet_webhook: 'Google Meet 事件轴',
+    microsoft_teams_webhook: 'Microsoft Teams 事件轴',
+    zoom_webhook: 'Zoom 事件轴',
     annotation_fallback: '等待真实飞书事件',
   };
   return labels[meeting.source] ?? meeting.source ?? '未标记来源';
@@ -32,6 +35,9 @@ export function isRealMeetingAxisClient(meeting = {}) {
     'lark_meeting_lookup_api',
     'lark_probe_auto_search',
     'lark_passive_meeting_scan',
+    'google_meet_webhook',
+    'microsoft_teams_webhook',
+    'zoom_webhook',
   ].includes(meeting.source) && !meeting.pending_binding;
 }
 

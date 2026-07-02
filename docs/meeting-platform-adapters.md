@@ -285,16 +285,17 @@ Teams SDK 可以让会议内 app/bot 接收 meetingStart、meetingEnd、particip
    - 先做 webhook receiver 和签名校验。
    - `recording.completed` 只作为会后 artifact，不影响实时标注验收。
 
-## 需要新增的 SDK/服务端边界
+## SDK/服务端边界
 
-建议新增但不替换现有接口：
+已新增但不替换现有接口：
 
 ```text
 POST /api/platform-events/:platform
 GET  /api/platform-events/:platform/status
-POST /api/artifacts/transcript
-POST /api/artifacts/recording
+GET  /api/platform-events/status
 ```
+
+`POST /api/platform-events/:platform` 当前支持 `google-meet`、`teams`、`zoom` 及其别名。服务端会用 SDK adapter 归一化原始事件，`meeting_started` 进入 `POST /api/meeting-session/start` 同一套建轴逻辑，`meeting_ended` 进入 `POST /api/meeting-session/end` 同一套结束逻辑。会后 transcript/recording artifact 目前先归一化为 `artifact_ready` signal，默认不写入用户标注流；后续可再补 `POST /api/artifacts/transcript` 和 `POST /api/artifacts/recording`。
 
 SDK 包结构建议：
 
