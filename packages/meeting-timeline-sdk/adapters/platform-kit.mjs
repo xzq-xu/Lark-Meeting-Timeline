@@ -26,6 +26,7 @@ import {
   createMeetingPlatformWebhookRouter,
   platformWebhookRoutePath,
 } from './platform-webhook-router.mjs';
+import { createMeetingPlatformFetchHandler } from './platform-http.mjs';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -134,11 +135,13 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     ...defaults,
     reconcile: firstNonEmpty(defaults.reconcile, defaults.reconciled, true),
   });
+  const fetchHandler = createMeetingPlatformFetchHandler(router, defaults);
 
   return {
     client: bridge.client,
     bridge,
     webhookRouter: router,
+    fetchHandler,
     platforms: MEETING_PLATFORM_KEYS,
     observe(snapshot = {}, observeOptions = {}) {
       return bridge.observe(snapshot, observeOptions);
@@ -169,6 +172,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     handleWebhook(input = {}, webhookOptions = {}) {
       return router(input, webhookOptions);
+    },
+    handleFetchRequest(request, fetchOptions = {}) {
+      return fetchHandler(request, fetchOptions);
     },
     diagnose(platform, payload, diagnosticOptions = {}) {
       return diagnosePlatformEvent(platform, payload, diagnosticOptions);

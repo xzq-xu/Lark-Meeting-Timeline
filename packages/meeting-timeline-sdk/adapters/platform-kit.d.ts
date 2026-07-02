@@ -4,6 +4,7 @@ import type {
   PlatformWebhookRouterOptions,
   PlatformWebhookRouterRequest,
 } from './platform-webhook-router.mjs';
+import type { MeetingPlatformFetchHandler, PlatformWebhookHttpOptions } from './platform-http.mjs';
 import type { PlatformEventDiagnosticResult, PlatformEventIngestInput, PlatformEventIngestOptions, ReconciledPlatformEventIngestResult } from './platform-ingest.mjs';
 
 export interface MeetingPlatformTimelineKitOptions extends MeetingTimelineBridgeOptions, PlatformWebhookRouterOptions {
@@ -22,6 +23,7 @@ export interface MeetingPlatformTimelineKit {
   client: MeetingTimelineClient;
   bridge: MeetingTimelineBridge;
   webhookRouter: unknown;
+  fetchHandler: MeetingPlatformFetchHandler;
   platforms: readonly string[];
   observe(snapshot?: Record<string, unknown>, observeOptions?: Record<string, unknown>): Promise<unknown>;
   observeCandidates(candidates?: unknown[] | Record<string, unknown>, observeOptions?: Record<string, unknown>): Promise<unknown>;
@@ -33,6 +35,7 @@ export interface MeetingPlatformTimelineKit {
   startMeeting(input?: Record<string, unknown>): Promise<unknown>;
   endMeeting(input?: Record<string, unknown>): Promise<unknown>;
   handleWebhook(input?: PlatformWebhookRouterRequest, webhookOptions?: PlatformWebhookRouterOptions): Promise<Record<string, unknown>>;
+  handleFetchRequest(request: Request, fetchOptions?: PlatformWebhookHttpOptions): Promise<Response>;
   diagnose(platform: string, payload?: unknown, diagnosticOptions?: Record<string, unknown>): PlatformEventDiagnosticResult;
   platform(platform: string, platformOptions?: MeetingPlatformTimelineKitOptions): Record<string, unknown>;
   allPlatforms(platformOptions?: MeetingPlatformTimelineKitOptions): Record<string, unknown>[];
