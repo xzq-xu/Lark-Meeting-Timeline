@@ -1,4 +1,5 @@
 import { compactObject, normalizeAbsoluteMs } from '../index.mjs';
+import { detectMeetingFromUrl, stableMeetingIdFromUrl } from './meeting-url.mjs';
 
 export const LOCAL_DETECTOR_EVENT_TYPES = Object.freeze([
   'meeting_started',
@@ -110,16 +111,6 @@ function eventTimestampMs(raw = {}, type = eventTypeOf(raw), options = {}) {
   return normalizeAbsoluteMs(input, 'local_detector_event_time');
 }
 
-function stableIdFromUrl(url) {
-  if (!url) return null;
-  try {
-    const parsed = new URL(String(url));
-    return `${parsed.hostname}${parsed.pathname}`.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
-  } catch {
-    return String(url).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || null;
-  }
-}
-
 function meetingIdentity(raw = {}) {
   const meetingUrl = firstPath(raw, [
     'meeting.meeting_url',
@@ -135,6 +126,7 @@ function meetingIdentity(raw = {}) {
     'window.url',
     'browser.url',
   ]);
+  const detected = detectMeetingFromUrl(raw) ?? detectMeetingFromUrl(meetingUrl);
   const platform = firstPath(raw, [
     'meeting.platform',
     'meeting_platform',
@@ -150,7 +142,7 @@ function meetingIdentity(raw = {}) {
     'platform',
     'provider',
     'app',
-  ]) ?? 'local_detector';
+  ]) ?? detected?.platform ?? 'local_detector';
   const meetingId = firstPath(raw, [
     'meeting.meeting_id',
     'meeting.meetingId',
@@ -166,7 +158,7 @@ function meetingIdentity(raw = {}) {
     'meeting_no',
     'meetingNo',
     'id',
-  ]) ?? stableIdFromUrl(meetingUrl);
+  ]) ?? detected?.meeting_id ?? stableMeetingIdFromUrl(meetingUrl);
   if (!meetingId) return null;
   return compactObject({
     platform: String(platform),
@@ -180,9 +172,9 @@ function meetingIdentity(raw = {}) {
       'externalMeetingId',
       'meeting_no',
       'meetingNo',
-    ]),
+    ]) ?? detected?.external_meeting_id,
     meeting_url: meetingUrl,
-    title: firstPath(raw, ['meeting.title', 'meeting.topic', 'meeting.name', 'title', 'topic', 'name', 'window.title']),
+    title: firstPath(raw, ['meeting.title', 'meeting.topic', 'meeting.name', 'title', 'topic', 'name', 'window.title']) ?? detected?.title,
     organizer_id: firstPath(raw, ['meeting.organizer_id', 'meeting.organizerId', 'organizer_id', 'organizerId']),
     organizer_name: firstPath(raw, ['meeting.organizer_name', 'meeting.organizerName', 'organizer_name', 'organizerName']),
   });
