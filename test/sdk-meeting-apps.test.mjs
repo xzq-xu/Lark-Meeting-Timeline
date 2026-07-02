@@ -117,6 +117,50 @@ assert.deepEqual(observed.signals.map((item) => item.type), ['meeting_started', 
 assert.equal(observed.signals[0].meeting.platform, 'zoom');
 assert.equal(observed.signals[1].speaker_name, 'Mira Patel');
 
+const lark = normalizeMeetingAppSnapshot({
+  url: 'https://vc.feishu.cn/j/123456789',
+  title: '会议进展实时可视化 - 飞书',
+  page: {
+    documentVisible: true,
+    controls: [
+      { label: '挂断' },
+      { label: 'AI 视图' },
+      { label: '共享屏幕' },
+    ],
+    participants: [
+      { id: 'xzq', ariaLabel: '徐智强 正在发言' },
+      { id: 'hold21', ariaLabel: 'hold21 已静音' },
+    ],
+  },
+  observedAtMs: startMs + 2_500,
+});
+assert.equal(lark.platform, 'lark');
+assert.equal(lark.meeting_id, '123456789');
+assert.equal(lark.inMeeting, true);
+assert.equal(lark.activeSpeaker.id, 'xzq');
+assert.equal(lark.activeSpeaker.name, '徐智强');
+
+const webex = normalizeMeetingAppSnapshot({
+  url: 'https://example.webex.com/meet/product-review',
+  title: 'Product review - Webex',
+  page: {
+    controls: [
+      { label: 'Leave meeting' },
+      { label: 'Unmute' },
+      { label: 'Chat' },
+    ],
+    participants: [
+      { id: 'maya', ariaLabel: 'Maya Chen, active speaker' },
+      { id: 'noah', ariaLabel: 'Noah Smith, muted' },
+    ],
+  },
+  observedAtMs: startMs + 2_800,
+});
+assert.equal(webex.platform, 'webex');
+assert.equal(webex.meeting_id, 'meet-product-review');
+assert.equal(webex.inMeeting, true);
+assert.equal(webex.activeSpeaker.name, 'Maya Chen');
+
 const calls = [];
 const source = createMeetingSourceAggregator({
   async startMeeting(input) {

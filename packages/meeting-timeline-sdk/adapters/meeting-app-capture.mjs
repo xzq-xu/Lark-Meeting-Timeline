@@ -18,12 +18,24 @@ const DEFAULT_PARTICIPANT_SELECTORS = Object.freeze([
   '[data-participant-name]',
   '[data-user-id]',
   '[data-userid]',
+  '[data-speaker-id]',
+  '[data-member-id]',
+  '[data-attendee-id]',
+  '[data-person-id]',
+  '[data-display-name]',
+  '[data-user-name]',
   '[data-tid*="participant" i]',
+  '[data-testid*="participant" i]',
+  '[data-testid*="attendee" i]',
   '[class*="participant" i]',
+  '[class*="attendee" i]',
+  '[class*="speaker" i]',
   '[aria-label*="speaking" i]',
   '[aria-label*="talking" i]',
+  '[aria-label*="active speaker" i]',
   '[aria-label*="正在发言"]',
   '[aria-label*="正在讲话"]',
+  '[aria-label*="正在说话"]',
 ]);
 
 const DEFAULT_TEXT_SELECTORS = Object.freeze([
@@ -199,7 +211,7 @@ function controlSummary(node) {
 function participantSummary(node) {
   const label = nodeText(node);
   const speaking = boolish(firstNonEmpty(
-    dataAttr(node, 'speaking', 'is-speaking', 'active-speaker'),
+    dataAttr(node, 'speaking', 'is-speaking', 'active-speaker', 'is-active-speaker'),
     attr(node, 'aria-current'),
   ));
   const level = numberish(firstNonEmpty(
@@ -210,11 +222,22 @@ function participantSummary(node) {
     tag: String(node?.tagName ?? '').toLowerCase() || undefined,
     role: nodeRole(node),
     id: firstNonEmpty(
-      dataAttr(node, 'participant-id', 'participantid', 'requested-participant-id', 'user-id', 'userid'),
+      dataAttr(
+        node,
+        'participant-id',
+        'participantid',
+        'requested-participant-id',
+        'speaker-id',
+        'member-id',
+        'attendee-id',
+        'person-id',
+        'user-id',
+        'userid',
+      ),
       nodeId(node),
     ),
     name: firstNonEmpty(
-      dataAttr(node, 'participant-name', 'self-name', 'user-name'),
+      dataAttr(node, 'participant-name', 'self-name', 'user-name', 'display-name', 'attendee-name', 'person-name'),
       label,
     ),
     ariaLabel: compactText(attr(node, 'aria-label')),

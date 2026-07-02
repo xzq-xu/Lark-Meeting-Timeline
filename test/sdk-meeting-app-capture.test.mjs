@@ -47,8 +47,14 @@ function fakeDocument({ url, title, nodes = [], hidden = false }) {
       if (text.includes('data-user-id')) {
         return nodes.filter((item) => item.attributes['data-user-id']);
       }
+      if (text.includes('data-person-id')) {
+        return nodes.filter((item) => item.attributes['data-person-id']);
+      }
+      if (text.includes('data-display-name')) {
+        return nodes.filter((item) => item.attributes['data-display-name']);
+      }
       if (text.includes('speaking')) {
-        return nodes.filter((item) => /speaking|正在发言/i.test(item.attributes['aria-label'] ?? ''));
+        return nodes.filter((item) => /speaking|active speaker|正在发言|正在讲话|正在说话/i.test(item.attributes['aria-label'] ?? ''));
       }
       if (text.includes('aria-live')) return nodes.filter((item) => item.attributes['aria-live']);
       if (text.includes('role="status"')) return nodes.filter((item) => item.attributes.role === 'status');
@@ -142,6 +148,58 @@ observed = createMeetingAppObserver({
 assert.deepEqual(observed.signals.map((item) => item.type), ['meeting_started', 'speaker_started']);
 assert.equal(observed.signals[0].meeting.platform, 'zoom');
 assert.equal(observed.signals[1].speaker_name, 'Mira Patel');
+
+const larkCaptured = captureMeetingAppDomSnapshot({
+  document: fakeDocument({
+    url: 'https://vc.feishu.cn/j/123456789',
+    title: '会议进展实时可视化 - 飞书',
+    nodes: [
+      node('button', { 'aria-label': '挂断' }),
+      node('button', { 'aria-label': 'AI 视图' }),
+      node('div', {
+        'data-user-id': 'xzq',
+        'data-display-name': '徐智强',
+        'aria-label': '徐智强 正在发言',
+      }),
+    ],
+  }),
+}, {
+  observedAtMs: startMs + 3_000,
+});
+assert.equal(larkCaptured.page.tiles[0].id, 'xzq');
+assert.equal(larkCaptured.page.tiles[0].name, '徐智强');
+observed = createMeetingAppObserver({
+  source: 'browser_dom_capture',
+  speakerOptions: { minStableMs: 0 },
+}).observe(larkCaptured, {
+  observedAtMs: startMs + 3_000,
+});
+assert.deepEqual(observed.signals.map((item) => item.type), ['meeting_started', 'speaker_started']);
+assert.equal(observed.signals[0].meeting.platform, 'lark');
+assert.equal(observed.signals[1].speaker_name, '徐智强');
+
+const webexCaptured = normalizeCapturedMeetingAppDomSnapshot({
+  document: fakeDocument({
+    url: 'https://example.webex.com/meet/product-review',
+    title: 'Product review - Webex',
+    nodes: [
+      node('button', { 'aria-label': 'Leave meeting' }),
+      node('button', { 'aria-label': 'Unmute' }),
+      node('div', {
+        'data-person-id': 'maya',
+        'data-display-name': 'Maya Chen',
+        'aria-label': 'Maya Chen, active speaker',
+      }),
+    ],
+  }),
+}, {
+  observedAtMs: startMs + 4_000,
+});
+assert.equal(webexCaptured.platform, 'webex');
+assert.equal(webexCaptured.meeting_id, 'meet-product-review');
+assert.equal(webexCaptured.inMeeting, true);
+assert.equal(webexCaptured.activeSpeaker.id, 'maya');
+assert.equal(webexCaptured.activeSpeaker.name, 'Maya Chen');
 
 const calls = [];
 const source = createMeetingSourceAggregator({

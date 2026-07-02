@@ -237,7 +237,7 @@ const result = meetingApps.observe({
 
 `meeting-apps` 是轻量 preset，不依赖具体浏览器扩展 SDK，也不要求实时 OCR 或实时转写。它的作用是把 Google Meet 等会议软件的本地可观测状态变成统一 meeting signal；官方 provider webhook 仍然走 `google-meet` / `microsoft-teams` / `zoom` 等 adapter 做校准和会后 artifact。
 
-浏览器扩展或 WebView 里可以再往前接一层 `meeting-app-capture`。它只读取 DOM 文本、按钮、`aria-label`、participant tile 和音量/发言状态，输出 `meeting-apps` 可识别的快照；不截图、不 OCR、不读取转写正文：
+浏览器扩展或 WebView 里可以再往前接一层 `meeting-app-capture`。它只读取 DOM 文本、按钮、`aria-label`、participant tile、常见 `data-participant-*` / `data-user-*` / `data-person-*` 属性和音量/发言状态，输出 `meeting-apps` 可识别的快照；不截图、不 OCR、不读取转写正文：
 
 ```js
 import { captureMeetingAppDomSnapshot } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-capture';
@@ -256,7 +256,7 @@ const snapshot = captureMeetingAppDomSnapshot({ document, location, window }, {
 await meetingSources.observeMeetingApp(snapshot, { observedAtMs: snapshot.observedAtMs });
 ```
 
-这条链路是 Google Meet / Teams Web / Zoom Web 的推荐 P0 接入：先用本地 DOM 状态低延迟建轴和标发言人位置；Google Workspace Events、Microsoft Graph、Zoom/Webex webhook 晚到后再进入 provider adapter 做 reconcile。
+这条链路是 Google Meet / Teams Web / Zoom Web / Webex Web / Lark/Feishu Web 的推荐 P0 接入：先用本地 DOM 状态低延迟建轴和标发言人位置；Google Workspace Events、Microsoft Graph、Zoom/Webex/Lark webhook 晚到后再进入 provider adapter 做 reconcile。
 
 外部项目优先使用更高层的 `meeting-app-runtime`，它把 client、`meeting-source` 和 DOM monitor 组合好，适合浏览器扩展 content script、Electron WebView 或内嵌浏览器宿主直接接入：
 

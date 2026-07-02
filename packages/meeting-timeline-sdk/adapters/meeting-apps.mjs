@@ -325,6 +325,10 @@ export const MEETING_APP_PRESETS = Object.freeze({
       /\bend call\b/i,
       /\byou are presenting\b/i,
       /\bstop presenting\b/i,
+      /\bpresent now\b/i,
+      /\bturn off microphone\b/i,
+      /\bturn off camera\b/i,
+      /\bmore options\b/i,
       /离开通话/,
       /退出通话/,
       /结束通话/,
@@ -351,9 +355,15 @@ export const MEETING_APP_PRESETS = Object.freeze({
       /\bturn camera off\b/i,
       /\bmute microphone\b/i,
       /\bmicrosoft teams meeting\b/i,
+      /\bshow conversation\b/i,
+      /\braise hand\b/i,
+      /\bshare content\b/i,
       /离开/,
       /挂断/,
       /会议聊天/,
+      /举手/,
+      /共享屏幕/,
+      /共享内容/,
     ],
     preJoinHints: [
       /\bjoin now\b/i,
@@ -372,8 +382,11 @@ export const MEETING_APP_PRESETS = Object.freeze({
       /\bleave meeting\b/i,
       /\bend meeting\b/i,
       /\bmute audio\b/i,
+      /\bunmute\b/i,
       /\bstop video\b/i,
+      /\bstart video\b/i,
       /\bparticipants\b/i,
+      /\breactions\b/i,
       /离开会议/,
       /结束会议/,
       /参与者/,
@@ -395,10 +408,16 @@ export const MEETING_APP_PRESETS = Object.freeze({
       /\bleave\b/i,
       /\bend call\b/i,
       /\bai summary\b/i,
+      /\bhang up\b/i,
+      /\bshare screen\b/i,
       /离开会议/,
       /结束通话/,
+      /挂断/,
       /AI 总结/,
+      /AI 视图/,
       /会议进展实时可视化/,
+      /共享屏幕/,
+      /关闭麦克风/,
     ],
     preJoinHints: [/加入会议/, /立即加入/, /\bjoin now\b/i],
     participantPaths: COMMON_PARTICIPANT_PATHS,
@@ -411,9 +430,15 @@ export const MEETING_APP_PRESETS = Object.freeze({
       /\bleave meeting\b/i,
       /\bend meeting\b/i,
       /\bmute microphone\b/i,
+      /\bunmute\b/i,
+      /\bstart video\b/i,
+      /\bstop video\b/i,
       /\bparticipants\b/i,
+      /\bchat\b/i,
       /离开会议/,
       /结束会议/,
+      /与会者/,
+      /聊天/,
     ],
     preJoinHints: [/\bjoin meeting\b/i, /\bstart meeting\b/i, /加入会议/],
     participantPaths: COMMON_PARTICIPANT_PATHS,
@@ -551,7 +576,8 @@ function cleanParticipantName(value) {
   if (!text) return undefined;
   text = text
     .replace(/\b(is speaking|speaking|talking|active speaker|muted|microphone off|mic off|camera off|presenting)\b/ig, '')
-    .replace(/(正在发言|正在讲话|正在说话|已静音|麦克风已关闭|摄像头已关闭|正在展示)/g, '')
+    .replace(/\b(you|me)\b/ig, '')
+    .replace(/(正在发言|正在讲话|正在说话|已静音|麦克风已关闭|摄像头已关闭|正在展示|我|本人)/g, '')
     .replace(/[，,].*$/g, '')
     .replace(/\s+/g, ' ')
     .trim();
