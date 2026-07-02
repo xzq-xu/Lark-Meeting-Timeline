@@ -859,6 +859,100 @@ export function allPlatformSetupManifests(options = {}) {
   return MEETING_PLATFORM_KEYS.map((platform) => platformSetupManifest(platform, options));
 }
 
+function providerEventNames(manifest = {}) {
+  if (Array.isArray(manifest.default_event_types)) return manifest.default_event_types;
+  if (Array.isArray(manifest.default_change_types)) return manifest.default_change_types;
+  if (Array.isArray(manifest.webhook_resources)) {
+    return manifest.webhook_resources.flatMap((item) => (
+      (item.events ?? []).map((event) => `${item.resource}.${event}`)
+    ));
+  }
+  return [];
+}
+
+function preferredAxisStrategy(platform, options = {}) {
+  const explicitMode = firstNonEmpty(options.axisMode, options.axis_mode);
+  if (explicitMode) return String(explicitMode);
+  return platform === 'local_detector' ? 'local_detector_primary' : 'hybrid_local_observer_first';
+}
+
+export function buildPlatformIntegrationPlan(platform, options = {}) {
+  const key = normalizePlatform(platform);
+  const manifest = platformSetupManifest(key, options);
+  const capabilities = manifest.capabilities;
+  const sourcePriority = key === 'local_detector'
+    ? ['local_detector']
+    : ['local_observer', `${key}_provider_events`, 'post_meeting_transcript_import'];
+  const transcript = capabilities.post_meeting_transcript ?? {};
+  const maintenanceSubscription = options.subscription ?? options.subscriptions?.[key] ?? {};
+  return compactObject({
+    platform: key,
+    display_name: manifest.display_name,
+    recommended_mode: preferredAxisStrategy(key, options),
+    source_priority: sourcePriority,
+    modules: capabilities.sdk_modules,
+    endpoints: capabilities.endpoints,
+    realtime_axis: {
+      strategy: preferredAxisStrategy(key, options),
+      primary: key === 'local_detector' ? 'local_detector' : 'local_observer',
+      reconcile_with_provider_events: key !== 'local_detector',
+      signal_types: ['meeting_started', 'meeting_ended'],
+      invariant: 'annotations_must_use_absolute_captured_at_ms_and_must_not_wait_for_transcript',
+      local_observer: {
+        module: capabilities.sdk_modules.local_observer,
+        url_detection_module: capabilities.sdk_modules.url_detection,
+        supported_platform_from_url: key !== 'local_detector',
+      },
+    },
+    provider_events: {
+      enabled: key !== 'local_detector',
+      transport: manifest.transport,
+      endpoint: manifest.endpoint,
+      status_endpoint: manifest.status_endpoint,
+      event_types: providerEventNames(manifest),
+      lifecycle_event_types: manifest.lifecycle_event_types ?? manifest.lifecycle_events,
+      adapter_module: capabilities.sdk_modules.events,
+      ingest_module: capabilities.sdk_modules.ingest,
+      webhook_handler_module: capabilities.sdk_modules.webhook_handler,
+    },
+    realtime_annotations: {
+      strategy: 'insert_mark_with_absolute_capture_time',
+      required_field: 'captured_at_ms',
+      sdk_method: 'MeetingTimelineClient.insertMark',
+      note: 'timeline_alignment_uses_meeting_axis_plus_absolute_annotation_time',
+    },
+    speaker_activity: {
+      strategy: capabilities.speaker_activity.status?.startsWith('not_supported')
+        ? 'local_detector_realtime_or_transcript_backfill'
+        : 'provider_or_local_detector',
+      ...capabilities.speaker_activity,
+    },
+    post_meeting_transcript: {
+      strategy: transcript.status === 'not_applicable'
+        ? 'provider_specific_or_generic_import_after_axis_exists'
+        : 'import_after_meeting_ends',
+      ...transcript,
+      import_module: capabilities.sdk_modules.transcript,
+    },
+    setup: {
+      required_permissions: manifest.required_permissions,
+      required_scopes: manifest.required_scopes,
+      admin_scopes: manifest.admin_scopes,
+      required_security_env: manifest.required_security_env,
+      optional_security_env: manifest.optional_security_env,
+      required_steps: manifest.required_setup,
+      builders: manifest.builders,
+    },
+    readiness: evaluatePlatformSetupReadiness(key, options),
+    subscription_maintenance: evaluatePlatformSubscriptionMaintenance(key, maintenanceSubscription, options),
+    limitations: capabilities.limitations,
+  });
+}
+
+export function allPlatformIntegrationPlans(options = {}) {
+  return MEETING_PLATFORM_KEYS.map((platform) => buildPlatformIntegrationPlan(platform, options));
+}
+
 export function buildPlatformSetup(platform, options = {}) {
   const key = normalizePlatform(platform);
   const manifest = platformSetupManifest(key, options);
@@ -1008,4 +1102,6 @@ export const MEETING_PLATFORM_SETUP_BUILDERS = Object.freeze({
   evaluateAllPlatformSubscriptionMaintenance,
   platformCapabilityContract,
   allPlatformCapabilityContracts,
+  buildPlatformIntegrationPlan,
+  allPlatformIntegrationPlans,
 });

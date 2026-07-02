@@ -131,6 +131,25 @@ export function platformCapabilityContract(platform: string, options?: PlatformS
 export function allPlatformCapabilityContracts(options?: PlatformSetupOptions): Record<string, unknown>[];
 export function platformSetupManifest(platform: string, options?: PlatformSetupOptions): Record<string, unknown>;
 export function allPlatformSetupManifests(options?: PlatformSetupOptions): Record<string, unknown>[];
+export function buildPlatformIntegrationPlan(platform: string, options?: PlatformSetupOptions & {
+  axisMode?: string;
+  axis_mode?: string;
+  subscription?: Record<string, unknown>;
+  subscriptions?: Record<string, Record<string, unknown>>;
+  now?: number | string | Date;
+  renewalWindowMs?: number;
+  renewal_window_ms?: number;
+  renewalTtl?: string;
+  renewal_ttl?: string;
+  renewalTtlSeconds?: number;
+  renewal_ttl_seconds?: number;
+}): Record<string, unknown>;
+export function allPlatformIntegrationPlans(options?: PlatformSetupOptions & {
+  axisMode?: string;
+  axis_mode?: string;
+  subscriptions?: Record<string, Record<string, unknown>>;
+  now?: number | string | Date;
+}): Record<string, unknown>[];
 export function buildPlatformSetup(platform: string, options?: PlatformSetupOptions): Record<string, unknown>;
 export function evaluatePlatformSetupReadiness(platform: string, options?: PlatformSetupOptions): Record<string, unknown>;
 export function evaluateAllPlatformSetupReadiness(options?: PlatformSetupOptions): Record<string, unknown>[];

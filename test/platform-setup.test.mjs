@@ -9,9 +9,11 @@ import {
   WEBEX_WEBHOOK_RESOURCES,
   ZOOM_MEETING_EVENT_TYPES,
   allPlatformCapabilityContracts,
+  allPlatformIntegrationPlans,
   allPlatformSetupManifests,
   buildGoogleMeetWorkspaceSubscriptionRequest,
   buildGoogleWorkspaceSubscriptionRenewalRequest,
+  buildPlatformIntegrationPlan,
   buildMicrosoftTeamsMeetingCallSubscriptionRequest,
   buildMicrosoftGraphSubscriptionRenewalRequest,
   buildPlatformSetup,
@@ -74,6 +76,36 @@ const googleCapabilities = platformCapabilityContract('google-meet', { baseUrl }
 assert.equal(googleCapabilities.endpoints.platform_events, 'https://timeline.example.com/api/platform-events/google-meet');
 assert.equal(googleCapabilities.realtime_transcript.status, 'not_supported');
 assert.equal(googleCapabilities.limitations.includes('transcript_entries_may_differ_from_google_docs_transcript'), true);
+
+const googlePlan = buildPlatformIntegrationPlan('google-meet', {
+  baseUrl,
+  env: {
+    GOOGLE_PUBSUB_OIDC_AUDIENCE: 'https://timeline.example.com/api/platform-events/google-meet',
+    GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL: 'pubsub@demo.iam.gserviceaccount.com',
+  },
+  subscription: {
+    name: 'subscriptions/google-sub-1',
+    expireTime: '2026-06-26T03:00:00.000Z',
+  },
+  now: '2026-06-26T02:00:00.000Z',
+});
+assert.equal(googlePlan.recommended_mode, 'hybrid_local_observer_first');
+assert.deepEqual(googlePlan.source_priority, ['local_observer', 'google_meet_provider_events', 'post_meeting_transcript_import']);
+assert.equal(googlePlan.realtime_axis.primary, 'local_observer');
+assert.equal(googlePlan.realtime_axis.reconcile_with_provider_events, true);
+assert.equal(googlePlan.provider_events.event_types.includes('google.workspace.meet.conference.v2.started'), true);
+assert.equal(googlePlan.provider_events.endpoint, 'https://timeline.example.com/api/platform-events/google-meet');
+assert.equal(googlePlan.realtime_annotations.required_field, 'captured_at_ms');
+assert.equal(googlePlan.speaker_activity.strategy, 'local_detector_realtime_or_transcript_backfill');
+assert.equal(googlePlan.post_meeting_transcript.strategy, 'import_after_meeting_ends');
+assert.equal(googlePlan.readiness.ready, true);
+assert.equal(googlePlan.subscription_maintenance.renewal_due, true);
+
+const localDetectorPlan = buildPlatformIntegrationPlan('local-detector', { baseUrl });
+assert.equal(localDetectorPlan.recommended_mode, 'local_detector_primary');
+assert.deepEqual(localDetectorPlan.source_priority, ['local_detector']);
+assert.equal(localDetectorPlan.provider_events.enabled, false);
+assert.equal(localDetectorPlan.post_meeting_transcript.strategy, 'provider_specific_or_generic_import_after_axis_exists');
 
 const googleRequest = buildGoogleMeetWorkspaceSubscriptionRequest({
   targetResource: '//cloudidentity.googleapis.com/users/me',
@@ -155,6 +187,10 @@ assert.deepEqual(all.map((item) => item.platform), ['local_detector', 'lark', 'g
 const allCapabilities = allPlatformCapabilityContracts({ baseUrl });
 assert.deepEqual(allCapabilities.map((item) => item.platform), ['local_detector', 'lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex']);
 assert.equal(allCapabilities.every((item) => item.endpoints.transcript_import === 'https://timeline.example.com/api/import/transcript'), true);
+const allPlans = allPlatformIntegrationPlans({ baseUrl });
+assert.deepEqual(allPlans.map((item) => item.platform), ['local_detector', 'lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex']);
+assert.equal(allPlans.every((item) => item.realtime_annotations.required_field === 'captured_at_ms'), true);
+assert.equal(allPlans.find((item) => item.platform === 'microsoft_teams').provider_events.event_types.includes('created'), true);
 
 const googleReady = evaluatePlatformSetupReadiness('google-meet', {
   baseUrl,

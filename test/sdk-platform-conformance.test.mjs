@@ -5,7 +5,9 @@ import {
   MEETING_PLATFORM_ALIASES,
   MEETING_PLATFORM_KEYS,
   allPlatformCapabilityContracts,
+  allPlatformIntegrationPlans,
   allPlatformSetupManifests,
+  buildPlatformIntegrationPlan,
   normalizeMeetingPlatform,
   platformCapabilityContract,
   platformEventEndpoint,
@@ -35,8 +37,10 @@ assert.equal(meetingPlatformEventAdapterFor('unknown-meeting-platform'), null);
 
 const setupRows = allPlatformSetupManifests({ baseUrl });
 const capabilityRows = allPlatformCapabilityContracts({ baseUrl });
+const integrationRows = allPlatformIntegrationPlans({ baseUrl });
 assert.deepEqual(setupRows.map((item) => item.platform), expectedPlatforms);
 assert.deepEqual(capabilityRows.map((item) => item.platform), expectedPlatforms);
+assert.deepEqual(integrationRows.map((item) => item.platform), expectedPlatforms);
 assert.deepEqual(MEETING_PLATFORM_EVENT_ADAPTERS.map((item) => item.key), expectedPlatforms);
 
 const envExample = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
@@ -45,6 +49,7 @@ for (const platform of MEETING_PLATFORM_KEYS) {
   const eventAdapter = meetingPlatformEventAdapterFor(platform);
   const manifest = platformSetupManifest(platform, { baseUrl });
   const capability = platformCapabilityContract(platform, { baseUrl });
+  const plan = buildPlatformIntegrationPlan(platform, { baseUrl });
   assert.equal(eventAdapter.key, platform);
   assert.equal(eventAdapter.source, platform === 'local_detector' ? 'local_detector' : `${platform}_webhook`);
   assert.equal(typeof eventAdapter.normalize, 'function');
@@ -57,6 +62,14 @@ for (const platform of MEETING_PLATFORM_KEYS) {
   assert.equal(capability.platform, platform);
   assert.equal(capability.endpoints.platform_events, platformEventEndpoint(baseUrl, platform));
   assert.equal(capability.endpoints.transcript_import, `${baseUrl}/api/import/transcript`);
+  assert.equal(plan.platform, platform);
+  assert.equal(plan.endpoints.platform_events, platformEventEndpoint(baseUrl, platform));
+  assert.equal(plan.modules.ingest, '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest');
+  assert.equal(plan.realtime_axis.signal_types.includes('meeting_started'), true);
+  assert.equal(plan.realtime_axis.signal_types.includes('meeting_ended'), true);
+  assert.equal(plan.realtime_annotations.required_field, 'captured_at_ms');
+  assert.equal(typeof plan.post_meeting_transcript.strategy, 'string');
+  assert.equal(typeof plan.readiness.ready, 'boolean');
   assert.equal(typeof capability.sdk_modules.events, 'string');
   assert.equal(capability.sdk_modules.url_detection, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-url');
   assert.equal(capability.sdk_modules.local_observer, '@ai-annotation/meeting-timeline-sdk/adapters/local-observer');
