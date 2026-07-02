@@ -233,6 +233,7 @@ h2 {
 .panel-title {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
   color: var(--muted);
   margin-bottom: 10px;
@@ -240,6 +241,42 @@ h2 {
 
 .panel-title h2 {
   color: var(--ink);
+}
+
+.timeline-title-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.timeline-zoom-controls {
+  display: grid;
+  grid-template-columns: 32px 48px 32px;
+  gap: 4px;
+  align-items: center;
+}
+
+.timeline-zoom-controls button {
+  height: 30px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.timeline-window-controls {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin: -2px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.timeline-window-controls input[type="range"] {
+  padding: 0;
 }
 
 .timeline {

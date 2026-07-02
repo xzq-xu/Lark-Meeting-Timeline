@@ -112,7 +112,7 @@ assert.equal(shouldHideDemoTimelineForProbe({
     prepared_at: '2026-06-26T12:00:00.000Z',
     last_real_axis_at: null,
   },
-}), true);
+}), false);
 
 assert.equal(shouldHideDemoTimelineForProbe({
   probe: { active: false },

@@ -59,6 +59,23 @@ assert.equal(liveOnly.meeting.source, 'annotation_fallback');
 assert.equal(liveOnly.alignments.length, 1);
 assert.equal(liveOnly.alignments[0].active_segment_id, null);
 assert.equal(liveOnly.alignments[0].events[0].event.type, 'meeting_start');
+assert.equal(liveOnly.duration_ms, 600_000);
+
+const shortEndedMeeting = buildTimeline({
+  meeting: {
+    platform: 'lark',
+    meeting_id: 'short-ended',
+    title: 'short ended',
+    start_time: '2026-06-26T03:00:00.000Z',
+    end_time: '2026-06-26T03:01:17.000Z',
+    source: 'lark_ws_event',
+  },
+  events: [
+    { id: 'short-start', time_ms: 0, type: 'meeting_start', label: '会议开始', source: 'lark_ws_event' },
+    { id: 'short-end', time_ms: 77_000, type: 'meeting_end', label: '会议结束', source: 'lark_ws_event' },
+  ],
+});
+assert.equal(shortEndedMeeting.duration_ms, 77_000);
 
 const localSimulation = buildTimeline({
   meeting: {

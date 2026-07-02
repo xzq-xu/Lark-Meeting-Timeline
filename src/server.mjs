@@ -728,12 +728,25 @@ function loggedEventPayload(entry = {}) {
   return entry.preview ?? null;
 }
 
-function isLoggedMeetingStartEntry(entry = {}) {
-  return Boolean(entry.timeline_started && (
+function isLoggedMeetingStartEventEntry(entry = {}) {
+  return Boolean(
     isDirectMeetingStartEvent(entry.event_type)
       || isReserveMeetingStartEvent(entry.event_type)
       || isMeetingContextBootstrapEvent(entry.event_type)
-  ));
+  );
+}
+
+function isLoggedMeetingStartEntry(entry = {}) {
+  return Boolean(entry.timeline_started && isLoggedMeetingStartEventEntry(entry));
+}
+
+function isRestorableLoggedMeetingStartEntry(entry = {}) {
+  return Boolean(
+    isLoggedMeetingStartEventEntry(entry)
+      && loggedEventPayload(entry)
+      && hasExplicitMeetingIdentity(loggedMeetingIdentity(entry))
+      && explicitMeetingStartMs(loggedEventPayload(entry)) != null
+  );
 }
 
 function isLoggedMeetingEndEntry(entry = {}) {
@@ -756,6 +769,10 @@ function latestLoggedMeetingStartEvent() {
   return larkEventLog.find((entry) => isLoggedMeetingStartEntry(entry)) ?? null;
 }
 
+function latestRestorableLoggedMeetingStartEvent() {
+  return larkEventLog.find((entry) => isRestorableLoggedMeetingStartEntry(entry)) ?? null;
+}
+
 function latestLoggedMeetingStartBefore(cutoff) {
   const cutoffMs = isoMs(cutoff);
   if (cutoffMs == null) return null;
@@ -773,6 +790,70 @@ function matchingLoggedMeetingEndAfter(startEntry = {}) {
       && eventLogEntryMs(entry) >= startMs
       && sameLoggedMeetingEntry(startEntry, entry)
   )) ?? null;
+}
+
+function matchingLoggedMeetingStartForEnd(endEntry = {}) {
+  if (!endEntry) return null;
+  return larkEventLog.find((entry) => (
+    isRestorableLoggedMeetingStartEntry(entry)
+      && sameLoggedMeetingEntry(entry, endEntry)
+  )) ?? null;
+}
+
+function latestRecoverableMeetingWindow() {
+  for (const entry of larkEventLog) {
+    if (isRestorableLoggedMeetingStartEntry(entry)) {
+      return {
+        restoreMode: 'latest_start_event',
+        startEntry: entry,
+        endEntry: matchingLoggedMeetingEndAfter(entry),
+      };
+    }
+    if (isLoggedMeetingEndEntry(entry) && loggedEventPayload(entry)) {
+      const startEntry = matchingLoggedMeetingStartForEnd(entry);
+      if (startEntry) {
+        return {
+          restoreMode: 'latest_ended_meeting_window',
+          startEntry,
+          endEntry: entry,
+        };
+      }
+    }
+  }
+  return null;
+}
+
+async function restoreRecentStartEventForProbe(body = {}) {
+  if (body.auto_search === false && body.auto_restore_recent_event !== true) return null;
+  if (body.auto_restore_recent_event === false) return null;
+  const startedMs = isoMs(realMeetingProbe.started_at);
+  if (startedMs == null) return null;
+  const lookbackMs = boundedNumber(
+    body.recent_event_lookback_ms ?? 5 * 60_000,
+    30_000,
+    10_000,
+    30 * 60_000,
+  );
+  const latestWindow = latestRecoverableMeetingWindow();
+  if (!latestWindow || latestWindow.restoreMode !== 'latest_start_event') return null;
+  const receivedMs = eventLogEntryMs(latestWindow.startEntry);
+  if (!receivedMs || receivedMs > startedMs || startedMs - receivedMs > lookbackMs) return null;
+  const endMs = latestWindow.endEntry ? eventLogEntryMs(latestWindow.endEntry) : null;
+  if (endMs != null && endMs <= startedMs) return null;
+  const restored = await restoreLatestRealMeetingAxisFromEventLog({
+    event_id: latestWindow.startEntry.id,
+    apply_end: true,
+  });
+  return {
+    restored: true,
+    reason: 'recent_start_event_before_probe',
+    lookback_ms: lookbackMs,
+    start_event_id: latestWindow.startEntry.id,
+    start_event_type: latestWindow.startEntry.event_type,
+    restored_at: restored.restored_at,
+    restore_mode: restored.restore_mode,
+    state: restored.state,
+  };
 }
 
 function missedMeetingWindowForProbe(req = null) {
@@ -1276,10 +1357,9 @@ function realDemoPresentationForState(state = {}) {
   const pending = Boolean(meeting.pending_binding);
   const demoSample = meeting.meeting_id === 'demo-lark-meeting-001' && !meeting.source && !pending;
   const localSimulation = meeting.source === 'local_simulation' && !pending;
-  const staleRealAxis = realDemoSession.active && realAxis && !axisObservedAfterPrepare;
   const hideTimeline = Boolean(
     realDemoWaiting
-      && (demoSample || localSimulation || pending || staleRealAxis || !realAxis),
+      && (demoSample || localSimulation || pending || !realAxis),
   );
   const hiddenReason = !hideTimeline
     ? null
@@ -1289,10 +1369,8 @@ function realDemoPresentationForState(state = {}) {
         ? 'demo_sample_axis_is_not_current_real_demo'
         : localSimulation
           ? 'local_simulation_hidden_during_real_demo'
-          : staleRealAxis
-            ? 'stale_real_axis_before_current_prepare'
-            : 'waiting_for_real_lark_meeting_axis';
-  const axisStatus = realAxis && axisObservedAfterPrepare
+          : 'waiting_for_real_lark_meeting_axis';
+  const axisStatus = realAxis
     ? 'real_axis_active'
     : pending
       ? 'pending_annotations_waiting_rebind'
@@ -3557,10 +3635,32 @@ function sourceForLoggedEvent(entry = {}) {
 }
 
 async function restoreLatestRealMeetingAxisFromEventLog(body = {}) {
-  const startEntry = body.event_id
+  const selectedEntry = body.event_id
     ? larkEventLog.find((entry) => entry.id === body.event_id || entry.preview?.event_id === body.event_id)
-    : latestLoggedMeetingStartEvent();
-  if (!startEntry || !isLoggedMeetingStartEntry(startEntry)) {
+    : null;
+  let restoreMode = 'latest_start_event';
+  let startEntry = null;
+  let endEntry = null;
+
+  if (selectedEntry && isLoggedMeetingEndEntry(selectedEntry)) {
+    restoreMode = 'selected_end_event';
+    endEntry = selectedEntry;
+    startEntry = matchingLoggedMeetingStartForEnd(endEntry);
+  } else if (selectedEntry) {
+    restoreMode = 'selected_start_event';
+    startEntry = selectedEntry;
+  } else {
+    const latestWindow = latestRecoverableMeetingWindow();
+    if (latestWindow) {
+      restoreMode = latestWindow.restoreMode;
+      startEntry = latestWindow.startEntry;
+      endEntry = latestWindow.endEntry;
+    } else {
+      startEntry = latestRestorableLoggedMeetingStartEvent() ?? latestLoggedMeetingStartEvent();
+    }
+  }
+
+  if (!startEntry || !isRestorableLoggedMeetingStartEntry(startEntry)) {
     const error = new Error('No logged real meeting start event is available to restore');
     error.status = 404;
     throw error;
@@ -3573,18 +3673,21 @@ async function restoreLatestRealMeetingAxisFromEventLog(body = {}) {
   }
   const startResult = await processLarkEventPayload(startPayload, {
     source: sourceForLoggedEvent(startEntry),
+    received_at: startEntry.at,
     suppress_auto_annotations: true,
+    force_restore: true,
   });
-  let endEntry = null;
   let endResult = null;
   if (body.apply_end !== false) {
-    endEntry = matchingLoggedMeetingEndAfter(startEntry);
+    endEntry = endEntry ?? matchingLoggedMeetingEndAfter(startEntry);
     if (endEntry) {
       const endPayload = loggedEventPayload(endEntry);
       if (endPayload) {
         endResult = await processLarkEventPayload(endPayload, {
           source: sourceForLoggedEvent(endEntry),
+          received_at: endEntry.at,
           suppress_auto_annotations: true,
+          force_restore: true,
         });
       }
     }
@@ -3592,6 +3695,7 @@ async function restoreLatestRealMeetingAxisFromEventLog(body = {}) {
   return {
     restored: true,
     restored_at: new Date().toISOString(),
+    restore_mode: restoreMode,
     start_event: startEntry,
     end_event: endEntry,
     start_result: {
@@ -4113,6 +4217,16 @@ async function processLarkEventPayload(payload, opts = {}) {
   const event = normalizeLarkEventPayload(payload, { ...current.meeting, ...meetingPatch });
   const source = opts.source ?? 'lark_event';
   event.source = source;
+  const receivedAtMs = parseAbsoluteMs(opts.received_at ?? opts.received_at_ms);
+  const eventCreatedMs = larkEventCreatedMsFromPayload(payload);
+  event.metadata = {
+    ...(event.metadata ?? {}),
+    event_created_at: eventCreatedMs != null ? new Date(eventCreatedMs).toISOString() : null,
+    received_at: receivedAtMs != null ? new Date(receivedAtMs).toISOString() : null,
+    delivery_delay_ms: eventCreatedMs != null && receivedAtMs != null
+      ? Math.max(0, receivedAtMs - eventCreatedMs)
+      : null,
+  };
   const payloadStartMs = explicitMeetingStartMs(payload);
   const incomingIdentity = explicitMeetingIdentity(payload);
   const hasIncomingIdentity = hasExplicitMeetingIdentity(incomingIdentity);
@@ -4137,6 +4251,7 @@ async function processLarkEventPayload(payload, opts = {}) {
   const incomingStartMs = payloadStartMs ?? parseAbsoluteMs(meetingPatch.start_time);
   const staleStartBeforeCurrentAxis = Boolean(
     event.type === 'meeting_start'
+      && !opts.force_restore
       && currentIsRealAxis
       && !currentIsCarryableFallbackAxis
       && !incomingMatchesCurrent
@@ -4266,7 +4381,10 @@ async function handleWsTimelineEvent(parsed = {}, raw = {}, forcedEventType = nu
     return `ignored ${eventType || 'unknown'} event`;
   }
 
-  const result = await processLarkEventPayload(buildWsPayload(eventType, parsed, raw), { source: 'lark_ws_event' });
+  const result = await processLarkEventPayload(buildWsPayload(eventType, parsed, raw), {
+    source: 'lark_ws_event',
+    received_at: logEntry.at,
+  });
   logEntry.timeline_processed = result.ok !== false;
   logEntry.timeline_started = result.timeline_started;
   if (result.ignored_reason) logEntry.ignored_reason = result.ignored_reason;
@@ -6290,10 +6408,12 @@ async function handleApi(req, res, url) {
     });
     scheduleProbeAutoSearchLoop();
     const resetResult = await resetTemporaryAxisForProbeIfRequested(body);
+    const recentEventRestore = await restoreRecentStartEventForProbe(body);
     return sendJson(res, 200, {
       ...publicRealMeetingProbeStatus(req),
       temporary_axis_reset: resetResult.reset,
       temporary_axis_reset_reason: resetResult.reason,
+      recent_event_restore: recentEventRestore,
     });
   }
 
@@ -6897,6 +7017,7 @@ async function handleApi(req, res, url) {
     const eventCallbackUrl = process.env.LARK_EVENT_CALLBACK_URL || localUrlFor(req, '/api/lark/events');
     const result = await processLarkEventPayload(payload, {
       source: publicWebhookStatus(eventCallbackUrl) ? 'lark_http_event' : 'lark_http_local_event',
+      received_at: logEntry.at,
     });
     logEntry.timeline_processed = result.ok !== false;
     logEntry.timeline_started = result.timeline_started;

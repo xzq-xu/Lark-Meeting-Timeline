@@ -1,0 +1,108 @@
+# Meeting Timeline SDK
+
+把外部项目里的会议检测、电子纸手写标记、桌面观察器事件，插入到统一会议时间轴。
+
+这个 SDK 只依赖当前服务暴露的稳定协议，不依赖飞书 SDK：
+
+- `POST /api/meeting-session/start`
+- `POST /api/annotations`
+- `POST /api/annotations/batch`
+- `POST /api/meeting-session/end`
+- `GET /api/annotations/status?id=...`
+- `GET /api/stream`
+
+## 安装
+
+本仓库内直接用相对路径：
+
+```js
+import { createMeetingTimelineClient } from './packages/meeting-timeline-sdk/index.mjs';
+```
+
+给别的项目使用时，可以先把 `packages/meeting-timeline-sdk` 作为独立包复制过去，或用本地 file 依赖：
+
+```json
+{
+  "dependencies": {
+    "@ai-annotation/meeting-timeline-sdk": "file:../meeting-timeline-sdk"
+  }
+}
+```
+
+## 基本用法
+
+```js
+import { createMeetingTimelineClient } from '@ai-annotation/meeting-timeline-sdk';
+
+const timeline = createMeetingTimelineClient({
+  baseUrl: 'http://localhost:8787',
+  source: 'hanwang_epaper',
+  deviceId: 'hanwang-device-001',
+});
+
+await timeline.startMeeting({
+  platform: 'lark',
+  meetingId: 'meeting-001',
+  title: '产品评审',
+  meetingUrl: 'https://vc.feishu.cn/j/example',
+  startTimeMs: Date.now(),
+  detectorSource: 'desktop_meeting_observer',
+});
+
+await timeline.insertMark({
+  id: 'mark-001',
+  capturedAtMs: Date.now(),
+  kind: 'handwriting_trigger',
+  label: 'why?',
+  textCandidates: ['why?', 'why'],
+  intent: 'question',
+  strokes: [],
+});
+
+await timeline.endMeeting({
+  endTimeMs: Date.now(),
+});
+```
+
+## 首条标记内联建轴
+
+如果外部项目不方便单独调用 `startMeeting`，可以在第一条标记里带 `meetingSession`：
+
+```js
+await timeline.insertMark({
+  id: 'mark-inline-001',
+  capturedAtMs: Date.now(),
+  label: 'follow up',
+  textCandidates: ['follow up'],
+  meetingSession: {
+    meetingId: 'meeting-001',
+    title: '产品评审',
+    startTimeMs: Date.now() - 30_000,
+    detectorSource: 'host_app',
+  },
+});
+```
+
+## 关键约束
+
+- 推荐总是传 `capturedAtMs`。这是“标到正确时间轴位置”的核心字段。
+- `capturedAtMs` 应该是设备/宿主采集到标记完成时的绝对时间，不是上传时间。
+- 若缺失 `capturedAtMs`，服务端只能退回到收到请求的时间，实时性和会后补传都会变差。
+- `insertMark` 默认会校验 `capturedAtMs`；如确实要允许服务端收包时间兜底，可传 `{ requireCapturedAt: false }`。
+
+## 批量写入
+
+```js
+await timeline.insertMarks([
+  { id: 'm1', capturedAtMs: t1, label: 'why?', textCandidates: ['why?'] },
+  { id: 'm2', capturedAtMs: t2, label: '重点', intent: 'attention' },
+]);
+```
+
+## 查询单条标记状态
+
+```js
+const status = await timeline.getAnnotationStatus('mark-001');
+```
+
+状态里会包含是否落在真实会议轴、归一化后的会议内时间、是否晚于会议结束等信息。

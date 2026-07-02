@@ -1,0 +1,23 @@
+{
+  "name": "@ai-annotation/meeting-timeline-sdk",
+  "version": "0.1.0",
+  "description": "Reusable client SDK for inserting human annotations into a meeting timeline.",
+  "type": "module",
+  "main": "./index.mjs",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.mjs"
+    }
+  },
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "index.mjs",
+    "index.d.ts",
+    "README.md"
+  ]
+}

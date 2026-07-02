@@ -70,6 +70,7 @@ export function shouldHideDemoTimelineForProbe({ probe, state, realDemoSession }
   );
   const hasMeeting = Boolean(state?.meeting);
   const meeting = state?.meeting ?? {};
+  if (isRealMeetingAxisClient(meeting)) return false;
   const realDemoWaiting = Boolean(
     realDemoSession?.active
       && !isCurrentPreparedRealAxis({ meeting, realDemoSession }),
