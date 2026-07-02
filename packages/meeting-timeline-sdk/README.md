@@ -95,6 +95,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/native-meeting`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-apps`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-capture`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-monitor`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-source`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
@@ -255,6 +256,24 @@ await meetingSources.observeMeetingApp(snapshot, { observedAtMs: snapshot.observ
 ```
 
 这条链路是 Google Meet / Teams Web / Zoom Web 的推荐 P0 接入：先用本地 DOM 状态低延迟建轴和标发言人位置；Google Workspace Events、Microsoft Graph、Zoom/Webex webhook 晚到后再进入 provider adapter 做 reconcile。
+
+如果希望 SDK 帮你管理轮询、去重和 keep-alive，可以直接用 `meeting-app-monitor`。它会高频低成本采集 DOM，但只有在页面状态变化、或到达 keep-alive 间隔时才把样本送给 `meeting-source`；即使 DOM 不变，也会按间隔继续送样本，避免 active speaker 的 `minStableMs` 因过度去重而无法触发：
+
+```js
+import { createMeetingAppDomMonitor } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-monitor';
+
+const monitor = createMeetingAppDomMonitor(meetingSources, {
+  sampleIntervalMs: 1000,
+  minObserveIntervalMs: 250,
+  unchangedObserveEveryMs: 1000,
+  captureOptions: { browserName: 'Chrome' },
+});
+
+monitor.start(() => ({ document, location, window }));
+
+// tab hidden, user leaves the page, or extension unloads:
+monitor.stop();
+```
 
 桌面客户端推荐用 `native-meeting`。它面向 macOS Accessibility、Windows UI Automation、Electron shell 或宿主进程采集到的 app/window/process/audio 快照；适合 Zoom、Teams、Lark/Feishu、Webex 桌面端：
 
