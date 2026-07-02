@@ -21,6 +21,8 @@ export interface MeetingAppMonitorOptions {
   provider?: string;
   captureProfile?: string | false | null;
   capture_profile?: string | false | null;
+  includeShadowDom?: boolean;
+  include_shadow_dom?: boolean;
   input?: MeetingAppDomCaptureInput;
   inputProvider?: () => MeetingAppDomCaptureInput | Promise<MeetingAppDomCaptureInput>;
   input_provider?: () => MeetingAppDomCaptureInput | Promise<MeetingAppDomCaptureInput>;

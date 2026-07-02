@@ -254,6 +254,7 @@ const snapshot = captureMeetingAppDomSnapshot({ document, location, window }, {
   observedAtMs: Date.now(),
   browserName: 'Chrome',
   platform: 'google_meet', // 可省略；SDK 会尽量从 URL/title 自动选择 Google Meet/Teams/Zoom/Lark/Webex profile。
+  includeShadowDom: true, // 仅在目标页面使用 open shadow root 时打开；默认关闭以控制采样成本。
 });
 
 await meetingSources.observeMeetingApp(snapshot, { observedAtMs: snapshot.observedAtMs });

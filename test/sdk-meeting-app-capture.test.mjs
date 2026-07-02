@@ -47,6 +47,44 @@ function selectorAttrMatches(item, selector) {
   });
 }
 
+function queryNodes(nodes, selector) {
+  const text = String(selector);
+  if (text === '*') return nodes;
+  const generic = nodes.filter((item) => selectorAttrMatches(item, text));
+  if (generic.length) return generic;
+  if (text === 'button') return nodes.filter((item) => item.tagName === 'BUTTON');
+  if (text.includes('role="button"')) return nodes.filter((item) => item.attributes.role === 'button');
+  if (text === '[aria-label]') return nodes.filter((item) => item.attributes['aria-label']);
+  if (text.includes('[title]')) return nodes.filter((item) => item.attributes.title);
+  if (text.includes('data-participant-id')) {
+    return nodes.filter((item) => item.attributes['data-participant-id']);
+  }
+  if (text.includes('data-user-id')) {
+    return nodes.filter((item) => item.attributes['data-user-id']);
+  }
+  if (text.includes('data-person-id')) {
+    return nodes.filter((item) => item.attributes['data-person-id']);
+  }
+  if (text.includes('data-display-name')) {
+    return nodes.filter((item) => item.attributes['data-display-name']);
+  }
+  if (text.includes('speaking')) {
+    return nodes.filter((item) => /speaking|active speaker|正在发言|正在讲话|正在说话/i.test(item.attributes['aria-label'] ?? ''));
+  }
+  if (text.includes('aria-live')) return nodes.filter((item) => item.attributes['aria-live']);
+  if (text.includes('role="status"')) return nodes.filter((item) => item.attributes.role === 'status');
+  return [];
+}
+
+function fakeShadowRoot(nodes = []) {
+  return {
+    nodeType: 11,
+    querySelectorAll(selector) {
+      return queryNodes(nodes, selector);
+    },
+  };
+}
+
 function fakeDocument({ url, title, nodes = [], hidden = false }) {
   return {
     nodeType: 9,
@@ -54,33 +92,7 @@ function fakeDocument({ url, title, nodes = [], hidden = false }) {
     hidden,
     location: { href: url },
     querySelectorAll(selector) {
-      const text = String(selector);
-      const generic = nodes.filter((item) => selectorAttrMatches(item, text));
-      if (generic.length) return generic;
-      if (text === 'button') return nodes.filter((item) => item.tagName === 'BUTTON');
-      if (text.includes('role="button"')) return nodes.filter((item) => item.attributes.role === 'button');
-      if (text === '[aria-label]') {
-        return nodes.filter((item) => item.attributes['aria-label']);
-      }
-      if (text.includes('[title]')) return nodes.filter((item) => item.attributes.title);
-      if (text.includes('data-participant-id')) {
-        return nodes.filter((item) => item.attributes['data-participant-id']);
-      }
-      if (text.includes('data-user-id')) {
-        return nodes.filter((item) => item.attributes['data-user-id']);
-      }
-      if (text.includes('data-person-id')) {
-        return nodes.filter((item) => item.attributes['data-person-id']);
-      }
-      if (text.includes('data-display-name')) {
-        return nodes.filter((item) => item.attributes['data-display-name']);
-      }
-      if (text.includes('speaking')) {
-        return nodes.filter((item) => /speaking|active speaker|正在发言|正在讲话|正在说话/i.test(item.attributes['aria-label'] ?? ''));
-      }
-      if (text.includes('aria-live')) return nodes.filter((item) => item.attributes['aria-live']);
-      if (text.includes('role="status"')) return nodes.filter((item) => item.attributes.role === 'status');
-      return [];
+      return queryNodes(nodes, selector);
     },
   };
 }
@@ -146,6 +158,37 @@ assert.equal(profileOnlyGoogleCapture.page.buttons[0].label, 'Leave call');
 assert.equal(profileOnlyGoogleCapture.page.tiles[0].id, 'ada-tile');
 assert.equal(profileOnlyGoogleCapture.page.tiles[0].name, 'Ada Lovelace');
 assert.equal(profileOnlyGoogleCapture.page.tiles[0].speaking, true);
+
+const shadowHost = node('meet-shell');
+shadowHost.shadowRoot = fakeShadowRoot([
+  node('div', { 'data-tooltip': 'Leave call' }),
+  node('div', {
+    'data-avatar-tooltip': 'Shadow Ada',
+    'data-is-speaking': 'true',
+    'data-tile-id': 'shadow-ada',
+  }),
+]);
+const shadowDoc = fakeDocument({
+  url: 'https://meet.google.com/abc-defg-hij',
+  title: 'Shadow capture - Google Meet',
+  nodes: [shadowHost],
+});
+const shallowShadowCapture = captureMeetingAppDomSnapshot({ document: shadowDoc }, {
+  observedAtMs: startMs + 600,
+  captureProfile: 'google_meet',
+});
+assert.equal(shallowShadowCapture.capture.shadow_root_count, undefined);
+assert.equal(shallowShadowCapture.page.buttons.length, 0);
+assert.equal(shallowShadowCapture.page.tiles.length, 0);
+const deepShadowCapture = captureMeetingAppDomSnapshot({ document: shadowDoc }, {
+  observedAtMs: startMs + 700,
+  captureProfile: 'google_meet',
+  includeShadowDom: true,
+});
+assert.equal(deepShadowCapture.capture.shadow_root_count, 1);
+assert.equal(deepShadowCapture.page.buttons[0].label, 'Leave call');
+assert.equal(deepShadowCapture.page.tiles[0].id, 'shadow-ada');
+assert.equal(deepShadowCapture.page.tiles[0].name, 'Shadow Ada');
 
 const normalized = normalizeCapturedMeetingAppDomSnapshot({ document: googleDoc }, {
   observedAtMs: startMs,

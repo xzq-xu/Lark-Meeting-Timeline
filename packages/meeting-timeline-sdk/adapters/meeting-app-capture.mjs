@@ -344,6 +344,22 @@ function numberish(value) {
   return Number.isFinite(numeric) ? numeric : undefined;
 }
 
+function optionBool(options = {}, keys = [], fallback = false) {
+  for (const key of keys) {
+    const parsed = boolish(options[key]);
+    if (parsed != null) return parsed;
+  }
+  return fallback;
+}
+
+function optionNumber(options = {}, keys = [], fallback) {
+  for (const key of keys) {
+    const numeric = numberish(options[key]);
+    if (numeric != null) return numeric;
+  }
+  return fallback;
+}
+
 function normalizeProfilePlatform(value) {
   if (!value || typeof value === 'object') return null;
   const text = String(value).trim();
@@ -418,22 +434,60 @@ export function meetingAppDomCaptureProfile(platformOrInput = {}, options = {}) 
   };
 }
 
-function selectorResults(root, selectors = [], limit = 80) {
+function queryAll(root, selector) {
+  if (!root?.querySelectorAll) return [];
+  try {
+    return Array.from(root.querySelectorAll(selector));
+  } catch {
+    return [];
+  }
+}
+
+function shadowRoots(root, options = {}) {
+  const include = optionBool(options, [
+    'includeShadowDom',
+    'include_shadow_dom',
+    'deepDom',
+    'deep_dom',
+  ], false);
+  if (!include || !root?.querySelectorAll) return [];
+  const maxRoots = Math.max(0, optionNumber(options, ['maxShadowRoots', 'max_shadow_roots'], 20));
+  const maxHosts = Math.max(0, optionNumber(options, ['maxShadowHosts', 'max_shadow_hosts'], 400));
+  const seen = new Set([root]);
+  const roots = [];
+  const queue = [root];
+  let scannedHosts = 0;
+  while (queue.length && roots.length < maxRoots && scannedHosts < maxHosts) {
+    const current = queue.shift();
+    for (const host of queryAll(current, '*')) {
+      scannedHosts += 1;
+      const shadow = host?.shadowRoot;
+      if (shadow?.querySelectorAll && !seen.has(shadow)) {
+        seen.add(shadow);
+        roots.push(shadow);
+        queue.push(shadow);
+        if (roots.length >= maxRoots) break;
+      }
+      if (scannedHosts >= maxHosts) break;
+    }
+  }
+  return roots;
+}
+
+function selectorResults(root, selectors = [], limit = 80, options = {}) {
   if (!root?.querySelectorAll) return [];
   const seen = new Set();
   const results = [];
+  const roots = [root, ...(options.__shadowRoots ?? shadowRoots(root, options))];
   for (const selector of selectors) {
     if (!selector || results.length >= limit) break;
-    let nodes = [];
-    try {
-      nodes = Array.from(root.querySelectorAll(selector));
-    } catch {
-      nodes = [];
-    }
-    for (const node of nodes) {
-      if (!node || seen.has(node)) continue;
-      seen.add(node);
-      results.push(node);
+    for (const current of roots) {
+      for (const node of queryAll(current, selector)) {
+        if (!node || seen.has(node)) continue;
+        seen.add(node);
+        results.push(node);
+        if (results.length >= limit) break;
+      }
       if (results.length >= limit) break;
     }
   }
@@ -553,27 +607,32 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
     url,
     title,
   }, options);
+  const capturedShadowRoots = shadowRoots(doc, options);
+  const selectorOptions = {
+    ...options,
+    __shadowRoots: capturedShadowRoots,
+  };
   const controls = selectorResults(doc, [
     ...uniqueStrings([
       ...(options.controlSelectors ?? options.control_selectors ?? []),
       ...(profile?.controlSelectors ?? []),
       ...DEFAULT_CONTROL_SELECTORS,
     ]),
-  ], controlLimit).map(controlSummary).filter((item) => item.label || item.ariaLabel || item.title);
+  ], controlLimit, selectorOptions).map(controlSummary).filter((item) => item.label || item.ariaLabel || item.title);
   const participants = selectorResults(doc, [
     ...uniqueStrings([
       ...(options.participantSelectors ?? options.participant_selectors ?? []),
       ...(profile?.participantSelectors ?? []),
       ...DEFAULT_PARTICIPANT_SELECTORS,
     ]),
-  ], participantLimit).map(participantSummary).filter((item) => item.id || item.name || item.label || item.audioLevel != null);
+  ], participantLimit, selectorOptions).map(participantSummary).filter((item) => item.id || item.name || item.label || item.audioLevel != null);
   const texts = selectorResults(doc, [
     ...uniqueStrings([
       ...(options.textSelectors ?? options.text_selectors ?? []),
       ...(profile?.textSelectors ?? []),
       ...DEFAULT_TEXT_SELECTORS,
     ]),
-  ], textLimit).map(textSummary).filter((item) => item.label || item.text);
+  ], textLimit, selectorOptions).map(textSummary).filter((item) => item.label || item.text);
 
   return compactObject({
     schema: MEETING_APP_DOM_CAPTURE_SCHEMA,
@@ -605,6 +664,7 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
     capture: {
       profile: profile?.platform,
       profile_display_name: profile?.displayName,
+      shadow_root_count: capturedShadowRoots.length || undefined,
       control_count: controls.length,
       participant_count: participants.length,
       text_count: texts.length,

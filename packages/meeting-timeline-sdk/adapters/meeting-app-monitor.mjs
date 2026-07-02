@@ -172,6 +172,20 @@ export function createMeetingAppDomMonitor(target, options = {}) {
         options.captureOptions?.capture_profile,
         options.capture_options?.capture_profile,
       ),
+      includeShadowDom: firstNonEmpty(
+        sampleOptions.includeShadowDom,
+        sampleOptions.include_shadow_dom,
+        options.includeShadowDom,
+        options.include_shadow_dom,
+        sampleOptions.captureOptions?.includeShadowDom,
+        sampleOptions.capture_options?.includeShadowDom,
+        sampleOptions.captureOptions?.include_shadow_dom,
+        sampleOptions.capture_options?.include_shadow_dom,
+        options.captureOptions?.includeShadowDom,
+        options.capture_options?.includeShadowDom,
+        options.captureOptions?.include_shadow_dom,
+        options.capture_options?.include_shadow_dom,
+      ),
       observedAtMs: atMs,
     };
     const observeOptions = {

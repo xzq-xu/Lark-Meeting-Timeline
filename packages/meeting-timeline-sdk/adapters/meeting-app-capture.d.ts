@@ -23,6 +23,14 @@ export interface MeetingAppDomCaptureOptions extends MeetingAppObserverOptions {
   provider?: string;
   captureProfile?: string | false | null;
   capture_profile?: string | false | null;
+  includeShadowDom?: boolean;
+  include_shadow_dom?: boolean;
+  deepDom?: boolean;
+  deep_dom?: boolean;
+  maxShadowRoots?: number;
+  max_shadow_roots?: number;
+  maxShadowHosts?: number;
+  max_shadow_hosts?: number;
   browserName?: string;
   browser_name?: string;
   maxControls?: number;
@@ -76,6 +84,7 @@ export interface MeetingAppDomCaptureSnapshot extends MeetingAppSnapshot {
   capture?: {
     profile?: MeetingAppDomCaptureProfilePlatform;
     profile_display_name?: string;
+    shadow_root_count?: number;
     control_count?: number;
     participant_count?: number;
     text_count?: number;
