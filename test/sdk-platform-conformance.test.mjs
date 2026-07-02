@@ -11,22 +11,14 @@ import {
   platformEventEndpoint,
   platformSetupManifest,
 } from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
+import {
+  MEETING_PLATFORM_EVENT_ADAPTERS,
+  meetingPlatformEventAdapterFor,
+} from '../packages/meeting-timeline-sdk/adapters/platform-registry.mjs';
 import * as transcriptAdapters from '../packages/meeting-timeline-sdk/adapters/transcript.mjs';
 
 const baseUrl = 'https://timeline.example.com';
 const expectedPlatforms = ['google_meet', 'microsoft_teams', 'zoom', 'webex'];
-const eventAdapterModules = {
-  google_meet: '../packages/meeting-timeline-sdk/adapters/google-meet.mjs',
-  microsoft_teams: '../packages/meeting-timeline-sdk/adapters/microsoft-teams.mjs',
-  zoom: '../packages/meeting-timeline-sdk/adapters/zoom.mjs',
-  webex: '../packages/meeting-timeline-sdk/adapters/webex.mjs',
-};
-const eventAdapterExports = {
-  google_meet: 'normalizeGoogleMeetEvent',
-  microsoft_teams: 'normalizeMicrosoftTeamsEvent',
-  zoom: 'normalizeZoomEvent',
-  webex: 'normalizeWebexEvent',
-};
 
 assert.deepEqual([...MEETING_PLATFORM_KEYS], expectedPlatforms);
 assert.equal(MEETING_PLATFORM_ALIASES['google-meet'], 'google_meet');
@@ -35,17 +27,27 @@ assert.equal(normalizeMeetingPlatform('meet'), 'google_meet');
 assert.equal(normalizeMeetingPlatform('teams'), 'microsoft_teams');
 assert.equal(normalizeMeetingPlatform('cisco-webex'), 'webex');
 assert.throws(() => normalizeMeetingPlatform('unknown-meeting-platform'), /Unsupported meeting platform/);
+assert.equal(meetingPlatformEventAdapterFor('unknown-meeting-platform'), null);
 
 const setupRows = allPlatformSetupManifests({ baseUrl });
 const capabilityRows = allPlatformCapabilityContracts({ baseUrl });
 assert.deepEqual(setupRows.map((item) => item.platform), expectedPlatforms);
 assert.deepEqual(capabilityRows.map((item) => item.platform), expectedPlatforms);
+assert.deepEqual(MEETING_PLATFORM_EVENT_ADAPTERS.map((item) => item.key), expectedPlatforms);
 
 const envExample = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
 
 for (const platform of MEETING_PLATFORM_KEYS) {
+  const eventAdapter = meetingPlatformEventAdapterFor(platform);
   const manifest = platformSetupManifest(platform, { baseUrl });
   const capability = platformCapabilityContract(platform, { baseUrl });
+  assert.equal(eventAdapter.key, platform);
+  assert.equal(eventAdapter.source, `${platform}_webhook`);
+  assert.equal(typeof eventAdapter.normalize, 'function');
+  assert.equal(eventAdapter.aliases.includes(platform), true);
+  for (const alias of eventAdapter.aliases) {
+    assert.equal(meetingPlatformEventAdapterFor(alias).key, platform);
+  }
   assert.equal(manifest.platform, platform);
   assert.equal(manifest.capabilities.platform, platform);
   assert.equal(capability.platform, platform);
@@ -67,9 +69,6 @@ for (const platform of MEETING_PLATFORM_KEYS) {
   if (transcriptNormalizer) {
     assert.equal(typeof transcriptAdapters[transcriptNormalizer], 'function', `${platform} transcript normalizer missing`);
   }
-
-  const eventModule = await import(eventAdapterModules[platform]);
-  assert.equal(typeof eventModule[eventAdapterExports[platform]], 'function', `${platform} event normalizer missing`);
 }
 
 console.log('ok meeting platform SDK conformance');

@@ -404,6 +404,8 @@ packages/meeting-timeline-sdk/
   adapters/
     platform-setup.mjs
     platform-setup.d.ts
+    platform-registry.mjs
+    platform-registry.d.ts
     webhook-security.mjs
     webhook-security.d.ts
     core.mjs

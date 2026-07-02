@@ -6,8 +6,10 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as Lark from '@larksuiteoapi/node-sdk';
 import { applyMeetingSignals } from '../packages/meeting-timeline-sdk/adapters/core.mjs';
-import { normalizeGoogleMeetEvent } from '../packages/meeting-timeline-sdk/adapters/google-meet.mjs';
-import { normalizeMicrosoftTeamsEvent } from '../packages/meeting-timeline-sdk/adapters/microsoft-teams.mjs';
+import {
+  MEETING_PLATFORM_EVENT_ADAPTERS,
+  meetingPlatformEventAdapterFor,
+} from '../packages/meeting-timeline-sdk/adapters/platform-registry.mjs';
 import {
   allPlatformCapabilityContracts,
   allPlatformSetupManifests,
@@ -17,8 +19,6 @@ import {
   evaluatePlatformSetupReadiness,
   evaluatePlatformSubscriptionMaintenance,
 } from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
-import { normalizeWebexEvent } from '../packages/meeting-timeline-sdk/adapters/webex.mjs';
-import { normalizeZoomEvent } from '../packages/meeting-timeline-sdk/adapters/zoom.mjs';
 import {
   buildZoomUrlValidationResponse,
   microsoftGraphValidationResponse,
@@ -146,37 +146,7 @@ const minuteOAuthScopes = [
   'minutes:minutes.basic:read',
   'minutes:minutes.transcript:export',
 ];
-const platformEventAdapterDefinitions = [
-  {
-    key: 'google_meet',
-    aliases: ['google-meet', 'google_meet', 'meet'],
-    source: 'google_meet_webhook',
-    normalize: normalizeGoogleMeetEvent,
-  },
-  {
-    key: 'microsoft_teams',
-    aliases: ['microsoft-teams', 'microsoft_teams', 'teams'],
-    source: 'microsoft_teams_webhook',
-    normalize: normalizeMicrosoftTeamsEvent,
-  },
-  {
-    key: 'zoom',
-    aliases: ['zoom'],
-    source: 'zoom_webhook',
-    normalize: normalizeZoomEvent,
-  },
-  {
-    key: 'webex',
-    aliases: ['webex', 'cisco-webex', 'cisco_webex'],
-    source: 'webex_webhook',
-    normalize: normalizeWebexEvent,
-  },
-];
-const platformEventAdapters = new Map(
-  platformEventAdapterDefinitions.flatMap((adapter) => (
-    adapter.aliases.map((alias) => [alias, adapter])
-  )),
-);
+const platformEventAdapterDefinitions = MEETING_PLATFORM_EVENT_ADAPTERS;
 const platformEventStatus = Object.fromEntries(platformEventAdapterDefinitions.map((adapter) => [
   adapter.key,
   {
@@ -6225,7 +6195,7 @@ function parsePlatformEventRoute(pathname = '') {
 }
 
 function platformEventAdapterFor(platform) {
-  return platformEventAdapters.get(String(platform ?? '').toLowerCase().replace(/\s+/g, '-')) ?? null;
+  return meetingPlatformEventAdapterFor(platform);
 }
 
 function platformEventRawInput(body = {}) {

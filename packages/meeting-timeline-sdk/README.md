@@ -85,6 +85,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/microsoft-teams`
 - `@ai-annotation/meeting-timeline-sdk/adapters/zoom`
 - `@ai-annotation/meeting-timeline-sdk/adapters/webex`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/transcript`
 - `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-setup`
@@ -92,6 +93,15 @@ await applyMeetingSignals(timeline, signals);
 `meeting_started` 会调用 `startMeeting`，`meeting_ended` 会调用 `endMeeting`。`participant_joined/left` 和 `artifact_ready` 默认不会写入用户标注流；如果需要临时显示参会人位置，可以给 `applyMeetingSignals` 传 `{ participantAsAnnotation: true }`，或者用 `onParticipantSignal` / `onArtifactSignal` 接到自己的服务端轨道。`subscription_lifecycle` 表示平台订阅自身的过期、移除、暂停、漏投或重新授权要求，默认不画到会议轴；需要接入诊断时传 `onSubscriptionLifecycleSignal` 处理。
 
 Google Meet adapter 同时支持已经解包的 Workspace Events CloudEvent，以及 Pub/Sub 默认 wrapped push body。wrapped body 会自动 base64 解码 `message.data`，所以 webhook handler 可以直接把 `req.body` 传给 `normalizeGoogleMeetEvent(req.body)`。Google Workspace Events 的 `subscription.v1.suspended`、`subscription.v1.expirationReminder`、`subscription.v1.expired` 会归一化为 `subscription_lifecycle`。Microsoft Graph change notifications 的 `lifecycleEvent` 值 `reauthorizationRequired`、`subscriptionRemoved`、`missed` 也会归一化为 `subscription_lifecycle`。Webex adapter 支持 `meetings` started/ended、`meetingParticipants` joined/left、`recordings` created/updated、`meetingTranscripts` created。
+
+宿主服务如果要按平台名动态接 webhook，可以直接用 registry：
+
+```js
+import { meetingPlatformEventAdapterFor } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-registry';
+
+const adapter = meetingPlatformEventAdapterFor(req.params.platform);
+const signals = adapter.normalize(req.body, { receivedAtMs: Date.now() });
+```
 
 ## 会后转写导入
 
