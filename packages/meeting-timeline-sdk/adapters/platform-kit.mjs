@@ -13,6 +13,7 @@ import {
   buildMeetingAppFixtureAcceptanceReport,
   buildMeetingAppFixtureSnapshot,
   diagnoseMeetingAppFixture,
+  diagnoseMeetingAppFixtureLifecycle,
 } from './meeting-app-fixtures.mjs';
 import { diagnosePlatformEvent } from './platform-ingest.mjs';
 import { buildMeetingPlatformOnboardingReport, buildMeetingPlatformOnboardingSummary } from './platform-onboarding.mjs';
@@ -280,6 +281,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     diagnoseMeetingAppFixture(platform, diagnosticOptions = {}) {
       return diagnoseMeetingAppFixture(platform, withDefaults(defaults, diagnosticOptions));
+    },
+    diagnoseMeetingAppFixtureLifecycle(platform, diagnosticOptions = {}) {
+      return diagnoseMeetingAppFixtureLifecycle(platform, withDefaults(defaults, diagnosticOptions));
     },
     meetingAppFixtureAcceptance(reportOptions = {}) {
       return buildMeetingAppFixtureAcceptanceReport(withDefaults(defaults, reportOptions));

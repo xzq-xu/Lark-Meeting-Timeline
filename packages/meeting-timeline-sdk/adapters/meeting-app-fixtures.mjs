@@ -48,6 +48,16 @@ function fixtureIds(platform, options = {}) {
   };
 }
 
+function fixtureState(options = {}) {
+  const value = String(firstNonEmpty(options.state, options.fixtureState, options.fixture_state, 'active')).toLowerCase();
+  if (['active', 'joined', 'in_meeting', 'in-meeting'].includes(value)) return 'active';
+  if (['prejoin', 'pre_join', 'pre-join', 'ended', 'left', 'inactive'].includes(value)) return 'prejoin';
+  throw new MeetingTimelineSdkError(`Unsupported meeting app fixture state: ${String(value || '(empty)')}`, {
+    state: value,
+    supported_states: ['active', 'prejoin'],
+  });
+}
+
 function controls(...items) {
   return items.map((label) => ({ label, ariaLabel: label }));
 }
@@ -65,12 +75,15 @@ function participant(id, name, label, extra = {}) {
 
 function fixtureConfig(platform, options = {}) {
   const ids = fixtureIds(platform, options);
+  const state = fixtureState(options);
   const byPlatform = {
     google_meet: {
       url: firstNonEmpty(options.url, options.meeting_url, 'https://meet.google.com/abc-defg-hij'),
-      title: firstNonEmpty(options.title, 'SDK fixture - Google Meet'),
-      buttons: controls('Turn off microphone', 'Present now', 'Leave call'),
-      participants: [
+      title: firstNonEmpty(options.title, state === 'prejoin' ? 'Ready to join - Google Meet' : 'SDK fixture - Google Meet'),
+      buttons: state === 'prejoin'
+        ? controls('Join now', 'Check your audio and video')
+        : controls('Turn off microphone', 'Present now', 'Leave call'),
+      participants: state === 'prejoin' ? [] : [
         participant(ids.speakerId, ids.speakerName, `${ids.speakerName} is speaking`, {
           audioLevel: 0.78,
           dataset: { participantId: ids.speakerId },
@@ -80,9 +93,11 @@ function fixtureConfig(platform, options = {}) {
     },
     microsoft_teams: {
       url: firstNonEmpty(options.url, options.meeting_url, 'https://teams.microsoft.com/l/meetup-join/19%3Ameeting_fixture%40thread.v2/0'),
-      title: firstNonEmpty(options.title, 'SDK fixture | Microsoft Teams'),
-      buttons: controls('Leave', 'Show conversation', 'Raise hand', 'Share content'),
-      participants: [
+      title: firstNonEmpty(options.title, state === 'prejoin' ? 'Join now | Microsoft Teams' : 'SDK fixture | Microsoft Teams'),
+      buttons: state === 'prejoin'
+        ? controls('Join now', 'Choose your audio and video settings')
+        : controls('Leave', 'Show conversation', 'Raise hand', 'Share content'),
+      participants: state === 'prejoin' ? [] : [
         participant(ids.speakerId, ids.speakerName, `${ids.speakerName} speaking`, {
           audioLevel: 0.66,
         }),
@@ -91,9 +106,11 @@ function fixtureConfig(platform, options = {}) {
     },
     zoom: {
       url: firstNonEmpty(options.url, options.meeting_url, 'https://zoom.us/j/987654321'),
-      title: firstNonEmpty(options.title, 'SDK fixture - Zoom Meeting'),
-      buttons: controls('Mute Audio', 'Start Video', 'Participants', 'Leave Meeting'),
-      participants: [
+      title: firstNonEmpty(options.title, state === 'prejoin' ? 'Join Meeting - Zoom' : 'SDK fixture - Zoom Meeting'),
+      buttons: state === 'prejoin'
+        ? controls('Join Meeting', 'Join with Computer Audio')
+        : controls('Mute Audio', 'Start Video', 'Participants', 'Leave Meeting'),
+      participants: state === 'prejoin' ? [] : [
         participant(ids.speakerId, ids.speakerName, `${ids.speakerName} is speaking`, {
           audioLevel: 0.73,
         }),
@@ -102,9 +119,11 @@ function fixtureConfig(platform, options = {}) {
     },
     lark: {
       url: firstNonEmpty(options.url, options.meeting_url, 'https://vc.feishu.cn/j/123456789'),
-      title: firstNonEmpty(options.title, 'SDK fixture - 飞书会议'),
-      buttons: controls('挂断', 'AI 视图', '共享屏幕', '关闭麦克风'),
-      participants: [
+      title: firstNonEmpty(options.title, state === 'prejoin' ? '加入会议 - 飞书' : 'SDK fixture - 飞书会议'),
+      buttons: state === 'prejoin'
+        ? controls('加入会议', '立即加入')
+        : controls('挂断', 'AI 视图', '共享屏幕', '关闭麦克风'),
+      participants: state === 'prejoin' ? [] : [
         participant(ids.speakerId, ids.speakerName, `${ids.speakerName} 正在发言`, {
           audioLevel: 0.71,
         }),
@@ -113,9 +132,11 @@ function fixtureConfig(platform, options = {}) {
     },
     webex: {
       url: firstNonEmpty(options.url, options.meeting_url, 'https://example.webex.com/meet/sdk-fixture'),
-      title: firstNonEmpty(options.title, 'SDK fixture - Webex'),
-      buttons: controls('Unmute', 'Chat', 'Participants', 'Leave meeting'),
-      participants: [
+      title: firstNonEmpty(options.title, state === 'prejoin' ? 'Join meeting - Webex' : 'SDK fixture - Webex'),
+      buttons: state === 'prejoin'
+        ? controls('Join meeting', 'Start meeting')
+        : controls('Unmute', 'Chat', 'Participants', 'Leave meeting'),
+      participants: state === 'prejoin' ? [] : [
         participant(ids.speakerId, ids.speakerName, `${ids.speakerName}, active speaker`, {
           audioLevel: 0.69,
         }),
@@ -123,7 +144,10 @@ function fixtureConfig(platform, options = {}) {
       ],
     },
   };
-  return byPlatform[platform];
+  return {
+    ...byPlatform[platform],
+    state,
+  };
 }
 
 export function buildMeetingAppFixtureSnapshot(platform, options = {}) {
@@ -146,6 +170,7 @@ export function buildMeetingAppFixtureSnapshot(platform, options = {}) {
     observedAtMs: atMs,
     platform: key,
     provider: key,
+    fixture_state: config.state,
     url: config.url,
     meeting_url: config.url,
     meeting_id: firstNonEmpty(options.meetingId, options.meeting_id, detected.meeting_id),
@@ -156,7 +181,7 @@ export function buildMeetingAppFixtureSnapshot(platform, options = {}) {
     },
     tab: {
       active: true,
-      audible: true,
+      audible: config.state === 'active' ? true : undefined,
       url: config.url,
       title: config.title,
     },
@@ -210,9 +235,73 @@ export function diagnoseMeetingAppFixture(platform, options = {}) {
   };
 }
 
+export function diagnoseMeetingAppFixtureLifecycle(platform, options = {}) {
+  const key = normalizeAppPlatform(platform);
+  const startMs = observedAtMs(options);
+  const endMs = normalizeAbsoluteMs(firstNonEmpty(
+    options.endObservedAtMs,
+    options.end_observed_at_ms,
+    startMs + Number(firstNonEmpty(options.endOffsetMs, options.end_offset_ms, 1_000)),
+  ), 'meeting_app_fixture_end_observed_at_ms');
+  const activeSnapshot = buildMeetingAppFixtureSnapshot(key, {
+    ...options,
+    state: 'active',
+    observedAtMs: startMs,
+  });
+  const endedSnapshot = buildMeetingAppFixtureSnapshot(key, {
+    ...options,
+    state: 'prejoin',
+    observedAtMs: endMs,
+  });
+  const active = observeMeetingAppSample(null, activeSnapshot, {
+    source: options.source ?? 'meeting_app_fixture',
+    speakerOptions: {
+      minStableMs: 0,
+      ...(options.speakerOptions ?? {}),
+      ...(options.speaker_options ?? {}),
+    },
+    observedAtMs: activeSnapshot.observedAtMs,
+    ...options,
+  });
+  const ended = observeMeetingAppSample(active.state, endedSnapshot, {
+    source: options.source ?? 'meeting_app_fixture',
+    speakerOptions: {
+      minStableMs: 0,
+      ...(options.speakerOptions ?? {}),
+      ...(options.speaker_options ?? {}),
+    },
+    observedAtMs: endedSnapshot.observedAtMs,
+    ...options,
+  });
+  const signals = [...active.signals, ...ended.signals];
+  const signalTypes = signals.map((item) => item.type);
+  const normalizedEnded = normalizeMeetingAppSnapshot(endedSnapshot, options);
+  return {
+    platform: key,
+    snapshots: {
+      active: activeSnapshot,
+      ended: endedSnapshot,
+    },
+    normalized_ended: normalizedEnded,
+    signal_types: signalTypes,
+    signals,
+    coverage: {
+      meeting_started: signalTypes.includes('meeting_started'),
+      speaker_started: signalTypes.includes('speaker_started'),
+      meeting_ended: signalTypes.includes('meeting_ended'),
+      ended_in_meeting_false: normalizedEnded?.inMeeting === false,
+    },
+    observations: {
+      active,
+      ended,
+    },
+  };
+}
+
 export function buildMeetingAppFixtureAcceptanceReport(options = {}) {
   const platforms = options.platforms ?? options.platform_keys ?? MEETING_APP_FIXTURE_PLATFORMS;
   const reports = platforms.map((platform) => diagnoseMeetingAppFixture(platform, options));
+  const lifecycle_reports = platforms.map((platform) => diagnoseMeetingAppFixtureLifecycle(platform, options));
   const required = [
     'platform_detected',
     'meeting_id',
@@ -220,18 +309,28 @@ export function buildMeetingAppFixtureAcceptanceReport(options = {}) {
     'active_speaker',
     'meeting_started',
     'speaker_started',
+    'meeting_ended',
   ];
-  const missing = reports.flatMap((report) => required
-    .filter((key) => report.coverage[key] !== true)
-    .map((key) => `${report.platform}:${key}`));
+  const coverageByPlatform = Object.fromEntries(reports.map((report, index) => {
+    const lifecycle = lifecycle_reports[index];
+    return [report.platform, {
+      ...report.coverage,
+      meeting_ended: lifecycle.coverage.meeting_ended,
+      ended_in_meeting_false: lifecycle.coverage.ended_in_meeting_false,
+    }];
+  }));
+  const missing = Object.entries(coverageByPlatform).flatMap(([platform, coverage]) => required
+    .filter((key) => coverage[key] !== true)
+    .map((key) => `${platform}:${key}`));
   return {
     type: 'meeting_app_fixture_acceptance_report',
     accepted: missing.length === 0,
     required,
     missing,
     platform_count: reports.length,
-    accepted_count: reports.filter((report) => required.every((key) => report.coverage[key] === true)).length,
-    coverage_by_platform: Object.fromEntries(reports.map((report) => [report.platform, report.coverage])),
+    accepted_count: Object.values(coverageByPlatform).filter((coverage) => required.every((key) => coverage[key] === true)).length,
+    coverage_by_platform: coverageByPlatform,
     reports,
+    lifecycle_reports,
   };
 }

@@ -83,6 +83,10 @@ const zoomAppDiagnosis = kit.diagnoseMeetingAppFixture('zoom');
 assert.deepEqual(zoomAppDiagnosis.signal_types, ['meeting_started', 'speaker_started']);
 assert.equal(zoomAppDiagnosis.coverage.active_speaker, true);
 
+const zoomAppLifecycle = kit.diagnoseMeetingAppFixtureLifecycle('zoom');
+assert.deepEqual(zoomAppLifecycle.signal_types, ['meeting_started', 'speaker_started', 'meeting_ended']);
+assert.equal(zoomAppLifecycle.coverage.meeting_ended, true);
+
 const appFixtures = kit.allMeetingAppFixtures();
 assert.equal(Object.keys(appFixtures).length, 5);
 assert.equal(appFixtures.lark.platform, 'lark');
@@ -91,6 +95,7 @@ const appFixtureAcceptance = kit.meetingAppFixtureAcceptance();
 assert.equal(appFixtureAcceptance.accepted, true);
 assert.equal(appFixtureAcceptance.accepted_count, 5);
 assert.equal(appFixtureAcceptance.coverage_by_platform.google_meet.meeting_started, true);
+assert.equal(appFixtureAcceptance.coverage_by_platform.google_meet.meeting_ended, true);
 
 const googleStart = await kit.handleWebhook({
   method: 'POST',

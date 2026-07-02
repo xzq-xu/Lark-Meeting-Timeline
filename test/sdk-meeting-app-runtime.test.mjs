@@ -47,6 +47,25 @@ function meetDocument() {
   };
 }
 
+function meetPrejoinDocument() {
+  const nodes = [
+    node('button', { 'aria-label': 'Join now' }),
+    node('div', { role: 'status' }, 'Check your audio and video'),
+  ];
+  return {
+    nodeType: 9,
+    title: 'Ready to join - Google Meet',
+    hidden: false,
+    location: { href: 'https://meet.google.com/abc-defg-hij' },
+    querySelectorAll(selector) {
+      const text = String(selector);
+      if (text === 'button') return nodes.filter((item) => item.tagName === 'BUTTON');
+      if (text.includes('role="status"')) return nodes.filter((item) => item.attributes.role === 'status');
+      return [];
+    },
+  };
+}
+
 let clock = startMs;
 const calls = [];
 const client = {
@@ -86,9 +105,16 @@ assert.equal(calls[0].input.meeting_id, 'abc-defg-hij');
 assert.equal(calls[1].input.kind, 'speaker_started');
 assert.equal(calls[1].input.payload.speaker_name, 'Ada Lovelace');
 
+clock += 1_000;
+const localEnd = await runtime.sample({ document: meetPrejoinDocument() }, { force: true });
+assert.equal(localEnd.emitted, true);
+assert.equal(localEnd.result.signals.at(-1).type, 'meeting_ended');
+assert.equal(calls.at(-1).method, 'endMeeting');
+assert.equal(calls.at(-1).input.meeting_id, 'abc-defg-hij');
+
 await runtime.insertMark({
   id: 'mark-runtime-1',
-  capturedAtMs: startMs + 1_000,
+  capturedAtMs: startMs + 2_000,
   kind: 'handwriting_trigger',
   label: 'why?',
 });
@@ -96,7 +122,8 @@ assert.equal(calls.at(-1).method, 'insertMark');
 assert.equal(calls.at(-1).input.id, 'mark-runtime-1');
 
 clock += 2_000;
-await runtime.ingestSignals({
+const callCountBeforeDuplicateEnd = calls.length;
+const duplicateEnd = await runtime.ingestSignals({
   type: 'meeting_ended',
   meeting: {
     platform: 'google_meet',
@@ -105,8 +132,8 @@ await runtime.ingestSignals({
   occurred_at_ms: clock,
   source: 'browser_dom_monitor',
 });
-assert.equal(calls.at(-1).method, 'endMeeting');
-assert.equal(calls.at(-1).input.meeting_id, 'abc-defg-hij');
+assert.equal(calls.length, callCountBeforeDuplicateEnd);
+assert.equal(duplicateEnd.reconciliation.skipped.length, 1);
 
 const running = runtime.start(() => ({ document: meetDocument() }), { immediate: false, sampleIntervalMs: 10_000 });
 assert.equal(running.running, true);

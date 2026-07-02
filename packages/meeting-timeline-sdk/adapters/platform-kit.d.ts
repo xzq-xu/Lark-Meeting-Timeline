@@ -11,6 +11,7 @@ import type { PlatformLaunchGateOptions } from './platform-gate.mjs';
 import type { PlatformEventDiagnosticResult, PlatformEventIngestInput, PlatformEventIngestOptions, ReconciledPlatformEventIngestResult } from './platform-ingest.mjs';
 import type {
   MeetingAppFixtureDiagnosis,
+  MeetingAppFixtureLifecycleDiagnosis,
   MeetingAppFixtureOptions,
   MeetingAppFixturePlatform,
 } from './meeting-app-fixtures.mjs';
@@ -68,6 +69,7 @@ export interface MeetingPlatformTimelineKit {
   meetingAppFixture(platform: string, fixtureOptions?: MeetingAppFixtureOptions): Record<string, unknown>;
   allMeetingAppFixtures(fixtureOptions?: MeetingAppFixtureOptions): Record<MeetingAppFixturePlatform, Record<string, unknown>>;
   diagnoseMeetingAppFixture(platform: string, diagnosticOptions?: MeetingAppFixtureOptions): MeetingAppFixtureDiagnosis;
+  diagnoseMeetingAppFixtureLifecycle(platform: string, diagnosticOptions?: MeetingAppFixtureOptions): MeetingAppFixtureLifecycleDiagnosis;
   meetingAppFixtureAcceptance(reportOptions?: MeetingAppFixtureOptions): Record<string, unknown>;
   onboarding(platform: string, onboardingOptions?: MeetingPlatformTimelineKitOptions): Record<string, unknown>;
   report(reportOptions?: MeetingPlatformTimelineKitOptions): Record<string, unknown>;

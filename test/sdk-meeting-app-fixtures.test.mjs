@@ -6,6 +6,7 @@ import {
   buildMeetingAppFixtureAcceptanceReport,
   buildMeetingAppFixtureSnapshot,
   diagnoseMeetingAppFixture,
+  diagnoseMeetingAppFixtureLifecycle,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
 import { createMeetingAppTimelineRuntime } from '../packages/meeting-timeline-sdk/adapters/meeting-app-runtime.mjs';
 import { normalizeMeetingAppSnapshot } from '../packages/meeting-timeline-sdk/adapters/meeting-apps.mjs';
@@ -28,6 +29,7 @@ assert.equal(allSnapshots.lark.page.buttons.some((item) => item.label === 'AI ่ง
 for (const platform of MEETING_APP_FIXTURE_PLATFORMS) {
   const snapshot = buildMeetingAppFixtureSnapshot(platform, { observedAtMs });
   const normalized = normalizeMeetingAppSnapshot(snapshot);
+  assert.equal(snapshot.fixture_state, 'active');
   assert.equal(normalized.platform, platform);
   assert.equal(normalized.inMeeting, true, `${platform} fixture should be in meeting`);
   assert.equal(Boolean(normalized.meeting_id), true, `${platform} fixture should expose meeting id`);
@@ -39,6 +41,17 @@ for (const platform of MEETING_APP_FIXTURE_PLATFORMS) {
   assert.equal(diagnosis.coverage.platform_detected, true);
   assert.equal(diagnosis.coverage.meeting_started, true);
   assert.equal(diagnosis.coverage.speaker_started, true);
+
+  const prejoinSnapshot = buildMeetingAppFixtureSnapshot(platform, { observedAtMs, state: 'prejoin' });
+  const prejoin = normalizeMeetingAppSnapshot(prejoinSnapshot);
+  assert.equal(prejoinSnapshot.fixture_state, 'prejoin');
+  assert.equal(prejoin.platform, platform);
+  assert.equal(prejoin.inMeeting, false, `${platform} prejoin fixture should be outside meeting`);
+
+  const lifecycle = diagnoseMeetingAppFixtureLifecycle(platform, { observedAtMs });
+  assert.deepEqual(lifecycle.signal_types, ['meeting_started', 'speaker_started', 'meeting_ended']);
+  assert.equal(lifecycle.coverage.meeting_ended, true);
+  assert.equal(lifecycle.coverage.ended_in_meeting_false, true);
 }
 
 const report = buildMeetingAppFixtureAcceptanceReport({ observedAtMs });
@@ -48,6 +61,8 @@ assert.equal(report.platform_count, MEETING_APP_FIXTURE_PLATFORMS.length);
 assert.equal(report.accepted_count, MEETING_APP_FIXTURE_PLATFORMS.length);
 assert.deepEqual(report.missing, []);
 assert.equal(report.coverage_by_platform.webex.active_speaker, true);
+assert.equal(report.coverage_by_platform.webex.meeting_ended, true);
+assert.equal(report.lifecycle_reports.length, MEETING_APP_FIXTURE_PLATFORMS.length);
 
 const calls = [];
 const runtime = createMeetingAppTimelineRuntime({

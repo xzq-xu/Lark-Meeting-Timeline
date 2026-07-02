@@ -52,12 +52,35 @@ function fakeDocument() {
   };
 }
 
+function fakePrejoinDocument() {
+  const nodes = [
+    node('button', { 'aria-label': 'Join now' }),
+    node('div', { role: 'status' }, 'Ready to join'),
+  ];
+  return {
+    nodeType: 9,
+    title: 'Ready to join - Google Meet',
+    hidden: false,
+    location: { href: 'https://meet.google.com/abc-defg-hij' },
+    querySelectorAll(selector) {
+      const text = String(selector);
+      if (text === 'button') return nodes.filter((item) => item.tagName === 'BUTTON');
+      if (text.includes('role="status"')) return nodes.filter((item) => item.attributes.role === 'status');
+      return [];
+    },
+  };
+}
+
 function fakeWindow(document) {
   const listeners = new Map();
-  return {
+  const win = {
     document,
     location: document.location,
     navigator: { userAgent: 'Chrome fixture' },
+    setDocument(nextDocument) {
+      win.document = nextDocument;
+      win.location = nextDocument.location;
+    },
     addEventListener(eventName, handler) {
       const handlers = listeners.get(eventName) ?? [];
       handlers.push(handler);
@@ -73,6 +96,7 @@ function fakeWindow(document) {
       return (listeners.get(eventName) ?? []).length;
     },
   };
+  return win;
 }
 
 let clock = startMs;
@@ -98,7 +122,7 @@ const client = {
   },
 };
 
-const input = meetingAppBrowserInput({ window, document });
+const input = meetingAppBrowserInput({ window });
 assert.equal(input.document, document);
 assert.equal(input.window, window);
 assert.equal(input.url, 'https://meet.google.com/abc-defg-hij');
@@ -106,7 +130,6 @@ assert.equal(input.title, 'Browser runtime - Google Meet');
 
 const runtime = createMeetingAppBrowserRuntime(client, {
   window,
-  document,
   now: () => clock,
   applyOptions: { speakerAsAnnotation: true },
   speakerOptions: { minStableMs: 0 },
@@ -120,6 +143,13 @@ assert.deepEqual(calls.map((item) => item.method), ['startMeeting', 'insertMark'
 assert.equal(calls[0].input.platform, 'google_meet');
 assert.equal(calls[0].input.meeting_id, 'abc-defg-hij');
 assert.equal(calls[1].input.payload.speaker_name, 'Ada Lovelace');
+
+window.setDocument(fakePrejoinDocument());
+const prejoinSample = await runtime.sample({ force: true });
+assert.equal(prejoinSample.emitted, true);
+assert.equal(prejoinSample.result.signals.at(-1).type, 'meeting_ended');
+assert.equal(calls.at(-1).method, 'endMeeting');
+assert.equal(calls.at(-1).input.meeting_id, 'abc-defg-hij');
 
 const running = runtime.start({ immediate: false, sampleIntervalMs: 10_000 });
 assert.equal(running.running, true);

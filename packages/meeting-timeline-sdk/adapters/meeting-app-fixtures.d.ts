@@ -6,8 +6,15 @@ export type MeetingAppFixturePlatform = 'google_meet' | 'microsoft_teams' | 'zoo
 export interface MeetingAppFixtureOptions extends MeetingAppObserverOptions {
   observedAtMs?: number | string | Date;
   observed_at_ms?: number | string | Date;
+  endObservedAtMs?: number | string | Date;
+  end_observed_at_ms?: number | string | Date;
+  endOffsetMs?: number;
+  end_offset_ms?: number;
   startMs?: number | string | Date;
   start_ms?: number | string | Date;
+  state?: 'active' | 'joined' | 'in_meeting' | 'in-meeting' | 'prejoin' | 'pre_join' | 'pre-join' | 'ended' | 'left' | 'inactive' | string;
+  fixtureState?: string;
+  fixture_state?: string;
   source?: string;
   url?: string;
   meeting_url?: string;
@@ -47,6 +54,28 @@ export interface MeetingAppFixtureDiagnosis {
   observation: BrowserMeetingObserverResult;
 }
 
+export interface MeetingAppFixtureLifecycleDiagnosis {
+  platform: MeetingAppFixturePlatform;
+  snapshots: {
+    active: MeetingAppSnapshot;
+    ended: MeetingAppSnapshot;
+  };
+  normalized_ended: MeetingAppSnapshot | null;
+  signal_types: string[];
+  signals: Record<string, unknown>[];
+  coverage: {
+    meeting_started: boolean;
+    speaker_started: boolean;
+    meeting_ended: boolean;
+    ended_in_meeting_false: boolean;
+    [key: string]: boolean;
+  };
+  observations: {
+    active: BrowserMeetingObserverResult;
+    ended: BrowserMeetingObserverResult;
+  };
+}
+
 export const MEETING_APP_FIXTURE_PLATFORMS: readonly MeetingAppFixturePlatform[];
 
 export function buildMeetingAppFixtureSnapshot(
@@ -63,6 +92,11 @@ export function diagnoseMeetingAppFixture(
   options?: MeetingAppFixtureOptions,
 ): MeetingAppFixtureDiagnosis;
 
+export function diagnoseMeetingAppFixtureLifecycle(
+  platform: string,
+  options?: MeetingAppFixtureOptions,
+): MeetingAppFixtureLifecycleDiagnosis;
+
 export function buildMeetingAppFixtureAcceptanceReport(
   options?: MeetingAppFixtureOptions,
 ): {
@@ -74,4 +108,5 @@ export function buildMeetingAppFixtureAcceptanceReport(
   accepted_count: number;
   coverage_by_platform: Record<MeetingAppFixturePlatform, MeetingAppFixtureDiagnosis['coverage']>;
   reports: MeetingAppFixtureDiagnosis[];
+  lifecycle_reports: MeetingAppFixtureLifecycleDiagnosis[];
 };
