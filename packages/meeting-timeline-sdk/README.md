@@ -99,6 +99,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-extension`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate`
@@ -483,6 +484,13 @@ const appGate = meetingKit.meetingAppLaunchGate('google-meet', {
   requireProductionReady: false,
 });
 // appGate.runtime_ready === true 表示 browser runtime preset、capture profile 和 mutation 配置齐备。
+
+const extensionPlan = meetingKit.meetingAppExtensionInstallPlan({
+  platforms: ['google-meet', 'microsoft-teams'],
+  js: ['meeting-app-content-script.bundle.js'],
+});
+// extensionPlan.manifest.content_scripts[0].matches 是 Google Meet / Teams 的白名单注入规则。
+// 默认也支持 Zoom、Lark/Feishu、Webex，且不会生成 <all_urls> 这种过宽权限。
 
 await meetingKit.handleWebhook({
   method: req.method,

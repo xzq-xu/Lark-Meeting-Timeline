@@ -59,6 +59,11 @@ import {
   buildMeetingAppLaunchGateInputFromRecords,
   createMeetingAppSnapshotRecorder,
 } from './meeting-app-snapshot-recorder.mjs';
+import {
+  buildMeetingAppContentScriptManifest,
+  buildMeetingAppExtensionInstallPlan,
+  buildMeetingAppExtensionMatchPatterns,
+} from './meeting-app-extension.mjs';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -163,6 +168,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
       samples: fixtureInput.samples,
       env: fixtureInput.env,
     }),
+    meeting_app_extension_install_plan: buildMeetingAppExtensionInstallPlan(options),
     meeting_app_fixture_acceptance: meetingAppFixtureAcceptance,
     meeting_app_launch_gate: meetingAppLaunchGateSummary,
   };
@@ -259,6 +265,15 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppGateInputFromRecords(records = [], recordOptions = {}) {
       return buildMeetingAppLaunchGateInputFromRecords(records, withDefaults(defaults, recordOptions));
+    },
+    meetingAppExtensionInstallPlan(extensionOptions = {}) {
+      return buildMeetingAppExtensionInstallPlan(withDefaults(defaults, extensionOptions));
+    },
+    meetingAppContentScriptManifest(extensionOptions = {}) {
+      return buildMeetingAppContentScriptManifest(withDefaults(defaults, extensionOptions));
+    },
+    meetingAppExtensionMatches(extensionOptions = {}) {
+      return buildMeetingAppExtensionMatchPatterns(withDefaults(defaults, extensionOptions));
     },
     assertMeetingAppLaunchGate(platform, gateOptions = {}) {
       return assertMeetingAppLaunchGate(platform, withDefaults(defaults, gateOptions));

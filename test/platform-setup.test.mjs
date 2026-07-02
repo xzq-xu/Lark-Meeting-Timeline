@@ -80,6 +80,7 @@ assert.equal(googleCapabilities.endpoints.platform_events, 'https://timeline.exa
 assert.equal(googleCapabilities.realtime_transcript.status, 'not_supported');
 assert.equal(googleCapabilities.limitations.includes('transcript_entries_may_differ_from_google_docs_transcript'), true);
 assert.equal(googleCapabilities.sdk_modules.meeting_app_content_script, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script');
+assert.equal(googleCapabilities.sdk_modules.meeting_app_extension, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-extension');
 assert.equal(googleCapabilities.sdk_modules.meeting_app_snapshot_recorder, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder');
 assert.equal(googleCapabilities.sdk_modules.meeting_app_gate, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate');
 
@@ -119,6 +120,8 @@ assert.equal(googlePlan.recommended_mode, 'hybrid_local_observer_first');
 assert.deepEqual(googlePlan.source_priority, ['local_observer', 'google_meet_provider_events', 'post_meeting_transcript_import']);
 assert.equal(googlePlan.realtime_axis.primary, 'local_observer');
 assert.equal(googlePlan.realtime_axis.reconcile_with_provider_events, true);
+assert.equal(googlePlan.realtime_axis.local_observer.meeting_app_extension_module, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-extension');
+assert.equal(googlePlan.realtime_axis.local_observer.meeting_app_snapshot_recorder_module, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder');
 assert.equal(googlePlan.provider_events.event_types.includes('google.workspace.meet.conference.v2.started'), true);
 assert.equal(googlePlan.provider_events.endpoint, 'https://timeline.example.com/api/platform-events/google-meet');
 assert.equal(googlePlan.realtime_annotations.required_field, 'captured_at_ms');
