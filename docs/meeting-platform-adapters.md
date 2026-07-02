@@ -182,7 +182,7 @@ type NormalizedMeetingSignal =
 
 推荐接入方式：
 
-1. P0：先支持本地/桌面检测器建轴。浏览器扩展或桌面观察器把 Google Meet 的 URL、按钮文案、tile/ariaLabel、active speaker 信息交给 `adapters/meeting-apps`，由 preset 归一成 `meeting_started` / `speaker_started`，再调用 `startMeeting({ platform: 'google_meet', start_time_ms })`。
+1. P0：先支持本地/桌面检测器建轴。浏览器扩展或 WebView 用 `adapters/meeting-app-capture` 低成本读取 Google Meet 的 URL、按钮文案、tile/ariaLabel、active speaker 信息，再交给 `adapters/meeting-apps` preset 归一成 `meeting_started` / `speaker_started`，最后通过 `meeting-source` 调用 `startMeeting({ platform: 'google_meet', start_time_ms })`。
 2. P1：接 Google Workspace Events API，处理：
    - `google.workspace.meet.conference.v2.started`
    - `google.workspace.meet.conference.v2.ended`
@@ -327,7 +327,8 @@ Teams SDK 可以让会议内 app/bot 接收 meetingStart、meetingEnd、particip
 
 1. **保留并强化 local detector path**
    - 宿主应用、桌面观察器、电子纸 companion app 发现“用户已经在会议中”时，直接调用本地 `startMeeting`。
-   - 对 Google Meet / Teams / Zoom / Lark / Webex 的浏览器 DOM 或桌面 Accessibility 快照，优先用 `adapters/meeting-apps` preset 归一化；它负责识别 Leave/Join 按钮、participant tile、ariaLabel 和音量/发言状态。
+   - 对 Google Meet / Teams / Zoom / Lark / Webex 的浏览器 DOM，先用 `adapters/meeting-app-capture` 采集按钮、participant tile、ariaLabel 和音量/发言状态，再用 `adapters/meeting-apps` preset 归一化。
+   - 对桌面 Accessibility 快照，直接交给 `adapters/meeting-apps` 或 `adapters/native-meeting`；它们负责识别 Leave/Join 按钮、participant tile、ariaLabel 和 active speaker。
    - 这是跨平台最低延迟、最低权限依赖的路径。
 
 2. **抽出 adapter core**

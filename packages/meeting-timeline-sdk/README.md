@@ -94,6 +94,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/browser-meeting`
 - `@ai-annotation/meeting-timeline-sdk/adapters/native-meeting`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-apps`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-capture`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-source`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
@@ -233,6 +234,27 @@ const result = meetingApps.observe({
 ```
 
 `meeting-apps` 是轻量 preset，不依赖具体浏览器扩展 SDK，也不要求实时 OCR 或实时转写。它的作用是把 Google Meet 等会议软件的本地可观测状态变成统一 meeting signal；官方 provider webhook 仍然走 `google-meet` / `microsoft-teams` / `zoom` 等 adapter 做校准和会后 artifact。
+
+浏览器扩展或 WebView 里可以再往前接一层 `meeting-app-capture`。它只读取 DOM 文本、按钮、`aria-label`、participant tile 和音量/发言状态，输出 `meeting-apps` 可识别的快照；不截图、不 OCR、不读取转写正文：
+
+```js
+import { captureMeetingAppDomSnapshot } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-capture';
+import { createMeetingSourceAggregator } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-source';
+
+const meetingSources = createMeetingSourceAggregator(timeline, {
+  applyOptions: { speakerAsAnnotation: true },
+  speakerOptions: { minStableMs: 300, switchStableMs: 400, endIdleMs: 1500 },
+});
+
+const snapshot = captureMeetingAppDomSnapshot({ document, location, window }, {
+  observedAtMs: Date.now(),
+  browserName: 'Chrome',
+});
+
+await meetingSources.observeMeetingApp(snapshot, { observedAtMs: snapshot.observedAtMs });
+```
+
+这条链路是 Google Meet / Teams Web / Zoom Web 的推荐 P0 接入：先用本地 DOM 状态低延迟建轴和标发言人位置；Google Workspace Events、Microsoft Graph、Zoom/Webex webhook 晚到后再进入 provider adapter 做 reconcile。
 
 桌面客户端推荐用 `native-meeting`。它面向 macOS Accessibility、Windows UI Automation、Electron shell 或宿主进程采集到的 app/window/process/audio 快照；适合 Zoom、Teams、Lark/Feishu、Webex 桌面端：
 
