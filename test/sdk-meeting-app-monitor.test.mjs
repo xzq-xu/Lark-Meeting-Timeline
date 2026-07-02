@@ -24,8 +24,24 @@ function node(tagName, attrs = {}, text = '') {
   };
 }
 
-function fakeDocument({ speakerId = 'ada', speakerLabel = 'Ada Lovelace is speaking' } = {}) {
-  const nodes = [
+function selectorAttrMatches(item, selector) {
+  if (selector === 'button') return item.tagName === 'BUTTON';
+  if (selector.startsWith('.')) return String(item.attributes.class ?? '').split(/\s+/).includes(selector.slice(1));
+  const attrParts = [...String(selector).matchAll(/\[([a-zA-Z0-9_-]+)([*]?=)?(?:"([^"]*)"|'([^']*)'|([^\]\s]+))?(?:\s+i)?\]/g)];
+  if (!attrParts.length) return false;
+  return attrParts.every((match) => {
+    const [, attrName, operator, doubleQuoted, singleQuoted, bare] = match;
+    const actual = item.attributes[attrName];
+    if (operator == null) return actual != null;
+    if (actual == null) return false;
+    const expected = doubleQuoted ?? singleQuoted ?? bare ?? '';
+    if (operator === '*=') return String(actual).toLowerCase().includes(String(expected).toLowerCase());
+    return String(actual) === String(expected);
+  });
+}
+
+function fakeDocument({ speakerId = 'ada', speakerLabel = 'Ada Lovelace is speaking', nodes } = {}) {
+  const docNodes = nodes ?? [
     node('button', { 'aria-label': 'Turn off microphone' }),
     node('button', { 'aria-label': 'Leave call' }),
     node('div', {
@@ -41,9 +57,11 @@ function fakeDocument({ speakerId = 'ada', speakerLabel = 'Ada Lovelace is speak
     location: { href: 'https://meet.google.com/abc-defg-hij' },
     querySelectorAll(selector) {
       const text = String(selector);
-      if (text === 'button') return nodes.filter((item) => item.tagName === 'BUTTON');
-      if (text.includes('data-participant-id')) return nodes.filter((item) => item.attributes['data-participant-id']);
-      if (text.includes('speaking')) return nodes.filter((item) => /speaking/i.test(item.attributes['aria-label'] ?? ''));
+      const generic = docNodes.filter((item) => selectorAttrMatches(item, text));
+      if (generic.length) return generic;
+      if (text === 'button') return docNodes.filter((item) => item.tagName === 'BUTTON');
+      if (text.includes('data-participant-id')) return docNodes.filter((item) => item.attributes['data-participant-id']);
+      if (text.includes('speaking')) return docNodes.filter((item) => /speaking/i.test(item.attributes['aria-label'] ?? ''));
       return [];
     },
   };
@@ -109,5 +127,28 @@ assert.equal(result.reason, 'unchanged_throttled');
 monitor.reset();
 assert.equal(monitor.getState().emitCount, 0);
 assert.equal(monitor.getState().running, false);
+
+const profileMonitor = createMeetingAppDomMonitor(createMeetingAppObserver({
+  source: 'browser_dom_monitor',
+  speakerOptions: { minStableMs: 0 },
+}), {
+  now: () => startMs,
+  platform: 'google_meet',
+});
+const profileResult = await profileMonitor.sample({
+  document: fakeDocument({
+    nodes: [
+      node('div', { 'data-tooltip': 'Leave call' }),
+      node('div', {
+        'data-avatar-tooltip': 'Ada Lovelace',
+        'data-is-speaking': 'true',
+        'data-tile-id': 'ada-tile',
+      }),
+    ],
+  }),
+});
+assert.equal(profileResult.snapshot.capture.profile, 'google_meet');
+assert.equal(profileResult.snapshot.page.tiles[0].name, 'Ada Lovelace');
+assert.deepEqual(profileResult.result.signals.map((item) => item.type), ['meeting_started', 'speaker_started']);
 
 console.log('ok meeting app DOM monitor');

@@ -1,5 +1,7 @@
 import { compactObject, normalizeAbsoluteMs } from '../index.mjs';
 import { normalizeMeetingAppSnapshot, normalizeMeetingAppSnapshots } from './meeting-apps.mjs';
+import { detectMeetingApplication } from './meeting-session-discovery.mjs';
+import { normalizeMeetingPlatform } from './platform-setup.mjs';
 
 export const MEETING_APP_DOM_CAPTURE_SCHEMA = 'meeting_app_dom_capture';
 export const MEETING_APP_DOM_CAPTURE_SCHEMA_VERSION = 1;
@@ -46,6 +48,163 @@ const DEFAULT_TEXT_SELECTORS = Object.freeze([
   '[data-topic]',
 ]);
 
+export const MEETING_APP_DOM_CAPTURE_PROFILES = Object.freeze({
+  google_meet: Object.freeze({
+    platform: 'google_meet',
+    displayName: 'Google Meet',
+    controlSelectors: Object.freeze([
+      '[data-tooltip*="Leave call" i]',
+      '[data-tooltip*="Present now" i]',
+      '[data-tooltip*="microphone" i]',
+      '[aria-label*="Leave call" i]',
+      '[aria-label*="Present now" i]',
+      '[aria-label*="microphone" i]',
+      '[aria-label*="camera" i]',
+      '[data-is-muted]',
+      '[jscontroller][aria-label]',
+    ]),
+    participantSelectors: Object.freeze([
+      '[data-participant-id]',
+      '[data-requested-participant-id]',
+      '[data-self-name]',
+      '[data-tile-id]',
+      '[data-avatar-tooltip]',
+      '[data-is-speaking="true"]',
+      '[data-speaking="true"]',
+      '[aria-label*="is speaking" i]',
+      '[aria-label*="speaking" i]',
+      '[aria-label*="正在发言"]',
+      '[aria-label*="正在讲话"]',
+    ]),
+    textSelectors: Object.freeze([
+      '[data-meeting-title]',
+      '[data-call-title]',
+      '[aria-live]',
+      '[role="status"]',
+    ]),
+  }),
+  microsoft_teams: Object.freeze({
+    platform: 'microsoft_teams',
+    displayName: 'Microsoft Teams',
+    controlSelectors: Object.freeze([
+      '[data-tid*="call-" i]',
+      '[data-tid*="meeting-" i]',
+      '[data-testid*="call-" i]',
+      '[aria-label*="Leave" i]',
+      '[aria-label*="Hang up" i]',
+      '[aria-label*="Share content" i]',
+      '[aria-label*="Raise hand" i]',
+      '[aria-label*="Mute" i]',
+    ]),
+    participantSelectors: Object.freeze([
+      '[data-tid*="participant" i]',
+      '[data-testid*="participant" i]',
+      '[data-cid]',
+      '[data-user-id]',
+      '[data-member-id]',
+      '[data-display-name]',
+      '[aria-label*="speaking" i]',
+      '[aria-label*="muted" i]',
+      '[aria-label*="正在发言"]',
+    ]),
+    textSelectors: Object.freeze([
+      '[data-tid*="meeting-title" i]',
+      '[data-testid*="meeting-title" i]',
+      '[aria-live]',
+      '[role="status"]',
+    ]),
+  }),
+  zoom: Object.freeze({
+    platform: 'zoom',
+    displayName: 'Zoom',
+    controlSelectors: Object.freeze([
+      '[aria-label*="Leave Meeting" i]',
+      '[aria-label*="End Meeting" i]',
+      '[aria-label*="Mute" i]',
+      '[aria-label*="Unmute" i]',
+      '[aria-label*="Participants" i]',
+      '[aria-label*="Share Screen" i]',
+      '[data-testid*="footer" i]',
+      '.footer-button__button',
+    ]),
+    participantSelectors: Object.freeze([
+      '[data-user-id]',
+      '[data-participant-id]',
+      '[data-participantid]',
+      '[data-display-name]',
+      '[data-active-speaker="true"]',
+      '[data-speaking="true"]',
+      '[aria-label*="is speaking" i]',
+      '[aria-label*="speaking" i]',
+      '.participants-item',
+      '.video-avatar__avatar-name',
+    ]),
+    textSelectors: Object.freeze([
+      '[data-testid*="meeting-title" i]',
+      '[aria-live]',
+      '[role="status"]',
+    ]),
+  }),
+  lark: Object.freeze({
+    platform: 'lark',
+    displayName: 'Lark/Feishu',
+    controlSelectors: Object.freeze([
+      '[aria-label*="挂断"]',
+      '[aria-label*="离开会议"]',
+      '[aria-label*="AI 视图"]',
+      '[aria-label*="AI 总结"]',
+      '[aria-label*="共享屏幕"]',
+      '[aria-label*="麦克风"]',
+      '[data-testid*="meeting" i]',
+    ]),
+    participantSelectors: Object.freeze([
+      '[data-user-id]',
+      '[data-member-id]',
+      '[data-participant-id]',
+      '[data-display-name]',
+      '[data-uid]',
+      '[aria-label*="正在发言"]',
+      '[aria-label*="正在讲话"]',
+      '[aria-label*="speaking" i]',
+    ]),
+    textSelectors: Object.freeze([
+      '[aria-live]',
+      '[role="status"]',
+      '[data-testid*="meeting-title" i]',
+      '[data-meeting-title]',
+    ]),
+  }),
+  webex: Object.freeze({
+    platform: 'webex',
+    displayName: 'Cisco Webex',
+    controlSelectors: Object.freeze([
+      '[aria-label*="Leave meeting" i]',
+      '[aria-label*="End meeting" i]',
+      '[aria-label*="Mute" i]',
+      '[aria-label*="Unmute" i]',
+      '[aria-label*="Participants" i]',
+      '[aria-label*="Chat" i]',
+      '[data-doi*="meeting" i]',
+    ]),
+    participantSelectors: Object.freeze([
+      '[data-person-id]',
+      '[data-participant-id]',
+      '[data-user-id]',
+      '[data-display-name]',
+      '[data-active-speaker="true"]',
+      '[data-speaking="true"]',
+      '[aria-label*="active speaker" i]',
+      '[aria-label*="speaking" i]',
+    ]),
+    textSelectors: Object.freeze([
+      '[aria-live]',
+      '[role="status"]',
+      '[data-testid*="meeting-title" i]',
+      '[data-meeting-title]',
+    ]),
+  }),
+});
+
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
 }
@@ -61,6 +220,18 @@ function normalizeText(value) {
 function compactText(value) {
   const text = normalizeText(value);
   return text || undefined;
+}
+
+function uniqueStrings(values = []) {
+  const seen = new Set();
+  const output = [];
+  for (const value of values) {
+    const text = compactText(value);
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    output.push(text);
+  }
+  return output;
 }
 
 function observedAtMs(input = {}, options = {}) {
@@ -135,6 +306,8 @@ function nodeText(node) {
   return compactText(firstNonEmpty(
     attr(node, 'aria-label'),
     attr(node, 'title'),
+    attr(node, 'data-tooltip'),
+    attr(node, 'data-avatar-tooltip'),
     attr(node, 'alt'),
     node?.innerText,
     node?.textContent,
@@ -169,6 +342,80 @@ function numberish(value) {
   if (value == null || value === '') return undefined;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : undefined;
+}
+
+function normalizeProfilePlatform(value) {
+  if (!value || typeof value === 'object') return null;
+  const text = String(value).trim();
+  if (!text || ['auto', 'detect', 'default'].includes(text.toLowerCase())) return null;
+  try {
+    return normalizeMeetingPlatform(text);
+  } catch {
+    return null;
+  }
+}
+
+function profileDisabled(value) {
+  if (value === false) return true;
+  if (value == null) return false;
+  const text = String(value).trim().toLowerCase();
+  return ['none', 'off', 'false', 'disabled'].includes(text);
+}
+
+function detectCapturePlatform(input = {}, options = {}, url, title) {
+  const explicit = firstNonEmpty(
+    options.captureProfile,
+    options.capture_profile,
+    options.platform,
+    options.provider,
+    input.captureProfile,
+    input.capture_profile,
+    input.platform,
+    input.provider,
+    input.meeting_platform,
+    input.meetingPlatform,
+  );
+  if (profileDisabled(explicit)) return null;
+  const normalized = normalizeProfilePlatform(explicit);
+  if (normalized) return normalized;
+  const detected = detectMeetingApplication({
+    ...input,
+    url,
+    title,
+    meeting_url: firstNonEmpty(input.meeting_url, input.meetingUrl, url),
+    tab: {
+      ...(input.tab ?? {}),
+      url: firstNonEmpty(input.tab?.url, url),
+      title: firstNonEmpty(input.tab?.title, title),
+    },
+    page: {
+      ...(input.page ?? {}),
+      url: firstNonEmpty(input.page?.url, url),
+      title: firstNonEmpty(input.page?.title, title),
+    },
+    dom: {
+      ...(input.dom ?? {}),
+      url: firstNonEmpty(input.dom?.url, url),
+      title: firstNonEmpty(input.dom?.title, title),
+    },
+  });
+  return detected?.platform ?? null;
+}
+
+export function meetingAppDomCaptureProfile(platformOrInput = {}, options = {}) {
+  const input = typeof platformOrInput === 'string'
+    ? { platform: platformOrInput }
+    : (platformOrInput ?? {});
+  const platform = detectCapturePlatform(input, options, options.url ?? input.url, options.title ?? input.title);
+  const profile = platform ? MEETING_APP_DOM_CAPTURE_PROFILES[platform] : null;
+  if (!profile) return null;
+  return {
+    platform: profile.platform,
+    displayName: profile.displayName,
+    controlSelectors: [...profile.controlSelectors],
+    participantSelectors: [...profile.participantSelectors],
+    textSelectors: [...profile.textSelectors],
+  };
 }
 
 function selectorResults(root, selectors = [], limit = 80) {
@@ -211,7 +458,7 @@ function controlSummary(node) {
 function participantSummary(node) {
   const label = nodeText(node);
   const speaking = boolish(firstNonEmpty(
-    dataAttr(node, 'speaking', 'is-speaking', 'active-speaker', 'is-active-speaker'),
+    dataAttr(node, 'speaking', 'is-speaking', 'is-speaking-now', 'active-speaker', 'is-active-speaker', 'active'),
     attr(node, 'aria-current'),
   ));
   const level = numberish(firstNonEmpty(
@@ -233,11 +480,26 @@ function participantSummary(node) {
         'person-id',
         'user-id',
         'userid',
+        'uid',
+        'cid',
+        'tile-id',
       ),
       nodeId(node),
     ),
     name: firstNonEmpty(
-      dataAttr(node, 'participant-name', 'self-name', 'user-name', 'display-name', 'attendee-name', 'person-name'),
+      dataAttr(
+        node,
+        'participant-name',
+        'self-name',
+        'user-name',
+        'user-display-name',
+        'display-name',
+        'displayname',
+        'attendee-name',
+        'person-name',
+        'member-name',
+        'avatar-tooltip',
+      ),
       label,
     ),
     ariaLabel: compactText(attr(node, 'aria-label')),
@@ -284,20 +546,34 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
   const controlLimit = Number(options.maxControls ?? options.max_controls ?? 80);
   const participantLimit = Number(options.maxParticipants ?? options.max_participants ?? 80);
   const textLimit = Number(options.maxTexts ?? options.max_texts ?? 40);
-  const controls = selectorResults(doc, [
-    ...(options.controlSelectors ?? options.control_selectors ?? []),
-    ...DEFAULT_CONTROL_SELECTORS,
-  ], controlLimit).map(controlSummary).filter((item) => item.label || item.ariaLabel || item.title);
-  const participants = selectorResults(doc, [
-    ...(options.participantSelectors ?? options.participant_selectors ?? []),
-    ...DEFAULT_PARTICIPANT_SELECTORS,
-  ], participantLimit).map(participantSummary).filter((item) => item.id || item.name || item.label || item.audioLevel != null);
-  const texts = selectorResults(doc, [
-    ...(options.textSelectors ?? options.text_selectors ?? []),
-    ...DEFAULT_TEXT_SELECTORS,
-  ], textLimit).map(textSummary).filter((item) => item.label || item.text);
   const url = firstNonEmpty(options.url, input.url, locationHref(location));
   const title = firstNonEmpty(options.title, input.title, doc?.title);
+  const profile = meetingAppDomCaptureProfile({
+    ...input,
+    url,
+    title,
+  }, options);
+  const controls = selectorResults(doc, [
+    ...uniqueStrings([
+      ...(options.controlSelectors ?? options.control_selectors ?? []),
+      ...(profile?.controlSelectors ?? []),
+      ...DEFAULT_CONTROL_SELECTORS,
+    ]),
+  ], controlLimit).map(controlSummary).filter((item) => item.label || item.ariaLabel || item.title);
+  const participants = selectorResults(doc, [
+    ...uniqueStrings([
+      ...(options.participantSelectors ?? options.participant_selectors ?? []),
+      ...(profile?.participantSelectors ?? []),
+      ...DEFAULT_PARTICIPANT_SELECTORS,
+    ]),
+  ], participantLimit).map(participantSummary).filter((item) => item.id || item.name || item.label || item.audioLevel != null);
+  const texts = selectorResults(doc, [
+    ...uniqueStrings([
+      ...(options.textSelectors ?? options.text_selectors ?? []),
+      ...(profile?.textSelectors ?? []),
+      ...DEFAULT_TEXT_SELECTORS,
+    ]),
+  ], textLimit).map(textSummary).filter((item) => item.label || item.text);
 
   return compactObject({
     schema: MEETING_APP_DOM_CAPTURE_SCHEMA,
@@ -327,6 +603,8 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
       texts,
     },
     capture: {
+      profile: profile?.platform,
+      profile_display_name: profile?.displayName,
       control_count: controls.length,
       participant_count: participants.length,
       text_count: texts.length,

@@ -17,6 +17,10 @@ export interface MeetingAppMonitorOptions {
   unchangedObserveEveryMs?: number;
   unchanged_observe_every_ms?: number;
   immediate?: boolean;
+  platform?: string;
+  provider?: string;
+  captureProfile?: string | false | null;
+  capture_profile?: string | false | null;
   input?: MeetingAppDomCaptureInput;
   inputProvider?: () => MeetingAppDomCaptureInput | Promise<MeetingAppDomCaptureInput>;
   input_provider?: () => MeetingAppDomCaptureInput | Promise<MeetingAppDomCaptureInput>;

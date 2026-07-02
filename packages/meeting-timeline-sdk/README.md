@@ -253,6 +253,7 @@ const meetingSources = createMeetingSourceAggregator(timeline, {
 const snapshot = captureMeetingAppDomSnapshot({ document, location, window }, {
   observedAtMs: Date.now(),
   browserName: 'Chrome',
+  platform: 'google_meet', // 可省略；SDK 会尽量从 URL/title 自动选择 Google Meet/Teams/Zoom/Lark/Webex profile。
 });
 
 await meetingSources.observeMeetingApp(snapshot, { observedAtMs: snapshot.observedAtMs });
@@ -271,7 +272,7 @@ const runtime = createMeetingAppTimelineRuntime({
 }, {
   applyOptions: { speakerAsAnnotation: true },
   speakerOptions: { minStableMs: 300, switchStableMs: 400, endIdleMs: 1500 },
-  captureOptions: { browserName: 'Chrome' },
+  captureOptions: { browserName: 'Chrome', platform: 'google_meet' },
   sampleIntervalMs: 1000,
   unchangedObserveEveryMs: 1000,
 });

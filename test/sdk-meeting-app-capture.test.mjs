@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 
 import {
+  MEETING_APP_DOM_CAPTURE_PROFILES,
   captureMeetingAppDomSnapshot,
+  meetingAppDomCaptureProfile,
   normalizeCapturedMeetingAppDomSnapshot,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-capture.mjs';
 import { createMeetingAppObserver } from '../packages/meeting-timeline-sdk/adapters/meeting-apps.mjs';
@@ -27,6 +29,24 @@ function node(tagName, attrs = {}, text = '') {
   };
 }
 
+function selectorAttrMatches(item, selector) {
+  if (selector === 'button') return item.tagName === 'BUTTON';
+  if (selector.startsWith('.')) {
+    return String(item.attributes.class ?? '').split(/\s+/).includes(selector.slice(1));
+  }
+  const attrParts = [...String(selector).matchAll(/\[([a-zA-Z0-9_-]+)([*]?=)?(?:"([^"]*)"|'([^']*)'|([^\]\s]+))?(?:\s+i)?\]/g)];
+  if (!attrParts.length) return false;
+  return attrParts.every((match) => {
+    const [, attrName, operator, doubleQuoted, singleQuoted, bare] = match;
+    const actual = item.attributes[attrName];
+    if (operator == null) return actual != null;
+    if (actual == null) return false;
+    const expected = doubleQuoted ?? singleQuoted ?? bare ?? '';
+    if (operator === '*=') return String(actual).toLowerCase().includes(String(expected).toLowerCase());
+    return String(actual) === String(expected);
+  });
+}
+
 function fakeDocument({ url, title, nodes = [], hidden = false }) {
   return {
     nodeType: 9,
@@ -35,9 +55,11 @@ function fakeDocument({ url, title, nodes = [], hidden = false }) {
     location: { href: url },
     querySelectorAll(selector) {
       const text = String(selector);
+      const generic = nodes.filter((item) => selectorAttrMatches(item, text));
+      if (generic.length) return generic;
       if (text === 'button') return nodes.filter((item) => item.tagName === 'BUTTON');
       if (text.includes('role="button"')) return nodes.filter((item) => item.attributes.role === 'button');
-      if (text.includes('aria-label') && !text.includes('*=')) {
+      if (text === '[aria-label]') {
         return nodes.filter((item) => item.attributes['aria-label']);
       }
       if (text.includes('[title]')) return nodes.filter((item) => item.attributes.title);
@@ -82,6 +104,13 @@ const googleDoc = fakeDocument({
   ],
 });
 
+assert.equal(MEETING_APP_DOM_CAPTURE_PROFILES.google_meet.platform, 'google_meet');
+assert.equal(meetingAppDomCaptureProfile('google-meet').platform, 'google_meet');
+assert.equal(
+  meetingAppDomCaptureProfile({ url: 'https://teams.microsoft.com/l/meetup-join/abc' }).platform,
+  'microsoft_teams',
+);
+
 const captured = captureMeetingAppDomSnapshot({ document: googleDoc }, {
   observedAtMs: startMs,
   browserName: 'Chrome',
@@ -93,6 +122,30 @@ assert.equal(captured.page.tiles.length, 2);
 assert.equal(captured.page.tiles[0].id, 'ada');
 assert.equal(captured.page.tiles[0].audioLevel, 0.84);
 assert.equal(captured.capture.participant_count, 2);
+assert.equal(captured.capture.profile, 'google_meet');
+
+const profileOnlyGoogleCapture = captureMeetingAppDomSnapshot({
+  document: fakeDocument({
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Profile-only capture - Google Meet',
+    nodes: [
+      node('div', { 'data-tooltip': 'Leave call' }),
+      node('div', {
+        'data-avatar-tooltip': 'Ada Lovelace',
+        'data-is-speaking': 'true',
+        'data-tile-id': 'ada-tile',
+      }),
+    ],
+  }),
+}, {
+  observedAtMs: startMs + 500,
+  captureProfile: 'google_meet',
+});
+assert.equal(profileOnlyGoogleCapture.capture.profile, 'google_meet');
+assert.equal(profileOnlyGoogleCapture.page.buttons[0].label, 'Leave call');
+assert.equal(profileOnlyGoogleCapture.page.tiles[0].id, 'ada-tile');
+assert.equal(profileOnlyGoogleCapture.page.tiles[0].name, 'Ada Lovelace');
+assert.equal(profileOnlyGoogleCapture.page.tiles[0].speaking, true);
 
 const normalized = normalizeCapturedMeetingAppDomSnapshot({ document: googleDoc }, {
   observedAtMs: startMs,

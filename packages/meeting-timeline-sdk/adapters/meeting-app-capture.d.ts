@@ -3,12 +3,26 @@ import type { MeetingAppObserverOptions, MeetingAppSnapshot } from './meeting-ap
 export const MEETING_APP_DOM_CAPTURE_SCHEMA: string;
 export const MEETING_APP_DOM_CAPTURE_SCHEMA_VERSION: number;
 
+export type MeetingAppDomCaptureProfilePlatform = 'google_meet' | 'microsoft_teams' | 'zoom' | 'lark' | 'webex';
+
+export interface MeetingAppDomCaptureProfile {
+  platform: MeetingAppDomCaptureProfilePlatform;
+  displayName: string;
+  controlSelectors: string[];
+  participantSelectors: string[];
+  textSelectors: string[];
+}
+
 export interface MeetingAppDomCaptureOptions extends MeetingAppObserverOptions {
   observedAtMs?: number | string | Date;
   observed_at_ms?: number | string | Date;
   source?: string;
   url?: string;
   title?: string;
+  platform?: string;
+  provider?: string;
+  captureProfile?: string | false | null;
+  capture_profile?: string | false | null;
   browserName?: string;
   browser_name?: string;
   maxControls?: number;
@@ -60,11 +74,20 @@ export interface MeetingAppDomCaptureSnapshot extends MeetingAppSnapshot {
   };
   dom?: Record<string, unknown>;
   capture?: {
+    profile?: MeetingAppDomCaptureProfilePlatform;
+    profile_display_name?: string;
     control_count?: number;
     participant_count?: number;
     text_count?: number;
   };
 }
+
+export const MEETING_APP_DOM_CAPTURE_PROFILES: Readonly<Record<MeetingAppDomCaptureProfilePlatform, MeetingAppDomCaptureProfile>>;
+
+export function meetingAppDomCaptureProfile(
+  platformOrInput?: string | MeetingAppDomCaptureInput | Record<string, unknown>,
+  options?: MeetingAppDomCaptureOptions,
+): MeetingAppDomCaptureProfile | null;
 
 export function captureMeetingAppDomSnapshot(
   input?: MeetingAppDomCaptureInput | Document,
