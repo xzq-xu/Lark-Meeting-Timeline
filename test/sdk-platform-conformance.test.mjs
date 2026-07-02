@@ -73,6 +73,7 @@ for (const platform of MEETING_PLATFORM_KEYS) {
   assert.equal(plan.realtime_axis.local_observer.meeting_apps_module, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-apps');
   assert.equal(plan.realtime_axis.local_observer.meeting_app_capture_module, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-capture');
   assert.equal(plan.realtime_axis.local_observer.meeting_app_monitor_module, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-monitor');
+  assert.equal(plan.realtime_axis.local_observer.meeting_app_runtime_module, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime');
   assert.equal(plan.realtime_axis.local_observer.meeting_source_module, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-source');
   assert.equal(plan.speaker_activity.active_speaker_module, '@ai-annotation/meeting-timeline-sdk/adapters/active-speaker');
   assert.equal(plan.realtime_annotations.required_field, 'captured_at_ms');
@@ -88,6 +89,7 @@ for (const platform of MEETING_PLATFORM_KEYS) {
   assert.equal(capability.sdk_modules.meeting_apps, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-apps');
   assert.equal(capability.sdk_modules.meeting_app_capture, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-capture');
   assert.equal(capability.sdk_modules.meeting_app_monitor, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-monitor');
+  assert.equal(capability.sdk_modules.meeting_app_runtime, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime');
   assert.equal(capability.sdk_modules.meeting_source, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-source');
   assert.equal(capability.sdk_modules.ingest, '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest');
   assert.equal(capability.sdk_modules.timeline_bridge, '@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge');

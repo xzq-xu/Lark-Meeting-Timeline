@@ -96,6 +96,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-apps`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-capture`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-monitor`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-source`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
@@ -256,6 +257,35 @@ await meetingSources.observeMeetingApp(snapshot, { observedAtMs: snapshot.observ
 ```
 
 这条链路是 Google Meet / Teams Web / Zoom Web 的推荐 P0 接入：先用本地 DOM 状态低延迟建轴和标发言人位置；Google Workspace Events、Microsoft Graph、Zoom/Webex webhook 晚到后再进入 provider adapter 做 reconcile。
+
+外部项目优先使用更高层的 `meeting-app-runtime`，它把 client、`meeting-source` 和 DOM monitor 组合好，适合浏览器扩展 content script、Electron WebView 或内嵌浏览器宿主直接接入：
+
+```js
+import { createMeetingAppTimelineRuntime } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime';
+
+const runtime = createMeetingAppTimelineRuntime({
+  baseUrl: 'http://localhost:8787',
+  source: 'browser_dom_runtime',
+}, {
+  applyOptions: { speakerAsAnnotation: true },
+  speakerOptions: { minStableMs: 300, switchStableMs: 400, endIdleMs: 1500 },
+  captureOptions: { browserName: 'Chrome' },
+  sampleIntervalMs: 1000,
+  unchangedObserveEveryMs: 1000,
+});
+
+runtime.start(() => ({ document, location, window }));
+
+await runtime.insertMark({
+  id: crypto.randomUUID(),
+  capturedAtMs: Date.now(),
+  kind: 'handwriting_trigger',
+  label: 'why?',
+});
+
+// 官方 provider 事件晚到后仍可进入同一个 reconciler 校准：
+await runtime.ingestProvider('google-meet', googleWorkspaceEventBody);
+```
 
 如果希望 SDK 帮你管理轮询、去重和 keep-alive，可以直接用 `meeting-app-monitor`。它会高频低成本采集 DOM，但只有在页面状态变化、或到达 keep-alive 间隔时才把样本送给 `meeting-source`；即使 DOM 不变，也会按间隔继续送样本，避免 active speaker 的 `minStableMs` 因过度去重而无法触发：
 
