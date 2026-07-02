@@ -99,6 +99,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-http`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-capture`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-gate`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-fetch`
@@ -291,6 +292,34 @@ const records = parsePlatformCaptureJsonl(await readText('platform-events.jsonl'
 const googleReplay = buildPlatformCaptureAcceptanceReport('google-meet', records, {
   baseUrl: 'https://timeline.example.com',
   env: process.env,
+  requireEndEvent: true,
+});
+```
+
+部署前或 CI 里可以用 `platform-gate` 做硬性验收。默认要求真实捕获记录或真实样本；fixture 只能证明 SDK wiring，除非显式允许，否则不会被当成生产证据：
+
+```js
+import {
+  assertPlatformLaunchGate,
+  buildPlatformLaunchGate,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-gate';
+
+const gate = buildPlatformLaunchGate('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+  env: process.env,
+  records,
+  requireEndEvent: true,
+  requireParticipants: true,
+});
+
+if (!gate.production_ready) {
+  console.error(gate.blocking_issues, gate.next_actions);
+}
+
+assertPlatformLaunchGate('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+  env: process.env,
+  records,
   requireEndEvent: true,
 });
 ```

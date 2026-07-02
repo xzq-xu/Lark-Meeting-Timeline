@@ -34,6 +34,12 @@ import {
   capturePlatformWebRequest,
   capturePlatformWebhookEvent,
 } from './platform-capture.mjs';
+import {
+  assertAllPlatformLaunchGates,
+  assertPlatformLaunchGate,
+  buildMeetingPlatformLaunchGateSummary,
+  buildPlatformLaunchGate,
+} from './platform-gate.mjs';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -197,6 +203,18 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     capturedAcceptanceSummary(records = [], reportOptions = {}) {
       return buildMeetingPlatformCaptureAcceptanceSummary(records, withDefaults(defaults, reportOptions));
+    },
+    launchGate(platform, gateOptions = {}) {
+      return buildPlatformLaunchGate(platform, withDefaults(defaults, gateOptions));
+    },
+    launchGateSummary(gateOptions = {}) {
+      return buildMeetingPlatformLaunchGateSummary(withDefaults(defaults, gateOptions));
+    },
+    assertLaunchGate(platform, gateOptions = {}) {
+      return assertPlatformLaunchGate(platform, withDefaults(defaults, gateOptions));
+    },
+    assertAllLaunchGates(gateOptions = {}) {
+      return assertAllPlatformLaunchGates(withDefaults(defaults, gateOptions));
     },
     diagnose(platform, payload, diagnosticOptions = {}) {
       return diagnosePlatformEvent(platform, payload, diagnosticOptions);

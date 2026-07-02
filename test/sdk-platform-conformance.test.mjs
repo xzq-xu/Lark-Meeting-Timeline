@@ -84,6 +84,7 @@ for (const platform of MEETING_PLATFORM_KEYS) {
   assert.equal(capability.sdk_modules.onboarding, '@ai-annotation/meeting-timeline-sdk/adapters/platform-onboarding');
   assert.equal(capability.sdk_modules.platform_http, '@ai-annotation/meeting-timeline-sdk/adapters/platform-http');
   assert.equal(capability.sdk_modules.platform_capture, '@ai-annotation/meeting-timeline-sdk/adapters/platform-capture');
+  assert.equal(capability.sdk_modules.platform_gate, '@ai-annotation/meeting-timeline-sdk/adapters/platform-gate');
   assert.equal(capability.sdk_modules.fixtures, '@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures');
   assert.equal(capability.sdk_modules.platform_kit, '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit');
   assert.equal(typeof capability.sdk_modules.transcript, 'string');
