@@ -301,6 +301,10 @@ const browserRuntime = createMeetingAppBrowserRuntime({
 }, {
   applyOptions: { speakerAsAnnotation: true },
   speakerOptions: { minStableMs: 300, switchStableMs: 400, endIdleMs: 1500 },
+  captureOptions: { platform: 'google_meet' },
+  observeMutations: true,
+  mutationDebounceMs: 150,
+  sampleIntervalMs: 10000, // MutationObserver 负责低延迟触发，低频轮询只做兜底。
 });
 
 browserRuntime.start();

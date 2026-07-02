@@ -46,6 +46,52 @@ function eventTarget(options = {}) {
   return options.eventTarget ?? options.event_target ?? browserWindow(options);
 }
 
+function mutationObserverCtor(options = {}) {
+  const win = browserWindow(options);
+  return options.MutationObserver
+    ?? options.mutationObserver
+    ?? options.mutation_observer
+    ?? options.mutationObserverCtor
+    ?? options.mutation_observer_ctor
+    ?? win?.MutationObserver
+    ?? globalValue('MutationObserver');
+}
+
+function mutationRoot(options = {}) {
+  const doc = browserDocument(options);
+  return options.mutationRoot
+    ?? options.mutation_root
+    ?? doc?.body
+    ?? doc?.documentElement
+    ?? doc;
+}
+
+function mutationObserveOptions(options = {}) {
+  return {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    characterData: true,
+    ...(options.mutationObserverOptions ?? {}),
+    ...(options.mutation_observer_options ?? {}),
+  };
+}
+
+function mutationEnabled(options = {}) {
+  return [
+    options.mutationObserver,
+    options.mutation_observer,
+    options.observeMutations,
+    options.observe_mutations,
+  ].some((value) => value === true);
+}
+
+function debounceMs(options = {}, fallback = 150) {
+  const value = firstNonEmpty(options.debounceMs, options.debounce_ms, options.mutationDebounceMs, options.mutation_debounce_ms, fallback);
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, numeric) : fallback;
+}
+
 function normalizeStopEvents(options = {}) {
   const value = options.stopEvents ?? options.stop_events ?? ['pagehide', 'beforeunload'];
   return Array.isArray(value) ? value : [value].filter(Boolean);
@@ -94,6 +140,14 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
   const stopEvents = normalizeStopEvents(options);
   const listeners = [];
   let lifecycleInstalled = false;
+  let mutationObserver = null;
+  let mutationTimer = null;
+  let mutationPendingCount = 0;
+  let mutationSampleCount = 0;
+  let mutationLastResult = null;
+  let mutationLastError = null;
+  let mutationLastObservedAtMs = null;
+  let mutationLastOptions = null;
 
   function inputProvider(extra = {}) {
     return meetingAppBrowserInput({
@@ -130,6 +184,107 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
     }
     lifecycleInstalled = false;
     return { installed: false };
+  }
+
+  function mutationState() {
+    return {
+      installed: mutationObserver != null,
+      pending_count: mutationPendingCount,
+      sample_count: mutationSampleCount,
+      last_observed_at_ms: mutationLastObservedAtMs,
+      last_result: mutationLastResult,
+      last_error: mutationLastError,
+      debounce_ms: mutationLastOptions ? debounceMs(mutationLastOptions) : null,
+    };
+  }
+
+  function clearMutationTimer() {
+    if (mutationTimer != null) {
+      clearTimeout(mutationTimer);
+      mutationTimer = null;
+    }
+  }
+
+  async function flushMutationObserver(flushOptions = {}) {
+    clearMutationTimer();
+    if (mutationPendingCount <= 0 && flushOptions.force !== true) {
+      return {
+        flushed: false,
+        reason: 'no_pending_mutations',
+        state: mutationState(),
+      };
+    }
+    mutationPendingCount = 0;
+    const sampleOptions = {
+      ...(mutationLastOptions?.sampleOptions ?? mutationLastOptions?.sample_options ?? {}),
+      ...(flushOptions.sampleOptions ?? flushOptions.sample_options ?? {}),
+      ...flushOptions,
+    };
+    try {
+      mutationLastObservedAtMs = Date.now();
+      const result = await runtime.sample(inputProvider(), sampleOptions);
+      mutationSampleCount += 1;
+      mutationLastResult = result;
+      mutationLastError = null;
+      return {
+        flushed: true,
+        result,
+        state: mutationState(),
+      };
+    } catch (error) {
+      mutationLastError = error?.message ?? String(error);
+      mutationLastResult = null;
+      return {
+        flushed: false,
+        reason: 'sample_error',
+        error: mutationLastError,
+        state: mutationState(),
+      };
+    }
+  }
+
+  function scheduleMutationSample(scheduleOptions = {}) {
+    clearMutationTimer();
+    const waitMs = debounceMs(scheduleOptions);
+    mutationTimer = setTimeout(() => {
+      flushMutationObserver().catch((error) => {
+        mutationLastError = error?.message ?? String(error);
+      });
+    }, waitMs);
+    return mutationState();
+  }
+
+  function installMutationObserver(mutationOptions = {}) {
+    if (mutationObserver) return { installed: false, reason: 'already_installed', state: mutationState() };
+    const merged = {
+      ...options,
+      ...mutationOptions,
+    };
+    const Observer = mutationObserverCtor(merged);
+    const root = mutationRoot(merged);
+    if (!Observer) return { installed: false, reason: 'missing_mutation_observer', state: mutationState() };
+    if (!root) return { installed: false, reason: 'missing_mutation_root', state: mutationState() };
+    mutationLastOptions = merged;
+    mutationObserver = new Observer((records = []) => {
+      mutationPendingCount += Math.max(1, Array.isArray(records) ? records.length : 1);
+      scheduleMutationSample(mutationLastOptions);
+    });
+    mutationObserver.observe(root, mutationObserveOptions(merged));
+    return {
+      installed: true,
+      root,
+      options: mutationObserveOptions(merged),
+      state: mutationState(),
+    };
+  }
+
+  function removeMutationObserver() {
+    clearMutationTimer();
+    if (mutationObserver?.disconnect) mutationObserver.disconnect();
+    mutationObserver = null;
+    mutationPendingCount = 0;
+    mutationLastOptions = null;
+    return mutationState();
   }
 
   async function handleMessage(message = {}, messageOptions = {}) {
@@ -180,6 +335,13 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
     ].includes(type)) {
       return { handled: true, action: 'stop', result: stop() };
     }
+    if ([
+      'meeting_timeline.flush_mutations',
+      'meeting_timeline_flush_mutations',
+      'flush_mutations',
+    ].includes(type)) {
+      return { handled: true, action: 'flushMutationObserver', result: await flushMutationObserver(messageOptions) };
+    }
     return { handled: false, reason: 'unsupported_message_type', type };
   }
 
@@ -187,15 +349,25 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
     if (startOptions.lifecycle !== false && startOptions.installLifecycleHandlers !== false && startOptions.install_lifecycle_handlers !== false) {
       installLifecycleHandlers(startOptions);
     }
+    if (mutationEnabled({
+      ...options,
+      ...startOptions,
+    })) {
+      installMutationObserver(startOptions);
+    }
     return runtime.start(() => inputProvider(), startOptions);
   }
 
   function stop() {
+    if (options.keepMutationObserverOnStop !== true && options.keep_mutation_observer_on_stop !== true) {
+      removeMutationObserver();
+    }
     return runtime.stop();
   }
 
   function dispose() {
     const stopped = runtime.stop();
+    removeMutationObserver();
     removeLifecycleHandlers();
     return stopped;
   }
@@ -214,6 +386,9 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
     handleMessage,
     installLifecycleHandlers,
     removeLifecycleHandlers,
+    installMutationObserver,
+    removeMutationObserver,
+    flushMutationObserver,
     dispose,
     getState() {
       return {
@@ -221,6 +396,7 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
         browser_runtime: {
           lifecycle_installed: lifecycleInstalled,
           stop_events: listeners.map(([eventName]) => eventName),
+          mutation_observer: mutationState(),
         },
       };
     },

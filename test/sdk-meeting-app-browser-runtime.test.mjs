@@ -71,12 +71,37 @@ function fakePrejoinDocument() {
   };
 }
 
-function fakeWindow(document) {
+class FakeMutationObserver {
+  static instances = [];
+
+  constructor(callback) {
+    this.callback = callback;
+    this.connected = false;
+    FakeMutationObserver.instances.push(this);
+  }
+
+  observe(root, options) {
+    this.root = root;
+    this.options = options;
+    this.connected = true;
+  }
+
+  disconnect() {
+    this.connected = false;
+  }
+
+  trigger(records = [{ type: 'childList' }]) {
+    this.callback(records, this);
+  }
+}
+
+function fakeWindow(document, extra = {}) {
   const listeners = new Map();
   const win = {
     document,
     location: document.location,
     navigator: { userAgent: 'Chrome fixture' },
+    ...extra,
     setDocument(nextDocument) {
       win.document = nextDocument;
       win.location = nextDocument.location;
@@ -198,5 +223,52 @@ assert.equal(runtime.getState().monitor.running, true);
 runtime.dispose();
 assert.equal(runtime.getState().monitor.running, false);
 assert.equal(window.listenerCount('pagehide'), 0);
+
+FakeMutationObserver.instances = [];
+const mutationCalls = [];
+const mutationClient = {
+  async startMeeting(input) {
+    mutationCalls.push({ method: 'startMeeting', input });
+    return { ok: true, input };
+  },
+  async endMeeting(input) {
+    mutationCalls.push({ method: 'endMeeting', input });
+    return { ok: true, input };
+  },
+  async insertMark(input, options) {
+    mutationCalls.push({ method: 'insertMark', input, options });
+    return { ok: true, input };
+  },
+};
+const mutationDocument = fakeDocument();
+const mutationWindow = fakeWindow(mutationDocument, { MutationObserver: FakeMutationObserver });
+const mutationRuntime = createMeetingAppBrowserRuntime(mutationClient, {
+  window: mutationWindow,
+  now: () => clock,
+  applyOptions: { speakerAsAnnotation: true },
+  speakerOptions: { minStableMs: 0 },
+  sampleIntervalMs: 10_000,
+});
+const mutationInstall = mutationRuntime.installMutationObserver({ mutationDebounceMs: 0 });
+assert.equal(mutationInstall.installed, true);
+assert.equal(FakeMutationObserver.instances.length, 1);
+assert.equal(FakeMutationObserver.instances[0].connected, true);
+assert.equal(FakeMutationObserver.instances[0].options.subtree, true);
+
+FakeMutationObserver.instances[0].trigger([{ type: 'childList' }, { type: 'attributes' }]);
+assert.equal(mutationRuntime.getState().browser_runtime.mutation_observer.pending_count, 2);
+const mutationFlush = await mutationRuntime.flushMutationObserver();
+assert.equal(mutationFlush.flushed, true);
+assert.deepEqual(mutationCalls.map((item) => item.method), ['startMeeting', 'insertMark']);
+assert.equal(mutationFlush.result.result.signals[0].type, 'meeting_started');
+assert.equal(mutationRuntime.getState().browser_runtime.mutation_observer.sample_count, 1);
+
+const flushMessage = await mutationRuntime.handleMessage({ type: 'meeting_timeline.flush_mutations' });
+assert.equal(flushMessage.handled, true);
+assert.equal(flushMessage.action, 'flushMutationObserver');
+assert.equal(flushMessage.result.flushed, false);
+
+mutationRuntime.stop();
+assert.equal(FakeMutationObserver.instances[0].connected, false);
 
 console.log('ok meeting app browser runtime');

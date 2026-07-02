@@ -19,6 +19,23 @@ export interface MeetingAppBrowserRuntimeOptions extends MeetingAppTimelineRunti
   stop_events?: string[];
   browserName?: string;
   browser_name?: string;
+  mutationObserver?: boolean | unknown;
+  mutation_observer?: boolean | unknown;
+  observeMutations?: boolean;
+  observe_mutations?: boolean;
+  MutationObserver?: unknown;
+  mutationObserverCtor?: unknown;
+  mutation_observer_ctor?: unknown;
+  mutationRoot?: unknown;
+  mutation_root?: unknown;
+  mutationObserverOptions?: Record<string, unknown>;
+  mutation_observer_options?: Record<string, unknown>;
+  debounceMs?: number;
+  debounce_ms?: number;
+  mutationDebounceMs?: number;
+  mutation_debounce_ms?: number;
+  keepMutationObserverOnStop?: boolean;
+  keep_mutation_observer_on_stop?: boolean;
   [key: string]: unknown;
 }
 
@@ -58,6 +75,13 @@ export function createMeetingAppBrowserRuntime(
   }>;
   installLifecycleHandlers(options?: MeetingAppBrowserRuntimeOptions): Record<string, unknown>;
   removeLifecycleHandlers(): Record<string, unknown>;
+  installMutationObserver(options?: MeetingAppBrowserRuntimeOptions): Record<string, unknown>;
+  removeMutationObserver(): Record<string, unknown>;
+  flushMutationObserver(options?: MeetingAppMonitorOptions & {
+    force?: boolean;
+    sampleOptions?: MeetingAppMonitorOptions;
+    sample_options?: MeetingAppMonitorOptions;
+  }): Promise<Record<string, unknown>>;
   dispose(): MeetingAppMonitorState;
   observeMeetingApp(input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<MeetingSourceResult>;
   insertMark(input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
