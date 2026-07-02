@@ -96,6 +96,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-router`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-fetch`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-onboarding`
@@ -182,6 +183,26 @@ const report = buildPlatformAcceptanceReport('google-meet', {
 });
 
 console.log(report.status, report.missing_required_coverage, report.issues);
+```
+
+如果真实 webhook 还没打通，但要先验证宿主项目的 SDK 接入、CI gate 和时间轴写入路径，可以用 `platform-fixtures` 生成各平台的原始事件样本。fixture 仍然走对应 normalizer 和 acceptance report，不会绕过适配层：
+
+```js
+import { buildPlatformAcceptanceReport } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance';
+import { buildPlatformFixtureAcceptanceInput } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures';
+
+const fixtureInput = buildPlatformFixtureAcceptanceInput({
+  baseUrl: 'https://timeline.example.com',
+});
+
+const googleFixtureReport = buildPlatformAcceptanceReport('google-meet', {
+  ...fixtureInput,
+  requireEndEvent: true,
+  requiredCoverage: ['meeting_start', 'meeting_end', 'participant_track', 'artifact_ready'],
+});
+
+// googleFixtureReport.accepted === true
+// fixtureInput.samples contains local_detector, lark, google_meet, microsoft_teams, zoom, webex
 ```
 
 如果要给配置页、接入向导或 CI 验收生成一份“这个会议平台现在能不能接进 timeline”的总报告，可以用 `platform-onboarding`。它会合并 `permission plan`、`integration plan`、真实样本 `acceptance` 和 `artifact-plan`：

@@ -82,6 +82,7 @@ for (const platform of MEETING_PLATFORM_KEYS) {
   assert.equal(capability.sdk_modules.artifact_plan, '@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan');
   assert.equal(capability.sdk_modules.artifact_fetch, '@ai-annotation/meeting-timeline-sdk/adapters/artifact-fetch');
   assert.equal(capability.sdk_modules.onboarding, '@ai-annotation/meeting-timeline-sdk/adapters/platform-onboarding');
+  assert.equal(capability.sdk_modules.fixtures, '@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures');
   assert.equal(typeof capability.sdk_modules.transcript, 'string');
   assert.equal(typeof capability.sdk_modules.setup, 'string');
   assert.equal(typeof capability.sdk_modules.security, 'string');
