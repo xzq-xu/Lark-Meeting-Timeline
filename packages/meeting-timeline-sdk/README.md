@@ -84,8 +84,50 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/google-meet`
 - `@ai-annotation/meeting-timeline-sdk/adapters/microsoft-teams`
 - `@ai-annotation/meeting-timeline-sdk/adapters/zoom`
+- `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
 
 `meeting_started` 会调用 `startMeeting`，`meeting_ended` 会调用 `endMeeting`。`participant_joined/left` 和 `artifact_ready` 默认不会写入用户标注流；如果需要临时显示参会人位置，可以给 `applyMeetingSignals` 传 `{ participantAsAnnotation: true }`，或者用 `onParticipantSignal` / `onArtifactSignal` 接到自己的服务端轨道。
+
+## Webhook 验证工具
+
+真实接 Zoom / Microsoft Graph / Google Pub/Sub push 时，建议先在 webhook 层完成平台验证，再把 payload 交给 normalizer：
+
+```js
+import {
+  buildZoomUrlValidationResponse,
+  microsoftGraphValidationResponse,
+  verifyMicrosoftGraphClientState,
+  verifyZoomWebhookEvent,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/webhook-security';
+
+if (req.query.validationToken) {
+  res.type('text/plain').send(microsoftGraphValidationResponse(new URL(req.url, 'https://callback.example')));
+  return;
+}
+
+if (req.body.event === 'endpoint.url_validation') {
+  res.json(buildZoomUrlValidationResponse(req.body.payload, { secretToken: process.env.ZOOM_WEBHOOK_SECRET_TOKEN }));
+  return;
+}
+
+const verification = verifyZoomWebhookEvent({
+  headers: req.headers,
+  rawBody: req.rawBody,
+  secretToken: process.env.ZOOM_WEBHOOK_SECRET_TOKEN,
+});
+if (!verification.ok) throw new Error(verification.reason);
+
+const graphCheck = verifyMicrosoftGraphClientState(req.body, {
+  clientState: process.env.MICROSOFT_GRAPH_CLIENT_STATE,
+});
+if (!graphCheck.ok) throw new Error(graphCheck.reason);
+```
+
+当前 server demo 会读取这些环境变量：
+
+- `ZOOM_WEBHOOK_SECRET_TOKEN`：启用 Zoom URL validation 和事件签名校验。
+- `MICROSOFT_GRAPH_CLIENT_STATE`：启用 Microsoft Graph change notification `clientState` 校验。
+- `GOOGLE_PUBSUB_BEARER_TOKEN`：对 Google Pub/Sub push 做轻量 bearer 校验；完整 OIDC JWT 校验建议在部署网关或后续 adapter 增强中完成。
 
 ## 首条标记内联建轴
 

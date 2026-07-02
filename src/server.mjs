@@ -9,6 +9,14 @@ import { applyMeetingSignals } from '../packages/meeting-timeline-sdk/adapters/c
 import { normalizeGoogleMeetEvent } from '../packages/meeting-timeline-sdk/adapters/google-meet.mjs';
 import { normalizeMicrosoftTeamsEvent } from '../packages/meeting-timeline-sdk/adapters/microsoft-teams.mjs';
 import { normalizeZoomEvent } from '../packages/meeting-timeline-sdk/adapters/zoom.mjs';
+import {
+  buildZoomUrlValidationResponse,
+  microsoftGraphValidationResponse,
+  platformWebhookVerificationStatus,
+  verifyGooglePubSubBearer,
+  verifyMicrosoftGraphClientState,
+  verifyZoomWebhookEvent,
+} from '../packages/meeting-timeline-sdk/adapters/webhook-security.mjs';
 import { createLarkClient, extractMeetingNo, extractMinuteToken } from './larkClient.mjs';
 import {
   annotationCapturedAbsoluteMs,
@@ -164,6 +172,7 @@ const platformEventStatus = Object.fromEntries(platformEventAdapterDefinitions.m
     last_received_at: null,
     last_event_type: null,
     last_signal_type: null,
+    last_verification: null,
     last_error: null,
   },
 ]));
@@ -5693,6 +5702,15 @@ async function readJson(req) {
   return JSON.parse(text);
 }
 
+async function readJsonWithRaw(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  if (!chunks.length) return { body: {}, rawBody: '' };
+  const rawBody = Buffer.concat(chunks).toString('utf8');
+  if (!rawBody.trim()) return { body: {}, rawBody };
+  return { body: JSON.parse(rawBody), rawBody };
+}
+
 function safePublicPath(urlPath) {
   const pathname = decodeURIComponent(new URL(urlPath, 'http://localhost').pathname);
   const requested = pathname === '/' ? '/index.html' : pathname;
@@ -5915,6 +5933,11 @@ async function annotationIngestInfoPayload(req) {
         ingest_endpoint: localUrlFor(req, `/api/platform-events/${item.aliases[0]}`),
         status_endpoint: localUrlFor(req, `/api/platform-events/${item.aliases[0]}/status`),
       })),
+      webhook_security: {
+        zoom_secret_configured: Boolean(process.env.ZOOM_WEBHOOK_SECRET_TOKEN),
+        microsoft_graph_client_state_configured: Boolean(process.env.MICROSOFT_GRAPH_CLIENT_STATE),
+        google_pubsub_bearer_configured: Boolean(process.env.GOOGLE_PUBSUB_BEARER_TOKEN),
+      },
     },
     meeting_session_inline_annotation: {
       supported: true,
@@ -6193,6 +6216,28 @@ function platformRawEventType(raw) {
     first.payload?.object?.event,
     'unknown',
   );
+}
+
+function platformWebhookVerification(adapter = {}, req = {}, body = {}, rawBody = '') {
+  if (adapter.key === 'zoom') {
+    return platformWebhookVerificationStatus(
+      adapter.key,
+      verifyZoomWebhookEvent({ headers: req.headers, rawBody, body }),
+    );
+  }
+  if (adapter.key === 'microsoft_teams') {
+    return platformWebhookVerificationStatus(
+      adapter.key,
+      verifyMicrosoftGraphClientState(body),
+    );
+  }
+  if (adapter.key === 'google_meet') {
+    return platformWebhookVerificationStatus(
+      adapter.key,
+      verifyGooglePubSubBearer({ headers: req.headers }),
+    );
+  }
+  return { platform: adapter.key, ok: true, skipped: true, reason: 'platform_verification_not_configured' };
 }
 
 function publicPlatformEventStatus(req, adapter = null) {
@@ -6484,7 +6529,7 @@ function platformEventTimelineClient(body = {}, req = {}, adapter = {}) {
   };
 }
 
-async function ingestPlatformEvent(platform, body = {}, req = {}) {
+async function ingestPlatformEvent(platform, body = {}, req = {}, options = {}) {
   const adapter = platformEventAdapterFor(platform);
   if (!adapter) {
     const error = new Error(`Unsupported meeting platform: ${platform}`);
@@ -6514,6 +6559,7 @@ async function ingestPlatformEvent(platform, body = {}, req = {}) {
     last_received_at: new Date(receivedAtMs).toISOString(),
     last_event_type: String(platformRawEventType(rawInput)),
     last_signal_type: signals.at(-1)?.type ?? null,
+    last_verification: options.verification ?? null,
     last_error: null,
   });
   return {
@@ -6557,11 +6603,46 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, publicPlatformEventStatus(req, adapter));
   }
 
+  if (platformRoute?.action === 'ingest' && url.searchParams.has('validationToken')) {
+    const adapter = platformEventAdapterFor(platformRoute.platform);
+    if (adapter?.key === 'microsoft_teams') {
+      return sendText(res, 200, microsoftGraphValidationResponse(url) ?? '');
+    }
+  }
+
   if (platformRoute?.action === 'ingest' && req.method === 'POST') {
     const adapter = platformEventAdapterFor(platformRoute.platform);
-    const body = await readJson(req);
+    const { body, rawBody } = await readJsonWithRaw(req);
     try {
-      return sendJson(res, 200, await ingestPlatformEvent(platformRoute.platform, body, req));
+      if (adapter?.key === 'zoom' && body?.event === 'endpoint.url_validation') {
+        const response = buildZoomUrlValidationResponse(body.payload ?? body);
+        updatePlatformEventStatus(adapter, {
+          last_received_at: new Date().toISOString(),
+          last_event_type: 'endpoint.url_validation',
+          last_signal_type: null,
+          last_verification: { platform: adapter.key, ok: true, skipped: false, reason: 'zoom_url_validation_response' },
+          last_error: null,
+        });
+        return sendJson(res, 200, response);
+      }
+      const verification = adapter
+        ? platformWebhookVerification(adapter, req, body, rawBody)
+        : null;
+      if (verification && verification.ok === false) {
+        updatePlatformEventStatus(adapter, {
+          last_received_at: new Date().toISOString(),
+          last_event_type: String(platformRawEventType(platformEventRawInput(body))),
+          last_verification: verification,
+          last_error: verification.reason ?? 'platform_webhook_verification_failed',
+        });
+        return sendJson(res, 401, {
+          error: verification.reason ?? 'platform_webhook_verification_failed',
+          platform: adapter?.key ?? platformRoute.platform,
+          verification,
+          status: adapter ? platformEventStatus[adapter.key] : null,
+        });
+      }
+      return sendJson(res, 200, await ingestPlatformEvent(platformRoute.platform, body, req, { verification }));
     } catch (error) {
       if (adapter) {
         updatePlatformEventStatus(adapter, {

@@ -297,6 +297,15 @@ GET  /api/platform-events/status
 
 `POST /api/platform-events/:platform` 当前支持 `google-meet`、`teams`、`zoom` 及其别名。服务端会用 SDK adapter 归一化原始事件，`meeting_started` 进入 `POST /api/meeting-session/start` 同一套建轴逻辑，`meeting_ended` 进入 `POST /api/meeting-session/end` 同一套结束逻辑。`participant_joined/left` 会进入会议 `events` 轨道，不写入用户标注流；同一平台、同一参会人、同一 join/leave 类型在默认 3 秒窗口内会被过滤为重复事件。会后 transcript/recording/smart notes 的 `artifact_ready` signal 也会进入会议 `events` 轨道，默认 5 秒窗口内按 artifact id/url 去重；artifact 本体内容仍建议后续通过 `POST /api/artifacts/transcript` 和 `POST /api/artifacts/recording` 独立导入。
 
+真实 webhook 接入的安全层也已经放进 SDK：
+
+- `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
+- Zoom：支持 `endpoint.url_validation` challenge response；配置 `ZOOM_WEBHOOK_SECRET_TOKEN` 后校验 `x-zm-request-timestamp` 和 `x-zm-signature`。
+- Microsoft Graph / Teams：支持 `validationToken` 纯文本响应；配置 `MICROSOFT_GRAPH_CLIENT_STATE` 后校验通知里的 `clientState`。
+- Google Meet / Pub/Sub：配置 `GOOGLE_PUBSUB_BEARER_TOKEN` 后可做轻量 bearer gate；完整 Pub/Sub OIDC JWT 校验仍建议作为下一步增强或交给部署网关处理。
+
+`GET /api/platform-events/status` 会返回每个平台最近一次 `last_verification`，用于区分“未配置所以跳过校验”和“签名/状态不匹配被拒绝”。
+
 SDK 包结构建议：
 
 ```text
@@ -304,6 +313,8 @@ packages/meeting-timeline-sdk/
   index.mjs
   index.d.ts
   adapters/
+    webhook-security.mjs
+    webhook-security.d.ts
     core.mjs
     core.d.ts
     google-meet.mjs

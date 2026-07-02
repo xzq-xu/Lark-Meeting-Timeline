@@ -11,6 +11,7 @@
 - 收到飞书直开会议开始事件后自动创建无转写的实时会议时间轴
 - 开放会议会话协议 `POST /api/meeting-session/start`，供桌面观察器、汉王端或人工入口在真实会议开始时建轴
 - 跨平台会议事件入口 `POST /api/platform-events/:platform`，可接 Google Meet / Microsoft Teams / Zoom adapter 归一化后的开始、结束、参会人和会后产物信号；参会人变化与 transcript/recording/smart notes ready 会进入事件轨道并做基础重复过滤
+- 跨平台 webhook 安全入口：Zoom URL validation / HMAC 校验、Microsoft Graph validationToken / clientState 校验、Google Pub/Sub bearer gate
 - 本地手动开始/结束实时会议，用作没有公网 webhook 时的 fallback
 - 会中实时写入外部标注事件，并通过 SSE 自动刷新页面
 - 开放标注接口 `POST /api/annotations`，供后续墨水屏/手写设备接入
@@ -35,6 +36,16 @@ npm run start
 ```bash
 npm run start:plain
 ```
+
+跨平台 webhook 真实接入时可按需配置：
+
+```bash
+ZOOM_WEBHOOK_SECRET_TOKEN=...
+MICROSOFT_GRAPH_CLIENT_STATE=...
+GOOGLE_PUBSUB_BEARER_TOKEN=...
+```
+
+未配置时对应平台校验会在本地开发中跳过；配置后失败的 Zoom 签名、Teams clientState 或 Google bearer 会被 `POST /api/platform-events/:platform` 拒绝，并写入 `/api/platform-events/status` 的 `last_verification`。
 
 面向产品目标的一键演示命令是：
 
