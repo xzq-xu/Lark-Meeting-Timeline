@@ -91,6 +91,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/local-observer`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
+- `@ai-annotation/meeting-timeline-sdk/adapters/signal-reconciler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/transcript`
 - `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
@@ -124,6 +125,25 @@ await ingestPlatformEvent(timeline, 'google-meet', req.body, {
 ```
 
 `ingestPlatformEvent()` 内部会按平台名选择 normalizer，把原始事件转成 `NormalizedMeetingSignal[]`，再调用 `startMeeting`、`endMeeting` 或可选的 participant/artifact handler。对于 Google Meet / Teams / Zoom / Webex，新项目可以优先接这一层，只有需要自定义事件验签、补拉详情或 artifact 导入时再下钻到 registry/core。
+
+如果宿主同时接本地观察器和官方 webhook，建议用有状态的 `createReconciledPlatformEventIngestor()`。它会过滤 exact duplicate、重复 speaker 信号，并处理“本地观察先建轴，Google Meet / Teams / Zoom / Webex 官方事件后到用于校准”的优先级：
+
+```js
+import { createMeetingTimelineClient } from '@ai-annotation/meeting-timeline-sdk';
+import { createReconciledPlatformEventIngestor } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest';
+
+const timeline = createMeetingTimelineClient({ baseUrl: 'http://localhost:8787' });
+const ingestor = createReconciledPlatformEventIngestor(timeline);
+
+await ingestor.ingest('local-detector', {
+  type: 'meeting_started',
+  detected_platform: 'google_meet',
+  meeting_url: 'https://meet.google.com/abc-defg-hij',
+  start_time_ms: Date.now(),
+});
+
+await ingestor.ingest('google-meet', req.body); // 后到的官方 start 可校准本地轴
+```
 
 如果外部项目想直接复用完整 HTTP webhook 入口，可以用 `platform-webhook-handler`。它会处理 Microsoft Graph `validationToken`、Zoom `endpoint.url_validation`、Zoom/Webex/Teams/Google Pub/Sub 验证，再把事件交给 `ingestPlatformEvent()`：
 

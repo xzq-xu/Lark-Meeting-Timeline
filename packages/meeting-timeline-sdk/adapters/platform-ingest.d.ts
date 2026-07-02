@@ -1,6 +1,11 @@
 import type { MeetingTimelineClient } from '../index.mjs';
 import type { MeetingPlatformEventAdapter } from './platform-registry.mjs';
 import type { NormalizedMeetingSignal, ApplyMeetingSignalOptions, ApplyMeetingSignalResult } from './core.mjs';
+import type {
+  MeetingSignalReconciliationResult,
+  MeetingSignalReconcilerOptions,
+  MeetingSignalReconcilerState,
+} from './signal-reconciler.mjs';
 
 export interface PlatformEventIngestInput {
   platform?: string;
@@ -30,6 +35,8 @@ export interface PlatformEventIngestOptions extends ApplyMeetingSignalOptions {
   normalizer_options?: Record<string, unknown>;
   applyOptions?: ApplyMeetingSignalOptions;
   apply_options?: ApplyMeetingSignalOptions;
+  reconcileOptions?: MeetingSignalReconcilerOptions;
+  reconcile_options?: MeetingSignalReconcilerOptions;
 }
 
 export interface NormalizedPlatformEvent {
@@ -40,6 +47,12 @@ export interface NormalizedPlatformEvent {
 }
 
 export interface PlatformEventIngestResult extends NormalizedPlatformEvent {
+  results: ApplyMeetingSignalResult[];
+}
+
+export interface ReconciledPlatformEventIngestResult extends NormalizedPlatformEvent {
+  rawSignals: NormalizedMeetingSignal[];
+  reconciliation: MeetingSignalReconciliationResult;
   results: ApplyMeetingSignalResult[];
 }
 
@@ -55,3 +68,32 @@ export function ingestPlatformEvent(
   payload?: unknown,
   options?: PlatformEventIngestOptions,
 ): Promise<PlatformEventIngestResult>;
+
+export function createReconciledPlatformEventIngestor(
+  client: MeetingTimelineClient,
+  options?: PlatformEventIngestOptions & {
+    reconciler?: {
+      reconcile(signals?: NormalizedMeetingSignal[], options?: MeetingSignalReconcilerOptions): MeetingSignalReconciliationResult;
+      getState(): MeetingSignalReconcilerState;
+      reset(nextState?: Partial<MeetingSignalReconcilerState>): MeetingSignalReconcilerState;
+    };
+    signalReconciler?: {
+      reconcile(signals?: NormalizedMeetingSignal[], options?: MeetingSignalReconcilerOptions): MeetingSignalReconciliationResult;
+      getState(): MeetingSignalReconcilerState;
+      reset(nextState?: Partial<MeetingSignalReconcilerState>): MeetingSignalReconcilerState;
+    };
+    signal_reconciler?: {
+      reconcile(signals?: NormalizedMeetingSignal[], options?: MeetingSignalReconcilerOptions): MeetingSignalReconciliationResult;
+      getState(): MeetingSignalReconcilerState;
+      reset(nextState?: Partial<MeetingSignalReconcilerState>): MeetingSignalReconcilerState;
+    };
+  },
+): {
+  ingest(
+    platformOrInput: string | PlatformEventIngestInput,
+    payload?: unknown,
+    options?: PlatformEventIngestOptions,
+  ): Promise<ReconciledPlatformEventIngestResult>;
+  getState(): MeetingSignalReconcilerState;
+  reset(nextState?: Partial<MeetingSignalReconcilerState>): MeetingSignalReconcilerState;
+};

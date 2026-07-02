@@ -694,6 +694,10 @@ export function platformCapabilityContract(platform, options = {}) {
   const contract = platformCapabilityContracts[key];
   return compactObject({
     ...contract,
+    sdk_modules: {
+      ...contract.sdk_modules,
+      signal_reconciler: '@ai-annotation/meeting-timeline-sdk/adapters/signal-reconciler',
+    },
     endpoints: options.baseUrl ? {
       platform_events: platformEventEndpoint(options.baseUrl, key),
       transcript_import: absoluteEndpoint(options.baseUrl, '/api/import/transcript'),

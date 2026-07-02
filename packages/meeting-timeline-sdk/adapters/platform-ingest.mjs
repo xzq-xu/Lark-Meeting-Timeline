@@ -1,6 +1,7 @@
 import { MeetingTimelineSdkError } from '../index.mjs';
 import { applyMeetingSignals } from './core.mjs';
 import { meetingPlatformEventAdapterFor } from './platform-registry.mjs';
+import { createMeetingSignalReconciler } from './signal-reconciler.mjs';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -102,5 +103,54 @@ export async function ingestPlatformEvent(client, platformOrInput, payload, opti
   return {
     ...normalized,
     results,
+  };
+}
+
+function reconcileContext(baseOptions = {}, ingestOptions = {}) {
+  return {
+    ...(baseOptions.reconcileOptions ?? {}),
+    ...(baseOptions.reconcile_options ?? {}),
+    ...(ingestOptions.reconcileOptions ?? {}),
+    ...(ingestOptions.reconcile_options ?? {}),
+  };
+}
+
+export function createReconciledPlatformEventIngestor(client, options = {}) {
+  if (!client) {
+    throw new MeetingTimelineSdkError('Meeting timeline client is required for createReconciledPlatformEventIngestor');
+  }
+  const reconciler = options.reconciler
+    ?? options.signalReconciler
+    ?? options.signal_reconciler
+    ?? createMeetingSignalReconciler(options.reconcileOptions ?? options.reconcile_options);
+  return {
+    async ingest(platformOrInput, payload, ingestOptions = {}) {
+      const normalized = normalizePlatformEvent(platformOrInput, payload, {
+        ...options,
+        ...ingestOptions,
+      });
+      const input = normalizeInputArgs(platformOrInput, payload, {
+        ...options,
+        ...ingestOptions,
+      });
+      const reconciliation = reconciler.reconcile(
+        normalized.signals,
+        reconcileContext(options, input.options),
+      );
+      const results = await applyMeetingSignals(client, reconciliation.signals, applyContext(input.options));
+      return {
+        ...normalized,
+        rawSignals: normalized.signals,
+        signals: reconciliation.signals,
+        reconciliation,
+        results,
+      };
+    },
+    getState() {
+      return reconciler.getState();
+    },
+    reset(nextState = {}) {
+      return reconciler.reset(nextState);
+    },
   };
 }
