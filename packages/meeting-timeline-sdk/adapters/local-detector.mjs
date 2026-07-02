@@ -5,6 +5,8 @@ export const LOCAL_DETECTOR_EVENT_TYPES = Object.freeze([
   'meeting_ended',
   'participant_joined',
   'participant_left',
+  'speaker_started',
+  'speaker_ended',
 ]);
 
 function firstNonEmpty(...values) {
@@ -36,6 +38,31 @@ function normalizeEventType(value) {
   }
   if (['participant_joined', 'participant_join', 'join', 'joined'].includes(text)) return 'participant_joined';
   if (['participant_left', 'participant_leave', 'leave', 'left'].includes(text)) return 'participant_left';
+  if ([
+    'speaker_started',
+    'speaker_start',
+    'speaker_active',
+    'active_speaker',
+    'active_speaker_started',
+    'speaking_started',
+    'speaking_start',
+    'speech_started',
+    'speech_start',
+    'talking_started',
+    'talking_start',
+  ].includes(text)) return 'speaker_started';
+  if ([
+    'speaker_ended',
+    'speaker_end',
+    'speaker_inactive',
+    'active_speaker_ended',
+    'speaking_ended',
+    'speaking_end',
+    'speech_ended',
+    'speech_end',
+    'talking_ended',
+    'talking_end',
+  ].includes(text)) return 'speaker_ended';
   return text;
 }
 
@@ -189,6 +216,38 @@ function participantName(raw = {}) {
   ]);
 }
 
+function speakerId(raw = {}) {
+  return firstPath(raw, [
+    'speaker.id',
+    'speaker.speaker_id',
+    'speaker.speakerId',
+    'speaker.participant_id',
+    'speaker.participantId',
+    'speaker.user_id',
+    'speaker.userId',
+    'active_speaker.id',
+    'activeSpeaker.id',
+    'speaker_id',
+    'speakerId',
+  ]) ?? participantId(raw);
+}
+
+function speakerName(raw = {}) {
+  return firstPath(raw, [
+    'speaker.name',
+    'speaker.display_name',
+    'speaker.displayName',
+    'speaker.user_name',
+    'speaker.userName',
+    'speaker.participant_name',
+    'speaker.participantName',
+    'active_speaker.name',
+    'activeSpeaker.name',
+    'speaker_name',
+    'speakerName',
+  ]) ?? participantName(raw);
+}
+
 function normalizeOne(raw = {}, options = {}) {
   const type = eventTypeOf(raw);
   const meeting = meetingIdentity(raw);
@@ -205,6 +264,16 @@ function normalizeOne(raw = {}, options = {}) {
     return [compactObject({
       ...base,
       type,
+      participant_id: participantId(raw),
+      participant_name: participantName(raw),
+    })];
+  }
+  if (type === 'speaker_started' || type === 'speaker_ended') {
+    return [compactObject({
+      ...base,
+      type,
+      speaker_id: speakerId(raw),
+      speaker_name: speakerName(raw),
       participant_id: participantId(raw),
       participant_name: participantName(raw),
     })];

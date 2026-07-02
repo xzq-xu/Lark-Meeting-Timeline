@@ -83,6 +83,30 @@ assert.equal(calls.at(-1).method, 'insertMark');
 assert.equal(calls.at(-1).input.kind, 'participant_joined');
 assert.equal(calls.at(-1).input.captured_at_ms, startMs + 10_000);
 
+const skippedSpeaker = await applyMeetingSignal(client, {
+  type: 'speaker_started',
+  meeting: { platform: 'google_meet', meeting_id: 'gm-001' },
+  occurred_at_ms: startMs + 20_000,
+  speaker_name: 'Ada',
+});
+assert.equal(skippedSpeaker.applied, false);
+assert.equal(skippedSpeaker.reason, 'speaker_track_not_configured');
+
+const speakerMark = await applyMeetingSignal(client, {
+  type: 'speaker_started',
+  meeting: { platform: 'google_meet', meeting_id: 'gm-001' },
+  occurred_at_ms: startMs + 20_000,
+  speaker_id: 'speaker-ada',
+  speaker_name: 'Ada',
+}, { speakerAsAnnotation: true });
+assert.equal(speakerMark.applied, true);
+assert.equal(speakerMark.action, 'insertSpeakerMark');
+assert.equal(calls.at(-1).method, 'insertMark');
+assert.equal(calls.at(-1).input.kind, 'speaker_started');
+assert.equal(calls.at(-1).input.label, 'Ada speaking');
+assert.equal(calls.at(-1).input.captured_at_ms, startMs + 20_000);
+assert.equal(calls.at(-1).input.payload.speaker_id, 'speaker-ada');
+
 const batchResults = await applyMeetingSignals(client, [
   {
     type: 'meeting_started',
@@ -161,6 +185,22 @@ const localDetectorEnd = normalizeLocalDetectorEvent({
 });
 assert.equal(localDetectorEnd[0].type, 'meeting_ended');
 assert.equal(localDetectorEnd[0].occurred_at_ms, startMs + 300_000);
+
+const localDetectorSpeaker = normalizeLocalDetectorEvent({
+  id: 'local-speaker-1',
+  type: 'active_speaker',
+  detected_platform: 'google_meet',
+  meeting_id: 'local-google-meet-001',
+  occurred_at_ms: startMs + 45_000,
+  speaker: {
+    id: 'local-speaker-ada',
+    name: 'Ada Lovelace',
+  },
+});
+assert.equal(localDetectorSpeaker[0].type, 'speaker_started');
+assert.equal(localDetectorSpeaker[0].speaker_id, 'local-speaker-ada');
+assert.equal(localDetectorSpeaker[0].speaker_name, 'Ada Lovelace');
+assert.equal(localDetectorSpeaker[0].occurred_at_ms, startMs + 45_000);
 
 const larkStart = normalizeLarkEvent({
   header: {

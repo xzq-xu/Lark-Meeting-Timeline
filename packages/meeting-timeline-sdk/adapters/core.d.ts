@@ -5,6 +5,8 @@ export type MeetingSignalType =
   | 'meeting_ended'
   | 'participant_joined'
   | 'participant_left'
+  | 'speaker_started'
+  | 'speaker_ended'
   | 'artifact_ready'
   | 'subscription_lifecycle';
 
@@ -36,6 +38,8 @@ export interface NormalizedMeetingSignal {
   source?: MeetingSignalSource;
   participant_id?: string;
   participant_name?: string;
+  speaker_id?: string;
+  speaker_name?: string;
   artifact_kind?: 'transcript' | 'recording' | 'smart_notes' | string;
   artifact_id?: string;
   artifact_url?: string;
@@ -53,7 +57,10 @@ export interface ApplyMeetingSignalOptions {
   defaults?: Record<string, unknown>;
   participantAsAnnotation?: boolean;
   participantAsMark?: boolean;
+  speakerAsAnnotation?: boolean;
+  speakerAsMark?: boolean;
   onParticipantSignal?: (signal: NormalizedMeetingSignal, client: MeetingTimelineClient) => unknown | Promise<unknown>;
+  onSpeakerSignal?: (signal: NormalizedMeetingSignal, client: MeetingTimelineClient) => unknown | Promise<unknown>;
   onArtifactSignal?: (signal: NormalizedMeetingSignal, client: MeetingTimelineClient) => unknown | Promise<unknown>;
   onSubscriptionLifecycleSignal?: (signal: NormalizedMeetingSignal, client: MeetingTimelineClient) => unknown | Promise<unknown>;
 }

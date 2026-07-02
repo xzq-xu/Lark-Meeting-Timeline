@@ -65,6 +65,9 @@ for (const platform of MEETING_PLATFORM_KEYS) {
   assert.equal(Array.isArray(capability.realtime_axis.signal_types), true);
   assert.equal(capability.realtime_axis.signal_types.includes('meeting_started'), true);
   assert.equal(capability.realtime_axis.signal_types.includes('meeting_ended'), true);
+  assert.equal(Array.isArray(capability.speaker_activity.signal_types), true);
+  assert.equal(capability.speaker_activity.signal_types.includes('speaker_started'), true);
+  assert.equal(capability.speaker_activity.signal_types.includes('speaker_ended'), true);
 
   for (const envName of manifest.required_security_env ?? []) {
     assert.match(envExample, new RegExp(`^${envName}=`, 'm'), `${platform} missing ${envName} in .env.example`);

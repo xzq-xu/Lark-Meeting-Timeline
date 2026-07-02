@@ -14,6 +14,8 @@ export const LOCAL_DETECTOR_EVENT_TYPES = Object.freeze([
   'meeting_ended',
   'participant_joined',
   'participant_left',
+  'speaker_started',
+  'speaker_ended',
 ]);
 
 export const GOOGLE_MEET_EVENT_TYPES = Object.freeze([
@@ -97,6 +99,12 @@ const platformCapabilityContracts = Object.freeze({
       source: 'local observer participant signals',
       signal_types: ['participant_joined', 'participant_left'],
     },
+    speaker_activity: {
+      status: 'supported_if_detector_provides_active_speaker_changes',
+      source: 'local observer active speaker signals',
+      signal_types: ['speaker_started', 'speaker_ended'],
+      fallback: 'post_meeting_transcript_segments_can_backfill_speaker_positions',
+    },
     post_meeting_transcript: {
       status: 'not_applicable',
       availability: 'provider_specific_post_meeting',
@@ -140,6 +148,12 @@ const platformCapabilityContracts = Object.freeze({
       status: 'supported_best_effort',
       source: 'Feishu/Lark join_meeting_v1 and leave_meeting_v1 events',
       signal_types: ['participant_joined', 'participant_left'],
+    },
+    speaker_activity: {
+      status: 'not_supported_by_official_realtime_events',
+      source: 'local_detector_or_post_meeting_minutes',
+      signal_types: ['speaker_started', 'speaker_ended'],
+      fallback: 'use_local_detector_for_realtime_speaker_markers_and_minutes_for_backfill',
     },
     post_meeting_transcript: {
       status: 'supported',
@@ -188,6 +202,12 @@ const platformCapabilityContracts = Object.freeze({
       status: 'supported_best_effort',
       source: 'Google Workspace Events participant joined/left',
       signal_types: ['participant_joined', 'participant_left'],
+    },
+    speaker_activity: {
+      status: 'not_supported_by_workspace_events',
+      source: 'local_detector_or_post_meeting_transcript_entries',
+      signal_types: ['speaker_started', 'speaker_ended'],
+      fallback: 'use_local_detector_for_realtime_speaker_markers_and_conferenceRecords_transcripts_entries_for_backfill',
     },
     post_meeting_transcript: {
       status: 'supported',
@@ -238,6 +258,12 @@ const platformCapabilityContracts = Object.freeze({
       source: 'Microsoft Graph meetingCallEvents rosterUpdated',
       signal_types: ['participant_joined', 'participant_left'],
     },
+    speaker_activity: {
+      status: 'not_supported_by_graph_meeting_call_events',
+      source: 'local_detector_or_post_meeting_callTranscript',
+      signal_types: ['speaker_started', 'speaker_ended'],
+      fallback: 'use_local_detector_for_realtime_speaker_markers_and_callTranscript_for_backfill',
+    },
     post_meeting_transcript: {
       status: 'supported',
       availability: 'post_meeting',
@@ -287,6 +313,12 @@ const platformCapabilityContracts = Object.freeze({
       source: 'Zoom Meeting webhooks participant_joined/participant_left',
       signal_types: ['participant_joined', 'participant_left'],
     },
+    speaker_activity: {
+      status: 'not_supported_by_zoom_meeting_webhooks',
+      source: 'local_detector_or_post_meeting_transcript_vtt',
+      signal_types: ['speaker_started', 'speaker_ended'],
+      fallback: 'use_local_detector_for_realtime_speaker_markers_and_recording_transcript_for_backfill',
+    },
     post_meeting_transcript: {
       status: 'supported_when_cloud_recording_transcript_enabled',
       availability: 'post_meeting',
@@ -334,6 +366,12 @@ const platformCapabilityContracts = Object.freeze({
       status: 'supported_best_effort',
       source: 'Webex webhooks meetingParticipants joined/left',
       signal_types: ['participant_joined', 'participant_left'],
+    },
+    speaker_activity: {
+      status: 'not_supported_by_webex_meeting_webhooks',
+      source: 'local_detector_or_post_meeting_transcript',
+      signal_types: ['speaker_started', 'speaker_ended'],
+      fallback: 'use_local_detector_for_realtime_speaker_markers_and_meeting_transcripts_for_backfill',
     },
     post_meeting_transcript: {
       status: 'supported',
@@ -671,6 +709,7 @@ export function platformSetupManifest(platform, options = {}) {
         'Run the detector in a trusted host context such as a desktop observer, browser extension, e-ink companion app, or explicit manual controller.',
         'When the detector knows a real meeting is active, send meeting_started with detected_platform, meeting_id or meeting_url, and start_time_ms when available.',
         'Send meeting_ended when the local observer confirms the meeting is closed.',
+        'Send speaker_started or active_speaker when the observer detects an active speaker change; send speaker_ended only when the observer has a reliable speech-end signal.',
         'Use captured_at_ms on annotations; do not wait for provider transcript or webhook events before creating the realtime axis.',
         'Let provider-specific webhooks backfill or reconcile metadata when they arrive later.',
       ],

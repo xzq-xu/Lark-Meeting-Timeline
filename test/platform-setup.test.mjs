@@ -39,7 +39,9 @@ const localDetectorManifest = platformSetupManifest('desktop-observer', { baseUr
 assert.equal(localDetectorManifest.endpoint, 'https://timeline.example.com/api/platform-events/local-detector');
 assert.equal(localDetectorManifest.default_event_types.includes('meeting_started'), true);
 assert.equal(LOCAL_DETECTOR_EVENT_TYPES.includes('meeting_ended'), true);
+assert.equal(LOCAL_DETECTOR_EVENT_TYPES.includes('speaker_started'), true);
 assert.equal(localDetectorManifest.capabilities.realtime_axis.status, 'supported');
+assert.equal(localDetectorManifest.capabilities.speaker_activity.signal_types.includes('speaker_started'), true);
 assert.equal(localDetectorManifest.capabilities.sdk_modules.events, '@ai-annotation/meeting-timeline-sdk/adapters/local-detector');
 const localDetectorMaintenance = evaluatePlatformSubscriptionMaintenance('local-detector', {});
 assert.equal(localDetectorMaintenance.renewal_supported, false);
@@ -63,6 +65,7 @@ assert.equal(googleManifest.lifecycle_event_types.includes('google.workspace.eve
 assert.equal(googleManifest.required_security_env.includes('GOOGLE_PUBSUB_OIDC_AUDIENCE'), true);
 assert.equal(GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES.includes('google.workspace.events.subscription.v1.expired'), true);
 assert.equal(googleManifest.capabilities.realtime_axis.status, 'supported_best_effort');
+assert.equal(googleManifest.capabilities.speaker_activity.status, 'not_supported_by_workspace_events');
 assert.equal(googleManifest.capabilities.post_meeting_transcript.import_endpoint, '/api/import/transcript');
 assert.equal(googleManifest.capabilities.sdk_modules.events, '@ai-annotation/meeting-timeline-sdk/adapters/google-meet');
 

@@ -100,6 +100,29 @@ assert.equal(calls.at(-1).input.platform, 'google_meet');
 assert.equal(calls.at(-1).input.detector_source, 'google_meet_local_detector');
 assert.equal(calls.at(-1).input.start_time_ms, startMs);
 
+const localDetectorSpeakerResult = await ingestPlatformEvent(
+  client,
+  'local-detector',
+  {
+    type: 'active_speaker',
+    detected_platform: 'google_meet',
+    meeting_id: 'local-google-meet-001',
+    occurred_at_ms: startMs + 15_000,
+    speaker: {
+      id: 'speaker-ada',
+      name: 'Ada',
+    },
+  },
+  { speakerAsAnnotation: true },
+);
+assert.equal(localDetectorSpeakerResult.platform, 'local_detector');
+assert.equal(localDetectorSpeakerResult.signals[0].type, 'speaker_started');
+assert.equal(localDetectorSpeakerResult.results[0].action, 'insertSpeakerMark');
+assert.equal(calls.at(-1).method, 'insertMark');
+assert.equal(calls.at(-1).input.kind, 'speaker_started');
+assert.equal(calls.at(-1).input.label, 'Ada speaking');
+assert.equal(calls.at(-1).input.captured_at_ms, startMs + 15_000);
+
 const larkStartResult = await ingestPlatformEvent(client, 'lark-suite', larkStartEvent);
 assert.equal(larkStartResult.platform, 'lark');
 assert.equal(larkStartResult.results[0].action, 'startMeeting');

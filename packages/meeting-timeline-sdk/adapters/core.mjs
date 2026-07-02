@@ -9,6 +9,8 @@ export const MEETING_SIGNAL_TYPES = Object.freeze([
   'meeting_ended',
   'participant_joined',
   'participant_left',
+  'speaker_started',
+  'speaker_ended',
   'artifact_ready',
   'subscription_lifecycle',
 ]);
@@ -136,6 +138,8 @@ export function normalizeMeetingSignal(input = {}, defaults = {}) {
     source: normalizeSource(firstNonEmpty(input.source, defaults.source)),
     participant_id: firstNonEmpty(input.participant_id, input.participantId),
     participant_name: firstNonEmpty(input.participant_name, input.participantName),
+    speaker_id: firstNonEmpty(input.speaker_id, input.speakerId, input.participant_id, input.participantId),
+    speaker_name: firstNonEmpty(input.speaker_name, input.speakerName, input.participant_name, input.participantName),
     artifact_kind: firstNonEmpty(input.artifact_kind, input.artifactKind),
     artifact_id: firstNonEmpty(input.artifact_id, input.artifactId),
     artifact_url: firstNonEmpty(input.artifact_url, input.artifactUrl, input.url),
@@ -190,6 +194,28 @@ function signalToParticipantMark(signal) {
   });
 }
 
+function signalToSpeakerMark(signal) {
+  const action = signal.type === 'speaker_ended' ? 'stopped speaking' : 'speaking';
+  const name = signal.speaker_name || signal.speaker_id || signal.participant_name || signal.participant_id || 'speaker';
+  return compactObject({
+    id: signal.source_event_id,
+    source: `${signal.meeting.platform}_speaker`,
+    captured_at_ms: signal.occurred_at_ms,
+    kind: signal.type,
+    label: `${name} ${action}`,
+    intent: 'speaker_track',
+    payload: {
+      meeting: signal.meeting,
+      speaker_id: signal.speaker_id,
+      speaker_name: signal.speaker_name,
+      participant_id: signal.participant_id,
+      participant_name: signal.participant_name,
+      source_event_id: signal.source_event_id,
+      raw: signal.raw,
+    },
+  });
+}
+
 export async function applyMeetingSignal(client, signalInput, options = {}) {
   const signal = normalizeMeetingSignal(signalInput, options.defaults);
   if (signal.type === 'meeting_started') {
@@ -213,6 +239,18 @@ export async function applyMeetingSignal(client, signalInput, options = {}) {
       return { applied: true, action: 'insertParticipantMark', signal, response };
     }
     return { applied: false, action: 'skipParticipantSignal', reason: 'participant_track_not_configured', signal };
+  }
+  if (signal.type === 'speaker_started' || signal.type === 'speaker_ended') {
+    if (typeof options.onSpeakerSignal === 'function') {
+      const response = await options.onSpeakerSignal(signal, client);
+      return { applied: true, action: 'onSpeakerSignal', signal, response };
+    }
+    if (options.speakerAsAnnotation === true || options.speakerAsMark === true) {
+      requireFunction(client, 'insertMark');
+      const response = await client.insertMark(signalToSpeakerMark(signal), { requireCapturedAt: true });
+      return { applied: true, action: 'insertSpeakerMark', signal, response };
+    }
+    return { applied: false, action: 'skipSpeakerSignal', reason: 'speaker_track_not_configured', signal };
   }
   if (signal.type === 'artifact_ready') {
     if (typeof options.onArtifactSignal === 'function') {
