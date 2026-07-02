@@ -68,6 +68,7 @@ assert.equal(googleManifest.capabilities.realtime_axis.status, 'supported_best_e
 assert.equal(googleManifest.capabilities.speaker_activity.status, 'not_supported_by_workspace_events');
 assert.equal(googleManifest.capabilities.post_meeting_transcript.import_endpoint, '/api/import/transcript');
 assert.equal(googleManifest.capabilities.sdk_modules.events, '@ai-annotation/meeting-timeline-sdk/adapters/google-meet');
+assert.equal(googleManifest.capabilities.sdk_modules.webhook_handler, '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler');
 
 const googleCapabilities = platformCapabilityContract('google-meet', { baseUrl });
 assert.equal(googleCapabilities.endpoints.platform_events, 'https://timeline.example.com/api/platform-events/google-meet');

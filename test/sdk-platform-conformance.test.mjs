@@ -59,6 +59,7 @@ for (const platform of MEETING_PLATFORM_KEYS) {
   assert.equal(capability.endpoints.transcript_import, `${baseUrl}/api/import/transcript`);
   assert.equal(typeof capability.sdk_modules.events, 'string');
   assert.equal(capability.sdk_modules.ingest, '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest');
+  assert.equal(capability.sdk_modules.webhook_handler, '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler');
   assert.equal(typeof capability.sdk_modules.transcript, 'string');
   assert.equal(typeof capability.sdk_modules.setup, 'string');
   assert.equal(typeof capability.sdk_modules.security, 'string');

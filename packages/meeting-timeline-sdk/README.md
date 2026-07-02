@@ -89,6 +89,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/webex`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/transcript`
 - `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-setup`
@@ -121,6 +122,56 @@ await ingestPlatformEvent(timeline, 'google-meet', req.body, {
 ```
 
 `ingestPlatformEvent()` 内部会按平台名选择 normalizer，把原始事件转成 `NormalizedMeetingSignal[]`，再调用 `startMeeting`、`endMeeting` 或可选的 participant/artifact handler。对于 Google Meet / Teams / Zoom / Webex，新项目可以优先接这一层，只有需要自定义事件验签、补拉详情或 artifact 导入时再下钻到 registry/core。
+
+如果外部项目想直接复用完整 HTTP webhook 入口，可以用 `platform-webhook-handler`。它会处理 Microsoft Graph `validationToken`、Zoom `endpoint.url_validation`、Zoom/Webex/Teams/Google Pub/Sub 验证，再把事件交给 `ingestPlatformEvent()`：
+
+```js
+import { createMeetingTimelineClient } from '@ai-annotation/meeting-timeline-sdk';
+import { createPlatformWebhookHandler } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler';
+
+const timeline = createMeetingTimelineClient({ baseUrl: 'http://localhost:8787' });
+const handleWebhook = createPlatformWebhookHandler(timeline, {
+  googleMeet: {
+    expectedAudience: 'https://timeline.example.com/api/platform-events/google-meet',
+    serviceAccountEmail: 'pubsub-pusher@demo.iam.gserviceaccount.com',
+  },
+  microsoftTeams: {
+    clientState: process.env.MICROSOFT_GRAPH_CLIENT_STATE,
+  },
+  zoom: {
+    secretToken: process.env.ZOOM_WEBHOOK_SECRET_TOKEN,
+  },
+  webex: {
+    secret: process.env.WEBEX_WEBHOOK_SECRET,
+  },
+});
+
+// Express/Fastify/Koa/Node 原生都可以套这一层；关键是传入原始 rawBody。
+const result = await handleWebhook({
+  platform: 'google-meet',
+  method: req.method,
+  url: req.url,
+  headers: req.headers,
+  body: req.body,
+  rawBody: req.rawBody,
+});
+
+res.status(result.status).set(result.headers).send(result.body);
+```
+
+本地观察器或汉王宿主 App 也可以走同一个 handler，只是默认验证结果会是 `platform_verification_not_configured`：
+
+```js
+await handleWebhook({
+  platform: 'local-detector',
+  body: {
+    type: 'meeting_started',
+    detected_platform: 'google_meet',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+    start_time_ms: Date.now(),
+  },
+});
+```
 
 桌面观察器或电子纸宿主 App 不需要等官方 webhook，可以直接走 `local-detector`：
 
