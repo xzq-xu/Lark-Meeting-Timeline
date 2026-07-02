@@ -8,6 +8,24 @@ import {
 const startMs = 1_782_442_800_000;
 const startIso = new Date(startMs).toISOString();
 
+const larkStartEvent = {
+  header: {
+    event_id: 'lark-start-1',
+    event_type: 'vc.meeting.all_meeting_started_v1',
+    create_time: String(startMs),
+  },
+  event: {
+    meeting: {
+      id: 'lark-meeting-001',
+      meeting_no: '123456789',
+      topic: 'Lark product review',
+      url: 'https://vc.feishu.cn/j/lark-meeting-001',
+      start_time: String(Math.round(startMs / 1000)),
+    },
+    minute_token: 'minute-token-001',
+  },
+};
+
 const googleStartEvent = {
   id: 'google-start-1',
   type: 'google.workspace.meet.conference.v2.started',
@@ -24,6 +42,12 @@ assert.equal(normalized.source, 'google_meet_webhook');
 assert.equal(normalized.signals.length, 1);
 assert.equal(normalized.signals[0].type, 'meeting_started');
 assert.equal(normalized.signals[0].meeting.meeting_id, 'google-record-001');
+
+const normalizedLark = normalizePlatformEvent('feishu', larkStartEvent);
+assert.equal(normalizedLark.platform, 'lark');
+assert.equal(normalizedLark.source, 'lark_webhook');
+assert.equal(normalizedLark.signals[0].meeting.meeting_id, 'lark-meeting-001');
+assert.equal(normalizedLark.signals[0].meeting.minute_token, 'minute-token-001');
 
 const calls = [];
 const client = {
@@ -50,6 +74,12 @@ assert.equal(startResult.results.length, 1);
 assert.equal(startResult.results[0].action, 'startMeeting');
 assert.equal(calls.at(-1).method, 'startMeeting');
 assert.equal(calls.at(-1).input.start_time_ms, startMs);
+
+const larkStartResult = await ingestPlatformEvent(client, 'lark-suite', larkStartEvent);
+assert.equal(larkStartResult.platform, 'lark');
+assert.equal(larkStartResult.results[0].action, 'startMeeting');
+assert.equal(calls.at(-1).input.platform, 'lark');
+assert.equal(calls.at(-1).input.minute_token, 'minute-token-001');
 
 const zoomParticipantResult = await ingestPlatformEvent(
   client,

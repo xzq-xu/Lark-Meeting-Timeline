@@ -5,6 +5,7 @@ import {
   normalizeMeetingSignal,
 } from '../packages/meeting-timeline-sdk/adapters/core.mjs';
 import { normalizeGoogleMeetEvent, unwrapGooglePubSubEvent } from '../packages/meeting-timeline-sdk/adapters/google-meet.mjs';
+import { normalizeLarkEvent } from '../packages/meeting-timeline-sdk/adapters/lark.mjs';
 import { normalizeMicrosoftTeamsEvent } from '../packages/meeting-timeline-sdk/adapters/microsoft-teams.mjs';
 import { normalizeWebexEvent } from '../packages/meeting-timeline-sdk/adapters/webex.mjs';
 import { normalizeZoomEvent } from '../packages/meeting-timeline-sdk/adapters/zoom.mjs';
@@ -126,6 +127,73 @@ const appliedLifecycle = await applyMeetingSignal(client, lifecycleSignal, {
 assert.equal(appliedLifecycle.applied, true);
 assert.equal(appliedLifecycle.action, 'onSubscriptionLifecycleSignal');
 assert.equal(appliedLifecycle.response.subscription, 'subscriptions/google-sub-001');
+
+const larkStart = normalizeLarkEvent({
+  header: {
+    event_id: 'lark-start-1',
+    event_type: 'vc.meeting.all_meeting_started_v1',
+    create_time: String(startMs),
+  },
+  event: {
+    meeting: {
+      id: 'lark-meeting-001',
+      meeting_no: '123456789',
+      topic: 'Lark product review',
+      url: 'https://vc.feishu.cn/j/lark-meeting-001',
+      start_time: String(Math.round(startMs / 1000)),
+    },
+    minute_token: 'minute-token-001',
+  },
+});
+assert.equal(larkStart.length, 1);
+assert.equal(larkStart[0].type, 'meeting_started');
+assert.equal(larkStart[0].meeting.platform, 'lark');
+assert.equal(larkStart[0].meeting.meeting_id, 'lark-meeting-001');
+assert.equal(larkStart[0].meeting.external_meeting_id, '123456789');
+assert.equal(larkStart[0].meeting.minute_token, 'minute-token-001');
+assert.equal(larkStart[0].occurred_at_ms, startMs);
+
+const larkStartResult = await applyMeetingSignal(client, larkStart[0]);
+assert.equal(larkStartResult.action, 'startMeeting');
+assert.equal(calls.at(-1).input.minute_token, 'minute-token-001');
+
+const larkJoin = normalizeLarkEvent({
+  header: {
+    event_id: 'lark-join-1',
+    event_type: 'vc.meeting.join_meeting_v1',
+    create_time: String(startMs + 60_000),
+  },
+  event: {
+    meeting: {
+      id: 'lark-meeting-001',
+      topic: 'Lark product review',
+      start_time: String(Math.round(startMs / 1000)),
+    },
+    user: {
+      open_id: 'ou_001',
+      name: 'Ada',
+    },
+  },
+});
+assert.equal(larkJoin[0].type, 'participant_joined');
+assert.equal(larkJoin[0].participant_id, 'ou_001');
+assert.equal(larkJoin[0].participant_name, 'Ada');
+
+const larkEnd = normalizeLarkEvent({
+  header: {
+    event_id: 'lark-end-1',
+    event_type: 'vc.meeting.all_meeting_ended_v1',
+  },
+  event: {
+    meeting: {
+      id: 'lark-meeting-001',
+      start_time: String(Math.round(startMs / 1000)),
+      end_time: String(Math.round((startMs + 600_000) / 1000)),
+    },
+  },
+});
+assert.equal(larkEnd[0].type, 'meeting_ended');
+assert.equal(larkEnd[0].occurred_at_ms, startMs + 600_000);
 
 const googleStart = normalizeGoogleMeetEvent({
   id: 'g-start-1',

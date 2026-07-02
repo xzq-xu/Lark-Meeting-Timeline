@@ -91,9 +91,11 @@ try {
   assert.equal(typeof info.platform_events.setup_endpoint, 'string');
   assert.equal(info.platform_events.platforms.some((item) => item.platform === 'google_meet'), true);
   assert.equal(info.platform_events.platforms.some((item) => item.platform === 'webex'), true);
+  assert.equal(info.platform_events.platforms.some((item) => item.platform === 'lark'), true);
 
   const setup = await getJson(baseUrl, '/api/platform-events/setup');
-  assert.equal(setup.setup.length, 4);
+  assert.equal(setup.setup.length, 5);
+  assert.equal(setup.setup.some((item) => item.platform === 'lark' && item.endpoint === `${baseUrl}/api/platform-events/lark`), true);
   assert.equal(setup.setup.some((item) => item.platform === 'google_meet' && item.endpoint === `${baseUrl}/api/platform-events/google-meet`), true);
   assert.equal(setup.setup.some((item) => item.platform === 'webex' && item.endpoint === `${baseUrl}/api/platform-events/webex`), true);
   assert.equal(setup.security_env_configured.GOOGLE_PUBSUB_OIDC_AUDIENCE, false);
@@ -400,7 +402,32 @@ try {
       && event.metadata?.artifact_url === 'https://webex.example/webex-transcript-1.vtt'
   )), true);
 
+  const larkStart = await postJson(baseUrl, '/api/platform-events/lark', {
+    force: true,
+    header: {
+      event_id: 'lark-start-001',
+      event_type: 'vc.meeting.all_meeting_started_v1',
+      create_time: String(startMs),
+    },
+    event: {
+      meeting: {
+        id: 'lark-meeting-001',
+        meeting_no: '654321',
+        topic: 'Lark platform event test',
+        url: 'https://vc.feishu.cn/j/lark-meeting-001',
+        start_time: String(Math.round(startMs / 1000)),
+      },
+      minute_token: 'minute-token-001',
+    },
+  });
+  assert.equal(larkStart.results[0].action, 'startMeeting');
+  assert.equal(larkStart.state.meeting.source, 'lark_webhook');
+  assert.equal(larkStart.state.meeting.platform, 'lark');
+  assert.equal(larkStart.state.meeting.meeting_id, 'lark-meeting-001');
+  assert.equal(larkStart.state.meeting.minute_token, 'minute-token-001');
+
   const allStatus = await getJson(baseUrl, '/api/platform-events/status');
+  assert.equal(allStatus.status.lark.received_count, 1);
   assert.equal(allStatus.status.google_meet.received_count, 7);
   assert.equal(allStatus.status.microsoft_teams.received_count, 3);
   assert.equal(allStatus.status.zoom.received_count, 2);

@@ -6287,6 +6287,10 @@ function publicPlatformEventStatus(req, adapter = null) {
 
 function platformSetupSecurityConfig() {
   return {
+    LARK_APP_ID: Boolean(process.env.LARK_APP_ID),
+    LARK_APP_SECRET: Boolean(process.env.LARK_APP_SECRET),
+    LARK_ENCRYPT_KEY: Boolean(process.env.LARK_ENCRYPT_KEY),
+    LARK_VERIFICATION_TOKEN: Boolean(process.env.LARK_VERIFICATION_TOKEN),
     ZOOM_WEBHOOK_SECRET_TOKEN: Boolean(process.env.ZOOM_WEBHOOK_SECRET_TOKEN),
     WEBEX_WEBHOOK_SECRET: Boolean(process.env.WEBEX_WEBHOOK_SECRET),
     MICROSOFT_GRAPH_CLIENT_STATE: Boolean(process.env.MICROSOFT_GRAPH_CLIENT_STATE),

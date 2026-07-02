@@ -1,4 +1,5 @@
 import { normalizeGoogleMeetEvent } from './google-meet.mjs';
+import { normalizeLarkEvent } from './lark.mjs';
 import { normalizeMicrosoftTeamsEvent } from './microsoft-teams.mjs';
 import {
   MEETING_PLATFORM_ALIASES,
@@ -9,6 +10,7 @@ import { normalizeWebexEvent } from './webex.mjs';
 import { normalizeZoomEvent } from './zoom.mjs';
 
 const normalizers = Object.freeze({
+  lark: normalizeLarkEvent,
   google_meet: normalizeGoogleMeetEvent,
   microsoft_teams: normalizeMicrosoftTeamsEvent,
   zoom: normalizeZoomEvent,

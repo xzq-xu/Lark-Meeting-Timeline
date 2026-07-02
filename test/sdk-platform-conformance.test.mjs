@@ -18,14 +18,16 @@ import {
 import * as transcriptAdapters from '../packages/meeting-timeline-sdk/adapters/transcript.mjs';
 
 const baseUrl = 'https://timeline.example.com';
-const expectedPlatforms = ['google_meet', 'microsoft_teams', 'zoom', 'webex'];
+const expectedPlatforms = ['lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex'];
 
 assert.deepEqual([...MEETING_PLATFORM_KEYS], expectedPlatforms);
+assert.equal(MEETING_PLATFORM_ALIASES.feishu, 'lark');
 assert.equal(MEETING_PLATFORM_ALIASES['google-meet'], 'google_meet');
 assert.equal(MEETING_PLATFORM_ALIASES['microsoft-teams'], 'microsoft_teams');
 assert.equal(normalizeMeetingPlatform('meet'), 'google_meet');
 assert.equal(normalizeMeetingPlatform('teams'), 'microsoft_teams');
 assert.equal(normalizeMeetingPlatform('cisco-webex'), 'webex');
+assert.equal(normalizeMeetingPlatform('lark-suite'), 'lark');
 assert.throws(() => normalizeMeetingPlatform('unknown-meeting-platform'), /Unsupported meeting platform/);
 assert.equal(meetingPlatformEventAdapterFor('unknown-meeting-platform'), null);
 

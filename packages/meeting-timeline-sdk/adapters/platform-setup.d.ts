@@ -1,3 +1,4 @@
+export const LARK_MEETING_EVENT_TYPES: readonly string[];
 export const GOOGLE_MEET_EVENT_TYPES: readonly string[];
 export const GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES: readonly string[];
 export const MICROSOFT_TEAMS_CHANGE_TYPES: readonly string[];

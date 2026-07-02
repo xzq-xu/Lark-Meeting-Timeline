@@ -21,6 +21,7 @@ export interface NormalizedMeetingIdentity {
   meeting_id: string;
   external_meeting_id?: string;
   meeting_url?: string;
+  minute_token?: string;
   title?: string;
   organizer_id?: string;
   organizer_name?: string;

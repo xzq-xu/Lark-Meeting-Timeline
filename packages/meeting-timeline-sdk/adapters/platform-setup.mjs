@@ -1,5 +1,14 @@
 import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
 
+export const LARK_MEETING_EVENT_TYPES = Object.freeze([
+  'vc.meeting.all_meeting_started_v1',
+  'vc.meeting.all_meeting_ended_v1',
+  'vc.meeting.meeting_started_v1',
+  'vc.meeting.meeting_ended_v1',
+  'vc.meeting.join_meeting_v1',
+  'vc.meeting.leave_meeting_v1',
+]);
+
 export const GOOGLE_MEET_EVENT_TYPES = Object.freeze([
   'google.workspace.meet.conference.v2.started',
   'google.workspace.meet.conference.v2.ended',
@@ -39,9 +48,14 @@ export const WEBEX_WEBHOOK_RESOURCES = Object.freeze([
   { resource: 'meetingTranscripts', events: ['created'] },
 ]);
 
-export const MEETING_PLATFORM_KEYS = Object.freeze(['google_meet', 'microsoft_teams', 'zoom', 'webex']);
+export const MEETING_PLATFORM_KEYS = Object.freeze(['lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex']);
 
 export const MEETING_PLATFORM_ALIASES = Object.freeze({
+  lark: 'lark',
+  feishu: 'lark',
+  'fei-shu': 'lark',
+  larksuite: 'lark',
+  'lark-suite': 'lark',
   'google-meet': 'google_meet',
   google_meet: 'google_meet',
   meet: 'google_meet',
@@ -55,6 +69,54 @@ export const MEETING_PLATFORM_ALIASES = Object.freeze({
 });
 
 const platformCapabilityContracts = Object.freeze({
+  lark: {
+    platform: 'lark',
+    display_name: 'Feishu / Lark',
+    realtime_axis: {
+      status: 'supported',
+      source: 'Feishu/Lark long-connection events or HTTP event callback',
+      signal_types: ['meeting_started', 'meeting_ended'],
+      fallback: 'current_user_meeting_scan_or_local_detector_recommended_when_event_delivery_lags',
+    },
+    participant_track: {
+      status: 'supported_best_effort',
+      source: 'Feishu/Lark join_meeting_v1 and leave_meeting_v1 events',
+      signal_types: ['participant_joined', 'participant_left'],
+    },
+    post_meeting_transcript: {
+      status: 'supported',
+      availability: 'post_meeting',
+      source: 'Feishu/Lark Minutes search/basic/transcript export APIs',
+      import_endpoint: '/api/import/transcript',
+      sdk_normalizer: null,
+    },
+    recording: {
+      status: 'metadata_supported',
+      availability: 'post_meeting',
+      source: 'Feishu/Lark meeting artifact or minutes metadata when available',
+      signal_types: ['artifact_ready'],
+    },
+    subscription_lifecycle: {
+      status: 'not_applicable_for_long_connection',
+      detail: 'local_demo_prefers_long_connection_event_delivery_and_current_user_scan_fallback',
+    },
+    realtime_transcript: {
+      status: 'not_supported',
+      detail: 'native_path_is_post_meeting_minutes_import',
+    },
+    sdk_modules: {
+      events: '@ai-annotation/meeting-timeline-sdk/adapters/lark',
+      ingest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest',
+      transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
+      setup: '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup',
+      security: '@ai-annotation/meeting-timeline-sdk/adapters/webhook-security',
+    },
+    limitations: [
+      'event_delivery_can_lag_or_depend_on_app_publication_and_event_subscription_mode',
+      'all_meeting_events_require_tenant_level_meeting_permission',
+      'minutes_transcript_export_can_require_separate_oauth_scopes_or_approval',
+    ],
+  },
   google_meet: {
     platform: 'google_meet',
     display_name: 'Google Meet',
@@ -503,6 +565,7 @@ export function buildGoogleWorkspaceSubscriptionRenewalRequest(input = {}) {
 export function platformEventEndpoint(baseUrl, platform) {
   const key = normalizePlatform(platform);
   const path = {
+    lark: '/api/platform-events/lark',
     google_meet: '/api/platform-events/google-meet',
     microsoft_teams: '/api/platform-events/teams',
     zoom: '/api/platform-events/zoom',
@@ -535,6 +598,31 @@ export function platformSetupManifest(platform, options = {}) {
     ? `${endpoint}/status`
     : null;
   const manifests = {
+    lark: {
+      platform: 'lark',
+      display_name: 'Feishu / Lark',
+      endpoint,
+      status_endpoint: statusEndpoint,
+      transport: 'Feishu/Lark long connection or HTTP event callback',
+      capabilities: platformCapabilityContract('lark', options),
+      default_event_types: LARK_MEETING_EVENT_TYPES,
+      required_permissions: [
+        'vc:meeting.all_meeting:readonly',
+        'vc:meeting.search:read for current-user scan fallback',
+        'minutes:minutes.search:read / minutes:minutes.basic:read / minutes:minutes.transcript:export for post-meeting minutes',
+      ],
+      required_security_env: [],
+      optional_security_env: ['LARK_APP_ID', 'LARK_APP_SECRET', 'LARK_ENCRYPT_KEY', 'LARK_VERIFICATION_TOKEN'],
+      required_setup: [
+        'Create a Feishu/Lark app and configure meeting event subscriptions.',
+        'Prefer long-connection event delivery for local development; use HTTP callback only when a public HTTPS callback is available.',
+        'Subscribe to all_meeting_started/all_meeting_ended as the direct meeting axis source.',
+        'Subscribe to join_meeting/leave_meeting when participant track is needed.',
+        'Use current-user meeting search or a local detector as a fallback when event delivery is delayed.',
+        'Import Minutes transcript after the meeting rather than blocking realtime annotation on transcript availability.',
+      ],
+      builders: [],
+    },
     google_meet: {
       platform: 'google_meet',
       display_name: 'Google Meet',
@@ -706,14 +794,16 @@ export function evaluatePlatformSubscriptionMaintenance(platform, subscription =
   const key = normalizePlatform(platform);
   const nowMs = parseTimeMs(options.now) ?? Date.now();
   const renewalWindowMs = Number(options.renewalWindowMs ?? options.renewal_window_ms ?? 12 * 60 * 60 * 1000);
-  if (key === 'zoom' || key === 'webex') {
+  if (key === 'lark' || key === 'zoom' || key === 'webex') {
     return {
       platform: key,
       status: 'configured_manually',
       renewal_supported: false,
       renewal_due: false,
       expired: false,
-      detail: `${key}_webhook_subscriptions_do_not_require_short_cycle_renewal`,
+      detail: key === 'lark'
+        ? 'lark_long_connection_or_event_callback_does_not_use_short_cycle_subscription_renewal'
+        : `${key}_webhook_subscriptions_do_not_require_short_cycle_renewal`,
     };
   }
   const expiresAtMs = subscriptionExpirationMs(subscription);
