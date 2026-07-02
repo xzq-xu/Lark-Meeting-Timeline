@@ -330,7 +330,9 @@ export function normalizeBrowserActiveSpeakerSample(input = {}, options = {}) {
     } : undefined,
     speaking: speaker ? speaking : false,
     observedAtMs: observedAtMs(input, options),
-    source_event_id: firstPath(input, ['source_event_id', 'sourceEventId', 'event_id', 'eventId', 'id']),
+    source_event_id: firstPath(input, ['source_event_id', 'sourceEventId', 'event_id', 'eventId', 'id'])
+      ? `${firstPath(input, ['source_event_id', 'sourceEventId', 'event_id', 'eventId', 'id'])}:active-speaker`
+      : undefined,
     raw: input,
   }), options);
 }

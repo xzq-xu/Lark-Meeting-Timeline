@@ -93,6 +93,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/active-speaker`
 - `@ai-annotation/meeting-timeline-sdk/adapters/browser-meeting`
 - `@ai-annotation/meeting-timeline-sdk/adapters/native-meeting`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-source`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
 - `@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge`
@@ -237,6 +238,31 @@ await nativeMeetings.observe({
 ```
 
 没有 URL 的 native app 会优先使用显式 `meetingId`；如果宿主拿不到会议 ID，SDK 会基于平台、会议窗口标题或窗口 ID 生成 `native-{platform}-...` 会话 ID。这个 ID 可以先保证实时标注落轴，后续官方 webhook 或会后转写到达后再做 reconcile。
+
+如果一个项目同时接浏览器扩展、桌面客户端观察器和官方 webhook，推荐用 `meeting-source` 作为总入口。它给 browser/native/local/provider 共用同一个 reconciler，避免重复建轴，并允许官方事件晚到后校准本地轴：
+
+```js
+import { createMeetingSourceAggregator } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-source';
+
+const meetingSources = createMeetingSourceAggregator(timeline, {
+  applyOptions: { speakerAsAnnotation: true },
+  speakerOptions: { minStableMs: 300, switchStableMs: 400, endIdleMs: 1500 },
+  reconcileOptions: { duplicateWindowMs: 60_000 },
+});
+
+await meetingSources.observeBrowser(browserSnapshot, { observedAtMs: Date.now() });
+await meetingSources.observeNative(nativeAppSnapshot, { observedAtMs: Date.now() });
+await meetingSources.ingestProvider('google-meet', googleWorkspaceEventBody);
+
+await meetingSources.insertMark({
+  capturedAtMs: Date.now(),
+  kind: 'handwriting_trigger',
+  label: 'why?',
+  intent: 'question',
+});
+```
+
+`meeting-source` 的返回值会带 `rawSignals`、`signals`、`reconciliation.skipped` 和 `diagnostic`，方便在接入现场判断是“未识别出会议窗口”、还是“被 provider 事件接管后本地重复信号被跳过”。
 
 如果业务项目要接入多个会议平台，推荐从 `platform-kit` 开始。它把 `timeline-bridge`、webhook router、平台 setup/onboarding、fixture acceptance 组合成一个入口；底层 normalizer、验签、artifact fetch 仍然可以按需单独 import：
 

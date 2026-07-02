@@ -212,16 +212,30 @@ function speakerStateKey(signal) {
   ].join('|');
 }
 
+function speakerSubject(signal) {
+  return signal.speaker_id ?? signal.speaker_name ?? signal.participant_id ?? signal.participant_name ?? 'speaker';
+}
+
 function reconcileSpeaker(state, signal, options) {
   const speakerWindowMs = Number(options.speakerRepeatWindowMs ?? options.speaker_repeat_window_ms ?? 5_000);
   const key = speakerStateKey(signal);
-  const existing = state.recent_speakers.find((item) => item.key === key && item.type === signal.type);
+  const ref = meetingRef(signal);
+  const subject = speakerSubject(signal);
+  const existing = state.recent_speakers.find((item) => (
+    item.type === signal.type
+    && (
+      item.key === key
+      || (item.subject === subject && sameMeetingRef(item.ref ?? {}, ref))
+    )
+  ));
   if (existing && near(existing.occurred_at_ms, signalTime(signal), speakerWindowMs)) {
     return skipped(signal, 'duplicate_speaker_signal', { existing });
   }
   state.recent_speakers = state.recent_speakers.filter((item) => item.key !== key || item.type !== signal.type);
   state.recent_speakers.push({
     key,
+    ref,
+    subject,
     type: signal.type,
     occurred_at_ms: signalTime(signal),
     source: sourceOf(signal),
