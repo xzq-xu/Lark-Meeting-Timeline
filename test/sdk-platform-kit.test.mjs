@@ -62,6 +62,8 @@ const googleOverview = kit.platform('google-meet');
 assert.equal(googleOverview.platform, 'google_meet');
 assert.equal(googleOverview.webhook_route, `${basePath}/google-meet`);
 assert.equal(googleOverview.fixture_samples.some((item) => item.label === 'google_meet:meeting_start'), true);
+assert.equal(googleOverview.meeting_app_fixture.coverage.meeting_started, true);
+assert.equal(googleOverview.meeting_app_fixture.coverage.speaker_started, true);
 assert.equal(googleOverview.integration_plan.recommended_mode, 'hybrid_local_observer_first');
 
 const fixtureAcceptance = kit.fixtureAcceptance('google-meet', {
@@ -72,6 +74,23 @@ assert.equal(fixtureAcceptance.coverage.subscription_lifecycle, true);
 
 const diagnostic = kit.diagnose('zoom', buildPlatformFixtureEvent('zoom', 'meeting_start'));
 assert.equal(diagnostic.signal_types.includes('meeting_started'), true);
+
+const webexAppFixture = kit.meetingAppFixture('webex');
+assert.equal(webexAppFixture.platform, 'webex');
+assert.equal(webexAppFixture.meeting_id, 'meet-sdk-fixture');
+
+const zoomAppDiagnosis = kit.diagnoseMeetingAppFixture('zoom');
+assert.deepEqual(zoomAppDiagnosis.signal_types, ['meeting_started', 'speaker_started']);
+assert.equal(zoomAppDiagnosis.coverage.active_speaker, true);
+
+const appFixtures = kit.allMeetingAppFixtures();
+assert.equal(Object.keys(appFixtures).length, 5);
+assert.equal(appFixtures.lark.platform, 'lark');
+
+const appFixtureAcceptance = kit.meetingAppFixtureAcceptance();
+assert.equal(appFixtureAcceptance.accepted, true);
+assert.equal(appFixtureAcceptance.accepted_count, 5);
+assert.equal(appFixtureAcceptance.coverage_by_platform.google_meet.meeting_started, true);
 
 const googleStart = await kit.handleWebhook({
   method: 'POST',
@@ -103,7 +122,10 @@ const report = buildMeetingPlatformKitReport({
   env,
 });
 assert.equal(report.supported_platforms.length, 6);
+assert.equal(report.supported_meeting_app_platforms.length, 5);
 assert.equal(report.webhook_router.base_path, basePath);
 assert.equal(report.fixture_acceptance.accepted_count, 6);
+assert.equal(report.meeting_app_fixture_acceptance.accepted, true);
+assert.equal(report.meeting_app_fixture_acceptance.accepted_count, 5);
 
 console.log('ok meeting platform timeline kit');

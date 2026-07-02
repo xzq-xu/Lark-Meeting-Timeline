@@ -7,6 +7,13 @@ import {
   buildPlatformFixtureAcceptanceInput,
   buildPlatformFixtureSamples,
 } from './platform-fixtures.mjs';
+import {
+  MEETING_APP_FIXTURE_PLATFORMS,
+  buildAllMeetingAppFixtureSnapshots,
+  buildMeetingAppFixtureAcceptanceReport,
+  buildMeetingAppFixtureSnapshot,
+  diagnoseMeetingAppFixture,
+} from './meeting-app-fixtures.mjs';
 import { diagnosePlatformEvent } from './platform-ingest.mjs';
 import { buildMeetingPlatformOnboardingReport, buildMeetingPlatformOnboardingSummary } from './platform-onboarding.mjs';
 import {
@@ -120,15 +127,20 @@ function platformOverview(platform, defaults = {}, options = {}) {
     integration_plan: buildPlatformIntegrationPlan(key, merged),
     webhook_route: platformWebhookRoutePath(key, merged),
     fixture_samples: buildPlatformFixtureSamples(key, merged),
+    meeting_app_fixture: MEETING_APP_FIXTURE_PLATFORMS.includes(key)
+      ? diagnoseMeetingAppFixture(key, merged)
+      : undefined,
   };
 }
 
 export function buildMeetingPlatformKitReport(options = {}) {
   const fixtureInput = buildPlatformFixtureAcceptanceInput(options);
+  const meetingAppFixtureAcceptance = buildMeetingAppFixtureAcceptanceReport(options);
   return {
     base_url: options.baseUrl ?? options.base_url,
     base_path: options.basePath ?? options.base_path ?? '/api/platform-events',
     supported_platforms: MEETING_PLATFORM_KEYS,
+    supported_meeting_app_platforms: MEETING_APP_FIXTURE_PLATFORMS,
     capabilities: allPlatformCapabilityContracts(options),
     webhook_router: buildPlatformWebhookRouterStatus(options),
     onboarding: buildMeetingPlatformOnboardingSummary(options),
@@ -139,6 +151,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
       samples: fixtureInput.samples,
       env: fixtureInput.env,
     }),
+    meeting_app_fixture_acceptance: meetingAppFixtureAcceptance,
   };
 }
 
@@ -258,6 +271,18 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     fixtureInput(fixtureOptions = {}) {
       return buildPlatformFixtureAcceptanceInput(withDefaults(defaults, fixtureOptions));
+    },
+    meetingAppFixture(platform, fixtureOptions = {}) {
+      return buildMeetingAppFixtureSnapshot(platform, withDefaults(defaults, fixtureOptions));
+    },
+    allMeetingAppFixtures(fixtureOptions = {}) {
+      return buildAllMeetingAppFixtureSnapshots(withDefaults(defaults, fixtureOptions));
+    },
+    diagnoseMeetingAppFixture(platform, diagnosticOptions = {}) {
+      return diagnoseMeetingAppFixture(platform, withDefaults(defaults, diagnosticOptions));
+    },
+    meetingAppFixtureAcceptance(reportOptions = {}) {
+      return buildMeetingAppFixtureAcceptanceReport(withDefaults(defaults, reportOptions));
     },
     onboarding(platform, onboardingOptions = {}) {
       return buildMeetingPlatformOnboardingReport(platform, withDefaults(defaults, onboardingOptions));

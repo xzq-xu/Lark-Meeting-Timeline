@@ -377,7 +377,7 @@ await meetingSources.insertMark({
 
 `meeting-source` 的返回值会带 `rawSignals`、`signals`、`reconciliation.skipped` 和 `diagnostic`，方便在接入现场判断是“未识别出会议窗口”、还是“被 provider 事件接管后本地重复信号被跳过”。
 
-如果业务项目要接入多个会议平台，推荐从 `platform-kit` 开始。它把 `timeline-bridge`、webhook router、平台 setup/onboarding、fixture acceptance 组合成一个入口；底层 normalizer、验签、artifact fetch 仍然可以按需单独 import：
+如果业务项目要接入多个会议平台，推荐从 `platform-kit` 开始。它把 `timeline-bridge`、webhook router、平台 setup/onboarding、provider fixture acceptance 和本地 meeting-app fixture acceptance 组合成一个入口；底层 normalizer、验签、artifact fetch 仍然可以按需单独 import：
 
 ```js
 import { createMeetingPlatformTimelineKit } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit';
@@ -398,6 +398,9 @@ const setup = meetingKit.platform('google-meet');
 const fixtureReport = meetingKit.fixtureAcceptance('google-meet', {
   requiredCoverage: ['meeting_start', 'meeting_end', 'participant_track', 'artifact_ready'],
 });
+
+const localAppReport = meetingKit.meetingAppFixtureAcceptance();
+// localAppReport.accepted === true 表示五个平台的本地 DOM/AX 建轴和发言人标注基线通过
 
 await meetingKit.handleWebhook({
   method: req.method,
