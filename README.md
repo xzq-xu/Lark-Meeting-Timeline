@@ -18,6 +18,8 @@
 - 手动导入任意数据序列 JSON
 - 在浏览器中可视化 transcript、meeting events、external sequence 的对齐结果
 
+SDK 后续跨 Google Meet、Microsoft Teams、Zoom 等会议软件的适配方案见 [多会议平台时间轴适配方案](docs/meeting-platform-adapters.md)。
+
 ## 启动
 
 ```bash
