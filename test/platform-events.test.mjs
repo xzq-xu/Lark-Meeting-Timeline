@@ -90,11 +90,14 @@ try {
   )), true);
   assert.equal(typeof info.platform_events.setup_endpoint, 'string');
   assert.equal(info.platform_events.platforms.some((item) => item.platform === 'google_meet'), true);
+  assert.equal(info.platform_events.platforms.some((item) => item.platform === 'webex'), true);
 
   const setup = await getJson(baseUrl, '/api/platform-events/setup');
-  assert.equal(setup.setup.length, 3);
+  assert.equal(setup.setup.length, 4);
   assert.equal(setup.setup.some((item) => item.platform === 'google_meet' && item.endpoint === `${baseUrl}/api/platform-events/google-meet`), true);
+  assert.equal(setup.setup.some((item) => item.platform === 'webex' && item.endpoint === `${baseUrl}/api/platform-events/webex`), true);
   assert.equal(setup.security_env_configured.GOOGLE_PUBSUB_OIDC_AUDIENCE, false);
+  assert.equal(setup.security_env_configured.WEBEX_WEBHOOK_SECRET, false);
   assert.equal(setup.readiness.google_meet.ready, false);
   assert.equal(setup.readiness.google_meet.checks.some((item) => item.id === 'google_pubsub_auth' && item.ok === false), true);
 
@@ -362,10 +365,46 @@ try {
       && event.metadata?.artifact_url === 'https://zoom.us/recording/download/1'
   )), true);
 
+  const webexStart = await postJson(baseUrl, '/api/platform-events/webex', {
+    force: true,
+    id: 'webex-start-001',
+    resource: 'meetings',
+    event: 'started',
+    data: {
+      id: 'webex-meeting-001',
+      meetingNumber: '123456789',
+      title: 'Webex platform event test',
+      webLink: 'https://webex.example/meet/webex-meeting-001',
+      startTime: startIso,
+    },
+  });
+  assert.equal(webexStart.state.meeting.source, 'webex_webhook');
+  assert.equal(webexStart.state.meeting.platform, 'webex');
+  assert.equal(webexStart.state.meeting.meeting_id, 'webex-meeting-001');
+
+  const webexTranscript = await postJson(baseUrl, '/api/platform-events/webex', {
+    id: 'webex-transcript-001',
+    resource: 'meetingTranscripts',
+    event: 'created',
+    data: {
+      meetingId: 'webex-meeting-001',
+      id: 'webex-transcript-1',
+      txtDownloadLink: 'https://webex.example/webex-transcript-1.vtt',
+    },
+  });
+  assert.equal(webexTranscript.results[0].action, 'onArtifactSignal');
+  assert.equal(webexTranscript.results[0].response.skipped, false);
+  assert.equal(webexTranscript.state.events.some((event) => (
+    event.source === 'webex_webhook'
+      && event.type === 'transcript_ready'
+      && event.metadata?.artifact_url === 'https://webex.example/webex-transcript-1.vtt'
+  )), true);
+
   const allStatus = await getJson(baseUrl, '/api/platform-events/status');
   assert.equal(allStatus.status.google_meet.received_count, 7);
   assert.equal(allStatus.status.microsoft_teams.received_count, 3);
   assert.equal(allStatus.status.zoom.received_count, 2);
+  assert.equal(allStatus.status.webex.received_count, 2);
 
   console.log('ok meeting platform event endpoints');
 } finally {

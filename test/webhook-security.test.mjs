@@ -8,6 +8,7 @@ import {
   verifyGooglePubSubBearer,
   verifyGooglePubSubOidcJwt,
   verifyMicrosoftGraphClientState,
+  verifyWebexWebhookEvent,
   verifyZoomWebhookEvent,
 } from '../packages/meeting-timeline-sdk/adapters/webhook-security.mjs';
 
@@ -52,6 +53,20 @@ assert.equal(verifyZoomWebhookEvent({
   rawBody: zoomBody,
   secretToken: zoomSecret,
 }).reason, 'zoom_signature_mismatch');
+
+const webexSecret = 'webex-shared-secret';
+const webexBody = JSON.stringify({ resource: 'meetings', event: 'started', data: { id: 'webex-1' } });
+const webexSignature = createHmac('sha1', webexSecret).update(webexBody).digest('hex');
+assert.equal(verifyWebexWebhookEvent({
+  headers: { 'x-spark-signature': webexSignature },
+  rawBody: webexBody,
+  secret: webexSecret,
+}).ok, true);
+assert.equal(verifyWebexWebhookEvent({
+  headers: { 'x-spark-signature': 'bad' },
+  rawBody: webexBody,
+  secret: webexSecret,
+}).reason, 'webex_signature_mismatch');
 
 const graphUrl = new URL('https://timeline.example.com/api/platform-events/teams?validationToken=hello%20graph');
 assert.equal(microsoftGraphValidationResponse(graphUrl), 'hello graph');

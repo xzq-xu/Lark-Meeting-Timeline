@@ -17,6 +17,7 @@ import {
   evaluatePlatformSetupReadiness,
   evaluatePlatformSubscriptionMaintenance,
 } from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
+import { normalizeWebexEvent } from '../packages/meeting-timeline-sdk/adapters/webex.mjs';
 import { normalizeZoomEvent } from '../packages/meeting-timeline-sdk/adapters/zoom.mjs';
 import {
   buildZoomUrlValidationResponse,
@@ -25,6 +26,7 @@ import {
   verifyGooglePubSubBearer,
   verifyGooglePubSubOidcJwt,
   verifyMicrosoftGraphClientState,
+  verifyWebexWebhookEvent,
   verifyZoomWebhookEvent,
 } from '../packages/meeting-timeline-sdk/adapters/webhook-security.mjs';
 import { createLarkClient, extractMeetingNo, extractMinuteToken } from './larkClient.mjs';
@@ -162,6 +164,12 @@ const platformEventAdapterDefinitions = [
     aliases: ['zoom'],
     source: 'zoom_webhook',
     normalize: normalizeZoomEvent,
+  },
+  {
+    key: 'webex',
+    aliases: ['webex', 'cisco-webex', 'cisco_webex'],
+    source: 'webex_webhook',
+    normalize: normalizeWebexEvent,
   },
 ];
 const platformEventAdapters = new Map(
@@ -3668,6 +3676,7 @@ function isRealMeetingAxis(meeting = {}) {
     'google_meet_webhook',
     'microsoft_teams_webhook',
     'zoom_webhook',
+    'webex_webhook',
   ].includes(meeting.source)
     && !meeting.pending_binding
     && meeting.start_time_reliable !== false
@@ -6255,6 +6264,12 @@ async function platformWebhookVerification(adapter = {}, req = {}, body = {}, ra
       verifyZoomWebhookEvent({ headers: req.headers, rawBody, body }),
     );
   }
+  if (adapter.key === 'webex') {
+    return platformWebhookVerificationStatus(
+      adapter.key,
+      verifyWebexWebhookEvent({ headers: req.headers, rawBody, body }),
+    );
+  }
   if (adapter.key === 'microsoft_teams') {
     return platformWebhookVerificationStatus(
       adapter.key,
@@ -6302,6 +6317,7 @@ function publicPlatformEventStatus(req, adapter = null) {
 function platformSetupSecurityConfig() {
   return {
     ZOOM_WEBHOOK_SECRET_TOKEN: Boolean(process.env.ZOOM_WEBHOOK_SECRET_TOKEN),
+    WEBEX_WEBHOOK_SECRET: Boolean(process.env.WEBEX_WEBHOOK_SECRET),
     MICROSOFT_GRAPH_CLIENT_STATE: Boolean(process.env.MICROSOFT_GRAPH_CLIENT_STATE),
     GOOGLE_PUBSUB_OIDC_AUDIENCE: Boolean(process.env.GOOGLE_PUBSUB_OIDC_AUDIENCE),
     GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL: Boolean(process.env.GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL),
@@ -6344,6 +6360,19 @@ function platformSetupOptionsFromQuery(req, url, adapter = null) {
       };
     }
   }
+  if (!adapter || adapter.key === 'webex') {
+    const webexName = url.searchParams.get('webex_subscription_name') ?? url.searchParams.get('webex_webhook_name');
+    const webexSecret = url.searchParams.get('webex_secret');
+    const webexOwnedBy = url.searchParams.get('webex_owned_by');
+    if (webexName || webexSecret || webexOwnedBy) {
+      options.webexSubscription = {
+        name: webexName,
+        targetUrl: localUrlFor(req, '/api/platform-events/webex'),
+        secret: webexSecret,
+        ownedBy: webexOwnedBy,
+      };
+    }
+  }
   return options;
 }
 
@@ -6352,6 +6381,7 @@ function platformSubscriptionFromQuery(url, platformKey) {
     google_meet: 'google_',
     microsoft_teams: 'teams_',
     zoom: 'zoom_',
+    webex: 'webex_',
   }[platformKey] ?? '';
   const value = (...names) => {
     for (const name of names) {

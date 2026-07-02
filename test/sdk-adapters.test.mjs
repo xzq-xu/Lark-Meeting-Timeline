@@ -6,6 +6,7 @@ import {
 } from '../packages/meeting-timeline-sdk/adapters/core.mjs';
 import { normalizeGoogleMeetEvent, unwrapGooglePubSubEvent } from '../packages/meeting-timeline-sdk/adapters/google-meet.mjs';
 import { normalizeMicrosoftTeamsEvent } from '../packages/meeting-timeline-sdk/adapters/microsoft-teams.mjs';
+import { normalizeWebexEvent } from '../packages/meeting-timeline-sdk/adapters/webex.mjs';
 import { normalizeZoomEvent } from '../packages/meeting-timeline-sdk/adapters/zoom.mjs';
 
 const startMs = 1_782_442_800_000;
@@ -317,5 +318,52 @@ const zoomRecording = normalizeZoomEvent({
 assert.equal(zoomRecording[0].type, 'artifact_ready');
 assert.equal(zoomRecording[0].artifact_kind, 'recording');
 assert.equal(zoomRecording[0].artifact_url, 'https://zoom.us/recording/download/1');
+
+const webexStart = normalizeWebexEvent({
+  id: 'webex-hook-1',
+  resource: 'meetings',
+  event: 'started',
+  data: {
+    id: 'webex-meeting-001',
+    meetingNumber: '123456789',
+    title: 'Webex review',
+    webLink: 'https://webex.example/meet/webex-meeting-001',
+    hostEmail: 'host@example.com',
+    startTime: startIso,
+  },
+});
+assert.equal(webexStart[0].type, 'meeting_started');
+assert.equal(webexStart[0].meeting.platform, 'webex');
+assert.equal(webexStart[0].meeting.meeting_id, 'webex-meeting-001');
+assert.equal(webexStart[0].meeting.external_meeting_id, '123456789');
+
+const webexParticipant = normalizeWebexEvent({
+  id: 'webex-hook-2',
+  resource: 'meetingParticipants',
+  event: 'joined',
+  data: {
+    meetingId: 'webex-meeting-001',
+    id: 'participant-1',
+    displayName: 'Ada',
+    joinTime: startIso,
+  },
+});
+assert.equal(webexParticipant[0].type, 'participant_joined');
+assert.equal(webexParticipant[0].participant_id, 'participant-1');
+assert.equal(webexParticipant[0].participant_name, 'Ada');
+
+const webexTranscript = normalizeWebexEvent({
+  id: 'webex-hook-3',
+  resource: 'meetingTranscripts',
+  event: 'created',
+  data: {
+    meetingId: 'webex-meeting-001',
+    id: 'transcript-1',
+    txtDownloadLink: 'https://webex.example/transcript-1.vtt',
+  },
+}, { receivedAtMs: startMs + 120_000 });
+assert.equal(webexTranscript[0].type, 'artifact_ready');
+assert.equal(webexTranscript[0].artifact_kind, 'transcript');
+assert.equal(webexTranscript[0].artifact_url, 'https://webex.example/transcript-1.vtt');
 
 console.log('ok meeting timeline SDK adapters');

@@ -4,6 +4,7 @@ import {
   buildPlatformTranscriptImportPayload,
   normalizeGoogleMeetTranscriptEntries,
   normalizeMicrosoftTeamsTranscript,
+  normalizeWebexTranscript,
   normalizeZoomTranscript,
   parseTimedTextTranscript,
 } from '../packages/meeting-timeline-sdk/adapters/transcript.mjs';
@@ -57,6 +58,12 @@ const zoomSegments = normalizeZoomTranscript({
 assert.equal(zoomSegments[0].source, 'zoom_transcript_vtt');
 assert.equal(zoomSegments[1].text, 'follow up later');
 
+const webexSegments = normalizeWebexTranscript({
+  text: timedText,
+});
+assert.equal(webexSegments[0].source, 'webex_transcript');
+assert.equal(webexSegments[0].speaker_name, 'Ada');
+
 const googlePayload = buildPlatformTranscriptImportPayload({
   platform: 'google_meet',
   meeting: {
@@ -94,5 +101,28 @@ const teamsPayload = buildPlatformTranscriptImportPayload({
 });
 assert.equal(teamsPayload.transcript.length, 2);
 assert.equal(teamsPayload.transcript[0].source, 'microsoft_teams_transcript');
+
+const webexPayload = buildPlatformTranscriptImportPayload({
+  platform: 'webex',
+  meeting: {
+    platform: 'webex',
+    meetingId: 'webex-meeting-001',
+    startTimeMs: startMs,
+  },
+  raw: {
+    snippets: [
+      {
+        id: 'webex-snippet-1',
+        startMs: 1000,
+        endMs: 4000,
+        speakerName: 'Lin',
+        text: 'Webex transcript line',
+      },
+    ],
+  },
+});
+assert.equal(webexPayload.meeting.platform, 'webex');
+assert.equal(webexPayload.transcript[0].source, 'webex_transcript');
+assert.equal(webexPayload.transcript[0].speaker_name, 'Lin');
 
 console.log('ok meeting transcript adapters');

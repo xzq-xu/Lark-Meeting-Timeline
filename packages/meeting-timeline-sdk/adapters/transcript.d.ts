@@ -13,6 +13,7 @@ export function parseTimedTextTranscript(raw?: string, options?: TranscriptNorma
 export function normalizeGoogleMeetTranscriptEntries(raw?: unknown, options?: TranscriptNormalizeOptions): TranscriptSegmentInput[];
 export function normalizeMicrosoftTeamsTranscript(raw?: unknown, options?: TranscriptNormalizeOptions): TranscriptSegmentInput[];
 export function normalizeZoomTranscript(raw?: unknown, options?: TranscriptNormalizeOptions): TranscriptSegmentInput[];
+export function normalizeWebexTranscript(raw?: unknown, options?: TranscriptNormalizeOptions): TranscriptSegmentInput[];
 export function buildPlatformTranscriptImportPayload(input?: TranscriptImportInput & {
   raw?: unknown;
   content?: unknown;

@@ -84,13 +84,14 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/google-meet`
 - `@ai-annotation/meeting-timeline-sdk/adapters/microsoft-teams`
 - `@ai-annotation/meeting-timeline-sdk/adapters/zoom`
+- `@ai-annotation/meeting-timeline-sdk/adapters/webex`
 - `@ai-annotation/meeting-timeline-sdk/adapters/transcript`
 - `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-setup`
 
 `meeting_started` 会调用 `startMeeting`，`meeting_ended` 会调用 `endMeeting`。`participant_joined/left` 和 `artifact_ready` 默认不会写入用户标注流；如果需要临时显示参会人位置，可以给 `applyMeetingSignals` 传 `{ participantAsAnnotation: true }`，或者用 `onParticipantSignal` / `onArtifactSignal` 接到自己的服务端轨道。`subscription_lifecycle` 表示平台订阅自身的过期、移除、暂停、漏投或重新授权要求，默认不画到会议轴；需要接入诊断时传 `onSubscriptionLifecycleSignal` 处理。
 
-Google Meet adapter 同时支持已经解包的 Workspace Events CloudEvent，以及 Pub/Sub 默认 wrapped push body。wrapped body 会自动 base64 解码 `message.data`，所以 webhook handler 可以直接把 `req.body` 传给 `normalizeGoogleMeetEvent(req.body)`。Google Workspace Events 的 `subscription.v1.suspended`、`subscription.v1.expirationReminder`、`subscription.v1.expired` 会归一化为 `subscription_lifecycle`。Microsoft Graph change notifications 的 `lifecycleEvent` 值 `reauthorizationRequired`、`subscriptionRemoved`、`missed` 也会归一化为 `subscription_lifecycle`。
+Google Meet adapter 同时支持已经解包的 Workspace Events CloudEvent，以及 Pub/Sub 默认 wrapped push body。wrapped body 会自动 base64 解码 `message.data`，所以 webhook handler 可以直接把 `req.body` 传给 `normalizeGoogleMeetEvent(req.body)`。Google Workspace Events 的 `subscription.v1.suspended`、`subscription.v1.expirationReminder`、`subscription.v1.expired` 会归一化为 `subscription_lifecycle`。Microsoft Graph change notifications 的 `lifecycleEvent` 值 `reauthorizationRequired`、`subscriptionRemoved`、`missed` 也会归一化为 `subscription_lifecycle`。Webex adapter 支持 `meetings` started/ended、`meetingParticipants` joined/left、`recordings` created/updated、`meetingTranscripts` created。
 
 ## 会后转写导入
 
@@ -119,6 +120,7 @@ await timeline.importTranscript({
 - `normalizeGoogleMeetTranscriptEntries(raw)`
 - `normalizeMicrosoftTeamsTranscript(raw)`，支持 JSON segments 或 WebVTT/timed text
 - `normalizeZoomTranscript(raw)`，支持 Zoom VTT 或 JSON segments
+- `normalizeWebexTranscript(raw)`，支持 Webex VTT/text 或 JSON snippets/segments
 - `buildPlatformTranscriptImportPayload(input)`，按 `platform` 自动选择 normalizer 并生成导入 body
 
 ## 平台接入配置
@@ -131,6 +133,7 @@ import {
   buildGoogleMeetWorkspaceSubscriptionRequest,
   buildMicrosoftGraphSubscriptionRenewalRequest,
   buildMicrosoftTeamsMeetingCallSubscriptionRequest,
+  buildWebexWebhookRequests,
   buildZoomEventSubscriptionRequest,
   evaluatePlatformSubscriptionMaintenance,
   evaluatePlatformSetupReadiness,
@@ -151,6 +154,12 @@ const teams = buildMicrosoftTeamsMeetingCallSubscriptionRequest({
 
 const zoom = buildZoomEventSubscriptionRequest({
   webhookUrl: 'https://timeline.example.com/api/platform-events/zoom',
+});
+
+const webex = buildWebexWebhookRequests({
+  targetUrl: 'https://timeline.example.com/api/platform-events/webex',
+  secret: process.env.WEBEX_WEBHOOK_SECRET,
+  ownedBy: 'org',
 });
 
 const manifest = platformSetupManifest('google-meet', {
@@ -183,7 +192,7 @@ if (teamsMaintenance.renewal_due) {
 }
 ```
 
-`platformSetupManifest()` 会暴露 Google Workspace subscription lifecycle event types 和 Microsoft Graph lifecycle events。Teams 订阅 request 默认把 `lifecycleNotificationUrl` 指向同一个 webhook endpoint；如果宿主项目用独立 lifecycle endpoint，可以显式传 `lifecycleNotificationUrl` 覆盖。
+`platformSetupManifest()` 会暴露 Google Workspace subscription lifecycle event types、Microsoft Graph lifecycle events、Webex webhook resources。Teams 订阅 request 默认把 `lifecycleNotificationUrl` 指向同一个 webhook endpoint；如果宿主项目用独立 lifecycle endpoint，可以显式传 `lifecycleNotificationUrl` 覆盖。Webex 的 `buildWebexWebhookRequests()` 会按默认资源生成多条 webhook 创建请求，因为 Webex firehose 不覆盖 meetings started/ended 和 meetingParticipants joined/left。
 
 `platformCapabilityContract()` 是给宿主项目做接入决策的机器可读能力表：每个平台会声明实时建轴、参会人轨、会后转写、录制、订阅生命周期、实时转写是否可用，以及对应 SDK normalizer 和 fallback 建议。当前策略是实时标注只依赖 meeting axis，转写统一标记为 `post_meeting` 导入，不把 transcript 当作实时链路前置依赖。
 
@@ -197,6 +206,7 @@ import {
   microsoftGraphValidationResponse,
   verifyGooglePubSubOidcJwt,
   verifyMicrosoftGraphClientState,
+  verifyWebexWebhookEvent,
   verifyZoomWebhookEvent,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/webhook-security';
 
@@ -228,6 +238,13 @@ const googleCheck = await verifyGooglePubSubOidcJwt({
   serviceAccountEmail: process.env.GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL,
 });
 if (!googleCheck.ok) throw new Error(googleCheck.reason);
+
+const webexCheck = verifyWebexWebhookEvent({
+  headers: req.headers,
+  rawBody: req.rawBody,
+  secret: process.env.WEBEX_WEBHOOK_SECRET,
+});
+if (!webexCheck.ok) throw new Error(webexCheck.reason);
 ```
 
 当前 server demo 会读取这些环境变量：
@@ -237,6 +254,7 @@ if (!googleCheck.ok) throw new Error(googleCheck.reason);
 - `GOOGLE_PUBSUB_OIDC_AUDIENCE`：启用 Google Pub/Sub authenticated push OIDC JWT 校验，匹配 JWT `aud` claim。
 - `GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL`：可选，匹配 Pub/Sub push subscription 里配置的 service account email claim。
 - `GOOGLE_PUBSUB_BEARER_TOKEN`：没有配置 OIDC 时，对 Google Pub/Sub push 做轻量 bearer 校验，主要用于本地或网关前置鉴权兜底。
+- `WEBEX_WEBHOOK_SECRET`：启用 Webex `X-Spark-Signature` HMAC-SHA1 校验。
 
 ## 首条标记内联建轴
 

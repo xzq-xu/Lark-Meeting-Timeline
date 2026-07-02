@@ -54,6 +54,10 @@ function zoomSignature(secret, timestamp, rawBody) {
   return `v0=${createHmac('sha256', secret).update(`v0:${timestamp}:${rawBody}`).digest('hex')}`;
 }
 
+function webexSignature(secret, rawBody) {
+  return createHmac('sha1', secret).update(rawBody).digest('hex');
+}
+
 function base64Url(input) {
   return Buffer.from(typeof input === 'string' ? input : JSON.stringify(input), 'utf8')
     .toString('base64url');
@@ -74,6 +78,7 @@ const tempDir = await mkdtemp(join(tmpdir(), 'meeting-platform-webhook-security-
 const baseUrl = `http://127.0.0.1:${port}`;
 const jwksUrl = `http://127.0.0.1:${jwksPort}/certs`;
 const zoomSecret = 'zoom-platform-secret';
+const webexSecret = 'webex-platform-secret';
 const graphClientState = 'graph-client-state';
 const googleAudience = `${baseUrl}/api/platform-events/google-meet`;
 const googleServiceAccountEmail = 'pubsub-pusher@demo-project.iam.gserviceaccount.com';
@@ -102,6 +107,7 @@ const child = spawn(process.execPath, ['src/server.mjs'], {
     LARK_WS_EVENTS: '0',
     TIMELINE_DATA_DIR: tempDir,
     ZOOM_WEBHOOK_SECRET_TOKEN: zoomSecret,
+    WEBEX_WEBHOOK_SECRET: webexSecret,
     MICROSOFT_GRAPH_CLIENT_STATE: graphClientState,
     GOOGLE_PUBSUB_OIDC_AUDIENCE: googleAudience,
     GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL: googleServiceAccountEmail,
@@ -159,6 +165,25 @@ try {
   assert.equal(validZoom.response.status, 200);
   assert.equal(validZoom.json.ok, true);
   assert.equal(validZoom.json.status.last_verification.reason, 'verified');
+
+  const webexRaw = JSON.stringify({
+    force: true,
+    id: 'webex-secure-001',
+    resource: 'meetings',
+    event: 'started',
+    data: { id: 'webex-secure-001', startTime: '2026-06-26T02:00:00.000Z' },
+  });
+  const invalidWebex = await postRaw(baseUrl, '/api/platform-events/webex', webexRaw, {
+    'x-spark-signature': 'bad',
+  });
+  assert.equal(invalidWebex.response.status, 401);
+  assert.equal(invalidWebex.json.verification.reason, 'webex_signature_mismatch');
+  const validWebex = await postRaw(baseUrl, '/api/platform-events/webex', webexRaw, {
+    'x-spark-signature': webexSignature(webexSecret, webexRaw),
+  });
+  assert.equal(validWebex.response.status, 200);
+  assert.equal(validWebex.json.ok, true);
+  assert.equal(validWebex.json.status.last_verification.reason, 'verified');
 
   const invalidTeams = await postRaw(baseUrl, '/api/platform-events/teams', JSON.stringify({
     value: [{

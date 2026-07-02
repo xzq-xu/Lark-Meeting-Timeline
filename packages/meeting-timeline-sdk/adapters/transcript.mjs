@@ -191,6 +191,32 @@ export function normalizeZoomTranscript(raw = {}, options = {}) {
   })).filter((item) => item.text);
 }
 
+export function normalizeWebexTranscript(raw = {}, options = {}) {
+  const content = typeof raw === 'string'
+    ? raw
+    : firstNonEmpty(raw.vtt, raw.content, raw.transcript, raw.text, raw.body, raw.data?.content, raw.data?.text);
+  if (typeof content === 'string') {
+    return parseTimedTextTranscript(content, {
+      ...options,
+      source: options.source ?? 'webex_transcript',
+    });
+  }
+  const rows = candidateArray(raw, ['segments', 'items', 'transcript', 'snippets', 'data.segments', 'data.items', 'data.snippets']);
+  return rows.map((item, index) => compactObject({
+    id: firstNonEmpty(item.id, item.snippet_id, item.snippetId, item.segment_id, `webex-seg-${index + 1}`),
+    start_ms: firstNonEmpty(item.start_ms, item.startMs, item.offset_ms, item.offsetMs),
+    end_ms: firstNonEmpty(item.end_ms, item.endMs),
+    start_time: firstNonEmpty(item.start_time, item.startTime, item.start),
+    end_time: firstNonEmpty(item.end_time, item.endTime, item.end),
+    speaker_id: firstNonEmpty(item.speaker_id, item.speakerId, item.person_id, item.personId),
+    speaker_name: firstNonEmpty(item.speaker_name, item.speakerName, item.display_name, item.displayName, item.personName),
+    text: firstNonEmpty(item.text, item.content, item.transcript),
+    language: firstNonEmpty(item.language, item.language_code, item.languageCode, options.language),
+    source: options.source ?? 'webex_transcript',
+    raw: item,
+  })).filter((item) => item.text);
+}
+
 export function buildPlatformTranscriptImportPayload(input = {}) {
   const platform = String(input.platform ?? input.meeting?.platform ?? '').toLowerCase();
   const raw = input.raw ?? input.transcript ?? input.content ?? input;
@@ -201,7 +227,9 @@ export function buildPlatformTranscriptImportPayload(input = {}) {
         ? normalizeMicrosoftTeamsTranscript(raw, input)
         : platform.includes('zoom')
           ? normalizeZoomTranscript(raw, input)
-          : candidateArray(raw, ['segments', 'items', 'transcript'])
+          : platform.includes('webex')
+            ? normalizeWebexTranscript(raw, input)
+            : candidateArray(raw, ['segments', 'items', 'transcript'])
   );
   return buildTranscriptImportPayload({
     ...input,

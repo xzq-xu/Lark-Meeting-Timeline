@@ -39,6 +39,10 @@ function hmacSha256Hex(secret, message) {
   return createHmac('sha256', String(secret)).update(String(message)).digest('hex');
 }
 
+function hmacSha1Hex(secret, message) {
+  return createHmac('sha1', String(secret)).update(String(message)).digest('hex');
+}
+
 function base64UrlDecode(text) {
   const padded = String(text).replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(String(text).length / 4) * 4, '=');
   return Buffer.from(padded, 'base64');
@@ -209,6 +213,23 @@ export function verifyZoomWebhookEvent({ headers = {}, rawBody = '', body, secre
     return { ok: false, reason: 'zoom_signature_mismatch', timestamp };
   }
   return { ok: true, skipped: false, reason: 'verified', timestamp };
+}
+
+export function verifyWebexWebhookEvent({ headers = {}, rawBody = '', body, secret } = {}) {
+  const token = firstNonEmpty(secret, process.env.WEBEX_WEBHOOK_SECRET);
+  if (!token) {
+    return { ok: true, skipped: true, reason: 'webex_secret_not_configured' };
+  }
+  const signature = headerValue(headers, 'x-spark-signature');
+  if (!signature) {
+    return { ok: false, reason: 'webex_signature_header_missing' };
+  }
+  const payloadText = rawBody !== '' && rawBody != null ? bodyText(rawBody) : bodyText(body);
+  const expected = hmacSha1Hex(token, payloadText);
+  if (!safeEqual(expected, String(signature).trim())) {
+    return { ok: false, reason: 'webex_signature_mismatch' };
+  }
+  return { ok: true, skipped: false, reason: 'verified' };
 }
 
 export function microsoftGraphValidationResponse(urlOrToken) {

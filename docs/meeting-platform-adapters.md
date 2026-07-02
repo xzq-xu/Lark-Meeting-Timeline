@@ -40,7 +40,7 @@ await timeline.endMeeting(...)
 ## 总体架构
 
 ```text
-Google Meet Events / Teams Graph / Zoom Webhook / Lark Events
+Google Meet Events / Teams Graph / Zoom Webhook / Webex Webhook / Lark Events
                  |
                  v
         platform adapter
@@ -80,6 +80,7 @@ type MeetingPlatform =
   | 'google_meet'
   | 'microsoft_teams'
   | 'zoom'
+  | 'webex'
   | 'manual'
   | 'local_detector';
 
@@ -169,6 +170,7 @@ type NormalizedMeetingSignal =
 | Google Meet | Google Workspace Events API 的 conference started/ended | participant joined/left events 或 Meet REST participant sessions | Meet REST `conferenceRecords.transcripts/entries`、recordings、smartNotes | Workspace 权限、订阅目标限制、部分参与者只能收到有限事件 |
 | Microsoft Teams | Graph `meetingCallEvents` 的 `callStarted/callEnded`，或 Teams bot meetingStart/meetingEnd | Graph rosterUpdated 或 Teams bot participant events | Graph transcript/recording notifications，会后获取内容 | Graph 应用权限、rich notification 加密、订阅最长 3 天、租户管理员可能关闭 transcript API |
 | Zoom | Zoom Meeting webhooks 的 meeting/participant 事件 | meeting participant webhook | `recording.completed` 后取录制和转写文件 | HTTPS webhook、事件 scope、3 秒响应要求、云录制/转写设置 |
+| Cisco Webex | Webex webhooks 的 meetings started/ended | `meetingParticipants` joined/left webhook | `meetingTranscripts` created、recordings created/updated | webhook payload 可能只有元数据、完整内容需 REST 补拉、FedRAMP 支持范围不同 |
 
 ## Google Meet 适配
 
@@ -284,6 +286,41 @@ Teams SDK 可以让会议内 app/bot 接收 meetingStart、meetingEnd、particip
 - [Zoom Meetings webhooks](https://developers.zoom.us/docs/api/meetings/events/)
 - [Using Zoom webhooks](https://developers.zoom.us/docs/api/webhooks/)
 
+## Cisco Webex 适配
+
+官方能力：
+
+- Webex webhook 支持 meeting related resources：`meetings`、`meetingParticipants`、`recordings`、`meetingTranscripts` 等。
+- `meetings` 支持 `started` / `ended`，`meetingParticipants` 支持 `joined` / `left`，`meetingTranscripts` 支持 `created`。
+- `all` firehose 不包含 meetings `started/ended` 和 meetingParticipants `joined/left`，所以必须为这些资源/事件单独注册 webhook。
+- 创建 webhook 时可设置 `secret`，Webex 会用 `X-Spark-Signature` 发送 JSON payload 的 HMAC-SHA1 签名。
+
+推荐接入方式：
+
+1. P0：仍然保留 local detector path，保证电子纸标注立即落到当前轴。
+2. P1：注册 Webex meeting webhooks：
+   - `meetings:started`
+   - `meetings:ended`
+   - `meetingParticipants:joined`
+   - `meetingParticipants:left`
+   - `recordings:created`
+   - `recordings:updated`
+   - `meetingTranscripts:created`
+3. P2：会议结束后用 Meeting Transcripts API 或 transcript download link 拉取 VTT/text，通过 `normalizeWebexTranscript()` 和 `/api/import/transcript` 导入。
+
+注意点：
+
+- Webex webhook 的 `data` 可能只包含元数据或资源 ID，完整标题、参与者、转写正文、录制下载地址可能需要宿主项目使用 OAuth token 再调 REST API 补齐。
+- Webex Meeting Transcripts API 在 2026 年 1 月更新后支持 Cisco AI Assistant 生成的 transcripts，但具体租户设置仍会影响是否可用。
+- Webex webhook 会长期运行，不像 Graph/Workspace Events 那样需要短周期续订；但是目标 URL 连续失败会导致 webhook 被禁用，需要监控状态。
+- FedRAMP 环境下会议相关 webhook/meetingTranscripts 支持范围要单独核验，不能默认和商业环境一致。
+
+参考：
+
+- [Webex Webhooks guide](https://developer.webex.com/messaging/docs/api/guides/webhooks)
+- [Create a Webhook](https://developer.webex.com/messaging/docs/api/v1/webhooks/create-a-webhook)
+- [Webex Meeting Transcripts](https://developer.webex.com/docs/api/v1/meeting-transcripts)
+
 ## 统一接入优先级
 
 建议按以下顺序开发：
@@ -308,6 +345,10 @@ Teams SDK 可以让会议内 app/bot 接收 meetingStart、meetingEnd、particip
    - 先做 webhook receiver 和签名校验。
    - `recording.completed` 只作为会后 artifact，不影响实时标注验收。
 
+6. **Webex adapter**
+   - 先做 meetings/meetingParticipants/recordings/meetingTranscripts webhook normalization。
+   - 用 `X-Spark-Signature` 验证请求；transcript 正文仍走会后导入。
+
 ## SDK/服务端边界
 
 已新增但不替换现有接口：
@@ -320,13 +361,13 @@ GET  /api/platform-events/:platform/status
 GET  /api/platform-events/status
 ```
 
-`POST /api/platform-events/:platform` 当前支持 `google-meet`、`teams`、`zoom` 及其别名。服务端会用 SDK adapter 归一化原始事件，`meeting_started` 进入 `POST /api/meeting-session/start` 同一套建轴逻辑，`meeting_ended` 进入 `POST /api/meeting-session/end` 同一套结束逻辑。`participant_joined/left` 会进入会议 `events` 轨道，不写入用户标注流；同一平台、同一参会人、同一 join/leave 类型在默认 3 秒窗口内会被过滤为重复事件。会后 transcript/recording/smart notes 的 `artifact_ready` signal 也会进入会议 `events` 轨道，默认 5 秒窗口内按 artifact id/url 去重；transcript 正文通过 SDK `adapters/transcript` 归一化后调用 `POST /api/import/transcript` 导入。`subscription_lifecycle` 只更新平台状态，不会创建会议轴，也不会写入用户标注或会议事件轨道。
+`POST /api/platform-events/:platform` 当前支持 `google-meet`、`teams`、`zoom`、`webex` 及其别名。服务端会用 SDK adapter 归一化原始事件，`meeting_started` 进入 `POST /api/meeting-session/start` 同一套建轴逻辑，`meeting_ended` 进入 `POST /api/meeting-session/end` 同一套结束逻辑。`participant_joined/left` 会进入会议 `events` 轨道，不写入用户标注流；同一平台、同一参会人、同一 join/leave 类型在默认 3 秒窗口内会被过滤为重复事件。会后 transcript/recording/smart notes 的 `artifact_ready` signal 也会进入会议 `events` 轨道，默认 5 秒窗口内按 artifact id/url 去重；transcript 正文通过 SDK `adapters/transcript` 归一化后调用 `POST /api/import/transcript` 导入。`subscription_lifecycle` 只更新平台状态，不会创建会议轴，也不会写入用户标注或会议事件轨道。
 
 `platformCapabilityContract(platform)` 会输出平台能力契约，供宿主项目决定接入路径：
 
 ```ts
 {
-  platform: 'google_meet' | 'microsoft_teams' | 'zoom',
+  platform: 'google_meet' | 'microsoft_teams' | 'zoom' | 'webex',
   realtime_axis: { status: 'supported_best_effort', fallback: 'local_detector_recommended_...' },
   participant_track: { status: 'supported_best_effort' },
   post_meeting_transcript: { status: 'supported', availability: 'post_meeting', import_endpoint: '/api/import/transcript' },
@@ -346,10 +387,11 @@ GET  /api/platform-events/status
 - Zoom：支持 `endpoint.url_validation` challenge response；配置 `ZOOM_WEBHOOK_SECRET_TOKEN` 后校验 `x-zm-request-timestamp` 和 `x-zm-signature`。
 - Microsoft Graph / Teams：支持 `validationToken` 纯文本响应；配置 `MICROSOFT_GRAPH_CLIENT_STATE` 后校验通知里的 `clientState`。
 - Google Meet / Pub/Sub：配置 `GOOGLE_PUBSUB_OIDC_AUDIENCE` 后会校验 authenticated push 的 Google-signed OIDC JWT，并可用 `GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL` 限定 service account email；未配置 OIDC 时可用 `GOOGLE_PUBSUB_BEARER_TOKEN` 做轻量 bearer gate。
+- Webex：配置 `WEBEX_WEBHOOK_SECRET` 后校验 `X-Spark-Signature` HMAC-SHA1。
 
 `GET /api/platform-events/status` 会返回每个平台最近一次 `last_verification`，用于区分“未配置所以跳过校验”和“签名/状态不匹配被拒绝”。同时会返回 `lifecycle_event_count` 和 `last_lifecycle`，用于观察订阅过期提醒、暂停、移除、漏投和重新授权要求。
 
-`GET /api/platform-events/setup` 会返回 Google Meet、Microsoft Teams、Zoom 的接入 manifest：默认事件类型、endpoint、权限/环境变量要求和操作步骤，同时包含 readiness 诊断，检查 endpoint 是否是 HTTPS/localhost、必需安全环境变量是否已配置。`GET /api/platform-events/:platform/setup` 可按平台返回，并支持用 query 生成订阅 request body，例如 Teams 的 `join_web_url` + `client_state`，或 Google 的 `target_resource` + `pubsub_topic`。同一接口还会基于 `subscription_expires_at`、`subscription_id`、`subscription_name` 等 query 返回 maintenance 建议，用于 Graph / Workspace Events 订阅续期调度。
+`GET /api/platform-events/setup` 会返回 Google Meet、Microsoft Teams、Zoom、Webex 的接入 manifest：默认事件类型/资源、endpoint、权限/环境变量要求和操作步骤，同时包含 readiness 诊断，检查 endpoint 是否是 HTTPS/localhost、必需安全环境变量是否已配置。`GET /api/platform-events/:platform/setup` 可按平台返回，并支持用 query 生成订阅 request body，例如 Teams 的 `join_web_url` + `client_state`，Google 的 `target_resource` + `pubsub_topic`，或 Webex 的 `webex_subscription_name` + `webex_secret`。同一接口还会基于 `subscription_expires_at`、`subscription_id`、`subscription_name` 等 query 返回 maintenance 建议，用于 Graph / Workspace Events 订阅续期调度；Zoom/Webex 返回无需短周期续订。
 
 SDK 包结构建议：
 
@@ -370,6 +412,8 @@ packages/meeting-timeline-sdk/
     microsoft-teams.d.ts
     zoom.mjs
     zoom.d.ts
+    webex.mjs
+    webex.d.ts
 ```
 
 `adapters/core` 只做平台无关的信号定义、校验和应用：

@@ -3,6 +3,7 @@ export const GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES: readonly strin
 export const MICROSOFT_TEAMS_CHANGE_TYPES: readonly string[];
 export const MICROSOFT_GRAPH_LIFECYCLE_EVENTS: readonly string[];
 export const ZOOM_MEETING_EVENT_TYPES: readonly string[];
+export const WEBEX_WEBHOOK_RESOURCES: readonly { resource: string; events: readonly string[]; filter?: string }[];
 
 export interface PlatformSetupOptions {
   baseUrl?: string;
@@ -10,6 +11,7 @@ export interface PlatformSetupOptions {
   googleMeetSubscription?: Record<string, unknown>;
   microsoftTeamsSubscription?: Record<string, unknown>;
   zoomSubscription?: Record<string, unknown>;
+  webexSubscription?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -73,6 +75,23 @@ export function buildZoomEventSubscriptionRequest(input?: {
   user_ids?: string[];
   [key: string]: unknown;
 }): Record<string, unknown>;
+
+export function buildWebexWebhookRequests(input?: {
+  targetUrl?: string;
+  target_url?: string;
+  webhookUrl?: string;
+  webhook_url?: string;
+  name?: string;
+  secret?: string;
+  webhookSecret?: string;
+  webhook_secret?: string;
+  ownedBy?: string;
+  owned_by?: string;
+  status?: string;
+  filter?: string;
+  resources?: { resource: string; events: string[]; filter?: string }[];
+  [key: string]: unknown;
+}): Record<string, unknown>[];
 
 export function buildMicrosoftGraphSubscriptionRenewalRequest(input?: {
   subscriptionId?: string;

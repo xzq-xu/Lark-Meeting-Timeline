@@ -4,6 +4,7 @@ import {
   GOOGLE_MEET_EVENT_TYPES,
   GOOGLE_WORKSPACE_SUBSCRIPTION_LIFECYCLE_EVENT_TYPES,
   MICROSOFT_GRAPH_LIFECYCLE_EVENTS,
+  WEBEX_WEBHOOK_RESOURCES,
   ZOOM_MEETING_EVENT_TYPES,
   allPlatformCapabilityContracts,
   allPlatformSetupManifests,
@@ -12,6 +13,7 @@ import {
   buildMicrosoftTeamsMeetingCallSubscriptionRequest,
   buildMicrosoftGraphSubscriptionRenewalRequest,
   buildPlatformSetup,
+  buildWebexWebhookRequests,
   buildZoomEventSubscriptionRequest,
   evaluateAllPlatformSetupReadiness,
   evaluateAllPlatformSubscriptionMaintenance,
@@ -27,6 +29,7 @@ const baseUrl = 'https://timeline.example.com';
 assert.equal(platformEventEndpoint(baseUrl, 'google-meet'), 'https://timeline.example.com/api/platform-events/google-meet');
 assert.equal(platformEventEndpoint(baseUrl, 'teams'), 'https://timeline.example.com/api/platform-events/teams');
 assert.equal(platformEventEndpoint(baseUrl, 'zoom'), 'https://timeline.example.com/api/platform-events/zoom');
+assert.equal(platformEventEndpoint(baseUrl, 'webex'), 'https://timeline.example.com/api/platform-events/webex');
 
 const googleManifest = platformSetupManifest('google_meet', { baseUrl });
 assert.equal(googleManifest.endpoint, 'https://timeline.example.com/api/platform-events/google-meet');
@@ -92,11 +95,36 @@ const zoomSetup = buildPlatformSetup('zoom', {
 });
 assert.equal(zoomSetup.zoom_event_subscription_request.event_subscription_name, 'Timeline Zoom Events');
 
+const webexRequests = buildWebexWebhookRequests({
+  targetUrl: 'https://timeline.example.com/api/platform-events/webex',
+  name: 'Timeline Webex Events',
+  secret: 'webex-secret',
+  ownedBy: 'org',
+});
+assert.equal(webexRequests.length, WEBEX_WEBHOOK_RESOURCES.reduce((sum, item) => sum + item.events.length, 0));
+assert.equal(webexRequests.some((item) => item.resource === 'meetings' && item.event === 'started'), true);
+assert.equal(webexRequests.some((item) => item.resource === 'meetingParticipants' && item.event === 'joined'), true);
+assert.equal(webexRequests[0].targetUrl, 'https://timeline.example.com/api/platform-events/webex');
+assert.equal(webexRequests[0].secret, 'webex-secret');
+
+const webexSetup = buildPlatformSetup('webex', {
+  baseUrl,
+  webexSubscription: {
+    targetUrl: 'https://timeline.example.com/api/platform-events/webex',
+    name: 'Timeline Webex Events',
+  },
+});
+assert.equal(webexSetup.webex_webhook_requests.length, webexRequests.length);
+const webexManifest = platformSetupManifest('webex', { baseUrl });
+assert.equal(webexManifest.required_scopes.includes('meeting:transcripts_read'), true);
+assert.equal(webexManifest.capabilities.post_meeting_transcript.sdk_normalizer, 'normalizeWebexTranscript');
+assert.equal(webexManifest.capabilities.realtime_axis.status, 'supported_best_effort');
+
 const all = allPlatformSetupManifests({ baseUrl });
-assert.equal(all.length, 3);
-assert.deepEqual(all.map((item) => item.platform), ['google_meet', 'microsoft_teams', 'zoom']);
+assert.equal(all.length, 4);
+assert.deepEqual(all.map((item) => item.platform), ['google_meet', 'microsoft_teams', 'zoom', 'webex']);
 const allCapabilities = allPlatformCapabilityContracts({ baseUrl });
-assert.deepEqual(allCapabilities.map((item) => item.platform), ['google_meet', 'microsoft_teams', 'zoom']);
+assert.deepEqual(allCapabilities.map((item) => item.platform), ['google_meet', 'microsoft_teams', 'zoom', 'webex']);
 assert.equal(allCapabilities.every((item) => item.endpoints.transcript_import === 'https://timeline.example.com/api/import/transcript'), true);
 
 const googleReady = evaluatePlatformSetupReadiness('google-meet', {
@@ -130,9 +158,10 @@ const allReadiness = evaluateAllPlatformSetupReadiness({
     GOOGLE_PUBSUB_OIDC_AUDIENCE: 'https://timeline.example.com/api/platform-events/google-meet',
     MICROSOFT_GRAPH_CLIENT_STATE: 'teams-state',
     ZOOM_WEBHOOK_SECRET_TOKEN: 'zoom-secret',
+    WEBEX_WEBHOOK_SECRET: 'webex-secret',
   },
 });
-assert.deepEqual(allReadiness.map((item) => item.ready), [true, true, true]);
+assert.deepEqual(allReadiness.map((item) => item.ready), [true, true, true, true]);
 
 const graphRenewal = buildMicrosoftGraphSubscriptionRenewalRequest({
   subscriptionId: 'graph-sub-1',
@@ -182,6 +211,11 @@ const zoomMaintenance = evaluatePlatformSubscriptionMaintenance('zoom', {}, {
 });
 assert.equal(zoomMaintenance.renewal_supported, false);
 assert.equal(zoomMaintenance.renewal_due, false);
+const webexMaintenance = evaluatePlatformSubscriptionMaintenance('webex', {}, {
+  now: '2026-06-26T02:00:00.000Z',
+});
+assert.equal(webexMaintenance.renewal_supported, false);
+assert.equal(webexMaintenance.renewal_due, false);
 
 const allMaintenance = evaluateAllPlatformSubscriptionMaintenance({
   google_meet: { name: 'subscriptions/google-sub-1', expireTime: '2026-06-26T03:00:00.000Z' },
@@ -189,7 +223,7 @@ const allMaintenance = evaluateAllPlatformSubscriptionMaintenance({
 }, {
   now: '2026-06-26T02:00:00.000Z',
 });
-assert.deepEqual(allMaintenance.map((item) => item.platform), ['google_meet', 'microsoft_teams', 'zoom']);
+assert.deepEqual(allMaintenance.map((item) => item.platform), ['google_meet', 'microsoft_teams', 'zoom', 'webex']);
 assert.equal(allMaintenance[0].renewal_due, true);
 assert.equal(allMaintenance[1].status, 'active');
 

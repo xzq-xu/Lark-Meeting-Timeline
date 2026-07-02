@@ -23,6 +23,13 @@ export function buildZoomUrlValidationResponse(
 
 export function verifyZoomWebhookEvent(input?: ZoomWebhookVerificationInput): WebhookVerificationResult;
 
+export function verifyWebexWebhookEvent(input?: {
+  headers?: Headers | Record<string, string | string[] | undefined>;
+  rawBody?: string | Buffer;
+  body?: unknown;
+  secret?: string;
+}): WebhookVerificationResult;
+
 export function microsoftGraphValidationResponse(
   urlOrToken?: URL | string | { validationToken?: string; validation_token?: string },
 ): string | null;

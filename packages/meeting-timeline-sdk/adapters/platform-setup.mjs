@@ -32,6 +32,15 @@ export const ZOOM_MEETING_EVENT_TYPES = Object.freeze([
   'recording.completed',
 ]);
 
+export const WEBEX_WEBHOOK_RESOURCES = Object.freeze([
+  { resource: 'meetings', events: ['started', 'ended'] },
+  { resource: 'meetingParticipants', events: ['joined', 'left'] },
+  { resource: 'recordings', events: ['created', 'updated'] },
+  { resource: 'meetingTranscripts', events: ['created'] },
+]);
+
+const supportedPlatforms = Object.freeze(['google_meet', 'microsoft_teams', 'zoom', 'webex']);
+
 const platformCapabilityContracts = Object.freeze({
   google_meet: {
     platform: 'google_meet',
@@ -176,6 +185,53 @@ const platformCapabilityContracts = Object.freeze({
       'download_url_access_can_require_zoom_auth_context',
     ],
   },
+  webex: {
+    platform: 'webex',
+    display_name: 'Cisco Webex',
+    realtime_axis: {
+      status: 'supported_best_effort',
+      source: 'Webex webhooks meetings started/ended',
+      signal_types: ['meeting_started', 'meeting_ended'],
+      fallback: 'local_detector_recommended_for_low_latency_axis',
+    },
+    participant_track: {
+      status: 'supported_best_effort',
+      source: 'Webex webhooks meetingParticipants joined/left',
+      signal_types: ['participant_joined', 'participant_left'],
+    },
+    post_meeting_transcript: {
+      status: 'supported',
+      availability: 'post_meeting',
+      source: 'Webex Meeting Transcripts API VTT/text content or txtDownloadLink artifact',
+      import_endpoint: '/api/import/transcript',
+      sdk_normalizer: 'normalizeWebexTranscript',
+    },
+    recording: {
+      status: 'metadata_supported',
+      availability: 'post_meeting',
+      source: 'Webex recordings webhook/API',
+      signal_types: ['artifact_ready'],
+    },
+    subscription_lifecycle: {
+      status: 'not_applicable',
+      detail: 'webex_webhooks_do_not_use_short_lived_graph_workspace_style_subscriptions',
+    },
+    realtime_transcript: {
+      status: 'not_supported_for_server_adapter',
+      detail: 'backend_timeline_uses_post_meeting_transcript_import',
+    },
+    sdk_modules: {
+      events: '@ai-annotation/meeting-timeline-sdk/adapters/webex',
+      transcript: '@ai-annotation/meeting-timeline-sdk/adapters/transcript',
+      setup: '@ai-annotation/meeting-timeline-sdk/adapters/platform-setup',
+      security: '@ai-annotation/meeting-timeline-sdk/adapters/webhook-security',
+    },
+    limitations: [
+      'webhook_payload_can_require_rest_enrichment_for_full_details',
+      'transcripts_are_post_meeting_artifacts_not_realtime_axis_dependencies',
+      'low_latency_annotation_should_not_wait_for_transcript',
+    ],
+  },
 });
 
 const platformAliases = new Map([
@@ -186,6 +242,9 @@ const platformAliases = new Map([
   ['microsoft_teams', 'microsoft_teams'],
   ['teams', 'microsoft_teams'],
   ['zoom', 'zoom'],
+  ['webex', 'webex'],
+  ['cisco-webex', 'webex'],
+  ['cisco_webex', 'webex'],
 ]);
 
 function firstNonEmpty(...values) {
@@ -375,6 +434,29 @@ export function buildZoomEventSubscriptionRequest(input = {}) {
   });
 }
 
+export function buildWebexWebhookRequests(input = {}) {
+  const targetUrl = firstNonEmpty(input.targetUrl, input.target_url, input.webhookUrl, input.webhook_url);
+  if (!targetUrl) {
+    throw new MeetingTimelineSdkError('targetUrl is required for Webex webhook setup');
+  }
+  const resources = input.resources ?? WEBEX_WEBHOOK_RESOURCES;
+  const secret = firstNonEmpty(input.secret, input.webhookSecret, input.webhook_secret);
+  const ownedBy = firstNonEmpty(input.ownedBy, input.owned_by);
+  const status = input.status ?? 'active';
+  return resources.flatMap((item) => (
+    (item.events ?? []).map((event) => compactObject({
+      name: input.name ? `${input.name} ${item.resource} ${event}` : `Meeting Timeline ${item.resource} ${event}`,
+      targetUrl,
+      resource: item.resource,
+      event,
+      filter: firstNonEmpty(item.filter, input.filter),
+      secret,
+      ownedBy,
+      status,
+    }))
+  ));
+}
+
 export function buildMicrosoftGraphSubscriptionRenewalRequest(input = {}) {
   const subscriptionId = firstNonEmpty(input.subscriptionId, input.subscription_id, input.id);
   const now = input.now instanceof Date ? input.now : new Date(input.now ?? Date.now());
@@ -414,6 +496,7 @@ export function platformEventEndpoint(baseUrl, platform) {
     google_meet: '/api/platform-events/google-meet',
     microsoft_teams: '/api/platform-events/teams',
     zoom: '/api/platform-events/zoom',
+    webex: '/api/platform-events/webex',
   }[key];
   return absoluteEndpoint(baseUrl, path);
 }
@@ -432,7 +515,7 @@ export function platformCapabilityContract(platform, options = {}) {
 }
 
 export function allPlatformCapabilityContracts(options = {}) {
-  return ['google_meet', 'microsoft_teams', 'zoom'].map((platform) => platformCapabilityContract(platform, options));
+  return supportedPlatforms.map((platform) => platformCapabilityContract(platform, options));
 }
 
 export function platformSetupManifest(platform, options = {}) {
@@ -505,12 +588,42 @@ export function platformSetupManifest(platform, options = {}) {
       ],
       builders: ['buildZoomEventSubscriptionRequest'],
     },
+    webex: {
+      platform: 'webex',
+      display_name: 'Cisco Webex',
+      endpoint,
+      status_endpoint: statusEndpoint,
+      transport: 'Webex meeting related webhooks',
+      capabilities: platformCapabilityContract('webex', options),
+      webhook_resources: WEBEX_WEBHOOK_RESOURCES,
+      required_security_env: ['WEBEX_WEBHOOK_SECRET'],
+      required_scopes: [
+        'meeting:schedules_read',
+        'meeting:participants_read',
+        'meeting:recordings_read',
+        'meeting:transcripts_read',
+      ],
+      admin_scopes: [
+        'meeting:admin_schedule_read',
+        'meeting:admin_participants_read',
+        'meeting:admin_recordings_read',
+        'meeting:admin_transcripts_read',
+      ],
+      required_setup: [
+        'Create one Webex webhook per meeting-related resource/event because firehose all does not include meetings started/ended or participant joined/left.',
+        'Set targetUrl to the platform event endpoint and configure a shared secret.',
+        'Grant the read scope for each selected resource before creating the webhook.',
+        'Return 2xx quickly and verify X-Spark-Signature on every request.',
+        'Treat transcripts and recordings as post-meeting artifact signals, then import VTT/text through /api/import/transcript.',
+      ],
+      builders: ['buildWebexWebhookRequests'],
+    },
   };
   return compactObject(manifests[key]);
 }
 
 export function allPlatformSetupManifests(options = {}) {
-  return ['google_meet', 'microsoft_teams', 'zoom'].map((platform) => platformSetupManifest(platform, options));
+  return supportedPlatforms.map((platform) => platformSetupManifest(platform, options));
 }
 
 export function buildPlatformSetup(platform, options = {}) {
@@ -540,6 +653,14 @@ export function buildPlatformSetup(platform, options = {}) {
         : undefined,
     });
   }
+  if (key === 'webex') {
+    return compactObject({
+      ...manifest,
+      webex_webhook_requests: options.webexSubscription
+        ? buildWebexWebhookRequests(options.webexSubscription)
+        : undefined,
+    });
+  }
   return manifest;
 }
 
@@ -554,7 +675,7 @@ export function evaluatePlatformSetupReadiness(platform, options = {}) {
 }
 
 export function evaluateAllPlatformSetupReadiness(options = {}) {
-  return ['google_meet', 'microsoft_teams', 'zoom'].map((platform) => (
+  return supportedPlatforms.map((platform) => (
     evaluatePlatformSetupReadiness(platform, options)
   ));
 }
@@ -575,14 +696,14 @@ export function evaluatePlatformSubscriptionMaintenance(platform, subscription =
   const key = normalizePlatform(platform);
   const nowMs = parseTimeMs(options.now) ?? Date.now();
   const renewalWindowMs = Number(options.renewalWindowMs ?? options.renewal_window_ms ?? 12 * 60 * 60 * 1000);
-  if (key === 'zoom') {
+  if (key === 'zoom' || key === 'webex') {
     return {
       platform: key,
       status: 'configured_manually',
       renewal_supported: false,
       renewal_due: false,
       expired: false,
-      detail: 'zoom_webhook_subscriptions_do_not_require_short_cycle_renewal',
+      detail: `${key}_webhook_subscriptions_do_not_require_short_cycle_renewal`,
     };
   }
   const expiresAtMs = subscriptionExpirationMs(subscription);
@@ -626,7 +747,7 @@ export function evaluatePlatformSubscriptionMaintenance(platform, subscription =
 }
 
 export function evaluateAllPlatformSubscriptionMaintenance(subscriptions = {}, options = {}) {
-  return ['google_meet', 'microsoft_teams', 'zoom'].map((platform) => (
+  return supportedPlatforms.map((platform) => (
     evaluatePlatformSubscriptionMaintenance(platform, subscriptions[platform] ?? {}, options)
   ));
 }
@@ -635,6 +756,7 @@ export const MEETING_PLATFORM_SETUP_BUILDERS = Object.freeze({
   buildGoogleMeetWorkspaceSubscriptionRequest,
   buildMicrosoftTeamsMeetingCallSubscriptionRequest,
   buildZoomEventSubscriptionRequest,
+  buildWebexWebhookRequests,
   buildMicrosoftGraphSubscriptionRenewalRequest,
   buildGoogleWorkspaceSubscriptionRenewalRequest,
   platformSetupManifest,
