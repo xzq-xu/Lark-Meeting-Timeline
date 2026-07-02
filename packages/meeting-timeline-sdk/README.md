@@ -84,12 +84,42 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/google-meet`
 - `@ai-annotation/meeting-timeline-sdk/adapters/microsoft-teams`
 - `@ai-annotation/meeting-timeline-sdk/adapters/zoom`
+- `@ai-annotation/meeting-timeline-sdk/adapters/transcript`
 - `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-setup`
 
 `meeting_started` 会调用 `startMeeting`，`meeting_ended` 会调用 `endMeeting`。`participant_joined/left` 和 `artifact_ready` 默认不会写入用户标注流；如果需要临时显示参会人位置，可以给 `applyMeetingSignals` 传 `{ participantAsAnnotation: true }`，或者用 `onParticipantSignal` / `onArtifactSignal` 接到自己的服务端轨道。`subscription_lifecycle` 表示平台订阅自身的过期、移除、暂停、漏投或重新授权要求，默认不画到会议轴；需要接入诊断时传 `onSubscriptionLifecycleSignal` 处理。
 
 Google Meet adapter 同时支持已经解包的 Workspace Events CloudEvent，以及 Pub/Sub 默认 wrapped push body。wrapped body 会自动 base64 解码 `message.data`，所以 webhook handler 可以直接把 `req.body` 传给 `normalizeGoogleMeetEvent(req.body)`。Google Workspace Events 的 `subscription.v1.suspended`、`subscription.v1.expirationReminder`、`subscription.v1.expired` 会归一化为 `subscription_lifecycle`。Microsoft Graph change notifications 的 `lifecycleEvent` 值 `reauthorizationRequired`、`subscriptionRemoved`、`missed` 也会归一化为 `subscription_lifecycle`。
+
+## 会后转写导入
+
+事件 adapter 只负责告诉你 transcript/recording 已生成；正文内容建议会后拉取后再导入。SDK 提供平台中性的 `importTranscript()` 和 transcript adapter：
+
+```js
+import { createMeetingTimelineClient } from '@ai-annotation/meeting-timeline-sdk';
+import { normalizeGoogleMeetTranscriptEntries } from '@ai-annotation/meeting-timeline-sdk/adapters/transcript';
+
+const timeline = createMeetingTimelineClient({ baseUrl: 'http://localhost:8787' });
+const transcript = normalizeGoogleMeetTranscriptEntries(googleMeetTranscriptEntryList);
+
+await timeline.importTranscript({
+  platform: 'google_meet',
+  meeting: {
+    platform: 'google_meet',
+    meetingId: 'conference-record-id',
+    startTimeMs: meetingStartMs,
+  },
+  transcript,
+});
+```
+
+`adapters/transcript` 当前支持：
+
+- `normalizeGoogleMeetTranscriptEntries(raw)`
+- `normalizeMicrosoftTeamsTranscript(raw)`，支持 JSON segments 或 WebVTT/timed text
+- `normalizeZoomTranscript(raw)`，支持 Zoom VTT 或 JSON segments
+- `buildPlatformTranscriptImportPayload(input)`，按 `platform` 自动选择 normalizer 并生成导入 body
 
 ## 平台接入配置
 

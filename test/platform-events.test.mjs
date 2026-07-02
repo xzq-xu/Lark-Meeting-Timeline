@@ -81,6 +81,8 @@ try {
 
   const info = await getJson(baseUrl, '/api/annotation-ingest-info');
   assert.equal(info.platform_events.supported, true);
+  assert.equal(info.transcript_import.supported, true);
+  assert.equal(info.transcript_import.endpoint, `${baseUrl}/api/import/transcript`);
   assert.equal(typeof info.platform_events.setup_endpoint, 'string');
   assert.equal(info.platform_events.platforms.some((item) => item.platform === 'google_meet'), true);
 

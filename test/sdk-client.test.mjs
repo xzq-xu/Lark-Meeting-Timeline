@@ -5,6 +5,7 @@ import {
   buildMeetingEndPayload,
   buildMeetingStartPayload,
   buildTimelineMark,
+  buildTranscriptImportPayload,
   createMeetingTimelineClient,
   normalizeAbsoluteMs,
 } from '../packages/meeting-timeline-sdk/index.mjs';
@@ -74,6 +75,28 @@ assert.deepEqual(endPayload, {
   detector_source: 'sdk-test',
 });
 
+const transcriptPayload = buildTranscriptImportPayload({
+  meeting: {
+    platform: 'google_meet',
+    meetingId: 'google-record-001',
+    title: 'Google SDK meeting',
+    startTimeMs: startMs,
+  },
+  transcript: [{
+    id: 'entry-1',
+    startTime: new Date(startMs + 1000).toISOString(),
+    endTime: new Date(startMs + 4000).toISOString(),
+    speakerName: 'Ada',
+    text: 'Transcript line',
+    source: 'google_meet_transcript',
+  }],
+});
+assert.equal(transcriptPayload.meeting.platform, 'google_meet');
+assert.equal(transcriptPayload.meeting.meeting_id, 'google-record-001');
+assert.equal(transcriptPayload.meeting.start_time, new Date(startMs).toISOString());
+assert.equal(transcriptPayload.transcript[0].source, 'google_meet_transcript');
+assert.equal(transcriptPayload.transcript[0].speaker_name, 'Ada');
+
 const calls = [];
 const client = createMeetingTimelineClient({
   baseUrl: 'http://localhost:8787/',
@@ -116,6 +139,18 @@ assert.equal(calls.at(-1).body.annotations.length, 2);
 
 await client.getAnnotationStatus('sdk-mark-002');
 assert.equal(calls.at(-1).url, 'http://localhost:8787/api/annotations/status?id=sdk-mark-002');
+
+await client.importTranscript({
+  platform: 'zoom',
+  meeting: {
+    meetingId: 'zoom-001',
+    startTimeMs: startMs,
+  },
+  transcript: [{ startMs: 0, endMs: 2000, text: 'Hello from Zoom' }],
+});
+assert.equal(calls.at(-1).url, 'http://localhost:8787/api/import/transcript');
+assert.equal(calls.at(-1).body.meeting.platform, 'zoom');
+assert.equal(calls.at(-1).body.transcript[0].source, 'transcript_import');
 
 const failing = createMeetingTimelineClient({
   baseUrl: 'http://localhost:8787',

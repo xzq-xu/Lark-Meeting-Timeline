@@ -39,6 +39,66 @@ export interface MeetingEndInput {
   [key: string]: unknown;
 }
 
+export interface TranscriptSegmentInput {
+  id?: string;
+  segment_id?: string;
+  segmentId?: string;
+  sentence_id?: string;
+  sentenceId?: string;
+  start_ms?: number | string;
+  startMs?: number | string;
+  start_time_ms?: number | string | Date;
+  startTimeMs?: number | string | Date;
+  start_time?: number | string | Date;
+  startTime?: number | string | Date;
+  start?: number | string | Date;
+  end_ms?: number | string;
+  endMs?: number | string;
+  end_time_ms?: number | string | Date;
+  endTimeMs?: number | string | Date;
+  end_time?: number | string | Date;
+  endTime?: number | string | Date;
+  end?: number | string | Date;
+  speaker_id?: string;
+  speakerId?: string;
+  speaker_name?: string;
+  speakerName?: string;
+  participant_id?: string;
+  participantId?: string;
+  participant_name?: string;
+  participantName?: string;
+  user_id?: string;
+  userId?: string;
+  user_name?: string;
+  userName?: string;
+  text?: string;
+  content?: string;
+  sentence?: string;
+  transcript?: string;
+  language?: string;
+  language_code?: string;
+  languageCode?: string;
+  source?: string;
+  raw?: unknown;
+  [key: string]: unknown;
+}
+
+export interface TranscriptImportInput {
+  meeting?: MeetingStartInput;
+  meetingSession?: MeetingStartInput;
+  session?: MeetingStartInput;
+  meeting_id?: string;
+  meetingId?: string;
+  platform?: string;
+  source?: string;
+  transcript?: TranscriptSegmentInput[];
+  segments?: TranscriptSegmentInput[];
+  entries?: TranscriptSegmentInput[];
+  items?: TranscriptSegmentInput[];
+  artifact?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 export interface TimelineMarkInput {
   id?: string;
   annotation_id?: string;
@@ -107,6 +167,7 @@ export function compactObject<T>(value: T): T;
 export function normalizeAbsoluteMs(value: number | string | Date, fieldName?: string): number;
 export function buildMeetingStartPayload(input?: MeetingStartInput, defaults?: Record<string, unknown>): Record<string, unknown>;
 export function buildMeetingEndPayload(input?: MeetingEndInput, defaults?: Record<string, unknown>): Record<string, unknown>;
+export function buildTranscriptImportPayload(input?: TranscriptImportInput, defaults?: Record<string, unknown>): Record<string, unknown>;
 export function buildTimelineMark(input?: TimelineMarkInput, defaults?: Record<string, unknown>): Record<string, unknown>;
 
 export class MeetingTimelineClient {
@@ -123,6 +184,8 @@ export class MeetingTimelineClient {
   insertMarks(inputs?: TimelineMarkInput[] | { annotations?: TimelineMarkInput[]; items?: TimelineMarkInput[] }, options?: Record<string, unknown>): Promise<unknown>;
   addAnnotations(inputs?: TimelineMarkInput[] | { annotations?: TimelineMarkInput[]; items?: TimelineMarkInput[] }, options?: Record<string, unknown>): Promise<unknown>;
   getAnnotationStatus(id: string): Promise<unknown>;
+  importTranscript(input?: TranscriptImportInput, options?: Record<string, unknown>): Promise<unknown>;
+  importMeetingTranscript(input?: TranscriptImportInput, options?: Record<string, unknown>): Promise<unknown>;
   subscribeState(options?: Record<string, unknown>): { stream: unknown; close(): void };
 }
 

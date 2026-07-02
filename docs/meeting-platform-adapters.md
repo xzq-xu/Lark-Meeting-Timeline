@@ -157,7 +157,7 @@ type NormalizedMeetingSignal =
 | `meeting_started` | `timeline.startMeeting({ platform, meeting_id, start_time_ms })` |
 | `meeting_ended` | `timeline.endMeeting({ meeting_id, end_time_ms })` |
 | `participant_joined/left` | 后续新增 participant track，或先作为 event row 绘制 |
-| `artifact_ready: transcript` | 先写入事件轨道表示转写已生成；正文 segment 后续独立导入 |
+| `artifact_ready: transcript` | 先写入事件轨道表示转写已生成；正文 segment 通过 `adapters/transcript` + `POST /api/import/transcript` 会后导入 |
 | `artifact_ready: recording` | 写入事件轨道并保存 artifact 元数据，不进入用户标注主链路 |
 | `subscription_lifecycle` | 写入平台接入诊断状态，不进入会议时间轴 |
 
@@ -187,7 +187,7 @@ type NormalizedMeetingSignal =
    - `google.workspace.meet.participant.v2.joined`
    - `google.workspace.meet.participant.v2.left`
    - `google.workspace.meet.transcript.v2.fileGenerated`
-3. P2：会议结束后用 Meet REST API 拉取 transcript entries 和 recording 元数据，导入时间轴 transcript track。
+3. P2：会议结束后用 Meet REST API 拉取 transcript entries 和 recording 元数据，通过 `normalizeGoogleMeetTranscriptEntries()` 导入时间轴 transcript track。
 
 注意点：
 
@@ -320,7 +320,7 @@ GET  /api/platform-events/:platform/status
 GET  /api/platform-events/status
 ```
 
-`POST /api/platform-events/:platform` 当前支持 `google-meet`、`teams`、`zoom` 及其别名。服务端会用 SDK adapter 归一化原始事件，`meeting_started` 进入 `POST /api/meeting-session/start` 同一套建轴逻辑，`meeting_ended` 进入 `POST /api/meeting-session/end` 同一套结束逻辑。`participant_joined/left` 会进入会议 `events` 轨道，不写入用户标注流；同一平台、同一参会人、同一 join/leave 类型在默认 3 秒窗口内会被过滤为重复事件。会后 transcript/recording/smart notes 的 `artifact_ready` signal 也会进入会议 `events` 轨道，默认 5 秒窗口内按 artifact id/url 去重；artifact 本体内容仍建议后续通过 `POST /api/artifacts/transcript` 和 `POST /api/artifacts/recording` 独立导入。`subscription_lifecycle` 只更新平台状态，不会创建会议轴，也不会写入用户标注或会议事件轨道。
+`POST /api/platform-events/:platform` 当前支持 `google-meet`、`teams`、`zoom` 及其别名。服务端会用 SDK adapter 归一化原始事件，`meeting_started` 进入 `POST /api/meeting-session/start` 同一套建轴逻辑，`meeting_ended` 进入 `POST /api/meeting-session/end` 同一套结束逻辑。`participant_joined/left` 会进入会议 `events` 轨道，不写入用户标注流；同一平台、同一参会人、同一 join/leave 类型在默认 3 秒窗口内会被过滤为重复事件。会后 transcript/recording/smart notes 的 `artifact_ready` signal 也会进入会议 `events` 轨道，默认 5 秒窗口内按 artifact id/url 去重；transcript 正文通过 SDK `adapters/transcript` 归一化后调用 `POST /api/import/transcript` 导入。`subscription_lifecycle` 只更新平台状态，不会创建会议轴，也不会写入用户标注或会议事件轨道。
 
 真实 webhook 接入的安全层也已经放进 SDK：
 

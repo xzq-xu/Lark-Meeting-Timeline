@@ -5933,6 +5933,19 @@ async function annotationIngestInfoPayload(req) {
     stream_status_alias_url: localUrlFor(req, '/api/stream-status'),
     meeting_session_start_endpoint: meetingSessionStartEndpoint,
     meeting_session_end_endpoint: meetingSessionEndEndpoint,
+    transcript_import: {
+      supported: true,
+      endpoint: localUrlFor(req, '/api/import/transcript'),
+      legacy_lark_endpoint: localUrlFor(req, '/api/import/lark-transcript'),
+      description: 'Post-meeting transcript segments can be imported after platform adapters fetch Google Meet, Microsoft Teams, Zoom, or Lark transcript content.',
+      accepted_fields: [
+        'meeting.platform',
+        'meeting.meeting_id',
+        'meeting.start_time or meeting.start_time_ms',
+        'transcript[].start_ms/end_ms or transcript[].start_time/end_time',
+        'transcript[].speaker_id/speaker_name/text/source',
+      ],
+    },
     platform_events: {
       supported: true,
       status_endpoint: localUrlFor(req, '/api/platform-events/status'),
@@ -7709,10 +7722,19 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, await appendAnnotation(body));
   }
 
-  if (req.method === 'POST' && url.pathname === '/api/import/lark-transcript') {
+  if (req.method === 'POST' && (url.pathname === '/api/import/lark-transcript' || url.pathname === '/api/import/transcript')) {
     const body = await readJson(req);
     const current = await store.load();
-    const meeting = { ...current.meeting, ...(body.meeting ?? {}) };
+    const incomingMeeting = body.meeting ?? {};
+    const meeting = { ...current.meeting, ...incomingMeeting };
+    if (!meeting.start_time && incomingMeeting.start_time_ms != null) {
+      const startMs = parseAbsoluteMs(incomingMeeting.start_time_ms);
+      if (startMs != null) meeting.start_time = new Date(startMs).toISOString();
+    }
+    if (!meeting.end_time && incomingMeeting.end_time_ms != null) {
+      const endMs = parseAbsoluteMs(incomingMeeting.end_time_ms);
+      if (endMs != null) meeting.end_time = new Date(endMs).toISOString();
+    }
     const segments = normalizeTranscript(body.transcript ?? body, meeting);
     const next = mergeTimelineWithRebasedAnnotations(current, { meeting, segments });
     return sendJson(res, 200, await saveAndBroadcast(next, 'state'));

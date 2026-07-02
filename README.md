@@ -490,7 +490,7 @@ POST /api/lark/sync-minute
 GET /api/transcript-status
 ```
 
-它会返回 `status`、`segment_count`、`meeting_ended`、`minute_token_present`、`next_action` 等字段。会议中没有转写是正常状态，`realtime_blocking=false`；实时标注会先进入时间轴，会议结束后再通过 `POST /api/lark/sync-minute` 或 `POST /api/import/lark-transcript` 补齐转写。
+它会返回 `status`、`segment_count`、`meeting_ended`、`minute_token_present`、`next_action` 等字段。会议中没有转写是正常状态，`realtime_blocking=false`；实时标注会先进入时间轴，会议结束后再通过 `POST /api/lark/sync-minute` 或平台中性的 `POST /api/import/transcript` 补齐转写。`POST /api/import/lark-transcript` 仍作为旧兼容入口保留。
 
 服务会请求：
 

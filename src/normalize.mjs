@@ -320,6 +320,7 @@ export function normalizeTranscript(rawTranscript, meeting = {}) {
     const start_ms = parseRelativeOrAbsoluteMs(startValue, meetingStartMs) ?? 0;
     const end_ms = parseRelativeOrAbsoluteMs(endValue, meetingStartMs) ?? Math.max(start_ms + 1, start_ms + 12_000);
     const speaker = speakerOf(item);
+    const source = String(firstDefined(item.source, meeting.platform ? `${meeting.platform}_transcript` : null, 'transcript_import'));
     return {
       id: String(firstDefined(item.id, item.segment_id, item.sentence_id, `seg-${index + 1}`)),
       start_ms,
@@ -328,7 +329,7 @@ export function normalizeTranscript(rawTranscript, meeting = {}) {
       speaker_name: speaker.speaker_name,
       text: textOf(item),
       language: firstDefined(item.language, item.language_code, item.languageCode, null),
-      source: 'lark_minute',
+      source,
       raw: item,
     };
   }).filter((seg) => seg.text).sort((a, b) => a.start_ms - b.start_ms || a.end_ms - b.end_ms);
