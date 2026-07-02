@@ -299,14 +299,9 @@ import { createMeetingAppBrowserRuntime } from '@ai-annotation/meeting-timeline-
 const browserRuntime = createMeetingAppBrowserRuntime({
   baseUrl: 'http://localhost:8787',
 }, {
+  runtimePreset: 'google_meet',
   applyOptions: { speakerAsAnnotation: true },
   speakerOptions: { minStableMs: 300, switchStableMs: 400, endIdleMs: 1500 },
-  captureOptions: { platform: 'google_meet' },
-  observeMutations: true,
-  mutationDebounceMs: 150,
-  mutationTrackSelectors: ['[data-participant-id]', '[aria-label*="Leave call" i]'],
-  mutationIgnoreSelectors: ['.caption-line', '[data-transcript-line]', '[data-chat-message]'],
-  speakerStableFollowupMs: 300,
   sampleIntervalMs: 10000, // MutationObserver 负责低延迟触发，低频轮询只做兜底。
 });
 
@@ -316,6 +311,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   browserRuntime.handleMessage(message).then(sendResponse);
   return true;
 });
+```
+
+`runtimePreset` 当前支持 `google_meet`、`microsoft_teams`、`zoom`、`lark` 和 `webex`。preset 会自动合并对应 `meeting-app-capture` DOM profile、MutationObserver track selectors、字幕/聊天/转写噪声过滤、发言人稳定 follow-up 和低频兜底轮询；调用方仍然可以覆盖 `mutationTrackSelectors`、`mutationIgnoreSelectors`、`mutationDebounceMs`、`speakerStableFollowupMs`、`captureOptions` 等字段。也可以单独读取预设用于浏览器扩展配置面板：
+
+```js
+import {
+  MEETING_APP_BROWSER_RUNTIME_PRESETS,
+  meetingAppBrowserRuntimePreset,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime';
+
+const preset = meetingAppBrowserRuntimePreset('microsoft-teams');
+// preset.captureOptions.platform === 'microsoft_teams'
+// MEETING_APP_BROWSER_RUNTIME_PRESETS.google_meet.observeMutations === true
 ```
 
 接入浏览器扩展、Electron WebView 或桌面 Accessibility 采集器前，可以先跑 `meeting-app-fixtures` 的本地验收样本。它覆盖 Google Meet、Teams Web、Zoom Web、Webex Web、Lark/Feishu Web，并验证平台识别、会议 ID、入会态、active speaker、`meeting_started` 和 `speaker_started`：

@@ -1,4 +1,8 @@
 import { createMeetingAppTimelineRuntime } from './meeting-app-runtime.mjs';
+import {
+  MEETING_APP_DOM_CAPTURE_PROFILES,
+  meetingAppDomCaptureProfile,
+} from './meeting-app-capture.mjs';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -96,6 +100,168 @@ function asArray(value) {
   if (Array.isArray(value)) return value;
   if (value && typeof value !== 'string' && typeof value[Symbol.iterator] === 'function') return Array.from(value);
   return value == null ? [] : [value];
+}
+
+function compactStrings(values = []) {
+  const seen = new Set();
+  const output = [];
+  for (const value of asArray(values).flatMap(asArray)) {
+    const text = String(value ?? '').trim();
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    output.push(text);
+  }
+  return output;
+}
+
+const COMMON_MUTATION_IGNORE_SELECTORS = Object.freeze([
+  '.caption-line',
+  '.captions-line',
+  '[data-caption-line]',
+  '[data-transcript-line]',
+  '[data-chat-message]',
+  '[data-message-id]',
+  '[class*="caption" i]',
+  '[class*="transcript" i]',
+  '[class*="chat" i]',
+  '[aria-label*="caption" i]',
+  '[aria-label*="subtitles" i]',
+  '[aria-label*="字幕"]',
+  '[aria-label*="聊天"]',
+]);
+
+function runtimePresetForPlatform(platform, timing = {}) {
+  const profile = MEETING_APP_DOM_CAPTURE_PROFILES[platform];
+  return Object.freeze({
+    platform,
+    captureOptions: Object.freeze({ platform }),
+    observeMutations: true,
+    observe_mutations: true,
+    mutationDebounceMs: timing.mutationDebounceMs ?? 150,
+    mutation_debounce_ms: timing.mutationDebounceMs ?? 150,
+    speakerStableFollowupMs: timing.speakerStableFollowupMs ?? 300,
+    speaker_stable_followup_ms: timing.speakerStableFollowupMs ?? 300,
+    sampleIntervalMs: timing.sampleIntervalMs ?? 10_000,
+    sample_interval_ms: timing.sampleIntervalMs ?? 10_000,
+    unchangedObserveEveryMs: timing.unchangedObserveEveryMs ?? 10_000,
+    unchanged_observe_every_ms: timing.unchangedObserveEveryMs ?? 10_000,
+    mutationTrackSelectors: Object.freeze(compactStrings([
+      profile?.controlSelectors,
+      profile?.participantSelectors,
+      profile?.textSelectors,
+    ])),
+    mutation_track_selectors: Object.freeze(compactStrings([
+      profile?.controlSelectors,
+      profile?.participantSelectors,
+      profile?.textSelectors,
+    ])),
+    mutationIgnoreSelectors: COMMON_MUTATION_IGNORE_SELECTORS,
+    mutation_ignore_selectors: COMMON_MUTATION_IGNORE_SELECTORS,
+  });
+}
+
+export const MEETING_APP_BROWSER_RUNTIME_PRESETS = Object.freeze({
+  google_meet: runtimePresetForPlatform('google_meet', {
+    mutationDebounceMs: 150,
+    speakerStableFollowupMs: 300,
+  }),
+  microsoft_teams: runtimePresetForPlatform('microsoft_teams', {
+    mutationDebounceMs: 180,
+    speakerStableFollowupMs: 350,
+  }),
+  zoom: runtimePresetForPlatform('zoom', {
+    mutationDebounceMs: 180,
+    speakerStableFollowupMs: 350,
+  }),
+  lark: runtimePresetForPlatform('lark', {
+    mutationDebounceMs: 180,
+    speakerStableFollowupMs: 350,
+  }),
+  webex: runtimePresetForPlatform('webex', {
+    mutationDebounceMs: 180,
+    speakerStableFollowupMs: 350,
+  }),
+});
+
+function copyRuntimePreset(preset) {
+  if (!preset) return null;
+  return {
+    ...preset,
+    captureOptions: { ...(preset.captureOptions ?? {}) },
+    capture_options: { ...(preset.captureOptions ?? {}) },
+    mutationTrackSelectors: [...(preset.mutationTrackSelectors ?? [])],
+    mutation_track_selectors: [...(preset.mutationTrackSelectors ?? [])],
+    mutationIgnoreSelectors: [...(preset.mutationIgnoreSelectors ?? [])],
+    mutation_ignore_selectors: [...(preset.mutationIgnoreSelectors ?? [])],
+  };
+}
+
+function explicitPresetInput(options = {}) {
+  return firstNonEmpty(
+    options.runtimePreset,
+    options.runtime_preset,
+    options.browserRuntimePreset,
+    options.browser_runtime_preset,
+    options.captureProfile,
+    options.capture_profile,
+    options.platform,
+    options.provider,
+    options.captureOptions?.platform,
+    options.capture_options?.platform,
+    options.captureOptions?.captureProfile,
+    options.captureOptions?.capture_profile,
+    options.capture_options?.captureProfile,
+    options.capture_options?.capture_profile,
+  );
+}
+
+function runtimePresetDisabled(options = {}) {
+  return [
+    options.runtimePreset,
+    options.runtime_preset,
+    options.browserRuntimePreset,
+    options.browser_runtime_preset,
+  ].some((value) => {
+    if (value === false) return true;
+    if (value == null) return false;
+    const text = String(value).trim().toLowerCase();
+    return ['none', 'off', 'false', 'disabled'].includes(text);
+  });
+}
+
+function mergeSelectorOptions(presetSelectors = [], options = {}, camel, snake) {
+  return compactStrings([
+    presetSelectors,
+    firstNonEmpty(options[camel], options[snake]),
+  ]);
+}
+
+export function meetingAppBrowserRuntimePreset(platformOrInput = {}, options = {}) {
+  const input = typeof platformOrInput === 'string'
+    ? { platform: platformOrInput }
+    : (platformOrInput ?? {});
+  if (runtimePresetDisabled({ ...input, ...options })) return null;
+  const inferredInput = {
+    ...meetingAppBrowserInput(input),
+    ...input,
+  };
+  const captureOptions = {
+    ...(inferredInput.captureOptions ?? {}),
+    ...(inferredInput.capture_options ?? {}),
+    ...(options.captureOptions ?? {}),
+    ...(options.capture_options ?? {}),
+  };
+  const explicit = explicitPresetInput({
+    ...inferredInput,
+    ...options,
+    captureOptions,
+    capture_options: captureOptions,
+  });
+  const profile = meetingAppDomCaptureProfile(
+    explicit ? { ...inferredInput, platform: explicit } : inferredInput,
+    { ...options, ...captureOptions },
+  );
+  return copyRuntimePreset(MEETING_APP_BROWSER_RUNTIME_PRESETS[profile?.platform]);
 }
 
 function selectorList(options = {}, camel, snake) {
@@ -231,25 +397,44 @@ export function meetingAppBrowserInput(options = {}) {
 }
 
 export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
+  const runtimePreset = meetingAppBrowserRuntimePreset(options) ?? {};
+  const mergedCaptureOptions = {
+    ...(runtimePreset.captureOptions ?? {}),
+    ...(runtimePreset.capture_options ?? {}),
+    ...(options.captureOptions ?? {}),
+    ...(options.capture_options ?? {}),
+  };
+  const mergedOptions = {
+    ...runtimePreset,
+    ...options,
+    observeMutations: firstNonEmpty(options.observeMutations, options.observe_mutations, runtimePreset.observeMutations, runtimePreset.observe_mutations),
+    observe_mutations: firstNonEmpty(options.observe_mutations, options.observeMutations, runtimePreset.observe_mutations, runtimePreset.observeMutations),
+    mutationTrackSelectors: mergeSelectorOptions(runtimePreset.mutationTrackSelectors, options, 'mutationTrackSelectors', 'mutation_track_selectors'),
+    mutation_track_selectors: mergeSelectorOptions(runtimePreset.mutation_track_selectors, options, 'mutation_track_selectors', 'mutationTrackSelectors'),
+    mutationIgnoreSelectors: mergeSelectorOptions(runtimePreset.mutationIgnoreSelectors, options, 'mutationIgnoreSelectors', 'mutation_ignore_selectors'),
+    mutation_ignore_selectors: mergeSelectorOptions(runtimePreset.mutation_ignore_selectors, options, 'mutation_ignore_selectors', 'mutationIgnoreSelectors'),
+    captureOptions: mergedCaptureOptions,
+    capture_options: mergedCaptureOptions,
+  };
   const inputOptions = {
-    window: options.window,
-    win: options.win,
-    document: options.document,
-    doc: options.doc,
-    location: options.location,
-    navigator: options.navigator,
+    window: mergedOptions.window,
+    win: mergedOptions.win,
+    document: mergedOptions.document,
+    doc: mergedOptions.doc,
+    location: mergedOptions.location,
+    navigator: mergedOptions.navigator,
   };
   const runtime = createMeetingAppTimelineRuntime(clientOrOptions, {
-    source: options.source ?? 'browser_content_script',
-    ...options,
+    source: mergedOptions.source ?? 'browser_content_script',
+    ...mergedOptions,
     captureOptions: {
-      browserName: browserName(options),
-      ...(options.captureOptions ?? {}),
-      ...(options.capture_options ?? {}),
+      browserName: browserName(mergedOptions),
+      ...(mergedOptions.captureOptions ?? {}),
+      ...(mergedOptions.capture_options ?? {}),
     },
   });
-  const target = eventTarget(options);
-  const stopEvents = normalizeStopEvents(options);
+  const target = eventTarget(mergedOptions);
+  const stopEvents = normalizeStopEvents(mergedOptions);
   const listeners = [];
   let lifecycleInstalled = false;
   let mutationObserver = null;
@@ -277,7 +462,7 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
     }
     const handler = () => runtime.stop();
     for (const eventName of normalizeStopEvents({
-      ...options,
+      ...mergedOptions,
       ...lifecycleOptions,
       stopEvents: lifecycleOptions.stopEvents ?? lifecycleOptions.stop_events ?? stopEvents,
     })) {
@@ -426,7 +611,7 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
   function installMutationObserver(mutationOptions = {}) {
     if (mutationObserver) return { installed: false, reason: 'already_installed', state: mutationState() };
     const merged = {
-      ...options,
+      ...mergedOptions,
       ...mutationOptions,
     };
     const Observer = mutationObserverCtor(merged);
@@ -529,7 +714,7 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
       installLifecycleHandlers(startOptions);
     }
     if (mutationEnabled({
-      ...options,
+      ...mergedOptions,
       ...startOptions,
     })) {
       installMutationObserver(startOptions);
@@ -538,7 +723,7 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
   }
 
   function stop() {
-    if (options.keepMutationObserverOnStop !== true && options.keep_mutation_observer_on_stop !== true) {
+    if (mergedOptions.keepMutationObserverOnStop !== true && mergedOptions.keep_mutation_observer_on_stop !== true) {
       removeMutationObserver();
     }
     return runtime.stop();

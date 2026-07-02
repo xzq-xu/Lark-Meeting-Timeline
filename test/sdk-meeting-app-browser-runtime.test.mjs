@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 
 import {
+  MEETING_APP_BROWSER_RUNTIME_PRESETS,
   createMeetingAppBrowserRuntime,
   meetingAppBrowserInput,
+  meetingAppBrowserRuntimePreset,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-browser-runtime.mjs';
 
 const startMs = 1_783_442_400_000;
@@ -157,6 +159,15 @@ assert.equal(input.window, window);
 assert.equal(input.url, 'https://meet.google.com/abc-defg-hij');
 assert.equal(input.title, 'Browser runtime - Google Meet');
 
+const googlePreset = meetingAppBrowserRuntimePreset('google-meet');
+assert.equal(googlePreset.captureOptions.platform, 'google_meet');
+assert.equal(googlePreset.observeMutations, true);
+assert.equal(googlePreset.mutationDebounceMs, 150);
+assert.equal(googlePreset.mutationTrackSelectors.some((item) => item.includes('data-participant-id')), true);
+assert.equal(MEETING_APP_BROWSER_RUNTIME_PRESETS.webex.captureOptions.platform, 'webex');
+assert.equal(meetingAppBrowserRuntimePreset({ window }).captureOptions.platform, 'google_meet');
+assert.equal(meetingAppBrowserRuntimePreset({ window, runtimePreset: false }), null);
+
 const runtime = createMeetingAppBrowserRuntime(client, {
   window,
   now: () => clock,
@@ -259,7 +270,10 @@ assert.equal(FakeMutationObserver.instances.length, 1);
 assert.equal(FakeMutationObserver.instances[0].connected, true);
 assert.equal(FakeMutationObserver.instances[0].options.subtree, true);
 
-FakeMutationObserver.instances[0].trigger([{ type: 'childList' }, { type: 'attributes' }]);
+FakeMutationObserver.instances[0].trigger([
+  { type: 'childList', target: node('div', { 'data-participant-id': 'ada' }) },
+  { type: 'attributes', target: node('button', { 'aria-label': 'Leave call' }) },
+]);
 assert.equal(mutationRuntime.getState().browser_runtime.mutation_observer.pending_count, 2);
 const mutationFlush = await mutationRuntime.flushMutationObserver();
 assert.equal(mutationFlush.flushed, true);
@@ -298,6 +312,48 @@ assert.equal(filteredRuntime.getState().browser_runtime.mutation_observer.sample
 filteredRuntime.dispose();
 
 FakeMutationObserver.instances = [];
+const presetCalls = [];
+const presetClient = {
+  async startMeeting(inputValue) {
+    presetCalls.push({ method: 'startMeeting', input: inputValue });
+    return { ok: true, input: inputValue };
+  },
+  async endMeeting(inputValue) {
+    presetCalls.push({ method: 'endMeeting', input: inputValue });
+    return { ok: true, input: inputValue };
+  },
+  async insertMark(inputValue, optionsValue) {
+    presetCalls.push({ method: 'insertMark', input: inputValue, options: optionsValue });
+    return { ok: true, input: inputValue };
+  },
+};
+const presetWindow = fakeWindow(fakeDocument(), { MutationObserver: FakeMutationObserver });
+const presetRuntime = createMeetingAppBrowserRuntime(presetClient, {
+  window: presetWindow,
+  runtimePreset: 'google_meet',
+  now: () => clock,
+  applyOptions: { speakerAsAnnotation: true },
+  speakerOptions: { minStableMs: 0 },
+  mutationDebounceMs: 0,
+});
+const presetStarted = presetRuntime.start({ immediate: false, sampleIntervalMs: 10_000 });
+assert.equal(presetStarted.running, true);
+assert.equal(FakeMutationObserver.instances.length, 1);
+assert.equal(FakeMutationObserver.instances[0].connected, true);
+FakeMutationObserver.instances[0].trigger([
+  { type: 'characterData', target: node('span', { class: 'caption-line' }, 'caption noise') },
+  { type: 'attributes', target: node('div', { 'data-participant-id': 'ada' }) },
+]);
+const presetMutationState = presetRuntime.getState().browser_runtime.mutation_observer;
+assert.equal(presetMutationState.pending_count, 1);
+assert.equal(presetMutationState.ignored_count, 1);
+const presetFlush = await presetRuntime.flushMutationObserver();
+assert.equal(presetFlush.flushed, true);
+assert.deepEqual(presetCalls.map((item) => item.method), ['startMeeting', 'insertMark']);
+assert.equal(presetCalls[0].input.platform, 'google_meet');
+presetRuntime.dispose();
+
+FakeMutationObserver.instances = [];
 let followupClock = startMs;
 const followupCalls = [];
 const followupClient = {
@@ -324,7 +380,9 @@ const followupRuntime = createMeetingAppBrowserRuntime(followupClient, {
   sampleIntervalMs: 10_000,
 });
 followupRuntime.installMutationObserver({ mutationDebounceMs: 0 });
-FakeMutationObserver.instances[0].trigger([{ type: 'attributes' }]);
+FakeMutationObserver.instances[0].trigger([
+  { type: 'attributes', target: node('div', { 'data-participant-id': 'ada' }) },
+]);
 const followupFirstFlush = await followupRuntime.flushMutationObserver();
 assert.equal(followupFirstFlush.flushed, true);
 assert.deepEqual(followupFirstFlush.result.result.signals.map((item) => item.type), ['meeting_started']);

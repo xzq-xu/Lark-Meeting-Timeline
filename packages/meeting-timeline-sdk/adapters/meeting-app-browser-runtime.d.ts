@@ -1,5 +1,8 @@
 import type { MeetingTimelineClient, MeetingTimelineClientOptions } from '../index.mjs';
-import type { MeetingAppDomCaptureInput } from './meeting-app-capture.mjs';
+import type {
+  MeetingAppDomCaptureInput,
+  MeetingAppDomCaptureProfilePlatform,
+} from './meeting-app-capture.mjs';
 import type {
   MeetingAppTimelineRuntimeOptions,
 } from './meeting-app-runtime.mjs';
@@ -19,6 +22,14 @@ export interface MeetingAppBrowserRuntimeOptions extends MeetingAppTimelineRunti
   stop_events?: string[];
   browserName?: string;
   browser_name?: string;
+  runtimePreset?: string | false | null;
+  runtime_preset?: string | false | null;
+  browserRuntimePreset?: string | false | null;
+  browser_runtime_preset?: string | false | null;
+  captureProfile?: string | false | null;
+  capture_profile?: string | false | null;
+  platform?: string;
+  provider?: string;
   mutationObserver?: boolean | unknown;
   mutation_observer?: boolean | unknown;
   observeMutations?: boolean;
@@ -54,6 +65,39 @@ export interface MeetingAppBrowserRuntimeOptions extends MeetingAppTimelineRunti
   keep_mutation_observer_on_stop?: boolean;
   [key: string]: unknown;
 }
+
+export type MeetingAppBrowserRuntimePresetPlatform = MeetingAppDomCaptureProfilePlatform;
+
+export interface MeetingAppBrowserRuntimePreset {
+  platform: MeetingAppBrowserRuntimePresetPlatform;
+  captureOptions: { platform: MeetingAppBrowserRuntimePresetPlatform; [key: string]: unknown };
+  capture_options: { platform: MeetingAppBrowserRuntimePresetPlatform; [key: string]: unknown };
+  observeMutations: boolean;
+  observe_mutations: boolean;
+  mutationDebounceMs: number;
+  mutation_debounce_ms: number;
+  speakerStableFollowupMs: number;
+  speaker_stable_followup_ms: number;
+  sampleIntervalMs: number;
+  sample_interval_ms: number;
+  unchangedObserveEveryMs: number;
+  unchanged_observe_every_ms: number;
+  mutationTrackSelectors: string[];
+  mutation_track_selectors: string[];
+  mutationIgnoreSelectors: string[];
+  mutation_ignore_selectors: string[];
+  [key: string]: unknown;
+}
+
+export const MEETING_APP_BROWSER_RUNTIME_PRESETS: Readonly<Record<
+  MeetingAppBrowserRuntimePresetPlatform,
+  Readonly<MeetingAppBrowserRuntimePreset>
+>>;
+
+export function meetingAppBrowserRuntimePreset(
+  platformOrInput?: string | MeetingAppBrowserRuntimeOptions | Record<string, unknown>,
+  options?: MeetingAppBrowserRuntimeOptions,
+): MeetingAppBrowserRuntimePreset | null;
 
 export interface MeetingAppBrowserRuntimeMessage {
   type?: string;
