@@ -5907,7 +5907,7 @@ async function annotationIngestInfoPayload(req) {
     platform_events: {
       supported: true,
       status_endpoint: localUrlFor(req, '/api/platform-events/status'),
-      description: 'Server-side adapters can ingest Google Meet, Microsoft Teams, and Zoom event payloads, normalize them into meeting timeline signals, then start/end the same meeting axis contract.',
+      description: 'Server-side adapters can ingest Google Meet, Microsoft Teams, and Zoom event payloads, normalize them into meeting timeline signals, start/end the same meeting axis contract, and append participant join/leave events with duplicate filtering.',
       platforms: platformEventAdapterDefinitions.map((item) => ({
         platform: item.key,
         aliases: item.aliases,
@@ -6245,6 +6245,107 @@ function platformSignalEndBody(signalPayload = {}, body = {}, adapter = {}) {
   };
 }
 
+function platformParticipantKey(signal = {}) {
+  return String(
+    signal.participant_id
+      ?? signal.participant_name
+      ?? signal.source_event_id
+      ?? 'unknown_participant',
+  );
+}
+
+function platformParticipantEventId(signal = {}, adapter = {}) {
+  const participant = platformParticipantKey(signal)
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'unknown-participant';
+  if (signal.source_event_id) return `evt-${adapter.source}-${signal.source_event_id}-${signal.type}-${participant}`;
+  return `evt-${adapter.source}-${signal.type}-${participant}-${signal.occurred_at_ms}`;
+}
+
+function platformParticipantEventFromSignal(signal = {}, current = {}, adapter = {}) {
+  const startMs = parseAbsoluteMs(current.meeting?.start_time);
+  const occurredAtMs = parseAbsoluteMs(signal.occurred_at_ms);
+  const timeMs = startMs != null && occurredAtMs != null
+    ? Math.max(0, occurredAtMs - startMs)
+    : 0;
+  const participantName = signal.participant_name || signal.participant_id || '参会人';
+  const joined = signal.type === 'participant_joined';
+  return {
+    id: platformParticipantEventId(signal, adapter),
+    time_ms: timeMs,
+    type: joined ? 'participant_join' : 'participant_leave',
+    label: `${participantName}${joined ? '加入' : '离开'}`,
+    source: adapter.source,
+    metadata: {
+      raw_type: `platform.${adapter.source}.${signal.type}`,
+      platform: adapter.key,
+      meeting_id: signal.meeting?.meeting_id ?? null,
+      source_event_id: signal.source_event_id ?? null,
+      participant_id: signal.participant_id ?? null,
+      participant_name: signal.participant_name ?? null,
+    },
+  };
+}
+
+function shouldSkipPlatformParticipantEvent(existingEvents = [], event = {}, filterWindowMs = 3000) {
+  if (existingEvents.some((item) => item.id === event.id)) return true;
+  const participantId = event.metadata?.participant_id;
+  const participantName = event.metadata?.participant_name;
+  return existingEvents.some((item) => (
+    item.source === event.source
+      && item.type === event.type
+      && Math.abs(Number(item.time_ms ?? 0) - Number(event.time_ms ?? 0)) <= filterWindowMs
+      && (
+        (participantId && item.metadata?.participant_id === participantId)
+          || (!participantId && participantName && item.metadata?.participant_name === participantName)
+      )
+  ));
+}
+
+async function appendPlatformParticipantSignal(signal = {}, body = {}, adapter = {}) {
+  const current = await store.load();
+  if (!isRealMeetingAxis(current.meeting)) {
+    return { skipped: true, reason: 'no_real_meeting_axis', state: current };
+  }
+  if (!sameMeeting(current.meeting, signal.meeting)) {
+    return {
+      skipped: true,
+      reason: 'participant_signal_meeting_mismatch',
+      meeting_id: current.meeting?.meeting_id ?? null,
+      signal_meeting_id: signal.meeting?.meeting_id ?? null,
+      state: current,
+    };
+  }
+  const filterWindowMs = boundedNumber(
+    body.participant_filter_window_ms ?? body.participantFilterWindowMs,
+    3000,
+    0,
+    60_000,
+  );
+  const event = platformParticipantEventFromSignal(signal, current, adapter);
+  const existingEvents = current.events ?? [];
+  if (shouldSkipPlatformParticipantEvent(existingEvents, event, filterWindowMs)) {
+    return {
+      skipped: true,
+      reason: 'duplicate_participant_signal_filtered',
+      filter_window_ms: filterWindowMs,
+      event,
+      state: current,
+    };
+  }
+  const next = mergeTimelineWithRebasedAnnotations(current, {
+    events: [...existingEvents, event],
+  });
+  const state = await saveAndBroadcast(next, 'state');
+  return {
+    skipped: false,
+    event,
+    state,
+  };
+}
+
 function platformEventTimelineClient(body = {}, req = {}, adapter = {}) {
   return {
     startMeeting(input = {}) {
@@ -6272,11 +6373,14 @@ async function ingestPlatformEvent(platform, body = {}, req = {}) {
   const client = platformEventTimelineClient(body, req, adapter);
   const results = await applyMeetingSignals(client, signals, {
     participantAsAnnotation: body.participant_as_annotation === true || body.participantAsAnnotation === true,
+    onParticipantSignal: body.participant_as_annotation === true || body.participantAsAnnotation === true
+      ? undefined
+      : (signal) => appendPlatformParticipantSignal(signal, body, adapter),
     onArtifactSignal: body.artifact_callback === 'status_only'
       ? async (signal) => signal
       : undefined,
   });
-  const appliedCount = results.filter((item) => item.applied).length;
+  const appliedCount = results.filter((item) => item.applied && item.response?.skipped !== true).length;
   const skippedCount = results.length - appliedCount;
   updatePlatformEventStatus(adapter, {
     received_count: platformEventStatus[adapter.key].received_count + 1,

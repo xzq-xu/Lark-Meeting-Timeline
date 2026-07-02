@@ -295,7 +295,7 @@ GET  /api/platform-events/:platform/status
 GET  /api/platform-events/status
 ```
 
-`POST /api/platform-events/:platform` 当前支持 `google-meet`、`teams`、`zoom` 及其别名。服务端会用 SDK adapter 归一化原始事件，`meeting_started` 进入 `POST /api/meeting-session/start` 同一套建轴逻辑，`meeting_ended` 进入 `POST /api/meeting-session/end` 同一套结束逻辑。会后 transcript/recording artifact 目前先归一化为 `artifact_ready` signal，默认不写入用户标注流；后续可再补 `POST /api/artifacts/transcript` 和 `POST /api/artifacts/recording`。
+`POST /api/platform-events/:platform` 当前支持 `google-meet`、`teams`、`zoom` 及其别名。服务端会用 SDK adapter 归一化原始事件，`meeting_started` 进入 `POST /api/meeting-session/start` 同一套建轴逻辑，`meeting_ended` 进入 `POST /api/meeting-session/end` 同一套结束逻辑。`participant_joined/left` 会进入会议 `events` 轨道，不写入用户标注流；同一平台、同一参会人、同一 join/leave 类型在默认 3 秒窗口内会被过滤为重复事件。会后 transcript/recording artifact 目前先归一化为 `artifact_ready` signal，默认不写入用户标注流；后续可再补 `POST /api/artifacts/transcript` 和 `POST /api/artifacts/recording`。
 
 SDK 包结构建议：
 

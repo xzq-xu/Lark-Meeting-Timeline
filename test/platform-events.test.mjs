@@ -101,6 +101,46 @@ try {
   assert.equal(googleStart.state.meeting.meeting_id, 'google-record-001');
   assert.equal(googleStart.state.events.some((event) => event.source === 'google_meet_webhook' && event.type === 'meeting_start'), true);
 
+  const googleJoin = await postJson(baseUrl, '/api/platform-events/google-meet', {
+    id: 'google-join-001',
+    type: 'google.workspace.meet.participant.v2.joined',
+    time: new Date(startMs + 15_000).toISOString(),
+    data: {
+      participantSession: {
+        name: 'conferenceRecords/google-record-001/participants/user-123/participantSessions/session-1',
+        participant: { displayName: 'Ada Lovelace' },
+      },
+    },
+  });
+  assert.equal(googleJoin.results[0].action, 'onParticipantSignal');
+  assert.equal(googleJoin.results[0].response.skipped, false);
+  const googleParticipantEvents = googleJoin.state.events.filter((event) => (
+    event.source === 'google_meet_webhook'
+      && event.type === 'participant_join'
+      && event.metadata?.participant_id === 'user-123'
+  ));
+  assert.equal(googleParticipantEvents.length, 1);
+  assert.equal(googleParticipantEvents[0].time_ms, 15_000);
+
+  const duplicateGoogleJoin = await postJson(baseUrl, '/api/platform-events/google-meet', {
+    id: 'google-join-duplicate',
+    type: 'google.workspace.meet.participant.v2.joined',
+    time: new Date(startMs + 16_000).toISOString(),
+    data: {
+      participantSession: {
+        name: 'conferenceRecords/google-record-001/participants/user-123/participantSessions/session-2',
+        participant: { displayName: 'Ada Lovelace' },
+      },
+    },
+  });
+  assert.equal(duplicateGoogleJoin.results[0].response.skipped, true);
+  assert.equal(duplicateGoogleJoin.results[0].response.reason, 'duplicate_participant_signal_filtered');
+  assert.equal(duplicateGoogleJoin.state.events.filter((event) => (
+    event.source === 'google_meet_webhook'
+      && event.type === 'participant_join'
+      && event.metadata?.participant_id === 'user-123'
+  )).length, 1);
+
   const annotation = await postJson(baseUrl, '/api/annotations', {
     id: 'google-platform-ann-1',
     source: 'hanwang_epaper',
@@ -126,8 +166,9 @@ try {
 
   const status = await getJson(baseUrl, '/api/platform-events/google-meet/status');
   assert.equal(status.status.platform, 'google_meet');
-  assert.equal(status.status.received_count, 2);
-  assert.equal(status.status.applied_signal_count, 2);
+  assert.equal(status.status.received_count, 4);
+  assert.equal(status.status.applied_signal_count, 3);
+  assert.equal(status.status.skipped_signal_count, 1);
   assert.equal(status.status.last_signal_type, 'meeting_ended');
 
   const teamsStart = await postJson(baseUrl, '/api/platform-events/teams', {
@@ -143,6 +184,30 @@ try {
   assert.equal(teamsStart.state.meeting.source, 'microsoft_teams_webhook');
   assert.equal(teamsStart.state.meeting.platform, 'microsoft_teams');
   assert.equal(teamsStart.state.meeting.meeting_id, 'teams-meeting-001');
+
+  const teamsRoster = await postJson(baseUrl, '/api/platform-events/teams', {
+    id: 'teams-roster-001',
+    resourceData: {
+      eventType: 'rosterUpdated',
+      eventDateTime: new Date(startMs + 20_000).toISOString(),
+      onlineMeetingId: 'teams-meeting-001',
+      'participants@delta': [
+        { id: 'teams-user-1', displayName: 'Grace Hopper', joinDateTime: new Date(startMs + 20_000).toISOString() },
+        { id: 'teams-user-2', displayName: 'Alan Turing', removedState: { reason: 'left' }, leaveDateTime: new Date(startMs + 30_000).toISOString() },
+      ],
+    },
+  });
+  assert.deepEqual(teamsRoster.results.map((item) => item.action), ['onParticipantSignal', 'onParticipantSignal']);
+  assert.equal(teamsRoster.state.events.some((event) => (
+    event.source === 'microsoft_teams_webhook'
+      && event.type === 'participant_join'
+      && event.metadata?.participant_id === 'teams-user-1'
+  )), true);
+  assert.equal(teamsRoster.state.events.some((event) => (
+    event.source === 'microsoft_teams_webhook'
+      && event.type === 'participant_leave'
+      && event.metadata?.participant_id === 'teams-user-2'
+  )), true);
 
   const zoomStart = await postJson(baseUrl, '/api/platform-events/zoom', {
     force: true,
@@ -163,8 +228,8 @@ try {
   assert.equal(zoomStart.state.meeting.meeting_id, 'zoom-uuid-001');
 
   const allStatus = await getJson(baseUrl, '/api/platform-events/status');
-  assert.equal(allStatus.status.google_meet.received_count, 2);
-  assert.equal(allStatus.status.microsoft_teams.received_count, 1);
+  assert.equal(allStatus.status.google_meet.received_count, 4);
+  assert.equal(allStatus.status.microsoft_teams.received_count, 2);
   assert.equal(allStatus.status.zoom.received_count, 1);
 
   console.log('ok meeting platform event endpoints');
