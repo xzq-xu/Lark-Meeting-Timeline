@@ -167,9 +167,9 @@ type NormalizedMeetingSignal =
 | 平台 | 实时建轴 | 参会人位置 | 会后转写/录制 | 主要风险 |
 | --- | --- | --- | --- | --- |
 | 飞书/Lark | 当前已接入长连接事件和会议扫描兜底 | join/leave 事件可做 speaker/participant track | 妙记会后导入 | 企业权限、事件投递延迟 |
-| Google Meet | Google Workspace Events API 的 conference started/ended | participant joined/left events 或 Meet REST participant sessions | Meet REST `conferenceRecords.transcripts/entries`、recordings、smartNotes | Workspace 权限、订阅目标限制、部分参与者只能收到有限事件 |
-| Microsoft Teams | Graph `meetingCallEvents` 的 `callStarted/callEnded`，或 Teams bot meetingStart/meetingEnd | Graph rosterUpdated 或 Teams bot participant events | Graph transcript/recording notifications，会后获取内容 | Graph 应用权限、rich notification 加密、订阅最长 3 天、租户管理员可能关闭 transcript API |
-| Zoom | Zoom Meeting webhooks 的 meeting/participant 事件 | meeting participant webhook | `recording.completed` 后取录制和转写文件 | HTTPS webhook、事件 scope、3 秒响应要求、云录制/转写设置 |
+| Google Meet | 本地 `meeting-apps`/browser 预设先建轴；Workspace Events conference started/ended 校准 | 本地 active speaker tile 或 participant joined/left events | Meet REST `conferenceRecords.transcripts/entries`、recordings、smartNotes | Workspace 权限、订阅目标限制、部分参与者只能收到有限事件 |
+| Microsoft Teams | 本地 `meeting-apps`/native 预设先建轴；Graph `meetingCallEvents` 或 Teams bot 校准 | 本地 active speaker tile、Graph rosterUpdated 或 Teams bot participant events | Graph transcript/recording notifications，会后获取内容 | Graph 应用权限、rich notification 加密、订阅最长 3 天、租户管理员可能关闭 transcript API |
+| Zoom | 本地 `meeting-apps`/native 预设先建轴；Zoom Meeting webhooks 校准 | 本地 active speaker tile 或 meeting participant webhook | `recording.completed` 后取录制和转写文件 | HTTPS webhook、事件 scope、3 秒响应要求、云录制/转写设置 |
 | Cisco Webex | Webex webhooks 的 meetings started/ended | `meetingParticipants` joined/left webhook | `meetingTranscripts` created、recordings created/updated | webhook payload 可能只有元数据、完整内容需 REST 补拉、FedRAMP 支持范围不同 |
 
 ## Google Meet 适配
@@ -182,7 +182,7 @@ type NormalizedMeetingSignal =
 
 推荐接入方式：
 
-1. P0：先支持本地/桌面检测器建轴。用户进入 Google Meet 页面或桌面端会议窗口后，检测器调用 `startMeeting({ platform: 'google_meet', start_time_ms })`。
+1. P0：先支持本地/桌面检测器建轴。浏览器扩展或桌面观察器把 Google Meet 的 URL、按钮文案、tile/ariaLabel、active speaker 信息交给 `adapters/meeting-apps`，由 preset 归一成 `meeting_started` / `speaker_started`，再调用 `startMeeting({ platform: 'google_meet', start_time_ms })`。
 2. P1：接 Google Workspace Events API，处理：
    - `google.workspace.meet.conference.v2.started`
    - `google.workspace.meet.conference.v2.ended`
@@ -327,6 +327,7 @@ Teams SDK 可以让会议内 app/bot 接收 meetingStart、meetingEnd、particip
 
 1. **保留并强化 local detector path**
    - 宿主应用、桌面观察器、电子纸 companion app 发现“用户已经在会议中”时，直接调用本地 `startMeeting`。
+   - 对 Google Meet / Teams / Zoom / Lark / Webex 的浏览器 DOM 或桌面 Accessibility 快照，优先用 `adapters/meeting-apps` preset 归一化；它负责识别 Leave/Join 按钮、participant tile、ariaLabel 和音量/发言状态。
    - 这是跨平台最低延迟、最低权限依赖的路径。
 
 2. **抽出 adapter core**

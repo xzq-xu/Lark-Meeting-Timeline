@@ -93,6 +93,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/active-speaker`
 - `@ai-annotation/meeting-timeline-sdk/adapters/browser-meeting`
 - `@ai-annotation/meeting-timeline-sdk/adapters/native-meeting`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-apps`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-source`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
@@ -203,6 +204,36 @@ await browserMeetings.observe({
 
 这条路径同样适用于 Teams Web、Zoom Web、Webex Web 和 Lark/Feishu Web：平台和会议 ID 优先从 URL 解析，`page.activeSpeaker` / `dom.activeSpeaker` / `participants[].speaking` 会归一化成 `speaker_started/ended`。如果官方 webhook 之后到达，再用 reconciler 校准；实时标注不要等待官方事件。
 
+如果宿主拿到的是更贴近真实浏览器扩展或桌面 Accessibility 的“脏输入”，例如 Google Meet 的 tile `ariaLabel`、Teams 的 `Leave` 按钮、Zoom 的窗口控件和 participant tile，推荐先走 `meeting-apps` 预设层。它会按 Google Meet / Microsoft Teams / Zoom / Lark / Webex 的常见 DOM/AX 线索，把按钮文案、tile 列表、发言状态和音量值归一成 `browser-meeting` 可识别的 `inMeeting`、`participants`、`activeSpeaker`：
+
+```js
+import { createMeetingAppObserver } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-apps';
+
+const meetingApps = createMeetingAppObserver({
+  source: 'browser_extension',
+  speakerOptions: { minStableMs: 300, switchStableMs: 400, endIdleMs: 1500 },
+});
+
+const result = meetingApps.observe({
+  tabs: [{
+    active: true,
+    audible: true,
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Review - Google Meet',
+    page: {
+      buttons: [{ ariaLabel: 'Leave call' }],
+      tiles: [
+        { dataset: { participantId: 'ada' }, ariaLabel: 'Ada Lovelace is speaking' },
+      ],
+    },
+  }],
+}, { observedAtMs: Date.now() });
+
+// result.signals -> meeting_started / speaker_started
+```
+
+`meeting-apps` 是轻量 preset，不依赖具体浏览器扩展 SDK，也不要求实时 OCR 或实时转写。它的作用是把 Google Meet 等会议软件的本地可观测状态变成统一 meeting signal；官方 provider webhook 仍然走 `google-meet` / `microsoft-teams` / `zoom` 等 adapter 做校准和会后 artifact。
+
 桌面客户端推荐用 `native-meeting`。它面向 macOS Accessibility、Windows UI Automation、Electron shell 或宿主进程采集到的 app/window/process/audio 快照；适合 Zoom、Teams、Lark/Feishu、Webex 桌面端：
 
 ```js
@@ -252,6 +283,7 @@ const meetingSources = createMeetingSourceAggregator(timeline, {
 
 await meetingSources.observeBrowser(browserSnapshot, { observedAtMs: Date.now() });
 await meetingSources.observeNative(nativeAppSnapshot, { observedAtMs: Date.now() });
+await meetingSources.observeMeetingApp(meetingAppDomOrAxSnapshot, { observedAtMs: Date.now() });
 await meetingSources.ingestProvider('google-meet', googleWorkspaceEventBody);
 
 await meetingSources.insertMark({

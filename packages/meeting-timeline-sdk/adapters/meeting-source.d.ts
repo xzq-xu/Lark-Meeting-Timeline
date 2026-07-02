@@ -2,6 +2,7 @@ import type { MeetingTimelineClient } from '../index.mjs';
 import type { BrowserMeetingObserverOptions, BrowserMeetingSnapshot } from './browser-meeting.mjs';
 import type { ApplyMeetingSignalOptions, ApplyMeetingSignalResult, NormalizedMeetingSignal } from './core.mjs';
 import type { LocalObserverOptions, LocalObserverSnapshot } from './local-observer.mjs';
+import type { MeetingAppObserverOptions, MeetingAppSnapshot } from './meeting-apps.mjs';
 import type { NativeMeetingObserverOptions, NativeMeetingSnapshot } from './native-meeting.mjs';
 
 export interface MeetingSourceAggregatorOptions {
@@ -16,6 +17,10 @@ export interface MeetingSourceAggregatorOptions {
   reconcile_options?: Record<string, unknown>;
   browserOptions?: BrowserMeetingObserverOptions;
   browser_options?: BrowserMeetingObserverOptions;
+  appOptions?: MeetingAppObserverOptions;
+  app_options?: MeetingAppObserverOptions;
+  meetingAppOptions?: MeetingAppObserverOptions;
+  meeting_app_options?: MeetingAppObserverOptions;
   nativeOptions?: NativeMeetingObserverOptions;
   native_options?: NativeMeetingObserverOptions;
   localOptions?: LocalObserverOptions;
@@ -62,6 +67,8 @@ export function createMeetingSourceAggregator(
   client: MeetingTimelineClient;
   observeBrowser(input?: BrowserMeetingSnapshot, options?: BrowserMeetingObserverOptions): Promise<MeetingSourceResult>;
   observeNative(input?: NativeMeetingSnapshot, options?: NativeMeetingObserverOptions): Promise<MeetingSourceResult>;
+  observeMeetingApp(input?: MeetingAppSnapshot, options?: MeetingAppObserverOptions): Promise<MeetingSourceResult>;
+  observeApp(input?: MeetingAppSnapshot, options?: MeetingAppObserverOptions): Promise<MeetingSourceResult>;
   observeLocal(snapshot?: LocalObserverSnapshot, options?: LocalObserverOptions): Promise<MeetingSourceResult>;
   observeLocalCandidates(candidates?: LocalObserverSnapshot[] | Record<string, unknown>, options?: LocalObserverOptions): Promise<MeetingSourceResult>;
   ingestProvider(platformOrInput: string | Record<string, unknown>, payload?: unknown, options?: Record<string, unknown>): Promise<MeetingSourceResult>;

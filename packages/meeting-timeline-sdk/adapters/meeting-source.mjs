@@ -5,6 +5,7 @@ import {
 import { applyMeetingSignals } from './core.mjs';
 import { createBrowserMeetingObserver } from './browser-meeting.mjs';
 import { createLocalMeetingObserver } from './local-observer.mjs';
+import { createMeetingAppObserver } from './meeting-apps.mjs';
 import { createNativeMeetingObserver } from './native-meeting.mjs';
 import { createReconciledPlatformEventIngestor } from './platform-ingest.mjs';
 import { createMeetingSignalReconciler } from './signal-reconciler.mjs';
@@ -66,6 +67,26 @@ function observerOptions(kind, options = {}) {
     source: options.source ?? defaultSource(kind),
     ...(options[camel] ?? {}),
     ...(options[snake] ?? {}),
+  };
+}
+
+function meetingAppOptions(options = {}) {
+  return {
+    source: options.source ?? 'meeting_app_observer',
+    ...(options.appOptions ?? {}),
+    ...(options.app_options ?? {}),
+    ...(options.meetingAppOptions ?? {}),
+    ...(options.meeting_app_options ?? {}),
+    speakerOptions: options.meetingAppOptions?.speakerOptions
+      ?? options.meeting_app_options?.speakerOptions
+      ?? options.meetingAppOptions?.speaker_options
+      ?? options.meeting_app_options?.speaker_options
+      ?? options.appOptions?.speakerOptions
+      ?? options.app_options?.speakerOptions
+      ?? options.appOptions?.speaker_options
+      ?? options.app_options?.speaker_options
+      ?? options.speakerOptions
+      ?? options.speaker_options,
   };
 }
 
@@ -155,6 +176,7 @@ export function createMeetingSourceAggregator(clientOrOptions, options = {}) {
         ?? options.speaker_options,
     },
   }));
+  const appObserver = createMeetingAppObserver(meetingAppOptions(options));
   const localObserver = createLocalMeetingObserver(observerOptions('local', options));
   const providerIngestor = createReconciledPlatformEventIngestor(client, {
     ...(options.providerOptions ?? {}),
@@ -162,6 +184,15 @@ export function createMeetingSourceAggregator(clientOrOptions, options = {}) {
     reconciler,
     applyOptions: mergeApplyOptions(options, options.providerOptions ?? options.provider_options ?? {}),
   });
+  async function observeMeetingAppInput(input = {}, observeOptions = {}) {
+    const observed = appObserver.observe(input, observeOptions);
+    const result = await applyObservedSignals(client, reconciler, observed, options, observeOptions);
+    return {
+      ...result,
+      source: 'meeting_app',
+      diagnostic: sourceDiagnostic('meeting_app', result),
+    };
+  }
 
   return {
     client,
@@ -182,6 +213,12 @@ export function createMeetingSourceAggregator(clientOrOptions, options = {}) {
         source: 'native',
         diagnostic: sourceDiagnostic('native', result),
       };
+    },
+    async observeMeetingApp(input = {}, observeOptions = {}) {
+      return observeMeetingAppInput(input, observeOptions);
+    },
+    async observeApp(input = {}, observeOptions = {}) {
+      return observeMeetingAppInput(input, observeOptions);
     },
     async observeLocal(snapshot = {}, observeOptions = {}) {
       const observed = localObserver.observe(snapshot, observeOptions);
@@ -246,6 +283,7 @@ export function createMeetingSourceAggregator(clientOrOptions, options = {}) {
       return {
         browser: browserObserver.getState(),
         native: nativeObserver.getState(),
+        meetingApp: appObserver.getState(),
         local: localObserver.getState(),
         reconciler: reconciler.getState(),
         client: typeof client.getState === 'function' ? client.getState() : undefined,
@@ -255,6 +293,7 @@ export function createMeetingSourceAggregator(clientOrOptions, options = {}) {
       return {
         browser: browserObserver.reset(nextState.browser ?? nextState.browserState ?? null),
         native: nativeObserver.reset(nextState.native ?? nextState.nativeState ?? null),
+        meetingApp: appObserver.reset(nextState.meetingApp ?? nextState.meeting_app ?? nextState.app ?? null),
         local: localObserver.reset(nextState.local ?? nextState.localState ?? null),
         reconciler: reconciler.reset(nextState.reconciler ?? nextState.signal_reconciler ?? nextState.signalReconciler ?? {}),
       };
