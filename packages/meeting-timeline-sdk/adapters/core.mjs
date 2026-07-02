@@ -10,6 +10,7 @@ export const MEETING_SIGNAL_TYPES = Object.freeze([
   'participant_joined',
   'participant_left',
   'artifact_ready',
+  'subscription_lifecycle',
 ]);
 
 const meetingSignalTypes = new Set(MEETING_SIGNAL_TYPES);
@@ -30,6 +31,14 @@ function normalizeSource(value) {
 
 function normalizePlatform(value) {
   return String(value || 'unknown').trim() || 'unknown';
+}
+
+function normalizeLifecycleType(value) {
+  const text = String(value || 'unknown').trim() || 'unknown';
+  return text
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[\s.-]+/g, '_')
+    .toLowerCase();
 }
 
 export function normalizeMeetingIdentity(input = {}, defaults = {}) {
@@ -85,6 +94,36 @@ export function normalizeMeetingSignal(input = {}, defaults = {}) {
     throw new MeetingTimelineSdkError('occurred_at_ms is required for meeting platform signals', {
       fieldName: 'occurred_at_ms',
       input,
+    });
+  }
+  if (type === 'subscription_lifecycle') {
+    const meetingInput = input.meeting ?? defaults.meeting;
+    const meeting = meetingInput ? normalizeMeetingIdentity(meetingInput, defaults.meeting ?? defaults) : undefined;
+    const expiresAtInput = firstNonEmpty(
+      input.expires_at_ms,
+      input.expiresAtMs,
+      input.expires_at,
+      input.expiresAt,
+      input.expire_time,
+      input.expireTime,
+      input.subscription_expiration_date_time,
+      input.subscriptionExpirationDateTime,
+    );
+    return compactObject({
+      type,
+      meeting,
+      platform: normalizePlatform(firstNonEmpty(input.platform, defaults.platform, meeting?.platform)),
+      occurred_at_ms: normalizeAbsoluteMs(occurredAtInput, 'occurred_at_ms'),
+      source_event_id: firstNonEmpty(input.source_event_id, input.sourceEventId, input.event_id, input.eventId, input.id),
+      source: normalizeSource(firstNonEmpty(input.source, defaults.source)),
+      lifecycle_type: normalizeLifecycleType(firstNonEmpty(input.lifecycle_type, input.lifecycleType, input.lifecycleEvent, input.event)),
+      subscription_id: firstNonEmpty(input.subscription_id, input.subscriptionId, input.id),
+      subscription_name: firstNonEmpty(input.subscription_name, input.subscriptionName, input.name),
+      expires_at_ms: expiresAtInput == null ? undefined : normalizeAbsoluteMs(expiresAtInput, 'expires_at_ms'),
+      resource: firstNonEmpty(input.resource, input.target_resource, input.targetResource),
+      tenant_id: firstNonEmpty(input.tenant_id, input.tenantId),
+      client_state: firstNonEmpty(input.client_state, input.clientState),
+      raw: input.raw,
     });
   }
   const meeting = normalizeMeetingIdentity(input.meeting ?? input, defaults.meeting ?? defaults);
@@ -179,6 +218,18 @@ export async function applyMeetingSignal(client, signalInput, options = {}) {
       return { applied: true, action: 'onArtifactSignal', signal, response };
     }
     return { applied: false, action: 'skipArtifactSignal', reason: 'artifact_import_not_configured', signal };
+  }
+  if (signal.type === 'subscription_lifecycle') {
+    if (typeof options.onSubscriptionLifecycleSignal === 'function') {
+      const response = await options.onSubscriptionLifecycleSignal(signal, client);
+      return { applied: true, action: 'onSubscriptionLifecycleSignal', signal, response };
+    }
+    return {
+      applied: false,
+      action: 'skipSubscriptionLifecycleSignal',
+      reason: 'subscription_lifecycle_not_configured',
+      signal,
+    };
   }
   return { applied: false, action: 'skipUnknownSignal', reason: 'unsupported_signal_type', signal };
 }

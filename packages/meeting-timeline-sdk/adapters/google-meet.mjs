@@ -58,6 +58,19 @@ function lastResourceId(name) {
   return parts.at(-1);
 }
 
+function subscriptionNameOf(raw = {}, data = {}) {
+  return firstPath(data, [
+    'subscription.name',
+    'subscription_name',
+    'subscriptionName',
+  ]) ?? firstPath(raw, [
+    'subject',
+    'source',
+    'subscription',
+    'pubsub.subscription',
+  ]);
+}
+
 function eventTypeOf(raw = {}) {
   return String(firstPath(raw, [
     'type',
@@ -129,6 +142,37 @@ function meetingIdentity(raw = {}, data = {}) {
   });
 }
 
+function googleLifecycleType(eventType = '') {
+  const lowerType = String(eventType || '').toLowerCase();
+  if (lowerType.endsWith('subscription.v1.expirationreminder')) return 'expiration_reminder';
+  if (lowerType.endsWith('subscription.v1.expired')) return 'expired';
+  if (lowerType.endsWith('subscription.v1.suspended')) return 'suspended';
+  return null;
+}
+
+function subscriptionLifecycleSignal(raw = {}, data = {}, lifecycleType = '', options = {}) {
+  const subscriptionName = subscriptionNameOf(raw, data);
+  const expiresAtInput = firstPath(data, [
+    'subscription.expire_time',
+    'subscription.expireTime',
+    'expire_time',
+    'expireTime',
+  ]);
+  return [compactObject({
+    type: 'subscription_lifecycle',
+    platform: 'google_meet',
+    occurred_at_ms: eventTimestampMs(raw, options),
+    source_event_id: firstNonEmpty(raw.id, raw.event_id, raw.eventId),
+    source: 'webhook',
+    lifecycle_type: lifecycleType,
+    subscription_id: resourceId(subscriptionName, 'subscriptions') ?? lastResourceId(subscriptionName),
+    subscription_name: subscriptionName,
+    expires_at_ms: expiresAtInput == null ? undefined : normalizeAbsoluteMs(expiresAtInput, 'google_meet_subscription_expires_at'),
+    resource: firstNonEmpty(firstPath(data, ['subscription.target_resource', 'subscription.targetResource']), raw.subject, raw.source),
+    raw,
+  })];
+}
+
 function participantSignal(raw, data, signalType, options) {
   const sessionName = firstPath(data, ['participantSession.name', 'participant_session.name']);
   const meeting = meetingIdentity(raw, data);
@@ -185,6 +229,8 @@ export function normalizeGoogleMeetEvent(raw = {}, options = {}) {
     source: 'webhook',
     raw: event,
   } : null;
+  const lifecycleType = googleLifecycleType(type);
+  if (lifecycleType) return subscriptionLifecycleSignal(event, data, lifecycleType, options);
 
   if (lowerType.endsWith('conference.v2.started')) return base ? [{ ...base, type: 'meeting_started' }] : [];
   if (lowerType.endsWith('conference.v2.ended')) return base ? [{ ...base, type: 'meeting_ended' }] : [];

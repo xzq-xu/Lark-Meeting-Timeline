@@ -178,9 +178,11 @@ const platformEventStatus = Object.fromEntries(platformEventAdapterDefinitions.m
     normalized_signal_count: 0,
     applied_signal_count: 0,
     skipped_signal_count: 0,
+    lifecycle_event_count: 0,
     last_received_at: null,
     last_event_type: null,
     last_signal_type: null,
+    last_lifecycle: null,
     last_verification: null,
     last_error: null,
   },
@@ -6655,6 +6657,39 @@ async function appendPlatformArtifactSignal(signal = {}, body = {}, adapter = {}
   };
 }
 
+function platformSubscriptionLifecycleAction(signal = {}) {
+  const lifecycleType = String(signal.lifecycle_type || '').toLowerCase();
+  if (lifecycleType === 'expiration_reminder') return 'renew_subscription';
+  if (lifecycleType === 'expired' || lifecycleType === 'subscription_removed') return 'recreate_subscription';
+  if (lifecycleType === 'suspended') return 'resolve_and_reactivate_subscription';
+  if (lifecycleType === 'reauthorization_required') return 'reauthorize_subscription';
+  if (lifecycleType === 'missed') return 'backfill_missed_events';
+  return 'inspect_subscription_state';
+}
+
+async function appendPlatformSubscriptionLifecycleSignal(signal = {}, body = {}, adapter = {}) {
+  const current = await store.load();
+  const lifecycle = {
+    platform: adapter.key,
+    source: adapter.source,
+    type: signal.lifecycle_type || 'unknown',
+    action: platformSubscriptionLifecycleAction(signal),
+    occurred_at: new Date(signal.occurred_at_ms).toISOString(),
+    source_event_id: signal.source_event_id ?? null,
+    subscription_id: signal.subscription_id ?? null,
+    subscription_name: signal.subscription_name ?? null,
+    expires_at: signal.expires_at_ms == null ? null : new Date(signal.expires_at_ms).toISOString(),
+    resource: signal.resource ?? null,
+    tenant_id: signal.tenant_id ?? null,
+    client_state_present: signal.client_state != null,
+  };
+  return {
+    skipped: false,
+    lifecycle,
+    state: current,
+  };
+}
+
 function platformEventTimelineClient(body = {}, req = {}, adapter = {}) {
   return {
     startMeeting(input = {}) {
@@ -6688,17 +6723,27 @@ async function ingestPlatformEvent(platform, body = {}, req = {}, options = {}) 
     onArtifactSignal: body.artifact_callback === 'status_only'
       ? async (signal) => signal
       : (signal) => appendPlatformArtifactSignal(signal, body, adapter),
+    onSubscriptionLifecycleSignal: (signal) => appendPlatformSubscriptionLifecycleSignal(signal, body, adapter),
   });
   const appliedCount = results.filter((item) => item.applied && item.response?.skipped !== true).length;
   const skippedCount = results.length - appliedCount;
+  const lifecycleResults = results.filter((item) => (
+    item.signal?.type === 'subscription_lifecycle'
+      && item.applied
+      && item.response?.skipped !== true
+  ));
+  const lastLifecycle = lifecycleResults.findLast((item) => item.response?.lifecycle)?.response?.lifecycle;
+  const currentStatus = platformEventStatus[adapter.key];
   updatePlatformEventStatus(adapter, {
-    received_count: platformEventStatus[adapter.key].received_count + 1,
-    normalized_signal_count: platformEventStatus[adapter.key].normalized_signal_count + signals.length,
-    applied_signal_count: platformEventStatus[adapter.key].applied_signal_count + appliedCount,
-    skipped_signal_count: platformEventStatus[adapter.key].skipped_signal_count + skippedCount,
+    received_count: currentStatus.received_count + 1,
+    normalized_signal_count: currentStatus.normalized_signal_count + signals.length,
+    applied_signal_count: currentStatus.applied_signal_count + appliedCount,
+    skipped_signal_count: currentStatus.skipped_signal_count + skippedCount,
+    lifecycle_event_count: currentStatus.lifecycle_event_count + lifecycleResults.length,
     last_received_at: new Date(receivedAtMs).toISOString(),
     last_event_type: String(platformRawEventType(rawInput)),
     last_signal_type: signals.at(-1)?.type ?? null,
+    last_lifecycle: lastLifecycle ?? currentStatus.last_lifecycle,
     last_verification: options.verification ?? null,
     last_error: null,
   });

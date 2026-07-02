@@ -232,12 +232,33 @@ try {
       && event.metadata?.artifact_id === 'transcript-1'
   )).length, 1);
 
+  const googleLifecycle = await postJson(baseUrl, '/api/platform-events/google-meet', {
+    id: 'google-lifecycle-001',
+    type: 'google.workspace.events.subscription.v1.expirationReminder',
+    time: new Date(startMs + 92_000).toISOString(),
+    data: {
+      subscription: {
+        name: 'subscriptions/google-sub-001',
+        expire_time: new Date(startMs + 12 * 60 * 60 * 1000).toISOString(),
+      },
+    },
+  });
+  assert.equal(googleLifecycle.results[0].action, 'onSubscriptionLifecycleSignal');
+  assert.equal(googleLifecycle.results[0].response.skipped, false);
+  assert.equal(googleLifecycle.results[0].response.lifecycle.type, 'expiration_reminder');
+  assert.equal(googleLifecycle.results[0].response.lifecycle.action, 'renew_subscription');
+  assert.equal(googleLifecycle.status.lifecycle_event_count, 1);
+  assert.equal(googleLifecycle.status.last_lifecycle.subscription_id, 'google-sub-001');
+  assert.equal(googleLifecycle.state.events.filter((event) => event.source === 'google_meet_webhook').length, googleTranscriptEvents.length + googleParticipantEvents.length + 2);
+
   const status = await getJson(baseUrl, '/api/platform-events/google-meet/status');
   assert.equal(status.status.platform, 'google_meet');
-  assert.equal(status.status.received_count, 6);
-  assert.equal(status.status.applied_signal_count, 4);
+  assert.equal(status.status.received_count, 7);
+  assert.equal(status.status.applied_signal_count, 5);
   assert.equal(status.status.skipped_signal_count, 2);
-  assert.equal(status.status.last_signal_type, 'artifact_ready');
+  assert.equal(status.status.last_signal_type, 'subscription_lifecycle');
+  assert.equal(status.status.lifecycle_event_count, 1);
+  assert.equal(status.status.last_lifecycle.action, 'renew_subscription');
 
   const teamsStart = await postJson(baseUrl, '/api/platform-events/teams', {
     id: 'teams-start-001',
@@ -276,6 +297,24 @@ try {
       && event.type === 'participant_leave'
       && event.metadata?.participant_id === 'teams-user-2'
   )), true);
+
+  const teamsLifecycle = await postJson(baseUrl, '/api/platform-events/teams', {
+    value: [
+      {
+        id: 'teams-lifecycle-001',
+        lifecycleEvent: 'subscriptionRemoved',
+        subscriptionId: 'teams-sub-001',
+        subscriptionExpirationDateTime: new Date(startMs + 120_000).toISOString(),
+        resource: 'communications/onlineMeetings(joinWebUrl=https%3A%2F%2Fteams.example%2Fjoin)/meetingCallEvents',
+        tenantId: 'tenant-001',
+        clientState: 'test-state',
+      },
+    ],
+  });
+  assert.equal(teamsLifecycle.results[0].action, 'onSubscriptionLifecycleSignal');
+  assert.equal(teamsLifecycle.results[0].response.lifecycle.type, 'subscription_removed');
+  assert.equal(teamsLifecycle.results[0].response.lifecycle.action, 'recreate_subscription');
+  assert.equal(teamsLifecycle.status.lifecycle_event_count, 1);
 
   const zoomStart = await postJson(baseUrl, '/api/platform-events/zoom', {
     force: true,
@@ -316,8 +355,8 @@ try {
   )), true);
 
   const allStatus = await getJson(baseUrl, '/api/platform-events/status');
-  assert.equal(allStatus.status.google_meet.received_count, 6);
-  assert.equal(allStatus.status.microsoft_teams.received_count, 2);
+  assert.equal(allStatus.status.google_meet.received_count, 7);
+  assert.equal(allStatus.status.microsoft_teams.received_count, 3);
   assert.equal(allStatus.status.zoom.received_count, 2);
 
   console.log('ok meeting platform event endpoints');

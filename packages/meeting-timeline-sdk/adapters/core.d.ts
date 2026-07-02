@@ -5,7 +5,8 @@ export type MeetingSignalType =
   | 'meeting_ended'
   | 'participant_joined'
   | 'participant_left'
-  | 'artifact_ready';
+  | 'artifact_ready'
+  | 'subscription_lifecycle';
 
 export type MeetingSignalSource =
   | 'webhook'
@@ -27,7 +28,8 @@ export interface NormalizedMeetingIdentity {
 
 export interface NormalizedMeetingSignal {
   type: MeetingSignalType;
-  meeting: NormalizedMeetingIdentity;
+  meeting?: NormalizedMeetingIdentity;
+  platform?: string;
   occurred_at_ms: number;
   source_event_id?: string;
   source?: MeetingSignalSource;
@@ -36,6 +38,13 @@ export interface NormalizedMeetingSignal {
   artifact_kind?: 'transcript' | 'recording' | 'smart_notes' | string;
   artifact_id?: string;
   artifact_url?: string;
+  lifecycle_type?: 'expiration_reminder' | 'expired' | 'suspended' | 'reauthorization_required' | 'subscription_removed' | 'missed' | string;
+  subscription_id?: string;
+  subscription_name?: string;
+  expires_at_ms?: number;
+  resource?: string;
+  tenant_id?: string;
+  client_state?: string;
   raw?: unknown;
 }
 
@@ -45,6 +54,7 @@ export interface ApplyMeetingSignalOptions {
   participantAsMark?: boolean;
   onParticipantSignal?: (signal: NormalizedMeetingSignal, client: MeetingTimelineClient) => unknown | Promise<unknown>;
   onArtifactSignal?: (signal: NormalizedMeetingSignal, client: MeetingTimelineClient) => unknown | Promise<unknown>;
+  onSubscriptionLifecycleSignal?: (signal: NormalizedMeetingSignal, client: MeetingTimelineClient) => unknown | Promise<unknown>;
 }
 
 export interface ApplyMeetingSignalResult {

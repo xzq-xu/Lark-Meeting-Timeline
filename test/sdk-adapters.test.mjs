@@ -98,6 +98,34 @@ assert.equal(batchResults[0].action, 'startMeeting');
 assert.equal(batchResults[1].applied, false);
 assert.equal(batchResults[1].reason, 'artifact_import_not_configured');
 
+const lifecycleSignal = normalizeMeetingSignal({
+  type: 'subscription_lifecycle',
+  platform: 'google_meet',
+  occurred_at_ms: startMs,
+  lifecycle_type: 'expirationReminder',
+  subscription_name: 'subscriptions/google-sub-001',
+  expires_at: endIso,
+  source: 'webhook',
+});
+assert.equal(lifecycleSignal.meeting, undefined);
+assert.equal(lifecycleSignal.platform, 'google_meet');
+assert.equal(lifecycleSignal.lifecycle_type, 'expiration_reminder');
+assert.equal(lifecycleSignal.subscription_name, 'subscriptions/google-sub-001');
+assert.equal(lifecycleSignal.expires_at_ms, startMs + 60_000);
+
+const skippedLifecycle = await applyMeetingSignal(client, lifecycleSignal);
+assert.equal(skippedLifecycle.applied, false);
+assert.equal(skippedLifecycle.reason, 'subscription_lifecycle_not_configured');
+
+const appliedLifecycle = await applyMeetingSignal(client, lifecycleSignal, {
+  onSubscriptionLifecycleSignal(signal) {
+    return { ok: true, action: 'renew', subscription: signal.subscription_name };
+  },
+});
+assert.equal(appliedLifecycle.applied, true);
+assert.equal(appliedLifecycle.action, 'onSubscriptionLifecycleSignal');
+assert.equal(appliedLifecycle.response.subscription, 'subscriptions/google-sub-001');
+
 const googleStart = normalizeGoogleMeetEvent({
   id: 'g-start-1',
   type: 'google.workspace.meet.conference.v2.started',
@@ -139,6 +167,24 @@ assert.equal(googlePubSubStart.length, 1);
 assert.equal(googlePubSubStart[0].type, 'meeting_started');
 assert.equal(googlePubSubStart[0].meeting.meeting_id, 'google-record-pubsub-001');
 assert.equal(googlePubSubStart[0].source_event_id, 'g-pubsub-start-1');
+
+const googleLifecycle = normalizeGoogleMeetEvent({
+  id: 'g-lifecycle-1',
+  type: 'google.workspace.events.subscription.v1.expirationReminder',
+  time: startIso,
+  data: {
+    subscription: {
+      name: 'subscriptions/google-sub-001',
+      expire_time: endIso,
+    },
+  },
+});
+assert.equal(googleLifecycle.length, 1);
+assert.equal(googleLifecycle[0].type, 'subscription_lifecycle');
+assert.equal(googleLifecycle[0].platform, 'google_meet');
+assert.equal(googleLifecycle[0].lifecycle_type, 'expiration_reminder');
+assert.equal(googleLifecycle[0].subscription_id, 'google-sub-001');
+assert.equal(googleLifecycle[0].expires_at_ms, startMs + 60_000);
 
 const googleParticipant = normalizeGoogleMeetEvent({
   id: 'g-join-1',
@@ -199,6 +245,27 @@ const teamsRoster = normalizeMicrosoftTeamsEvent({
 });
 assert.deepEqual(teamsRoster.map((item) => item.type), ['participant_joined', 'participant_left']);
 assert.equal(teamsRoster[1].participant_name, 'Grace');
+
+const teamsLifecycle = normalizeMicrosoftTeamsEvent({
+  value: [
+    {
+      id: 'teams-lifecycle-1',
+      lifecycleEvent: 'reauthorizationRequired',
+      subscriptionId: 'teams-sub-001',
+      subscriptionExpirationDateTime: endIso,
+      resource: 'communications/onlineMeetings/example/meetingCallEvents',
+      tenantId: 'tenant-001',
+      clientState: 'opaque-secret',
+    },
+  ],
+}, { receivedAtMs: startMs });
+assert.equal(teamsLifecycle.length, 1);
+assert.equal(teamsLifecycle[0].type, 'subscription_lifecycle');
+assert.equal(teamsLifecycle[0].platform, 'microsoft_teams');
+assert.equal(teamsLifecycle[0].lifecycle_type, 'reauthorization_required');
+assert.equal(teamsLifecycle[0].subscription_id, 'teams-sub-001');
+assert.equal(teamsLifecycle[0].expires_at_ms, startMs + 60_000);
+assert.equal(teamsLifecycle[0].tenant_id, 'tenant-001');
 
 const zoomStart = normalizeZoomEvent({
   event: 'meeting.started',

@@ -10,7 +10,7 @@
 - 接收飞书事件回调的 URL verification 和 plaintext event
 - 收到飞书直开会议开始事件后自动创建无转写的实时会议时间轴
 - 开放会议会话协议 `POST /api/meeting-session/start`，供桌面观察器、汉王端或人工入口在真实会议开始时建轴
-- 跨平台会议事件入口 `POST /api/platform-events/:platform`，可接 Google Meet / Microsoft Teams / Zoom adapter 归一化后的开始、结束、参会人和会后产物信号；参会人变化与 transcript/recording/smart notes ready 会进入事件轨道并做基础重复过滤
+- 跨平台会议事件入口 `POST /api/platform-events/:platform`，可接 Google Meet / Microsoft Teams / Zoom adapter 归一化后的开始、结束、参会人和会后产物信号；参会人变化与 transcript/recording/smart notes ready 会进入事件轨道并做基础重复过滤，订阅 lifecycle 事件只进入接入诊断状态
 - 跨平台 webhook 安全入口：Zoom URL validation / HMAC 校验、Microsoft Graph validationToken / clientState 校验、Google Pub/Sub OIDC JWT / bearer gate
 - 跨平台 setup 诊断入口 `GET /api/platform-events/setup`，返回 Google Meet / Microsoft Teams / Zoom 所需事件、权限、回调地址、readiness 检查、订阅维护建议和可选订阅 request body
 - 本地手动开始/结束实时会议，用作没有公网 webhook 时的 fallback

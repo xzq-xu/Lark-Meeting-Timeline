@@ -128,6 +128,25 @@ type NormalizedMeetingSignal =
       artifact_url?: string;
       source_event_id?: string;
       raw?: unknown;
+    }
+  | {
+      type: 'subscription_lifecycle';
+      platform: MeetingPlatform;
+      lifecycle_type:
+        | 'expiration_reminder'
+        | 'expired'
+        | 'suspended'
+        | 'reauthorization_required'
+        | 'subscription_removed'
+        | 'missed'
+        | string;
+      occurred_at_ms: number;
+      subscription_id?: string;
+      subscription_name?: string;
+      expires_at_ms?: number;
+      resource?: string;
+      source_event_id?: string;
+      raw?: unknown;
     };
 ```
 
@@ -140,6 +159,7 @@ type NormalizedMeetingSignal =
 | `participant_joined/left` | 后续新增 participant track，或先作为 event row 绘制 |
 | `artifact_ready: transcript` | 先写入事件轨道表示转写已生成；正文 segment 后续独立导入 |
 | `artifact_ready: recording` | 写入事件轨道并保存 artifact 元数据，不进入用户标注主链路 |
+| `subscription_lifecycle` | 写入平台接入诊断状态，不进入会议时间轴 |
 
 ## 平台适配矩阵
 
@@ -173,6 +193,7 @@ type NormalizedMeetingSignal =
 
 - 官方事件适合校准轴和会后补齐，但不应阻塞电子纸标注实时落轴。
 - Pub/Sub push 默认是 wrapped JSON，事件在 `message.data`，需要 base64 解码；当前 Google adapter 已支持 wrapped push body 和已解包 CloudEvent 两种输入。
+- Workspace Events 订阅生命周期事件 `subscription.v1.suspended`、`subscription.v1.expirationReminder`、`subscription.v1.expired` 是平台健康信号，不对应某场会议；adapter 会归一化为 `subscription_lifecycle`，服务端只更新 `/api/platform-events/status`。
 - 事件 payload 可能只给 resource name，需要再调 REST API 获取详情。
 - Transcript entry 和 Google Docs transcript 可能不完全一致，需要保留 provider/source 字段。
 
@@ -206,6 +227,7 @@ Graph change notifications 支持对 Teams online meeting 订阅 call started、
 - 需要 application permission，例如 `OnlineMeetings.Read.All` 或 `OnlineMeetings.ReadWrite.All`。
 - 官方建议 active meeting call 用 rich notifications；basic notification 信息太少。
 - 订阅最长 3 天，需要自动续订。
+- `lifecycleNotificationUrl` 会收到 `reauthorizationRequired`、`subscriptionRemoved`、`missed` 等 lifecycle notification。它们不对应具体会议；adapter 会归一化为 `subscription_lifecycle`，用于提示重新授权、重建订阅或补拉漏投事件。
 
 ### 路线 B：Teams app/bot meeting events
 
@@ -298,7 +320,7 @@ GET  /api/platform-events/:platform/status
 GET  /api/platform-events/status
 ```
 
-`POST /api/platform-events/:platform` 当前支持 `google-meet`、`teams`、`zoom` 及其别名。服务端会用 SDK adapter 归一化原始事件，`meeting_started` 进入 `POST /api/meeting-session/start` 同一套建轴逻辑，`meeting_ended` 进入 `POST /api/meeting-session/end` 同一套结束逻辑。`participant_joined/left` 会进入会议 `events` 轨道，不写入用户标注流；同一平台、同一参会人、同一 join/leave 类型在默认 3 秒窗口内会被过滤为重复事件。会后 transcript/recording/smart notes 的 `artifact_ready` signal 也会进入会议 `events` 轨道，默认 5 秒窗口内按 artifact id/url 去重；artifact 本体内容仍建议后续通过 `POST /api/artifacts/transcript` 和 `POST /api/artifacts/recording` 独立导入。
+`POST /api/platform-events/:platform` 当前支持 `google-meet`、`teams`、`zoom` 及其别名。服务端会用 SDK adapter 归一化原始事件，`meeting_started` 进入 `POST /api/meeting-session/start` 同一套建轴逻辑，`meeting_ended` 进入 `POST /api/meeting-session/end` 同一套结束逻辑。`participant_joined/left` 会进入会议 `events` 轨道，不写入用户标注流；同一平台、同一参会人、同一 join/leave 类型在默认 3 秒窗口内会被过滤为重复事件。会后 transcript/recording/smart notes 的 `artifact_ready` signal 也会进入会议 `events` 轨道，默认 5 秒窗口内按 artifact id/url 去重；artifact 本体内容仍建议后续通过 `POST /api/artifacts/transcript` 和 `POST /api/artifacts/recording` 独立导入。`subscription_lifecycle` 只更新平台状态，不会创建会议轴，也不会写入用户标注或会议事件轨道。
 
 真实 webhook 接入的安全层也已经放进 SDK：
 
@@ -307,7 +329,7 @@ GET  /api/platform-events/status
 - Microsoft Graph / Teams：支持 `validationToken` 纯文本响应；配置 `MICROSOFT_GRAPH_CLIENT_STATE` 后校验通知里的 `clientState`。
 - Google Meet / Pub/Sub：配置 `GOOGLE_PUBSUB_OIDC_AUDIENCE` 后会校验 authenticated push 的 Google-signed OIDC JWT，并可用 `GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL` 限定 service account email；未配置 OIDC 时可用 `GOOGLE_PUBSUB_BEARER_TOKEN` 做轻量 bearer gate。
 
-`GET /api/platform-events/status` 会返回每个平台最近一次 `last_verification`，用于区分“未配置所以跳过校验”和“签名/状态不匹配被拒绝”。
+`GET /api/platform-events/status` 会返回每个平台最近一次 `last_verification`，用于区分“未配置所以跳过校验”和“签名/状态不匹配被拒绝”。同时会返回 `lifecycle_event_count` 和 `last_lifecycle`，用于观察订阅过期提醒、暂停、移除、漏投和重新授权要求。
 
 `GET /api/platform-events/setup` 会返回 Google Meet、Microsoft Teams、Zoom 的接入 manifest：默认事件类型、endpoint、权限/环境变量要求和操作步骤，同时包含 readiness 诊断，检查 endpoint 是否是 HTTPS/localhost、必需安全环境变量是否已配置。`GET /api/platform-events/:platform/setup` 可按平台返回，并支持用 query 生成订阅 request body，例如 Teams 的 `join_web_url` + `client_state`，或 Google 的 `target_resource` + `pubsub_topic`。同一接口还会基于 `subscription_expires_at`、`subscription_id`、`subscription_name` 等 query 返回 maintenance 建议，用于 Graph / Workspace Events 订阅续期调度。
 

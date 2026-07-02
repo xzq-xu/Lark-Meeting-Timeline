@@ -15,6 +15,14 @@ function firstPath(raw, paths) {
   return firstNonEmpty(...paths.map((path) => getPath(raw, path)));
 }
 
+function normalizeLifecycleType(value) {
+  return String(value || 'unknown')
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[\s.-]+/g, '_')
+    .toLowerCase();
+}
+
 function dataOf(raw = {}) {
   return raw.resourceData ?? raw.payload?.resourceData ?? raw.payload ?? raw.value ?? raw;
 }
@@ -138,8 +146,36 @@ function participantSignalType(participant = {}, fallbackType = '') {
   return removed ? 'participant_left' : 'participant_joined';
 }
 
+function subscriptionLifecycleSignal(raw = {}, data = dataOf(raw), options = {}) {
+  const lifecycleEvent = firstNonEmpty(data.lifecycleEvent, raw.lifecycleEvent);
+  if (!lifecycleEvent) return null;
+  const expiresAtInput = firstNonEmpty(
+    data.subscriptionExpirationDateTime,
+    raw.subscriptionExpirationDateTime,
+    data.expirationDateTime,
+    raw.expirationDateTime,
+  );
+  return compactObject({
+    type: 'subscription_lifecycle',
+    platform: 'microsoft_teams',
+    occurred_at_ms: eventTimestampMs(raw, data, options),
+    source_event_id: firstNonEmpty(raw.id, data.id, raw.subscriptionId, data.subscriptionId),
+    source: 'webhook',
+    lifecycle_type: normalizeLifecycleType(lifecycleEvent),
+    subscription_id: firstNonEmpty(data.subscriptionId, raw.subscriptionId),
+    subscription_name: firstNonEmpty(data.subscriptionId, raw.subscriptionId),
+    expires_at_ms: expiresAtInput == null ? undefined : normalizeAbsoluteMs(expiresAtInput, 'microsoft_graph_subscription_expires_at'),
+    resource: firstNonEmpty(data.resource, raw.resource),
+    tenant_id: firstNonEmpty(data.tenantId, raw.tenantId),
+    client_state: firstNonEmpty(data.clientState, raw.clientState),
+    raw,
+  });
+}
+
 function normalizeOne(raw = {}, options = {}) {
   const data = dataOf(raw);
+  const lifecycleSignal = subscriptionLifecycleSignal(raw, data, options);
+  if (lifecycleSignal) return [lifecycleSignal];
   const eventType = eventTypeOf(raw, data);
   const lowerType = eventType.toLowerCase();
   const meeting = meetingIdentity(raw, data);
