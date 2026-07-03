@@ -45,6 +45,8 @@ assert.equal(packedFiles.includes('adapters/platform-provider-connection.mjs'), 
 assert.equal(packedFiles.includes('adapters/platform-provider-connection.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-subscription-handoff.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-subscription-handoff.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-speaker-track.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-speaker-track.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-sample.mjs'), true);
@@ -131,6 +133,11 @@ import {
   buildMeetingPlatformSubscriptionHandoffMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-subscription-handoff';
 import {
+  buildMeetingPlatformSpeakerTrack,
+  buildMeetingPlatformSpeakerTrackMatrix,
+  buildMeetingPlatformSpeakerTrackPlan,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-speaker-track';
+import {
   assertMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
   buildMeetingPlatformAdapterContractAcceptanceReport,
@@ -203,6 +210,26 @@ assert.equal(kit.platformSubscriptionHandoff('zoom').schema, 'meeting_platform_s
 assert.equal(kit.platformSubscriptionHandoffMatrix({
   platforms: ['zoom'],
 }).platform_count, 1);
+assert.equal(kit.platformSpeakerTrackPlan('zoom').schema, 'meeting_platform_speaker_track_plan');
+assert.equal(kit.platformSpeakerTrackMatrix({
+  platforms: ['zoom'],
+}).platform_count, 1);
+assert.equal(kit.platformSpeakerTrack('zoom', {
+  signals: [
+    {
+      type: 'speaker_started',
+      meeting: { platform: 'zoom', meeting_id: '987654321' },
+      occurred_at_ms: 1_782_614_400_000,
+      speaker_name: 'Ada',
+    },
+    {
+      type: 'speaker_ended',
+      meeting: { platform: 'zoom', meeting_id: '987654321' },
+      occurred_at_ms: 1_782_614_402_000,
+      speaker_name: 'Ada',
+    },
+  ],
+}).mark_count, 1);
 
 const rollout = buildMeetingPlatformRolloutPlan('teams', {
   baseUrl: 'http://localhost:8787',
@@ -296,6 +323,26 @@ assert.equal(buildMeetingPlatformSubscriptionHandoffMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],
 }).platform_count, 1);
+assert.equal(buildMeetingPlatformSpeakerTrackPlan('google-meet').output_contract.transcript_required, false);
+assert.equal(buildMeetingPlatformSpeakerTrackMatrix({
+  platforms: ['google-meet'],
+}).provider_blocking_count, 0);
+assert.equal(buildMeetingPlatformSpeakerTrack('google-meet', {
+  signals: [
+    {
+      type: 'speaker_started',
+      meeting: { platform: 'google_meet', meeting_id: 'abc-defg-hij' },
+      occurred_at_ms: 1_782_614_400_000,
+      speaker_name: 'Ada',
+    },
+    {
+      type: 'speaker_ended',
+      meeting: { platform: 'google_meet', meeting_id: 'abc-defg-hij' },
+      occurred_at_ms: 1_782_614_402_000,
+      speaker_name: 'Ada',
+    },
+  ],
+}).marks[0].intent, 'speaker_track');
 assert.equal(buildMeetingPlatformAdapterContract('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).supported_surfaces.browser_observer, true);

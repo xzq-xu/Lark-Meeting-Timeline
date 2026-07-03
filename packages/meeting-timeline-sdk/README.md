@@ -132,6 +132,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-host-integration`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-subscription-handoff`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-speaker-track`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract`
@@ -1413,6 +1414,50 @@ await ingestPlatformEvent(timeline, 'local-detector', {
 }, {
   speakerAsAnnotation: true,
 });
+```
+
+如果宿主项目不想直接把每个 `speaker_started` 写入用户标注流，可以用 `platform-speaker-track` 先生成独立的发言人位置轨。它只输出 `speaker_track` marks，不包含转写正文；输入可以是连续 active-speaker samples，也可以是宿主已经去抖过的 `speaker_started/speaker_ended` signals：
+
+```js
+import {
+  buildMeetingPlatformSpeakerTrack,
+  buildMeetingPlatformSpeakerTrackMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-speaker-track';
+
+const matrix = buildMeetingPlatformSpeakerTrackMatrix({
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+// matrix.rows[*].provider_events_block_realtime === false
+// matrix.rows[*].source_order[0] === 'local_active_speaker_observer'
+
+const track = buildMeetingPlatformSpeakerTrack('google-meet', {
+  samples: [
+    {
+      meeting: { platform: 'google_meet', meeting_id: 'abc-defg-hij' },
+      activeSpeaker: { id: 'speaker-ada', name: 'Ada', speaking: true },
+      observedAtMs: Date.now(),
+    },
+  ],
+}, {
+  minStableMs: 500,
+  switchStableMs: 700,
+  endIdleMs: 1500,
+  minSegmentMs: 800,
+});
+
+// track.marks 可批量 insertMarks() 到会议时间轴的 speaker rail。
+// track.diagnostics 会列出 dropped_duplicate_count / dropped_short_segment_count。
+```
+
+对应 CLI 可用于现场采样或 CI 报告：
+
+```sh
+npm run meeting-platform:speaker-track -- \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --samples-file=data/meeting-platform-speaker-samples.json \
+  --out-dir=data/meeting-platform-speaker-tracks \
+  --report-file=data/meeting-platform-speaker-track-report.json
 ```
 
 ## 会后转写导入
