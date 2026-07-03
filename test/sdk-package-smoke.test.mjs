@@ -114,7 +114,9 @@ import {
 import {
   assertMeetingPlatformIntegrationRuntimeManifest,
   buildMeetingPlatformIntegrationRuntimeManifest,
+  createMeetingPlatformIntegrationBrowserRuntime,
   createMeetingPlatformIntegrationRuntime,
+  detectMeetingPlatformForBrowser,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';
 import {
   assertMeetingPlatformRegistryManifest,
@@ -283,6 +285,14 @@ const integrationRuntime = createMeetingPlatformIntegrationRuntime(client, {
 });
 assert.equal(integrationRuntime.manifest().host_integration_ready, true);
 assert.equal(integrationRuntime.runtimeBundles().platform_count, 1);
+assert.equal(detectMeetingPlatformForBrowser({
+  url: 'https://meet.google.com/abc-defg-hij',
+}).platform, 'google_meet');
+assert.equal(createMeetingPlatformIntegrationBrowserRuntime(client, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+  url: 'https://meet.google.com/abc-defg-hij',
+}).detect().platform, 'google_meet');
 assert.equal(integrationRuntime.timelineView('google-meet', {
   meeting: {
     platform: 'google_meet',

@@ -6,11 +6,88 @@ import {
   MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA,
   assertMeetingPlatformIntegrationRuntimeManifest,
   buildMeetingPlatformIntegrationRuntimeManifest,
+  createMeetingPlatformIntegrationBrowserRuntime,
   createMeetingPlatformIntegrationRuntime,
+  detectMeetingPlatformForBrowser,
 } from '../packages/meeting-timeline-sdk/adapters/platform-integration-runtime.mjs';
 import { buildPlatformFixtureEvent } from '../packages/meeting-timeline-sdk/adapters/platform-fixtures.mjs';
 
 const baseUrl = 'https://timeline.example.com';
+const browserStartMs = 1_782_614_400_000;
+
+function node(tagName, attrs = {}, text = '') {
+  return {
+    tagName: tagName.toUpperCase(),
+    attributes: attrs,
+    dataset: Object.fromEntries(Object.entries(attrs)
+      .filter(([key]) => key.startsWith('data-'))
+      .map(([key, value]) => [
+        key.slice(5).replace(/-([a-z])/g, (_, char) => char.toUpperCase()),
+        value,
+      ])),
+    innerText: text,
+    textContent: text,
+    getAttribute(name) {
+      return attrs[name] ?? null;
+    },
+  };
+}
+
+function fakeGoogleMeetDocument() {
+  const nodes = [
+    node('button', { 'aria-label': 'Turn off microphone' }),
+    node('button', { 'aria-label': 'Leave call' }),
+    node('div', {
+      'data-participant-id': 'ada',
+      'data-display-name': 'Ada Lovelace',
+      'aria-label': 'Ada Lovelace is speaking',
+      'data-audio-level': '0.82',
+    }),
+  ];
+  return {
+    nodeType: 9,
+    title: 'SDK runtime - Google Meet',
+    hidden: false,
+    location: { href: 'https://meet.google.com/abc-defg-hij' },
+    querySelectorAll(selector) {
+      const text = String(selector);
+      if (text === 'button') return nodes.filter((item) => item.tagName === 'BUTTON');
+      if (text.includes('data-participant-id')) return nodes.filter((item) => item.attributes['data-participant-id']);
+      if (text.includes('data-display-name')) return nodes.filter((item) => item.attributes['data-display-name']);
+      if (text.includes('speaking')) return nodes.filter((item) => /speaking/i.test(item.attributes['aria-label'] ?? ''));
+      return [];
+    },
+  };
+}
+
+function fakeWindow(document) {
+  const listeners = new Map();
+  return {
+    document,
+    location: document.location,
+    navigator: { userAgent: 'Chrome fixture' },
+    addEventListener(eventName, handler) {
+      const rows = listeners.get(eventName) ?? [];
+      rows.push(handler);
+      listeners.set(eventName, rows);
+    },
+    removeEventListener(eventName, handler) {
+      listeners.set(eventName, (listeners.get(eventName) ?? []).filter((item) => item !== handler));
+    },
+    listenerCount(eventName) {
+      return (listeners.get(eventName) ?? []).length;
+    },
+  };
+}
+
+const browserDetection = detectMeetingPlatformForBrowser({
+  url: 'https://teams.microsoft.com/l/meetup-join/abc',
+  title: 'Teams meeting',
+});
+assert.equal(browserDetection.detected, true);
+assert.equal(browserDetection.platform, 'microsoft_teams');
+assert.equal(browserDetection.reason, 'url');
+
 const manifest = buildMeetingPlatformIntegrationRuntimeManifest({
   baseUrl,
   platforms: ['google-meet', 'zoom'],
@@ -177,5 +254,37 @@ await assert.rejects(
   () => runtime.handleEvent({ action: 'insert_annotation' }),
   /platform is required/,
 );
+
+const browserDocument = fakeGoogleMeetDocument();
+const browserWindow = fakeWindow(browserDocument);
+const browserRuntime = createMeetingPlatformIntegrationBrowserRuntime(client, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom'],
+  window: browserWindow,
+  now: () => browserStartMs,
+  applyOptions: { speakerAsAnnotation: true },
+  speakerOptions: { minStableMs: 0 },
+});
+assert.equal(browserRuntime.detect().platform, 'google_meet');
+assert.equal(browserRuntime.platformFor(), 'google_meet');
+const browserSample = await browserRuntime.sample();
+assert.equal(browserSample.emitted, true);
+assert.equal(browserSample.result.browser_detection.platform, 'google_meet');
+assert.equal(calls.some((call) => call.method === 'startMeeting' && call.input.meeting_id === 'abc-defg-hij'), true);
+assert.equal(calls.some((call) => call.method === 'insertMark' && call.input.payload?.speaker_name === 'Ada Lovelace'), true);
+const browserInserted = await browserRuntime.handleMessage({
+  type: 'meeting_timeline.insert_mark',
+  payload: {
+    mark: {
+      id: 'browser-integration-note-1',
+      label: 'why?',
+      captured_at_ms: browserStartMs + 3_000,
+    },
+  },
+});
+assert.equal(browserInserted.handled, true);
+assert.equal(browserInserted.result.action, 'insert_annotation');
+assert.equal(calls.some((call) => call.method === 'insertMark' && call.input.id === 'browser-integration-note-1'), true);
+assert.equal(browserRuntime.getState().browser_detection.platform, 'google_meet');
 
 console.log('ok meeting platform integration runtime');

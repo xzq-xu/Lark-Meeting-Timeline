@@ -3,6 +3,12 @@ import {
   MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
+import { detectMeetingFromUrl } from './meeting-url.mjs';
+import {
+  createMeetingAppBrowserRuntime,
+  meetingAppBrowserInput,
+  meetingAppBrowserRuntimePreset,
+} from './meeting-app-browser-runtime.mjs';
 import { createMeetingPlatformTimelineKit } from './platform-kit.mjs';
 import {
   buildMeetingPlatformAdaptationPackageMatrix,
@@ -156,6 +162,81 @@ function snapshotFrom(input = {}) {
 
 function providerInputFrom(input = {}, payload) {
   return firstNonEmpty(input.request, input.provider_event, input.providerEvent, input.event, input.raw, input, payload);
+}
+
+function maybeNormalizePlatform(platform) {
+  if (platform == null || platform === '') return undefined;
+  try {
+    return normalizeMeetingPlatform(platform);
+  } catch {
+    return undefined;
+  }
+}
+
+function detectionReason(explicit, urlDetected, presetPlatform) {
+  if (explicit) return 'explicit';
+  if (urlDetected?.platform) return 'url';
+  if (presetPlatform) return 'runtime_preset';
+  return 'none';
+}
+
+function emptyObservationResult(reason, details = {}) {
+  return {
+    source: 'meeting_app',
+    signals: [],
+    rawSignals: [],
+    raw_signals: [],
+    reconciliation: {
+      signals: [],
+      skipped: [],
+      decisions: [],
+      state: {},
+    },
+    results: [],
+    diagnostic: {
+      source: 'meeting_app',
+      raw_signal_count: 0,
+      applied_signal_count: 0,
+      skipped_count: 0,
+      result_count: 0,
+      reason,
+    },
+    ...details,
+  };
+}
+
+export function detectMeetingPlatformForBrowser(input = {}, options = {}) {
+  const browserInput = meetingAppBrowserInput({
+    ...options,
+    ...input,
+  });
+  const explicitPlatform = maybeNormalizePlatform(firstNonEmpty(options.platform, input.platform, input.provider, input.adapter));
+  const urlDetected = detectMeetingFromUrl({
+    ...browserInput,
+    ...input,
+  });
+  const runtimePreset = meetingAppBrowserRuntimePreset({
+    ...browserInput,
+    ...input,
+    ...options,
+  });
+  const presetPlatform = maybeNormalizePlatform(firstNonEmpty(
+    runtimePreset?.captureOptions?.platform,
+    runtimePreset?.capture_options?.platform,
+  ));
+  const platform = explicitPlatform ?? maybeNormalizePlatform(urlDetected?.platform) ?? presetPlatform;
+  return compactObject({
+    type: 'meeting_platform_browser_detection',
+    detected: Boolean(platform),
+    platform,
+    reason: detectionReason(explicitPlatform, urlDetected, presetPlatform),
+    meeting: urlDetected,
+    browser: {
+      url: browserInput.url,
+      title: browserInput.title,
+    },
+    runtime_preset_platform: presetPlatform,
+  });
 }
 
 export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
@@ -419,4 +500,146 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
     },
   };
   return runtime;
+}
+
+export function createMeetingPlatformIntegrationBrowserRuntime(clientOrOptions, options = {}) {
+  const integrationRuntime = options.integrationRuntime
+    ?? options.integration_runtime
+    ?? createMeetingPlatformIntegrationRuntime(clientOrOptions, options);
+  const baseInputOptions = {
+    window: options.window,
+    win: options.win,
+    document: options.document,
+    doc: options.doc,
+    location: options.location,
+    navigator: options.navigator,
+  };
+
+  function detect(input = {}, detectOptions = {}) {
+    return detectMeetingPlatformForBrowser(input, {
+      ...options,
+      ...baseInputOptions,
+      ...detectOptions,
+    });
+  }
+
+  function platformFor(input = {}, platformOptions = {}) {
+    const detection = detect(input, platformOptions);
+    if (!detection.platform) {
+      throw new MeetingTimelineSdkError('Unable to detect meeting platform for browser runtime event', {
+        detection,
+      });
+    }
+    return detection.platform;
+  }
+
+  const sources = {
+    client: integrationRuntime.client,
+    async observeMeetingApp(input = {}, observeOptions = {}) {
+      const detection = detect(input, observeOptions);
+      if (!detection.platform) {
+        return emptyObservationResult('unsupported_browser_page', {
+          browser_detection: detection,
+        });
+      }
+      const result = await integrationRuntime.observeMeetingApp(detection.platform, {
+        ...input,
+        platform: detection.platform,
+      }, observeOptions);
+      return {
+        ...result,
+        browser_detection: detection,
+      };
+    },
+    observeApp(input = {}, observeOptions = {}) {
+      return this.observeMeetingApp(input, observeOptions);
+    },
+    async insertMark(input = {}, markOptions = {}) {
+      const platform = platformFor(input, markOptions);
+      return integrationRuntime.insertAnnotation(platform, input, markOptions);
+    },
+    async insertAnnotation(input = {}, markOptions = {}) {
+      return this.insertMark(input, markOptions);
+    },
+    async insertMarks(inputs = [], markOptions = {}) {
+      const rows = Array.isArray(inputs) ? inputs : [inputs];
+      const results = [];
+      for (const input of rows) {
+        results.push(await this.insertMark(input, markOptions));
+      }
+      return {
+        ok: results.every((item) => item?.result?.ok !== false),
+        results,
+      };
+    },
+    async ingestProvider(platformOrInput, payload, ingestOptions = {}) {
+      const platform = maybeNormalizePlatform(typeof platformOrInput === 'string'
+        ? platformOrInput
+        : firstNonEmpty(platformOrInput?.platform, platformOrInput?.provider, ingestOptions.platform))
+        ?? platformFor(platformOrInput, ingestOptions);
+      return integrationRuntime.ingestProvider(platform, platformOrInput, payload, ingestOptions);
+    },
+    ingestSignals(signals = [], ingestOptions = {}) {
+      return integrationRuntime.kit.ingest('local-detector', signals, ingestOptions);
+    },
+    importTranscript(input = {}, transcriptOptions = {}) {
+      return integrationRuntime.kit.importTranscript(input, transcriptOptions);
+    },
+    startMeeting(input = {}) {
+      return integrationRuntime.kit.startMeeting(input);
+    },
+    endMeeting(input = {}) {
+      return integrationRuntime.kit.endMeeting(input);
+    },
+    getState() {
+      return integrationRuntime.getState();
+    },
+    reset(nextState = {}) {
+      return integrationRuntime.reset(nextState);
+    },
+  };
+
+  const browserRuntime = createMeetingAppBrowserRuntime({}, {
+    ...options,
+    sources,
+  });
+
+  return {
+    ...browserRuntime,
+    type: 'meeting_platform_integration_browser_runtime',
+    schema: MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA,
+    schema_version: MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA_VERSION,
+    integrationRuntime,
+    integration_runtime: integrationRuntime,
+    detect,
+    platformFor,
+    observeMeetingApp(input = {}, observeOptions = {}) {
+      const detection = detect(input, observeOptions);
+      if (!detection.platform) {
+        return Promise.resolve(emptyObservationResult('unsupported_browser_page', {
+          browser_detection: detection,
+        }));
+      }
+      return integrationRuntime.observeMeetingApp(detection.platform, {
+        ...input,
+        platform: detection.platform,
+      }, observeOptions);
+    },
+    insertAnnotation(input = {}, markOptions = {}) {
+      return sources.insertMark(input, markOptions);
+    },
+    getState() {
+      return {
+        ...browserRuntime.getState(),
+        integration_runtime: integrationRuntime.getState(),
+        browser_detection: detect(),
+      };
+    },
+    reset(nextState = {}) {
+      return {
+        browser_runtime: browserRuntime.reset?.(nextState.browser_runtime ?? nextState.browserRuntime ?? {}),
+        integration_runtime: integrationRuntime.reset(nextState.integration_runtime ?? nextState.integrationRuntime ?? {}),
+      };
+    },
+  };
 }

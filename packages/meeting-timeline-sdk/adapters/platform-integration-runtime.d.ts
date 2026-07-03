@@ -66,6 +66,19 @@ export interface MeetingPlatformIntegrationRuntimeManifest {
   handoff_readiness_matrix: Record<string, unknown>;
 }
 
+export interface MeetingPlatformBrowserDetection {
+  type: 'meeting_platform_browser_detection';
+  detected: boolean;
+  platform?: string;
+  reason: 'explicit' | 'url' | 'runtime_preset' | 'none';
+  meeting?: Record<string, unknown>;
+  browser?: {
+    url?: string;
+    title?: string;
+  };
+  runtime_preset_platform?: string;
+}
+
 export interface MeetingPlatformIntegrationRuntime {
   type: 'meeting_platform_integration_runtime';
   schema: typeof MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA;
@@ -102,6 +115,31 @@ export interface MeetingPlatformIntegrationRuntime {
   reset(nextState?: Record<string, unknown>): Record<string, unknown>;
 }
 
+export interface MeetingPlatformIntegrationBrowserRuntime {
+  type: 'meeting_platform_integration_browser_runtime';
+  schema: typeof MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA;
+  schema_version: typeof MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA_VERSION;
+  integrationRuntime: MeetingPlatformIntegrationRuntime;
+  integration_runtime: MeetingPlatformIntegrationRuntime;
+  detect(input?: Record<string, unknown>, detectOptions?: Record<string, unknown>): MeetingPlatformBrowserDetection;
+  platformFor(input?: Record<string, unknown>, platformOptions?: Record<string, unknown>): string;
+  sample(sampleOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
+  tick(sampleOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
+  start(startOptions?: Record<string, unknown>): Record<string, unknown>;
+  stop(): Record<string, unknown>;
+  dispose(): Record<string, unknown>;
+  handleMessage(message?: Record<string, unknown>, messageOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
+  observeMeetingApp(input?: Record<string, unknown>, observeOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
+  insertAnnotation(input?: Record<string, unknown>, markOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
+  getState(): Record<string, unknown>;
+  reset(nextState?: Record<string, unknown>): Record<string, unknown>;
+}
+
+export function detectMeetingPlatformForBrowser(
+  input?: Record<string, unknown>,
+  options?: MeetingPlatformIntegrationRuntimeOptions,
+): MeetingPlatformBrowserDetection;
+
 export function buildMeetingPlatformIntegrationRuntimeManifest(
   options?: MeetingPlatformIntegrationRuntimeOptions,
 ): MeetingPlatformIntegrationRuntimeManifest;
@@ -115,3 +153,8 @@ export function createMeetingPlatformIntegrationRuntime(
   clientOrOptions: MeetingTimelineClient | MeetingPlatformIntegrationRuntimeOptions,
   options?: MeetingPlatformIntegrationRuntimeOptions,
 ): MeetingPlatformIntegrationRuntime;
+
+export function createMeetingPlatformIntegrationBrowserRuntime(
+  clientOrOptions: MeetingTimelineClient | MeetingPlatformIntegrationRuntimeOptions,
+  options?: MeetingPlatformIntegrationRuntimeOptions,
+): MeetingPlatformIntegrationBrowserRuntime;

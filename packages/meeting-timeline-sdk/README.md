@@ -205,6 +205,30 @@ const viewModel = runtime.timelineView('google-meet', {
 });
 ```
 
+浏览器扩展或 WebView preload 可以再包一层 `createMeetingPlatformIntegrationBrowserRuntime()`。它会从当前 `window.location`/DOM capture profile 自动识别 Google Meet、Teams、Zoom、Webex、Lark，然后把 content-script sample、provider event 和手写标注路由到同一个 integration runtime：
+
+```js
+import {
+  createMeetingPlatformIntegrationBrowserRuntime,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';
+
+const browserRuntime = createMeetingPlatformIntegrationBrowserRuntime({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+await browserRuntime.sample();
+await browserRuntime.handleMessage({
+  type: 'meeting_timeline.insert_mark',
+  payload: {
+    mark: {
+      label: 'why?',
+      captured_at_ms: Date.now(),
+    },
+  },
+});
+```
+
 `runtime.manifest()` 只证明 SDK 接线、runtime bundle、`captured_at_ms`、provider/transcript 非阻塞策略已经满足 host handoff；真实会议页 DOM 和官方事件证据仍然要用 `platform-real-intake` / `platform-handoff-readiness` 验收，不能用 runtime manifest 冒充 production ready。
 
 多平台正式接入前，可以先用 `platform-strategy` 输出机器可读策略。它把 Google Meet、Teams、Zoom、Webex、Lark 的共性收敛成同一条原则：实时标注轴由本地观察或 host detector 先建，provider webhook 只做 reconcile/backfill，post-meeting transcript 只做会后导入，不阻塞当前标注：
