@@ -7,6 +7,65 @@ export interface MeetingPlatformEventAdapter {
   normalize(raw?: unknown, options?: Record<string, unknown>): NormalizedMeetingSignal[];
 }
 
+export const MEETING_PLATFORM_REGISTRY_ENTRY_SCHEMA: 'meeting_platform_registry_entry';
+export const MEETING_PLATFORM_REGISTRY_MANIFEST_SCHEMA: 'meeting_platform_registry_manifest';
+export const MEETING_PLATFORM_REGISTRY_SCHEMA_VERSION: 1;
 export const MEETING_PLATFORM_EVENT_ADAPTERS: readonly MeetingPlatformEventAdapter[];
 
 export function meetingPlatformEventAdapterFor(platform: string): MeetingPlatformEventAdapter | null;
+
+export interface MeetingPlatformRegistryOptions {
+  baseUrl?: string;
+  base_url?: string;
+  basePath?: string;
+  base_path?: string;
+  platforms?: Iterable<string> | string[];
+  platform_keys?: Iterable<string> | string[];
+  env?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface MeetingPlatformRegistryEntry {
+  type: 'meeting_platform_registry_entry';
+  schema: 'meeting_platform_registry_entry';
+  schema_version: 1;
+  platform: string;
+  display_name?: string;
+  aliases: string[];
+  event_adapter: Record<string, unknown>;
+  supported_surfaces?: Record<string, unknown>;
+  runtime: Record<string, unknown>;
+  provider: Record<string, unknown>;
+  annotations: Record<string, unknown>;
+  transcript: Record<string, unknown>;
+  host: Record<string, unknown>;
+  sdk: Record<string, unknown>;
+  readiness: Record<string, unknown>;
+  commands: Record<string, string>;
+  next_actions: string[];
+}
+
+export interface MeetingPlatformRegistryManifest {
+  type: 'meeting_platform_registry_manifest';
+  schema: 'meeting_platform_registry_manifest';
+  schema_version: 1;
+  platform_count: number;
+  normalizer_count: number;
+  runtime_ready_count: number;
+  contract_accepted_count: number;
+  provider_required_for_realtime_count: number;
+  transcript_blocking_count: number;
+  platforms: string[];
+  rows: Array<Record<string, unknown>>;
+  entries: MeetingPlatformRegistryEntry[];
+  next_actions: string[];
+}
+
+export function buildMeetingPlatformRegistryEntry(
+  platform: string,
+  options?: MeetingPlatformRegistryOptions,
+): MeetingPlatformRegistryEntry;
+
+export function buildMeetingPlatformRegistryManifest(
+  options?: MeetingPlatformRegistryOptions,
+): MeetingPlatformRegistryManifest;

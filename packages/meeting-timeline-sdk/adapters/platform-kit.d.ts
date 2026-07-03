@@ -6,6 +6,11 @@ import type {
 } from './platform-webhook-router.mjs';
 import type { MeetingPlatformFetchHandler, PlatformWebhookHttpOptions } from './platform-http.mjs';
 import type { MeetingPlatformNodeHandler, PlatformWebhookNodeOptions } from './platform-node.mjs';
+import type {
+  MeetingPlatformRegistryEntry,
+  MeetingPlatformRegistryManifest,
+  MeetingPlatformRegistryOptions,
+} from './platform-registry.mjs';
 import type { PlatformCaptureOptions, PlatformCaptureRecord } from './platform-capture.mjs';
 import type { PlatformLaunchGateOptions } from './platform-gate.mjs';
 import type {
@@ -363,6 +368,8 @@ export interface MeetingPlatformTimelineKit {
   platformAdaptationPackageMatrix(packageOptions?: MeetingPlatformAdaptationPackageOptions): MeetingPlatformAdaptationPackageMatrix;
   platformRuntimeBundle(platform: string, bundleOptions?: MeetingPlatformRuntimeBundleOptions): MeetingPlatformRuntimeBundle;
   platformRuntimeBundleMatrix(bundleOptions?: MeetingPlatformRuntimeBundleOptions): MeetingPlatformRuntimeBundleMatrix;
+  platformRegistryEntry(platform: string, registryOptions?: MeetingPlatformRegistryOptions): MeetingPlatformRegistryEntry;
+  platformRegistryManifest(registryOptions?: MeetingPlatformRegistryOptions): MeetingPlatformRegistryManifest;
   platformAdapterContract(platform: string, contractOptions?: MeetingPlatformAdapterContractOptions): MeetingPlatformAdapterContract;
   platformAdapterContractMatrix(contractOptions?: MeetingPlatformAdapterContractOptions): MeetingPlatformAdapterContractMatrix;
   platformAdapterContractAcceptance(

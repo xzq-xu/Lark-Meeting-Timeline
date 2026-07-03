@@ -1135,10 +1135,30 @@ Local detector adapter 支持桌面观察器、浏览器扩展、汉王宿主 Ap
 宿主服务如果要按平台名动态接 webhook，可以直接用 registry：
 
 ```js
-import { meetingPlatformEventAdapterFor } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-registry';
+import {
+  buildMeetingPlatformRegistryManifest,
+  meetingPlatformEventAdapterFor,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-registry';
 
 const adapter = meetingPlatformEventAdapterFor(req.params.platform);
 const signals = adapter.normalize(req.body, { receivedAtMs: Date.now() });
+
+const manifest = buildMeetingPlatformRegistryManifest({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+// manifest.rows 是下游项目的选型表：normalizer、runtime、provider、insert endpoint、非阻塞规则。
+// manifest.entries[*] 进一步包含 SDK import、runtime bundle、provider security verifier 和 host endpoints。
+```
+
+也可以直接导出 registry 报告：
+
+```sh
+npm run meeting-platform:registry -- \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --report-file=data/meeting-platform-registry-report.json
 ```
 
 如果外部项目只想“收到平台 webhook 后直接落到会议轴”，可以用更高层的 `platform-ingest`：

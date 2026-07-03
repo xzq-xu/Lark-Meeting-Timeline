@@ -26,6 +26,10 @@ import {
   normalizeMeetingPlatform,
   platformCapabilityContract,
 } from './platform-setup.mjs';
+import {
+  buildMeetingPlatformRegistryEntry,
+  buildMeetingPlatformRegistryManifest,
+} from './platform-registry.mjs';
 import { createMeetingTimelineBridge } from './timeline-bridge.mjs';
 import {
   buildPlatformWebhookRouteTable,
@@ -339,6 +343,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     base_path: options.basePath ?? options.base_path ?? '/api/platform-events',
     supported_platforms: MEETING_PLATFORM_KEYS,
     supported_meeting_app_platforms: MEETING_APP_FIXTURE_PLATFORMS,
+    platform_registry_manifest: buildMeetingPlatformRegistryManifest(options),
     capabilities: allPlatformCapabilityContracts(options),
     webhook_router: buildPlatformWebhookRouterStatus(options),
     onboarding: buildMeetingPlatformOnboardingSummary(options),
@@ -916,6 +921,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     allPlatforms(platformOptions = {}) {
       return MEETING_PLATFORM_KEYS.map((platform) => platformOverview(platform, defaults, platformOptions));
+    },
+    platformRegistryEntry(platform, registryOptions = {}) {
+      return buildMeetingPlatformRegistryEntry(platform, withDefaults(defaults, registryOptions));
+    },
+    platformRegistryManifest(registryOptions = {}) {
+      return buildMeetingPlatformRegistryManifest(withDefaults(defaults, registryOptions));
     },
     capability(platform, platformOptions = {}) {
       return platformCapabilityContract(platform, withDefaults(defaults, platformOptions));

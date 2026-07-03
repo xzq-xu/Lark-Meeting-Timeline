@@ -67,6 +67,14 @@ assert.equal(googleOverview.meeting_app_fixture.coverage.meeting_started, true);
 assert.equal(googleOverview.meeting_app_fixture.coverage.speaker_started, true);
 assert.equal(googleOverview.integration_plan.recommended_mode, 'hybrid_local_observer_first');
 
+const googleRegistryEntry = kit.platformRegistryEntry('google-meet');
+assert.equal(googleRegistryEntry.platform, 'google_meet');
+assert.equal(googleRegistryEntry.annotations.timestamp_field, 'captured_at_ms');
+assert.equal(googleRegistryEntry.runtime.browser_matches.includes('https://meet.google.com/*'), true);
+const registryManifest = kit.platformRegistryManifest({ platforms: ['google-meet', 'zoom'] });
+assert.equal(registryManifest.platform_count, 2);
+assert.equal(registryManifest.provider_required_for_realtime_count, 0);
+
 const fixtureAcceptance = kit.fixtureAcceptance('google-meet', {
   requiredCoverage: ['meeting_start', 'meeting_end', 'participant_track', 'artifact_ready', 'subscription_lifecycle'],
 });

@@ -29,6 +29,8 @@ assert.equal(packedFiles.includes('index.mjs'), true);
 assert.equal(packedFiles.includes('index.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-registry.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-registry.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
@@ -107,6 +109,11 @@ import {
 import {
   createMeetingPlatformTimelineKit,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit';
+import {
+  buildMeetingPlatformRegistryEntry,
+  buildMeetingPlatformRegistryManifest,
+  meetingPlatformEventAdapterFor,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-registry';
 import {
   buildMeetingPlatformAdaptationRunbook,
   buildMeetingPlatformRolloutPlan,
@@ -254,6 +261,17 @@ const kit = createMeetingPlatformTimelineKit(client, {
 assert.equal(kit.platformRolloutPlan('google-meet').platform, 'google_meet');
 assert.equal(kit.platformAdaptationRunbook('zoom').platform, 'zoom');
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_rollout.type, 'meeting_platform_rollout_summary');
+assert.equal(kit.report({ platforms: ['google-meet'] }).platform_registry_manifest.platform_count, 1);
+assert.equal(kit.platformRegistryEntry('google-meet').annotations.timestamp_field, 'captured_at_ms');
+assert.equal(kit.platformRegistryManifest({ platforms: ['zoom'] }).rows[0].platform, 'zoom');
+assert.equal(meetingPlatformEventAdapterFor('teams').key, 'microsoft_teams');
+assert.equal(buildMeetingPlatformRegistryEntry('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).runtime.browser_matches.includes('https://meet.google.com/*'), true);
+assert.equal(buildMeetingPlatformRegistryManifest({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).provider_required_for_realtime_count, 0);
 assert.equal(kit.platformLiveAdapterHandoff('zoom').sdk.factory, 'createMeetingPlatformLiveAdapter');
 assert.equal(kit.platformLiveAdapterHandoffBundle({
   platforms: ['zoom'],

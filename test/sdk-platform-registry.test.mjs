@@ -1,0 +1,79 @@
+import assert from 'node:assert/strict';
+
+import {
+  MEETING_PLATFORM_REGISTRY_ENTRY_SCHEMA,
+  MEETING_PLATFORM_REGISTRY_MANIFEST_SCHEMA,
+  buildMeetingPlatformRegistryEntry,
+  buildMeetingPlatformRegistryManifest,
+  meetingPlatformEventAdapterFor,
+} from '../packages/meeting-timeline-sdk/adapters/platform-registry.mjs';
+import {
+  createMeetingPlatformTimelineKit,
+} from '../packages/meeting-timeline-sdk/adapters/platform-kit.mjs';
+
+const baseUrl = 'https://timeline.example.com';
+
+const googleAdapter = meetingPlatformEventAdapterFor('google-meet');
+assert.equal(googleAdapter.key, 'google_meet');
+assert.equal(googleAdapter.source, 'google_meet_webhook');
+assert.equal(typeof googleAdapter.normalize, 'function');
+
+const google = buildMeetingPlatformRegistryEntry('google-meet', { baseUrl });
+assert.equal(google.schema, MEETING_PLATFORM_REGISTRY_ENTRY_SCHEMA);
+assert.equal(google.platform, 'google_meet');
+assert.equal(google.aliases.includes('google-meet'), true);
+assert.equal(google.event_adapter.normalize_available, true);
+assert.equal(google.event_adapter.module, '@ai-annotation/meeting-timeline-sdk/adapters/google-meet');
+assert.equal(google.runtime.runtime_ready, true);
+assert.equal(google.runtime.browser_matches.includes('https://meet.google.com/*'), true);
+assert.equal(google.runtime.sample_interval_ms, 10_000);
+assert.equal(google.provider.required_for_realtime, false);
+assert.equal(google.provider.security_verifier, 'verifyGooglePubSubOidcJwt');
+assert.equal(google.provider.start_events.includes('google.workspace.meet.conference.v2.started'), true);
+assert.equal(google.annotations.insert_endpoint, `${baseUrl}/api/annotations`);
+assert.equal(google.annotations.timestamp_field, 'captured_at_ms');
+assert.equal(google.annotations.provider_events_block_realtime, false);
+assert.equal(google.annotations.transcript_blocks_realtime, false);
+assert.equal(google.transcript.blocks_realtime_annotation, false);
+assert.equal(google.host.endpoints.runtime_bundles, '/api/meeting-platform/runtime-bundles');
+assert.equal(google.sdk.imports.runtime_bundle, '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle');
+assert.equal(google.readiness.contract_accepted, true);
+assert.equal(google.readiness.provider_required_for_realtime, false);
+assert.equal(google.readiness.transcript_blocks_realtime, false);
+assert.equal(google.commands.print_registry.includes('meeting-platform:registry'), true);
+
+const local = buildMeetingPlatformRegistryEntry('local-detector', { baseUrl });
+assert.equal(local.platform, 'local_detector');
+assert.equal(local.runtime.browser_matches.length, 0);
+assert.equal(local.event_adapter.source, 'local_detector');
+assert.equal(local.readiness.runtime_ready, true);
+
+const manifest = buildMeetingPlatformRegistryManifest({
+  baseUrl,
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+assert.equal(manifest.schema, MEETING_PLATFORM_REGISTRY_MANIFEST_SCHEMA);
+assert.equal(manifest.platform_count, 5);
+assert.equal(manifest.normalizer_count, 5);
+assert.equal(manifest.runtime_ready_count, 5);
+assert.equal(manifest.contract_accepted_count, 5);
+assert.equal(manifest.provider_required_for_realtime_count, 0);
+assert.equal(manifest.transcript_blocking_count, 0);
+assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').provider_transport, 'Microsoft Graph change notifications');
+assert.equal(manifest.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
+assert.equal(manifest.next_actions.includes('wire_host_runtime_bundles_endpoint_before_building_extension'), true);
+
+const client = {
+  async startMeeting(input) { return { ok: true, input }; },
+  async endMeeting(input) { return { ok: true, input }; },
+  async insertMark(input) { return { ok: true, input }; },
+};
+const kit = createMeetingPlatformTimelineKit(client, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom'],
+});
+assert.equal(kit.platformRegistryEntry('zoom').platform, 'zoom');
+assert.equal(kit.platformRegistryManifest().platform_count, 2);
+assert.equal(kit.report().platform_registry_manifest.provider_required_for_realtime_count, 0);
+
+console.log('ok meeting platform registry manifest');
