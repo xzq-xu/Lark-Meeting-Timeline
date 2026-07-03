@@ -15,6 +15,8 @@ import { buildMeetingPlatformRuntimeProfile } from './platform-runtime-profile.m
 
 export const MEETING_PLATFORM_FIELD_CAPTURE_PLAN_SCHEMA = 'meeting_platform_field_capture_plan';
 export const MEETING_PLATFORM_FIELD_CAPTURE_MATRIX_SCHEMA = 'meeting_platform_field_capture_matrix';
+export const MEETING_PLATFORM_FIELD_CAPTURE_MANIFEST_SCHEMA = 'meeting_platform_field_capture_manifest';
+export const MEETING_PLATFORM_FIELD_CAPTURE_MANIFEST_MATRIX_SCHEMA = 'meeting_platform_field_capture_manifest_matrix';
 export const MEETING_PLATFORM_FIELD_EVIDENCE_BUNDLE_SCHEMA = 'meeting_platform_field_evidence_bundle';
 export const MEETING_PLATFORM_FIELD_EVIDENCE_MATRIX_SCHEMA = 'meeting_platform_field_evidence_matrix';
 export const MEETING_PLATFORM_FIELD_CAPTURE_SCHEMA_VERSION = 1;
@@ -133,6 +135,20 @@ function outputPaths(platform, options = {}) {
       : `${root}/provider-evidence/${platform}.json`,
     evidence_package: `${root}/meeting-platform-evidence-packages/${platform}.json`,
     capture_report: `${root}/meeting-platform-field-capture/${platform}.json`,
+  };
+}
+
+function fieldEvidencePaths(platform, options = {}) {
+  const root = String(firstNonEmpty(options.evidenceDir, options.evidence_dir, 'data'));
+  return {
+    field_evidence_input_dir: `${root}/meeting-platform-field-evidence`,
+    field_evidence_input: `${root}/meeting-platform-field-evidence/${platform}.json`,
+    field_evidence_bundle_dir: `${root}/meeting-platform-field-evidence-bundles`,
+    field_evidence_bundle: `${root}/meeting-platform-field-evidence-bundles/${platform}.json`,
+    evidence_package_dir: `${root}/meeting-platform-evidence-packages`,
+    evidence_package: `${root}/meeting-platform-evidence-packages/${platform}.json`,
+    field_evidence_report: `${root}/meeting-platform-field-evidence-report.json`,
+    field_capture_report: `${root}/meeting-platform-field-capture-report.json`,
   };
 }
 
@@ -266,6 +282,45 @@ function captureChecklist(platform, localPlan = undefined, providerPlan = {}, ru
   return items;
 }
 
+function acceptedInputContracts() {
+  return [
+    {
+      schema: 'raw_field_evidence',
+      description: 'Unwrapped platform capture input from field tools.',
+      required_fields: ['platform'],
+      optional_fields: ['providerRecords', 'providerSamples', 'meetingAppRecordSet', 'meetingAppRecords', 'metadata'],
+    },
+    {
+      schema: 'platform_map',
+      description: 'Object keyed by platform, where each value is raw_field_evidence.',
+      example_keys: ['google_meet', 'teams', 'zoom', 'webex', 'lark'],
+    },
+    {
+      schema: 'meeting_platform_evidence_package',
+      description: 'Previously exported package from buildMeetingPlatformEvidencePackage.',
+    },
+    {
+      schema: 'meeting_platform_field_evidence_bundle',
+      description: 'Previously exported bundle from buildMeetingPlatformFieldEvidenceBundle.',
+    },
+    {
+      schema: 'meeting_app_snapshot_record_set',
+      description: 'Local DOM snapshot record set for browser-extension or native-host observers.',
+    },
+  ];
+}
+
+function manifestCommands(platform, paths = {}, options = {}) {
+  const baseUrl = firstNonEmpty(options.baseUrl, options.base_url);
+  const baseUrlArg = baseUrl ? ` --base-url=${baseUrl}` : '';
+  return {
+    capture_manifest: `buildMeetingPlatformFieldCaptureManifest('${platform}', options)`,
+    build_field_evidence: `npm run meeting-platform:field-evidence -- --platforms=${platform}${baseUrlArg} --dir=${paths.field_evidence_input_dir} --package-dir=${paths.evidence_package_dir} --bundle-dir=${paths.field_evidence_bundle_dir} --report-file=${paths.field_evidence_report}`,
+    inspect_capture_gaps: `npm run meeting-platform:field-capture -- --platforms=${platform}${baseUrlArg} --dir=${paths.evidence_package_dir} --report-file=${paths.field_capture_report}`,
+    verify_package: `npm run meeting-platform:evidence-package -- --input=${paths.evidence_package}${baseUrlArg}`,
+  };
+}
+
 export function buildMeetingPlatformFieldCapturePlan(platform, options = {}) {
   const key = normalizeMeetingPlatform(platform);
   const runtime = buildMeetingPlatformRuntimeProfile(key, options);
@@ -340,6 +395,138 @@ export function buildMeetingPlatformFieldCaptureMatrix(options = {}) {
     })),
     plans,
     next_actions: unique(plans.flatMap((plan) => plan.next_actions ?? [])),
+  };
+}
+
+export function buildMeetingPlatformFieldCaptureManifest(platform, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  const runtime = buildMeetingPlatformRuntimeProfile(key, options);
+  const provider = buildMeetingPlatformProviderConnectionPack(key, options);
+  const plan = buildMeetingPlatformFieldCapturePlan(key, options);
+  const paths = fieldEvidencePaths(key, options);
+  const requiredSnapshots = (plan.local_observer?.required_snapshots ?? []).map((item) => item.id);
+  return compactObject({
+    type: 'meeting_platform_field_capture_manifest',
+    schema: MEETING_PLATFORM_FIELD_CAPTURE_MANIFEST_SCHEMA,
+    schema_version: MEETING_PLATFORM_FIELD_CAPTURE_SCHEMA_VERSION,
+    platform: key,
+    display_name: plan.display_name,
+    status: plan.status,
+    production_ready: plan.production_ready,
+    ready_for_realtime_annotations: plan.ready_for_realtime_annotations,
+    objective: 'portable_field_capture_contract_for_meeting_timeline_platform_adaptation',
+    file_contract: {
+      input_dir: paths.field_evidence_input_dir,
+      bundle_dir: paths.field_evidence_bundle_dir,
+      package_dir: paths.evidence_package_dir,
+      files: {
+        field_evidence_input: paths.field_evidence_input,
+        field_evidence_bundle: paths.field_evidence_bundle,
+        evidence_package: paths.evidence_package,
+        field_evidence_report: paths.field_evidence_report,
+        field_capture_report: paths.field_capture_report,
+      },
+      write_policy: {
+        field_evidence_input: 'one_json_per_platform_or_platform_map',
+        field_evidence_bundle: 'generated_by_meeting-platform_field-evidence',
+        evidence_package: 'generated_by_meeting-platform_field-evidence_or_buildMeetingPlatformEvidencePackage',
+      },
+    },
+    input_contract: {
+      accepted_inputs: acceptedInputContracts(),
+      raw_field_evidence_shape: {
+        platform: key,
+        providerRecords: 'array_of_platform_capture_records_from_provider_webhooks',
+        providerSamples: 'array_or_platform_map_of_raw_provider_sample_events',
+        meetingAppRecordSet: 'meeting_app_snapshot_record_set_from_browser_extension_or_native_host',
+        meetingAppRecords: 'array_of_meeting_app_snapshot_records',
+        metadata: 'source_files_or_capture_environment_metadata',
+      },
+    },
+    runtime_contract: {
+      annotation_timestamp_field: runtime.runtime_contract?.annotation_timestamp_field,
+      provider_transcript_blocking: runtime.runtime_contract?.provider_transcript_blocking,
+      local_axis_policy: runtime.axis,
+      speaker_marker_filter: runtime.speaker_markers?.filter,
+    },
+    local_observer_contract: plan.local_observer ? {
+      source: plan.local_observer.source,
+      required_snapshots: requiredSnapshots,
+      minimum_record_count: plan.local_observer.minimum_record_count,
+      recorder: plan.local_observer.recorder,
+      validation: plan.local_observer.validation,
+    } : undefined,
+    provider_contract: {
+      transport: provider.transport,
+      endpoint: provider.endpoint,
+      status_endpoint: provider.status_endpoint,
+      required_coverage: plan.provider_events?.required_coverage ?? [],
+      minimum_record_count: plan.provider_events?.minimum_record_count ?? 0,
+      start_events: plan.provider_events?.start_events ?? [],
+      end_events: plan.provider_events?.end_events ?? [],
+      participant_events: plan.provider_events?.participant_events ?? [],
+      artifact_events: plan.provider_events?.artifact_events ?? [],
+      lifecycle_events: plan.provider_events?.lifecycle_events ?? [],
+      security: plan.provider_events?.security,
+    },
+    acceptance: {
+      production_condition: 'bundle.production_ready === true && bundle.verification.passed === true',
+      pilot_condition: 'bundle.ready_for_realtime_annotations === true',
+      required_provider_coverage: plan.provider_events?.required_coverage ?? [],
+      required_local_snapshots: requiredSnapshots,
+      minimum_provider_records: plan.provider_events?.minimum_record_count ?? 0,
+      minimum_local_records: plan.local_observer?.minimum_record_count ?? 0,
+      current_missing_items: plan.missing_items ?? [],
+    },
+    automation: {
+      commands: manifestCommands(key, paths, options),
+      sdk_methods: [
+        'buildMeetingPlatformFieldCaptureManifest',
+        'buildMeetingPlatformFieldEvidenceBundle',
+        'buildMeetingPlatformFieldCapturePlan',
+        'verifyMeetingPlatformEvidencePackage',
+      ],
+    },
+    handoff: {
+      primary_entry: '@ai-annotation/meeting-timeline-sdk/adapters/platform-field-capture',
+      kit_methods: ['platformFieldCaptureManifest', 'platformFieldEvidenceBundle', 'platformFieldCapturePlan'],
+      report_fields: ['status', 'production_ready', 'ready_for_realtime_annotations', 'missing_items'],
+    },
+    field_capture_plan: plan,
+    next_actions: plan.next_actions ?? [],
+  });
+}
+
+export function buildMeetingPlatformFieldCaptureManifestMatrix(options = {}) {
+  const manifests = selectedPlatforms(options).map((platform) => buildMeetingPlatformFieldCaptureManifest(platform, {
+    ...options,
+    platforms: undefined,
+    platform_keys: undefined,
+  }));
+  return {
+    type: 'meeting_platform_field_capture_manifest_matrix',
+    schema: MEETING_PLATFORM_FIELD_CAPTURE_MANIFEST_MATRIX_SCHEMA,
+    schema_version: MEETING_PLATFORM_FIELD_CAPTURE_SCHEMA_VERSION,
+    platform_count: manifests.length,
+    production_ready_count: manifests.filter((manifest) => manifest.production_ready).length,
+    realtime_ready_count: manifests.filter((manifest) => manifest.ready_for_realtime_annotations).length,
+    missing_item_count: manifests.reduce((total, manifest) => total + (manifest.acceptance?.current_missing_items?.length ?? 0), 0),
+    platforms: manifests.map((manifest) => manifest.platform),
+    rows: manifests.map((manifest) => ({
+      platform: manifest.platform,
+      display_name: manifest.display_name,
+      status: manifest.status,
+      production_ready: manifest.production_ready,
+      ready_for_realtime_annotations: manifest.ready_for_realtime_annotations,
+      input_file: manifest.file_contract?.files?.field_evidence_input,
+      bundle_file: manifest.file_contract?.files?.field_evidence_bundle,
+      evidence_package_file: manifest.file_contract?.files?.evidence_package,
+      required_provider_coverage: manifest.acceptance?.required_provider_coverage ?? [],
+      required_local_snapshots: manifest.acceptance?.required_local_snapshots ?? [],
+      missing_items: manifest.acceptance?.current_missing_items ?? [],
+    })),
+    manifests,
+    next_actions: unique(manifests.flatMap((manifest) => manifest.next_actions ?? [])),
   };
 }
 

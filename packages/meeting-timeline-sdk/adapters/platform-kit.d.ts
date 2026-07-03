@@ -64,6 +64,8 @@ import type {
   MeetingPlatformRuntimeProfileOptions,
 } from './platform-runtime-profile.mjs';
 import type {
+  MeetingPlatformFieldCaptureManifest,
+  MeetingPlatformFieldCaptureManifestMatrix,
   MeetingPlatformFieldEvidenceBundle,
   MeetingPlatformFieldEvidenceMatrix,
   MeetingPlatformFieldCaptureMatrix,
@@ -189,6 +191,8 @@ export interface MeetingPlatformTimelineKit {
   platformRuntimeProfileMatrix(profileOptions?: MeetingPlatformRuntimeProfileOptions): MeetingPlatformRuntimeProfileMatrix;
   platformFieldCapturePlan(platform: string, captureOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCapturePlan;
   platformFieldCaptureMatrix(captureOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCaptureMatrix;
+  platformFieldCaptureManifest(platform: string, manifestOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCaptureManifest;
+  platformFieldCaptureManifestMatrix(manifestOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCaptureManifestMatrix;
   platformFieldEvidenceBundle(platform: string, input?: MeetingPlatformEvidencePackage | MeetingPlatformEvidencePackageOptions, bundleOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldEvidenceBundle;
   platformFieldEvidenceMatrix(matrixOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldEvidenceMatrix;
   meetingAppSnapshotRecorder(recorderOptions?: MeetingAppSnapshotRecordOptions): MeetingAppSnapshotRecorder;

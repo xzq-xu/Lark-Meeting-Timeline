@@ -243,6 +243,22 @@ const bundle = buildMeetingPlatformFieldEvidenceBundle('google-meet', {
 
 在宿主项目里也可以通过 `kit.platformFieldEvidenceBundle()` 和 `kit.platformFieldEvidenceMatrix()` 调用同一套逻辑，用于批量比较 Google Meet / Teams / Zoom / Webex 的真实采样进度。
 
+现场采样工具如果需要一份机器可读的接入说明，先生成 manifest。它会把“要采哪些 provider 事件 / DOM 快照、原始 JSON 允许哪些形态、输出文件写到哪里、用哪个 CLI 验收”放在同一个对象里：
+
+```js
+import {
+  buildMeetingPlatformFieldCaptureManifest,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-field-capture';
+
+const manifest = buildMeetingPlatformFieldCaptureManifest('teams', {
+  baseUrl: 'https://timeline.example.com',
+});
+
+// manifest.input_contract.accepted_inputs 是现场工具允许输出的 JSON 形态。
+// manifest.file_contract.files 给出 raw input、bundle、evidence package 的默认路径。
+// manifest.automation.commands.build_field_evidence 可直接交给 CI 或现场采样脚本执行。
+```
+
 对应 CLI 可直接把现场采样目录转换成 bundle 和 evidence package。目录里的 JSON 可以是原始采样输入、按平台分组的对象、已有 evidence package，或上一次导出的 bundle：
 
 ```sh

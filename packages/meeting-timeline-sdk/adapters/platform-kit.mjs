@@ -101,6 +101,8 @@ import {
   buildMeetingPlatformRuntimeProfileMatrix,
 } from './platform-runtime-profile.mjs';
 import {
+  buildMeetingPlatformFieldCaptureManifest,
+  buildMeetingPlatformFieldCaptureManifestMatrix,
   buildMeetingPlatformFieldEvidenceBundle,
   buildMeetingPlatformFieldEvidenceMatrix,
   buildMeetingPlatformFieldCaptureMatrix,
@@ -282,6 +284,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_provider_connection_matrix: buildMeetingPlatformProviderConnectionMatrix(options),
     platform_runtime_profile_matrix: buildMeetingPlatformRuntimeProfileMatrix(options),
     platform_field_capture_matrix: buildMeetingPlatformFieldCaptureMatrix(options),
+    platform_field_capture_manifest_matrix: buildMeetingPlatformFieldCaptureManifestMatrix(options),
   };
 }
 
@@ -498,6 +501,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformFieldCaptureMatrix(captureOptions = {}) {
       return buildMeetingPlatformFieldCaptureMatrix(withDefaults(defaults, captureOptions));
+    },
+    platformFieldCaptureManifest(platform, manifestOptions = {}) {
+      return buildMeetingPlatformFieldCaptureManifest(platform, withDefaults(defaults, manifestOptions));
+    },
+    platformFieldCaptureManifestMatrix(manifestOptions = {}) {
+      return buildMeetingPlatformFieldCaptureManifestMatrix(withDefaults(defaults, manifestOptions));
     },
     platformFieldEvidenceBundle(platform, input = {}, bundleOptions = {}) {
       return buildMeetingPlatformFieldEvidenceBundle(platform, input, withDefaults(defaults, bundleOptions));

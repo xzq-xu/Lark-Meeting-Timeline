@@ -8,6 +8,8 @@ import type {
 
 export const MEETING_PLATFORM_FIELD_CAPTURE_PLAN_SCHEMA: 'meeting_platform_field_capture_plan';
 export const MEETING_PLATFORM_FIELD_CAPTURE_MATRIX_SCHEMA: 'meeting_platform_field_capture_matrix';
+export const MEETING_PLATFORM_FIELD_CAPTURE_MANIFEST_SCHEMA: 'meeting_platform_field_capture_manifest';
+export const MEETING_PLATFORM_FIELD_CAPTURE_MANIFEST_MATRIX_SCHEMA: 'meeting_platform_field_capture_manifest_matrix';
 export const MEETING_PLATFORM_FIELD_EVIDENCE_BUNDLE_SCHEMA: 'meeting_platform_field_evidence_bundle';
 export const MEETING_PLATFORM_FIELD_EVIDENCE_MATRIX_SCHEMA: 'meeting_platform_field_evidence_matrix';
 export const MEETING_PLATFORM_FIELD_CAPTURE_SCHEMA_VERSION: 1;
@@ -66,6 +68,42 @@ export interface MeetingPlatformFieldCaptureMatrix {
   next_actions: string[];
 }
 
+export interface MeetingPlatformFieldCaptureManifest {
+  type: 'meeting_platform_field_capture_manifest';
+  schema: 'meeting_platform_field_capture_manifest';
+  schema_version: 1;
+  platform: string;
+  display_name?: string;
+  status: string;
+  production_ready: boolean;
+  ready_for_realtime_annotations: boolean;
+  objective: string;
+  file_contract: Record<string, unknown>;
+  input_contract: Record<string, unknown>;
+  runtime_contract: Record<string, unknown>;
+  local_observer_contract?: Record<string, unknown>;
+  provider_contract: Record<string, unknown>;
+  acceptance: Record<string, unknown>;
+  automation: Record<string, unknown>;
+  handoff: Record<string, unknown>;
+  field_capture_plan: MeetingPlatformFieldCapturePlan;
+  next_actions: string[];
+}
+
+export interface MeetingPlatformFieldCaptureManifestMatrix {
+  type: 'meeting_platform_field_capture_manifest_matrix';
+  schema: 'meeting_platform_field_capture_manifest_matrix';
+  schema_version: 1;
+  platform_count: number;
+  production_ready_count: number;
+  realtime_ready_count: number;
+  missing_item_count: number;
+  platforms: string[];
+  rows: Record<string, unknown>[];
+  manifests: MeetingPlatformFieldCaptureManifest[];
+  next_actions: string[];
+}
+
 export interface MeetingPlatformFieldEvidenceBundle {
   type: 'meeting_platform_field_evidence_bundle';
   schema: 'meeting_platform_field_evidence_bundle';
@@ -106,6 +144,15 @@ export function buildMeetingPlatformFieldCapturePlan(
 export function buildMeetingPlatformFieldCaptureMatrix(
   options?: MeetingPlatformFieldCaptureOptions,
 ): MeetingPlatformFieldCaptureMatrix;
+
+export function buildMeetingPlatformFieldCaptureManifest(
+  platform: string,
+  options?: MeetingPlatformFieldCaptureOptions,
+): MeetingPlatformFieldCaptureManifest;
+
+export function buildMeetingPlatformFieldCaptureManifestMatrix(
+  options?: MeetingPlatformFieldCaptureOptions,
+): MeetingPlatformFieldCaptureManifestMatrix;
 
 export function buildMeetingPlatformFieldEvidenceBundle(
   platform: string,
