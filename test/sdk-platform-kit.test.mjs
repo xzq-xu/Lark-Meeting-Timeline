@@ -194,6 +194,15 @@ const kitDomDiagnoses = kit.allMeetingAppDomAdaptationDiagnoses({
 });
 assert.deepEqual(Object.keys(kitDomDiagnoses), ['zoom']);
 assert.equal(kitDomDiagnoses.zoom.accepted, true);
+const kitDomDiagnosisMatrix = kit.meetingAppDomAdaptationDiagnosisMatrix({
+  platforms: ['google-meet'],
+  snapshots: {
+    'google-meet': kitLiveSnapshots,
+  },
+});
+assert.equal(kitDomDiagnosisMatrix.platform_count, 1);
+assert.equal(kitDomDiagnosisMatrix.accepted_count, 1);
+assert.equal(kitDomDiagnosisMatrix.rows[0].active_speaker_matched, true);
 const runtimeAdapterConfigs = kit.allMeetingAppRuntimeAdapterConfigs({ platforms: ['zoom'] });
 assert.deepEqual(Object.keys(runtimeAdapterConfigs), ['zoom']);
 assert.equal(runtimeAdapterConfigs.zoom.runtime_options.runtimePreset, 'zoom');
@@ -324,6 +333,8 @@ assert.equal(report.meeting_app_deployment_manifests.google_meet.production_gate
 assert.equal(report.meeting_app_deployment_manifest_acceptance.google_meet.accepted, true);
 assert.equal(report.meeting_app_deployment_manifest_acceptance_summary.accepted_count, 5);
 assert.equal(report.meeting_app_dom_adaptation_diagnosis.google_meet.accepted, false);
+assert.equal(report.meeting_app_dom_adaptation_diagnosis_matrix.platform_count, 5);
+assert.equal(report.meeting_app_dom_adaptation_diagnosis_matrix.rows.find((row) => row.platform === 'google_meet').accepted, false);
 assert.equal(report.meeting_app_runtime_adapter_configs.google_meet.bridge_options.browser_runtime_preset, 'google_meet');
 assert.equal(report.meeting_app_runtime_adapter_acceptance.google_meet.accepted, true);
 assert.equal(report.meeting_app_live_snapshot_capture_plans.google_meet.minimum_record_count, 2);

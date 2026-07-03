@@ -29,6 +29,7 @@ export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA = 'meeting_app_live_s
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA = 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA = 'meeting_app_live_evidence_package';
 export const MEETING_APP_DOM_ADAPTATION_DIAGNOSIS_SCHEMA = 'meeting_app_dom_adaptation_diagnosis';
+export const MEETING_APP_DOM_ADAPTATION_DIAGNOSIS_MATRIX_SCHEMA = 'meeting_app_dom_adaptation_diagnosis_matrix';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -1270,6 +1271,42 @@ export function buildAllMeetingAppDomAdaptationDiagnoses(options = {}) {
     platform,
     buildMeetingAppDomAdaptationDiagnosis(platform, options),
   ]));
+}
+
+export function buildMeetingAppDomAdaptationDiagnosisMatrix(options = {}) {
+  const diagnoses = Object.values(buildAllMeetingAppDomAdaptationDiagnoses(options));
+  return {
+    type: 'meeting_app_dom_adaptation_diagnosis_matrix',
+    schema: MEETING_APP_DOM_ADAPTATION_DIAGNOSIS_MATRIX_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    platform_count: diagnoses.length,
+    accepted_count: diagnoses.filter((diagnosis) => diagnosis.accepted).length,
+    production_ready_count: diagnoses.filter((diagnosis) => diagnosis.production_ready).length,
+    active_speaker_ready_count: diagnoses.filter((diagnosis) => diagnosis.selector_probe?.matched?.active_speaker === true).length,
+    meeting_start_ready_count: diagnoses.filter((diagnosis) => diagnosis.observer_probe?.coverage?.meeting_started === true).length,
+    meeting_end_ready_count: diagnoses.filter((diagnosis) => diagnosis.observer_probe?.coverage?.meeting_ended === true).length,
+    platforms: diagnoses.map((diagnosis) => diagnosis.platform),
+    rows: diagnoses.map((diagnosis) => ({
+      platform: diagnosis.platform,
+      display_name: diagnosis.display_name,
+      accepted: diagnosis.accepted,
+      production_ready: diagnosis.production_ready,
+      evidence_level: diagnosis.evidence_level,
+      evidence_count: diagnosis.evidence_count,
+      record_count: diagnosis.record_count,
+      controls_matched: diagnosis.selector_probe?.matched?.controls === true,
+      participants_matched: diagnosis.selector_probe?.matched?.participants === true,
+      active_speaker_matched: diagnosis.selector_probe?.matched?.active_speaker === true,
+      meeting_started: diagnosis.observer_probe?.coverage?.meeting_started === true,
+      speaker_started: diagnosis.observer_probe?.coverage?.speaker_started === true,
+      meeting_ended: diagnosis.observer_probe?.coverage?.meeting_ended === true,
+      missing_required_coverage: diagnosis.observer_probe?.missing_required_coverage ?? [],
+      issue_codes: (diagnosis.issues ?? []).map((item) => item.code),
+      next_actions: diagnosis.next_actions ?? [],
+    })),
+    diagnoses,
+    next_actions: uniqueList(diagnoses.flatMap((diagnosis) => diagnosis.next_actions ?? [])),
+  };
 }
 
 function buildEvidenceRecordSet(input = {}, options = {}) {

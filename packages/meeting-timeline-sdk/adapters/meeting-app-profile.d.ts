@@ -9,6 +9,7 @@ export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA: 'meeting_app_live_sn
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA: 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA: 'meeting_app_live_evidence_package';
 export const MEETING_APP_DOM_ADAPTATION_DIAGNOSIS_SCHEMA: 'meeting_app_dom_adaptation_diagnosis';
+export const MEETING_APP_DOM_ADAPTATION_DIAGNOSIS_MATRIX_SCHEMA: 'meeting_app_dom_adaptation_diagnosis_matrix';
 
 export interface MeetingAppIntegrationProfileOptions extends MeetingAppLaunchGateOptions {
   platform?: MeetingAppDomCaptureProfilePlatform | string;
@@ -112,6 +113,22 @@ export interface MeetingAppDomAdaptationDiagnosis {
   recommended_capture: Record<string, unknown>;
   next_actions: string[];
   issues: Array<Record<string, unknown>>;
+}
+
+export interface MeetingAppDomAdaptationDiagnosisMatrix {
+  type: 'meeting_app_dom_adaptation_diagnosis_matrix';
+  schema: 'meeting_app_dom_adaptation_diagnosis_matrix';
+  version: number;
+  platform_count: number;
+  accepted_count: number;
+  production_ready_count: number;
+  active_speaker_ready_count: number;
+  meeting_start_ready_count: number;
+  meeting_end_ready_count: number;
+  platforms: MeetingAppDomCaptureProfilePlatform[];
+  rows: Array<Record<string, unknown>>;
+  diagnoses: MeetingAppDomAdaptationDiagnosis[];
+  next_actions: string[];
 }
 
 export interface MeetingAppLiveSnapshotCapturePlan {
@@ -299,6 +316,10 @@ export function buildMeetingAppDomAdaptationDiagnosis(
 export function buildAllMeetingAppDomAdaptationDiagnoses(
   options?: MeetingAppIntegrationProfileOptions,
 ): Partial<Record<MeetingAppDomCaptureProfilePlatform, MeetingAppDomAdaptationDiagnosis>>;
+
+export function buildMeetingAppDomAdaptationDiagnosisMatrix(
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppDomAdaptationDiagnosisMatrix;
 
 export function buildMeetingAppRuntimeAdapterValidationReport(
   configOrPlatform?: MeetingAppRuntimeAdapterConfig | MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,

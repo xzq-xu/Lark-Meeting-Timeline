@@ -63,20 +63,30 @@ assert.equal(summary.evidence_file_count, 2);
 assert.equal(summary.evaluated_file_count, 2);
 assert.equal(summary.required_platforms.length, 3);
 assert.equal(summary.production_ready_count, 1);
+assert.equal(summary.dom_diagnosis_accepted_count, 1);
+assert.equal(summary.active_speaker_ready_count, 1);
+assert.equal(summary.meeting_end_ready_count, 1);
 assert.deepEqual(summary.missing_platforms, ['microsoft_teams']);
 
 const googleRow = summary.rows.find((row) => row.platform === 'google_meet');
 assert.equal(googleRow.production_ready, true);
 assert.equal(googleRow.evidence_level, 'captured_dom');
 assert.equal(googleRow.source_file.endsWith('google-meet.json'), true);
+assert.equal(googleRow.dom_diagnosis.accepted, true);
+assert.equal(googleRow.dom_diagnosis.active_speaker_matched, true);
+assert.equal(googleRow.dom_diagnosis.meeting_started, true);
+assert.equal(googleRow.dom_diagnosis.meeting_ended, true);
 
 const zoomRow = summary.rows.find((row) => row.platform === 'zoom');
 assert.equal(zoomRow.status, 'failed');
 assert.equal(zoomRow.production_ready, false);
 assert.equal(zoomRow.blocking_issue_codes.includes('missing_required_coverage'), true);
+assert.equal(zoomRow.dom_diagnosis.accepted, false);
+assert.equal(zoomRow.dom_diagnosis.issue_codes.includes('missing_live_snapshots'), true);
 
 const teamsRow = summary.rows.find((row) => row.platform === 'microsoft_teams');
 assert.equal(teamsRow.status, 'missing');
+assert.equal(teamsRow.dom_diagnosis.accepted, false);
 assert.equal(teamsRow.next_actions.includes('capture_live_dom_snapshots_for_this_platform'), true);
 
 const report = JSON.parse(await readFile(reportFile, 'utf8'));

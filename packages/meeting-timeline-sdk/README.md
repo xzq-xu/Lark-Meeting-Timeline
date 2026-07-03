@@ -714,6 +714,24 @@ const liveGate = buildMeetingAppLaunchGate('google-meet', {
 // liveGate.production_ready === true 时，才表示真实 Google Meet DOM 适配已验收。
 ```
 
+如果要同时看 Google Meet / Teams / Zoom / Webex / Lark 的真实快照适配情况，可以用 DOM adaptation diagnosis matrix。它会把 selector 命中、建轴、发言人和结束态拆成独立字段，方便判断是 URL/selector 问题，还是 observer 状态转换问题：
+
+```js
+import {
+  buildMeetingAppDomAdaptationDiagnosisMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-profile';
+
+const diagnosis = buildMeetingAppDomAdaptationDiagnosisMatrix({
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+  snapshots: capturedLiveMeetingSnapshotsByPlatform,
+});
+
+// diagnosis.rows[*].controls_matched / participants_matched / active_speaker_matched
+// 分别对应 toolbar、参会人/发言人选择器是否适配真实页面。
+// diagnosis.rows[*].meeting_started / speaker_started / meeting_ended
+// 对应本地 observer 是否能产生时间轴 start、speaker marker 和 end。
+```
+
 如果希望 SDK 帮你管理轮询、去重和 keep-alive，可以直接用 `meeting-app-monitor`。它会高频低成本采集 DOM，但只有在页面状态变化、或到达 keep-alive 间隔时才把样本送给 `meeting-source`；即使 DOM 不变，也会按间隔继续送样本，避免 active speaker 的 `minStableMs` 因过度去重而无法触发：
 
 ```js
@@ -858,6 +876,12 @@ const domDiagnosis = meetingKit.meetingAppDomAdaptationDiagnosis('google-meet', 
 // domDiagnosis 更适合现场调试：它会拆开 selector_probe、observer_probe 和 runtime_probe，
 // 明确指出当前真实页面快照是否命中 controls / participants / active speaker / meeting ended。
 // Google Meet、Teams、Zoom、Lark/Feishu、Webex 都可以用同一个诊断入口，只换平台 key。
+
+const domDiagnosisMatrix = meetingKit.meetingAppDomAdaptationDiagnosisMatrix({
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+  snapshots: capturedLiveMeetingSnapshotsByPlatform,
+});
+// domDiagnosisMatrix.rows 可以直接做成多会议软件本地 observer 适配看板。
 
 const runtimeConfig = meetingKit.meetingAppRuntimeAdapterConfig('google-meet');
 // runtimeConfig 可以交给浏览器 extension content script、Electron WebView preload 或桌面宿主：

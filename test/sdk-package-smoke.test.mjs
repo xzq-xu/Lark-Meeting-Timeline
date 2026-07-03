@@ -153,6 +153,9 @@ import {
 import {
   buildMeetingAppLaunchGate,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate';
+import {
+  buildMeetingAppDomAdaptationDiagnosisMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-profile';
 
 assert.equal(SDK_VERSION, '0.1.0');
 const client = createMeetingTimelineClient({
@@ -353,6 +356,12 @@ assert.equal(kit.platformFieldEvidenceBundle('google-meet', evidencePackage, {
 }).field_capture_plan.schema, 'meeting_platform_field_capture_plan');
 assert.equal(kit.platformFieldIntakePlan('google-meet').schema, 'meeting_platform_field_intake_plan');
 assert.equal(kit.platformFieldIntakeMatrix({ platforms: ['zoom'] }).platform_count, 1);
+assert.equal(buildMeetingAppDomAdaptationDiagnosisMatrix({
+  platforms: ['google-meet'],
+}).schema, 'meeting_app_dom_adaptation_diagnosis_matrix');
+assert.equal(kit.meetingAppDomAdaptationDiagnosisMatrix({
+  platforms: ['google-meet'],
+}).platform_count, 1);
 
 const gate = buildMeetingAppLaunchGate('google-meet', {
   allowFixtureEvidence: true,

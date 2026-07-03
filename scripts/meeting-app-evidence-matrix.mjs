@@ -6,6 +6,9 @@ import {
   buildMeetingAppLaunchGate,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-gate.mjs';
 import {
+  buildMeetingAppDomAdaptationDiagnosis,
+} from '../packages/meeting-timeline-sdk/adapters/meeting-app-profile.mjs';
+import {
   normalizeMeetingPlatform,
 } from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
 import {
@@ -95,6 +98,10 @@ function evaluateEvidence(evidence) {
     allowFixtureEvidence,
     requireProductionReady,
   }));
+  const diagnoses = evidence.platforms.map((platform) => buildMeetingAppDomAdaptationDiagnosis(platform, {
+    recordSet: evidence.recordSet,
+    requireMeetingEnd: requireProductionReady,
+  }));
   return {
     file: evidence.file,
     record_set_id: evidence.recordSet.id,
@@ -103,6 +110,7 @@ function evaluateEvidence(evidence) {
     bytes: evidence.bytes,
     modified_at_ms: Math.round(evidence.modified_at_ms),
     gates,
+    diagnoses,
     rows: gates.map((gate) => summarizeGate(gate)),
   };
 }
@@ -120,6 +128,21 @@ function bestRows(evaluations = []) {
         modified_at_ms: evaluation.modified_at_ms,
         ...summarizeGate(gate),
       };
+      const diagnosis = evaluation.diagnoses.find((item) => item.platform === gate.platform);
+      if (diagnosis) {
+        candidate.dom_diagnosis = {
+          accepted: diagnosis.accepted,
+          production_ready: diagnosis.production_ready,
+          controls_matched: diagnosis.selector_probe?.matched?.controls === true,
+          participants_matched: diagnosis.selector_probe?.matched?.participants === true,
+          active_speaker_matched: diagnosis.selector_probe?.matched?.active_speaker === true,
+          meeting_started: diagnosis.observer_probe?.coverage?.meeting_started === true,
+          speaker_started: diagnosis.observer_probe?.coverage?.speaker_started === true,
+          meeting_ended: diagnosis.observer_probe?.coverage?.meeting_ended === true,
+          issue_codes: (diagnosis.issues ?? []).map((item) => item.code),
+          next_actions: diagnosis.next_actions ?? [],
+        };
+      }
       if (!current || scoreGate(gate) > current.score) {
         byPlatform.set(gate.platform, {
           ...candidate,
@@ -147,6 +170,12 @@ function buildSummary(files, evaluations) {
       missing_required_coverage: ['captured_dom_evidence'],
       blocking_issue_codes: ['missing_platform_evidence_file'],
       warning_codes: [],
+      dom_diagnosis: {
+        accepted: false,
+        production_ready: false,
+        issue_codes: ['missing_platform_evidence_file'],
+        next_actions: ['capture_live_dom_snapshots_for_this_platform'],
+      },
       next_actions: ['capture_live_dom_snapshots_for_this_platform'],
     };
   });
@@ -165,12 +194,18 @@ function buildSummary(files, evaluations) {
     allow_fixture_evidence: allowFixtureEvidence,
     require_production_ready: requireProductionReady,
     production_ready_count: requiredRows.filter((row) => row.production_ready).length,
+    dom_diagnosis_accepted_count: requiredRows.filter((row) => row.dom_diagnosis?.accepted).length,
+    active_speaker_ready_count: requiredRows.filter((row) => row.dom_diagnosis?.active_speaker_matched).length,
+    meeting_end_ready_count: requiredRows.filter((row) => row.dom_diagnosis?.meeting_ended).length,
     failed_count: requiredRows.filter((row) => row.status === 'failed' || row.status === 'missing').length,
     missing_platforms: requiredRows.filter((row) => row.status === 'missing').map((row) => row.platform),
     rows: requiredRows,
     all_rows: rows,
     evaluations,
-    next_actions: unique(requiredRows.flatMap((row) => row.next_actions)),
+    next_actions: unique(requiredRows.flatMap((row) => [
+      ...(row.next_actions ?? []),
+      ...(row.dom_diagnosis?.next_actions ?? []),
+    ])),
   };
 }
 
@@ -207,7 +242,7 @@ try {
   } else {
     console.log(`meeting_app_evidence_matrix | ok=${boolLabel(summary.ok)} | production_ready=${boolLabel(summary.production_ready)} | files=${summary.evaluated_file_count}/${summary.evidence_file_count}`);
     for (const row of summary.rows) {
-      console.log(`${row.platform}: status=${row.status} production_ready=${boolLabel(row.production_ready)} evidence=${row.evidence_level}/${row.evidence_count} file=${row.source_file ?? '-'}`);
+      console.log(`${row.platform}: status=${row.status} production_ready=${boolLabel(row.production_ready)} observer=${boolLabel(row.dom_diagnosis?.accepted)} speaker=${boolLabel(row.dom_diagnosis?.active_speaker_matched)} end=${boolLabel(row.dom_diagnosis?.meeting_ended)} evidence=${row.evidence_level}/${row.evidence_count} file=${row.source_file ?? '-'}`);
     }
     if (summary.next_actions.length > 0) console.log(`next_actions=${summary.next_actions.join(',')}`);
   }

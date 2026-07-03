@@ -105,6 +105,7 @@ import type {
   MeetingAppDeploymentManifestAcceptanceReport,
   MeetingAppDeploymentManifestAcceptanceSummary,
   MeetingAppDomAdaptationDiagnosis,
+  MeetingAppDomAdaptationDiagnosisMatrix,
   MeetingAppIntegrationMatrix,
   MeetingAppIntegrationProfile,
   MeetingAppIntegrationProfileOptions,
@@ -278,6 +279,7 @@ export interface MeetingPlatformTimelineKit {
   meetingAppLiveEvidencePackageSummary(input?: MeetingAppLiveEvidencePackage | Record<string, unknown> | unknown[], evidenceOptions?: MeetingAppIntegrationProfileOptions): MeetingAppLiveEvidencePackageSummary;
   meetingAppDomAdaptationDiagnosis(platformOrInput?: string | MeetingAppIntegrationProfileOptions | Record<string, unknown> | unknown[], diagnosisOptions?: MeetingAppIntegrationProfileOptions): MeetingAppDomAdaptationDiagnosis;
   allMeetingAppDomAdaptationDiagnoses(diagnosisOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppDomAdaptationDiagnosis>>;
+  meetingAppDomAdaptationDiagnosisMatrix(diagnosisOptions?: MeetingAppIntegrationProfileOptions): MeetingAppDomAdaptationDiagnosisMatrix;
   meetingAppRuntimeAdapterConfig(platform: string, configOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterConfig;
   meetingAppLiveSnapshotCapturePlan(platform: string, planOptions?: MeetingAppIntegrationProfileOptions): MeetingAppLiveSnapshotCapturePlan;
   allMeetingAppLiveSnapshotCapturePlans(planOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppLiveSnapshotCapturePlan>>;
