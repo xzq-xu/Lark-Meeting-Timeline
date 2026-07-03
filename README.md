@@ -23,6 +23,17 @@
 
 SDK 后续跨 Google Meet、Microsoft Teams、Zoom 等会议软件的适配方案见 [多会议平台时间轴适配方案](docs/meeting-platform-adapters.md)。
 
+如果要在真实 Google Meet / Microsoft Teams / Zoom / Webex / Lark 网页上采样 DOM 证据，先导出会议应用浏览器扩展：
+
+```bash
+npm run meeting-app:extension
+cd data/meeting-app-extension
+npm install
+npm run build
+```
+
+然后在 `chrome://extensions` 或 `edge://extensions` 打开开发者模式，选择 `data/meeting-app-extension` 作为 unpacked extension。进入真实会议页面后，可在 DevTools 里调用 `window.__meetingTimelineLiveCapture.captureActive()`、`captureEnded()`、`evidencePackage()` 或 `diagnose()`，把真实页面的 active speaker、结束态和 DOM 适配问题变成 SDK 可验收的数据，而不是依赖 demo 模拟。
+
 ## 启动
 
 ```bash
