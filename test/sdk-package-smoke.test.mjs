@@ -51,6 +51,8 @@ assert.equal(packedFiles.includes('adapters/platform-real-intake.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-real-intake.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-field-intake.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-field-intake.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-handoff-readiness.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-handoff-readiness.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.d.ts'), true);
 assert.equal(packedFiles.includes('README.md'), true);
@@ -142,6 +144,10 @@ import {
   buildMeetingPlatformFieldIntakeMatrix,
   buildMeetingPlatformFieldIntakePlan,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake';
+import {
+  buildMeetingPlatformHandoffReadiness,
+  buildMeetingPlatformHandoffReadinessMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness';
 import {
   buildMeetingPlatformFieldCaptureManifest,
   buildMeetingPlatformFieldCollectorConfig,
@@ -314,6 +320,13 @@ assert.equal(buildMeetingPlatformFieldIntakeMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet', 'zoom'],
 }).platform_count, 2);
+assert.equal(buildMeetingPlatformHandoffReadiness('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).schema, 'meeting_platform_handoff_readiness');
+assert.equal(buildMeetingPlatformHandoffReadinessMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+}).platform_count, 1);
 
 const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {
   providerRecords: [],
@@ -356,6 +369,8 @@ assert.equal(kit.platformFieldEvidenceBundle('google-meet', evidencePackage, {
 }).field_capture_plan.schema, 'meeting_platform_field_capture_plan');
 assert.equal(kit.platformFieldIntakePlan('google-meet').schema, 'meeting_platform_field_intake_plan');
 assert.equal(kit.platformFieldIntakeMatrix({ platforms: ['zoom'] }).platform_count, 1);
+assert.equal(kit.platformHandoffReadiness('google-meet').schema, 'meeting_platform_handoff_readiness');
+assert.equal(kit.platformHandoffReadinessMatrix({ platforms: ['zoom'] }).platform_count, 1);
 assert.equal(buildMeetingAppDomAdaptationDiagnosisMatrix({
   platforms: ['google-meet'],
 }).schema, 'meeting_app_dom_adaptation_diagnosis_matrix');

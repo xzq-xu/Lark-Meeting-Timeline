@@ -98,6 +98,11 @@ import type {
   MeetingPlatformFieldIntakeOptions,
   MeetingPlatformFieldIntakePlan,
 } from './platform-field-intake.mjs';
+import type {
+  MeetingPlatformHandoffReadiness,
+  MeetingPlatformHandoffReadinessMatrix,
+  MeetingPlatformHandoffReadinessOptions,
+} from './platform-handoff-readiness.mjs';
 import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type {
@@ -264,6 +269,10 @@ export interface MeetingPlatformTimelineKit {
   platformFieldEvidenceMatrix(matrixOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldEvidenceMatrix;
   platformFieldIntakePlan(platform: string, intakeOptions?: MeetingPlatformFieldIntakeOptions): MeetingPlatformFieldIntakePlan;
   platformFieldIntakeMatrix(intakeOptions?: MeetingPlatformFieldIntakeOptions): MeetingPlatformFieldIntakeMatrix;
+  platformHandoffReadiness(platform: string, input?: MeetingPlatformHandoffReadinessOptions, readinessOptions?: MeetingPlatformHandoffReadinessOptions): MeetingPlatformHandoffReadiness;
+  platformHandoffReadinessMatrix(input?: MeetingPlatformHandoffReadinessOptions, readinessOptions?: MeetingPlatformHandoffReadinessOptions): MeetingPlatformHandoffReadinessMatrix;
+  assertPlatformHandoffReadiness(platform: string, input?: MeetingPlatformHandoffReadinessOptions, readinessOptions?: MeetingPlatformHandoffReadinessOptions): MeetingPlatformHandoffReadiness;
+  assertPlatformHandoffReadinessMatrix(input?: MeetingPlatformHandoffReadinessOptions, readinessOptions?: MeetingPlatformHandoffReadinessOptions): MeetingPlatformHandoffReadinessMatrix;
   meetingAppSnapshotRecorder(recorderOptions?: MeetingAppSnapshotRecordOptions): MeetingAppSnapshotRecorder;
   meetingAppGateInputFromRecords(records?: MeetingAppSnapshotRecord[] | MeetingAppSnapshotRecordSet, recordOptions?: MeetingAppSnapshotRecordOptions): Record<string, unknown>;
   meetingAppIntegrationProfile(platform: string, profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppIntegrationProfile;

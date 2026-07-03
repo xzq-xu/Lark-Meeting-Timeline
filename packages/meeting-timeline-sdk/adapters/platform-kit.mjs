@@ -136,6 +136,12 @@ import {
   buildMeetingPlatformFieldIntakePlan,
 } from './platform-field-intake.mjs';
 import {
+  assertMeetingPlatformHandoffReadiness,
+  assertMeetingPlatformHandoffReadinessMatrix,
+  buildMeetingPlatformHandoffReadiness,
+  buildMeetingPlatformHandoffReadinessMatrix,
+} from './platform-handoff-readiness.mjs';
+import {
   assertAllMeetingAppLaunchGates,
   assertMeetingAppLaunchGate,
   buildMeetingAppLaunchGate,
@@ -318,6 +324,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_field_capture_manifest_matrix: buildMeetingPlatformFieldCaptureManifestMatrix(options),
     platform_field_collector_config_matrix: buildMeetingPlatformFieldCollectorConfigMatrix(options),
     platform_field_intake_matrix: buildMeetingPlatformFieldIntakeMatrix(options),
+    platform_handoff_readiness_matrix: buildMeetingPlatformHandoffReadinessMatrix(options),
   };
 }
 
@@ -603,6 +610,18 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformFieldIntakeMatrix(intakeOptions = {}) {
       return buildMeetingPlatformFieldIntakeMatrix(withDefaults(defaults, intakeOptions));
+    },
+    platformHandoffReadiness(platform, input = {}, readinessOptions = {}) {
+      return buildMeetingPlatformHandoffReadiness(platform, input, withDefaults(defaults, readinessOptions));
+    },
+    platformHandoffReadinessMatrix(input = {}, readinessOptions = {}) {
+      return buildMeetingPlatformHandoffReadinessMatrix(input, withDefaults(defaults, readinessOptions));
+    },
+    assertPlatformHandoffReadiness(platform, input = {}, readinessOptions = {}) {
+      return assertMeetingPlatformHandoffReadiness(platform, input, withDefaults(defaults, readinessOptions));
+    },
+    assertPlatformHandoffReadinessMatrix(input = {}, readinessOptions = {}) {
+      return assertMeetingPlatformHandoffReadinessMatrix(input, withDefaults(defaults, readinessOptions));
     },
     meetingAppSnapshotRecorder(recorderOptions = {}) {
       return createMeetingAppSnapshotRecorder(withDefaults(defaults, recorderOptions));

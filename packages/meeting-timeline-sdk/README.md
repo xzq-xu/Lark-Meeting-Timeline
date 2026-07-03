@@ -132,6 +132,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-host-integration`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures`
@@ -366,6 +367,38 @@ npm run meeting-platform:field-intake -- \
 ```
 
 这一步输出的是“采样前执行单”，不是生产验收；最终仍要跑 `meeting-platform:real-intake` 或 `platform-live-adapter` readiness。
+
+给其他项目交付时，建议在 evidence package 生成后再跑一层 `platform-handoff-readiness`。它把 adapter contract、provider connection、DOM 诊断、field intake、real-intake gate 和 live adapter readiness 合成一个状态：`needs_local_observer_evidence`、`pilot_ready_provider_setup_pending`、`pilot_ready_provider_reconcile_pending` 或 `production_ready`。这个对象适合给宿主项目做接入面板：它不要求读完整 runbook，但能直接回答“Google Meet / Teams / Zoom / Webex / Lark 现在能不能接入，缺什么，下一条命令是什么”。
+
+```js
+import {
+  buildMeetingPlatformHandoffReadinessMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness';
+
+const matrix = buildMeetingPlatformHandoffReadinessMatrix({
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+  google_meet: {
+    evidencePackage: googleEvidencePackage,
+  },
+}, {
+  baseUrl: 'https://timeline.example.com',
+  env: process.env,
+  target: 'production',
+});
+
+// matrix.rows 每行都有 handoff_ready / pilot_ready / production_ready，
+// 以及 provider_missing_env、dom_record_count、next_actions。
+```
+
+CLI 入口：
+
+```sh
+npm run meeting-platform:handoff-readiness -- \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --package-dir=data/meeting-platform-evidence-packages \
+  --report-file=data/meeting-platform-handoff-readiness-report.json
+```
 
 ```sh
 npm run meeting-platform:field-manifest -- \
