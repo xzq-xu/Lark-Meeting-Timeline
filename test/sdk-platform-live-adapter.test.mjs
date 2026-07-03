@@ -136,9 +136,75 @@ const inserted = await adapter.insertAnnotation({
   kind: 'question',
 });
 assert.equal(inserted.action, 'insert_annotation');
+assert.equal(inserted.result.mode, 'realtime_annotation_pipeline');
+assert.equal(inserted.result.status, 'ready_to_insert');
+assert.equal(inserted.result.pipeline.status, 'ready_to_insert');
+assert.equal(inserted.result.pipeline.selected_meeting.meeting_id, 'abc-defg-hij');
 assert.equal(calls.at(-1).method, 'insertMark');
 assert.equal(calls.at(-1).input.id, 'why-mark-1');
+assert.equal(calls.at(-1).input.time_ms, 10_000);
 assert.equal(inserted.live_evidence.can_insert_realtime_marks, true);
+
+const beforeStrictClockInsertCount = calls.length;
+const strictClockBlocked = await adapter.insertAnnotation({
+  id: 'strict-clock-note',
+  capturedAtMs: startMs + 11_000,
+  label: 'strict clock',
+}, {
+  requireClockSync: true,
+});
+assert.equal(strictClockBlocked.result.status, 'needs_clock_sync');
+assert.equal(strictClockBlocked.result.pipeline.accepted_for_realtime, false);
+assert.equal(calls.length, beforeStrictClockInsertCount);
+
+const routedCalls = [];
+const routedClient = {
+  async startMeeting(input) {
+    routedCalls.push({ method: 'startMeeting', input });
+    return { ok: true, input };
+  },
+  async endMeeting(input) {
+    routedCalls.push({ method: 'endMeeting', input });
+    return { ok: true, input };
+  },
+  async insertMark(input, options) {
+    routedCalls.push({ method: 'insertMark', input, options });
+    return { ok: true, input };
+  },
+  async insertMarks(input, options) {
+    routedCalls.push({ method: 'insertMarks', input, options });
+    return { ok: true, input };
+  },
+};
+const routedAdapter = createMeetingPlatformLiveAdapter('zoom', routedClient, {
+  id: 'zoom-route-from-local-observer-test',
+  baseUrl,
+});
+const routedAnnotation = await routedAdapter.insertAnnotation({
+  id: 'zoom-route-note',
+  capturedAtMs: startMs + 5_000,
+  label: 'follow up',
+  local_observer: {
+    url: 'https://zoom.us/j/987654321',
+    observed_at_ms: startMs,
+  },
+});
+assert.equal(routedAnnotation.result.status, 'start_axis_then_insert');
+assert.deepEqual(routedAnnotation.result.actions, ['start_meeting_session', 'insert_mark']);
+assert.deepEqual(routedCalls.map((call) => call.method), ['startMeeting', 'insertMark']);
+assert.equal(routedCalls[0].input.meeting_id, '987654321');
+assert.equal(routedCalls[1].input.id, 'zoom-route-note');
+assert.equal(routedCalls[1].input.time_ms, 5_000);
+
+const beforePendingCount = routedCalls.length;
+const pendingAnnotation = await routedAdapter.insertAnnotation({
+  id: 'zoom-pending-note',
+  capturedAtMs: startMs + 6_000,
+  label: 'pending without meeting identity',
+});
+assert.equal(pendingAnnotation.result.status, 'pending_real_meeting');
+assert.equal(pendingAnnotation.result.pending_payload.id, 'zoom-pending-note');
+assert.equal(routedCalls.length, beforePendingCount);
 
 const providerStart = await adapter.ingestProvider({
   method: 'POST',

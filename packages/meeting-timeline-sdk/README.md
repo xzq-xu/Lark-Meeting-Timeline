@@ -445,7 +445,7 @@ npm run meeting-platform:field-capture -- \
 
 真实采样交接时，`platform-evidence-correlation` 会检查 provider 事件和本地 DOM 记录是否来自同一场会议。它优先用 meeting id / URL 匹配；没有共享 id 时会退到同平台时间窗口匹配。`verifyMeetingPlatformEvidencePackage()` 默认会要求 correlation 通过，避免把不同会议的 provider 样本和 DOM 样本混成一个 production-ready 包。
 
-业务项目如果要直接接入“会议中边写边标注”，优先用 `platform-live-adapter`。它把本地会议 App 观察、provider webhook 回填、实时标注插入和 evidence session 绑成一个对象；`observeMeetingApp()` 会同时尝试建轴并记录本地证据，`ingestProvider()` 会同时回填 provider 事件并记录 provider 证据，`insertAnnotation()` 会返回当前 live readiness：
+业务项目如果要直接接入“会议中边写边标注”，优先用 `platform-live-adapter`。它把本地会议 App 观察、provider webhook 回填、实时标注插入和 evidence session 绑成一个对象；`observeMeetingApp()` 会同时尝试建轴并记录本地证据，`ingestProvider()` 会同时回填 provider 事件并记录 provider 证据，`insertAnnotation()` 会先走 `platform-realtime-annotation` 决策链，再按 action 执行建轴、插入或 pending。
 
 ```js
 import { createMeetingPlatformLiveAdapter } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter';
@@ -463,8 +463,14 @@ const inserted = await live.insertAnnotation({
   capturedAtMs: Date.now(),
   label: 'why?',
   kind: 'question',
+}, {
+  // 默认允许先用 capturedAtMs 低延迟落轴；量产设备可设为 true，要求先完成 /api/time 校准。
+  requireClockSync: false,
 });
 
+// inserted.result.pipeline.status === 'ready_to_insert' 表示已写入当前轴。
+// inserted.result.pipeline.status === 'start_axis_then_insert' 表示 SDK 已先建轴再写入。
+// inserted.result.pipeline.status === 'pending_real_meeting' 表示缺会议身份，应暂存并等待真实会议绑定。
 // inserted.live_evidence.can_insert_realtime_marks === true 表示当前本地观察足以支撑实时落轴。
 // live.exportPackage() 可在现场采样结束后交给另一个项目复验。
 ```

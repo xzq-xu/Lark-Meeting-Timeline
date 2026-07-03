@@ -17,6 +17,11 @@ import type {
 import type { MeetingPlatformEvidenceCorrelation } from './platform-evidence-correlation.mjs';
 import type { MeetingPlatformAdaptationStrategy } from './platform-strategy.mjs';
 import type { MeetingPlatformAdaptationRunbook } from './platform-rollout.mjs';
+import type {
+  MeetingPlatformRealtimeAnnotation,
+  MeetingPlatformRealtimeAnnotationInput,
+  MeetingPlatformRealtimeAnnotationOptions,
+} from './platform-realtime-annotation.mjs';
 
 export const MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA: string;
 export const MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA_VERSION: number;
@@ -36,6 +41,14 @@ export interface MeetingPlatformLiveAdapterOptions extends MeetingSourceAggregat
   platform_keys?: Iterable<string> | string[];
   captureEvidence?: boolean;
   capture_evidence?: boolean;
+  useRealtimeAnnotationPipeline?: boolean;
+  use_realtime_annotation_pipeline?: boolean;
+  requireClockSync?: boolean;
+  require_clock_sync?: boolean;
+  realtimeAnnotationOptions?: MeetingPlatformRealtimeAnnotationOptions;
+  realtime_annotation_options?: MeetingPlatformRealtimeAnnotationOptions;
+  realtimeAnnotationInput?: MeetingPlatformRealtimeAnnotationInput;
+  realtime_annotation_input?: MeetingPlatformRealtimeAnnotationInput;
 }
 
 export interface MeetingPlatformLiveAdapterReadinessOptions extends MeetingPlatformLiveAdapterOptions {
@@ -62,6 +75,17 @@ export interface MeetingPlatformLiveAdapterResult<T = unknown> {
   evidence_state: MeetingPlatformEvidenceSessionState;
 }
 
+export interface MeetingPlatformLiveAnnotationInsertResult {
+  mode: 'realtime_annotation_pipeline' | 'direct_insert';
+  ok: boolean;
+  status?: string;
+  actions?: string[];
+  pipeline?: MeetingPlatformRealtimeAnnotation;
+  start_result?: unknown;
+  insert_result?: unknown;
+  pending_payload?: Record<string, unknown>;
+}
+
 export interface MeetingPlatformLiveSourceResult extends MeetingSourceResult {
   action: string;
   live_evidence: MeetingPlatformEvidenceSessionSummary;
@@ -85,7 +109,7 @@ export interface MeetingPlatformLiveAdapter {
   ingestSignals(signals?: unknown[] | Record<string, unknown>, options?: MeetingPlatformLiveAdapterOptions): Promise<MeetingPlatformLiveSourceResult>;
   captureMeetingAppSnapshot(input?: Record<string, unknown>, options?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapterResult<Record<string, unknown>>;
   captureProviderWebhook(input?: Record<string, unknown> | string, payload?: unknown, options?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapterResult<Record<string, unknown>>;
-  insertAnnotation(input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<MeetingPlatformLiveAdapterResult<unknown>>;
+  insertAnnotation(input?: Record<string, unknown>, options?: MeetingPlatformLiveAdapterOptions): Promise<MeetingPlatformLiveAdapterResult<MeetingPlatformLiveAnnotationInsertResult>>;
   insertMark(input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<MeetingPlatformLiveAdapterResult<unknown>>;
   insertMarks(inputs?: Record<string, unknown>[], options?: Record<string, unknown>): Promise<MeetingPlatformLiveAdapterResult<unknown>>;
   importTranscript(input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;

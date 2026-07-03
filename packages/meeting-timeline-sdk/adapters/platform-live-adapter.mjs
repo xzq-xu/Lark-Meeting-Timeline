@@ -7,6 +7,7 @@ import {
   buildPlatformIntegrationPlan,
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
+import { buildMeetingPlatformRealtimeAnnotation } from './platform-realtime-annotation.mjs';
 import { buildMeetingPlatformAdaptationRunbook } from './platform-rollout.mjs';
 import { buildMeetingPlatformAdaptationStrategy } from './platform-strategy.mjs';
 
@@ -41,6 +42,10 @@ function uniqueList(values = []) {
   return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
 function matchesPlatform(value, platform) {
   if (!value) return true;
   try {
@@ -72,6 +77,189 @@ function providerPayload(input, payload) {
   return payload;
 }
 
+function boolFlag(options = {}, keys = [], fallback) {
+  const value = firstNonEmpty(...keys.map((key) => options[key]));
+  return value == null ? fallback : value !== false && value !== 'false';
+}
+
+function directMeetingInput(input = {}, options = {}) {
+  return firstNonEmpty(
+    input.current_meeting,
+    input.currentMeeting,
+    input.current_axis,
+    input.currentAxis,
+    input.meeting,
+    options.current_meeting,
+    options.currentMeeting,
+    options.current_axis,
+    options.currentAxis,
+    options.meeting,
+  );
+}
+
+function meetingFromActiveState(platform, source) {
+  const state = typeof source.getState === 'function' ? source.getState() : {};
+  const active = (state.reconciler?.active_meetings ?? [])
+    .filter((meeting) => matchesPlatform(meeting.platform, platform))
+    .at(-1);
+  if (!active) return undefined;
+  return compactObject({
+    platform,
+    meeting_id: active.meeting_id,
+    external_meeting_id: active.external_meeting_id,
+    meeting_url: active.meeting_url,
+    start_time_ms: active.occurred_at_ms,
+    source: active.source,
+    source_event_id: active.source_event_id,
+  });
+}
+
+function stripRoutingFields(input = {}) {
+  const {
+    annotation,
+    mark,
+    item,
+    payload,
+    current_meeting: currentMeetingSnake,
+    currentMeeting,
+    current_axis: currentAxisSnake,
+    currentAxis,
+    meeting,
+    local_observer: localObserverSnake,
+    localObserver,
+    local_observers: localObserversSnake,
+    localObservers,
+    provider_signal: providerSignalSnake,
+    providerSignal,
+    provider_signals: providerSignalsSnake,
+    providerSignals,
+    provider_event: providerEventSnake,
+    providerEvent,
+    provider_events: providerEventsSnake,
+    providerEvents,
+    signal,
+    signals,
+    samples,
+    clock_samples: clockSamplesSnake,
+    clockSamples,
+    time_sync_samples: timeSyncSamplesSnake,
+    timeSyncSamples,
+    clock_sync: clockSyncSnake,
+    clockSync,
+    time_sync: timeSyncSnake,
+    timeSync,
+    ...annotationFields
+  } = input;
+  void annotation;
+  void mark;
+  void item;
+  void payload;
+  void currentMeetingSnake;
+  void currentMeeting;
+  void currentAxisSnake;
+  void currentAxis;
+  void meeting;
+  void localObserverSnake;
+  void localObserver;
+  void localObserversSnake;
+  void localObservers;
+  void providerSignalSnake;
+  void providerSignal;
+  void providerSignalsSnake;
+  void providerSignals;
+  void providerEventSnake;
+  void providerEvent;
+  void providerEventsSnake;
+  void providerEvents;
+  void signal;
+  void signals;
+  void samples;
+  void clockSamplesSnake;
+  void clockSamples;
+  void timeSyncSamplesSnake;
+  void timeSyncSamples;
+  void clockSyncSnake;
+  void clockSync;
+  void timeSyncSnake;
+  void timeSync;
+  return annotationFields;
+}
+
+function annotationPayload(input = {}, platform) {
+  const explicit = firstNonEmpty(input.annotation, input.mark, input.item, input.payload?.annotation);
+  if (isPlainObject(explicit)) {
+    return {
+      platform,
+      ...explicit,
+    };
+  }
+  return {
+    platform,
+    ...stripRoutingFields(input),
+  };
+}
+
+function enrichAnnotationWithMeeting(annotation = {}, meeting = {}) {
+  if (!meeting || Object.keys(meeting).length === 0) return annotation;
+  return compactObject({
+    ...annotation,
+    meeting_id: firstNonEmpty(annotation.meeting_id, annotation.meetingId, annotation.session_id, annotation.sessionId, meeting.meeting_id),
+    external_meeting_id: firstNonEmpty(annotation.external_meeting_id, annotation.externalMeetingId, meeting.external_meeting_id),
+    meeting_url: firstNonEmpty(annotation.meeting_url, annotation.meetingUrl, annotation.url, meeting.meeting_url),
+    meeting_title: firstNonEmpty(annotation.meeting_title, annotation.meetingTitle, meeting.title),
+  });
+}
+
+function realtimeAnnotationOptions(baseOptions = {}, markOptions = {}) {
+  const configured = {
+    ...(baseOptions.realtimeAnnotation ?? {}),
+    ...(baseOptions.realtimeAnnotationOptions ?? {}),
+    ...(baseOptions.realtime_annotation ?? {}),
+    ...(baseOptions.realtime_annotation_options ?? {}),
+    ...(markOptions.realtimeAnnotation ?? {}),
+    ...(markOptions.realtimeAnnotationOptions ?? {}),
+    ...(markOptions.realtime_annotation ?? {}),
+    ...(markOptions.realtime_annotation_options ?? {}),
+  };
+  const requireClockSync = boolFlag({
+    ...baseOptions,
+    ...markOptions,
+    ...configured,
+  }, ['requireClockSync', 'require_clock_sync'], false);
+  return compactObject({
+    ...configured,
+    allowUnsyncedCapturedAtMs: firstNonEmpty(
+      configured.allowUnsyncedCapturedAtMs,
+      configured.allow_unsynced_captured_at_ms,
+      requireClockSync ? false : true,
+    ),
+  });
+}
+
+function realtimeAnnotationInput(platform, source, input = {}, markOptions = {}) {
+  const currentMeeting = directMeetingInput(input, markOptions) ?? meetingFromActiveState(platform, source);
+  const annotation = enrichAnnotationWithMeeting(annotationPayload(input, platform), currentMeeting);
+  const extra = firstNonEmpty(
+    markOptions.realtimeAnnotationInput,
+    markOptions.realtime_annotation_input,
+    input.realtimeAnnotationInput,
+    input.realtime_annotation_input,
+    {},
+  );
+  return compactObject({
+    ...markOptions,
+    ...input,
+    ...extra,
+    platform,
+    annotation,
+    current_meeting: currentMeeting,
+    clock_sync: firstNonEmpty(input.clock_sync, input.clockSync, markOptions.clock_sync, markOptions.clockSync, extra.clock_sync, extra.clockSync),
+    samples: firstNonEmpty(input.samples, markOptions.samples, extra.samples),
+    clock_samples: firstNonEmpty(input.clock_samples, input.clockSamples, markOptions.clock_samples, markOptions.clockSamples, extra.clock_samples, extra.clockSamples),
+    time_sync_samples: firstNonEmpty(input.time_sync_samples, input.timeSyncSamples, markOptions.time_sync_samples, markOptions.timeSyncSamples, extra.time_sync_samples, extra.timeSyncSamples),
+  });
+}
+
 function meetingAppRecordOptions(input = {}, options = {}) {
   return {
     ...options,
@@ -98,6 +286,47 @@ function meetingAppRecordOptions(input = {}, options = {}) {
       input.snapshot?.observed_at_ms,
     ),
   };
+}
+
+async function executeRealtimeAnnotationPipeline(source, platform, input = {}, markOptions = {}, baseOptions = {}) {
+  const usePipeline = boolFlag({
+    ...baseOptions,
+    ...markOptions,
+  }, ['useRealtimeAnnotationPipeline', 'use_realtime_annotation_pipeline'], true);
+  if (!usePipeline) {
+    const direct = await source.insertAnnotation({
+      platform,
+      ...input,
+    }, markOptions);
+    return compactObject({
+      mode: 'direct_insert',
+      ok: true,
+      insert_result: direct,
+    });
+  }
+  const decision = buildMeetingPlatformRealtimeAnnotation(
+    platform,
+    realtimeAnnotationInput(platform, source, input, markOptions),
+    realtimeAnnotationOptions(baseOptions, markOptions),
+  );
+  let startResult;
+  let insertResult;
+  if (decision.actions.includes('start_meeting_session')) {
+    startResult = await source.startMeeting(decision.start_payload);
+  }
+  if (decision.actions.includes('insert_mark')) {
+    insertResult = await source.insertAnnotation(decision.insert_payload, markOptions);
+  }
+  return compactObject({
+    mode: 'realtime_annotation_pipeline',
+    ok: decision.accepted_for_realtime,
+    status: decision.status,
+    actions: decision.actions,
+    pipeline: decision,
+    start_result: startResult,
+    insert_result: insertResult,
+    pending_payload: decision.pending_payload,
+  });
 }
 
 function resultWithEvidence(result = {}, evidenceSession, action, options = {}) {
@@ -708,10 +937,7 @@ export function createMeetingPlatformLiveAdapter(platform, clientOrOptions = {},
       return operationWithEvidence('capture_provider_webhook', record, evidenceSession, captureOptions);
     },
     async insertAnnotation(input = {}, markOptions = {}) {
-      const result = await source.insertAnnotation({
-        platform: key,
-        ...input,
-      }, markOptions);
+      const result = await executeRealtimeAnnotationPipeline(source, key, input, markOptions, options);
       return operationWithEvidence('insert_annotation', result, evidenceSession, markOptions);
     },
     async insertMark(input = {}, markOptions = {}) {
