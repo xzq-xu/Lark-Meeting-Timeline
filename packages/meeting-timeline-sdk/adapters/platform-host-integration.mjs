@@ -10,6 +10,10 @@ import {
 import {
   buildMeetingAppExtensionInstallPlan,
 } from './meeting-app-extension.mjs';
+import {
+  buildMeetingPlatformAdapterContractAcceptanceMatrix,
+  buildMeetingPlatformAdapterContractMatrix,
+} from './platform-adapter-contract.mjs';
 
 export const MEETING_PLATFORM_HOST_INTEGRATION_SCHEMA = 'meeting_platform_host_integration';
 export const MEETING_PLATFORM_HOST_INTEGRATION_SCHEMA_VERSION = 1;
@@ -110,6 +114,18 @@ export function createMeetingPlatformHost(options = {}) {
         platforms: handoffOptions.platforms ?? handoffOptions.platform_keys ?? platforms,
       });
     },
+    adapterContracts(contractOptions = {}) {
+      return kit.platformAdapterContractMatrix({
+        ...contractOptions,
+        platforms: contractOptions.platforms ?? contractOptions.platform_keys ?? platforms,
+      });
+    },
+    adapterContractAcceptance(acceptanceOptions = {}) {
+      return kit.platformAdapterContractAcceptanceMatrix({
+        ...acceptanceOptions,
+        platforms: acceptanceOptions.platforms ?? acceptanceOptions.platform_keys ?? platforms,
+      });
+    },
     adapter(platform, adapterOptions = {}) {
       return liveAdapters.adapter(platform, adapterOptions);
     },
@@ -155,6 +171,12 @@ function routesSource(options = {}) {
   }
   if (url.pathname === '/api/meeting-platform/handoff') {
     return Response.json(host.handoffBundle(options));
+  }
+  if (url.pathname === '/api/meeting-platform/contracts') {
+    return Response.json(host.adapterContracts(options));
+  }
+  if (url.pathname === '/api/meeting-platform/contract-acceptance') {
+    return Response.json(host.adapterContractAcceptance(options));
   }
   return Response.json({ ok: false, error: 'not_found' }, { status: 404 });
 }
@@ -203,6 +225,8 @@ npm run meeting-app:extension:build
 npm run meeting-app:evidence-matrix
 npm run meeting-platform:rollout-matrix
 npm run meeting-platform:live-readiness
+npm run meeting-platform:contracts
+npm run meeting-platform:contract-acceptance
 npm run sdk:package-smoke
 \`\`\`
 `;
@@ -213,6 +237,18 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
   const baseUrl = firstNonEmpty(options.baseUrl, options.base_url, 'http://localhost:8787');
   const basePath = firstNonEmpty(options.basePath, options.base_path, '/api/platform-events');
   const handoff = buildMeetingPlatformLiveAdapterHandoffBundle({
+    ...options,
+    platforms,
+    baseUrl,
+    basePath,
+  });
+  const adapterContractMatrix = buildMeetingPlatformAdapterContractMatrix({
+    ...options,
+    platforms,
+    baseUrl,
+    basePath,
+  });
+  const adapterContractAcceptanceMatrix = buildMeetingPlatformAdapterContractAcceptanceMatrix({
     ...options,
     platforms,
     baseUrl,
@@ -249,6 +285,8 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       annotations: '/api/annotations',
       readiness: '/api/meeting-platform/readiness',
       handoff: '/api/meeting-platform/handoff',
+      adapter_contracts: '/api/meeting-platform/contracts',
+      adapter_contract_acceptance: '/api/meeting-platform/contract-acceptance',
     },
     commands: handoff.commands,
     evidence_paths: handoff.evidence_paths,
@@ -258,8 +296,11 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     ])),
     extension_install_plan: extensionInstallPlan,
     handoff_bundle: handoff,
+    adapter_contract_matrix: adapterContractMatrix,
+    adapter_contract_acceptance_matrix: adapterContractAcceptanceMatrix,
     next_actions: unique([
       ...(handoff.next_actions ?? []),
+      'run_meeting_platform_contract_acceptance_before_enabling_new_platform',
       'wire_host_routes_to_handleMeetingPlatformRequest',
       'capture_real_meeting_app_snapshots_for_each_target_platform',
       'capture_real_provider_events_where_available',
@@ -277,6 +318,8 @@ export function buildMeetingPlatformHostIntegrationScaffold(options = {}) {
     scripts: {
       'meeting-platform:handoff': 'node ./scripts/print-handoff.mjs',
       'meeting-platform:readiness': 'node ./scripts/print-readiness.mjs',
+      'meeting-platform:contracts': 'node ./scripts/print-contracts.mjs',
+      'meeting-platform:contract-acceptance': 'node ./scripts/verify-contracts.mjs',
     },
     dependencies: {
       '@ai-annotation/meeting-timeline-sdk': '^0.1.0',
@@ -298,6 +341,30 @@ const host = createMeetingPlatformHost({
 
 console.log(JSON.stringify(host.liveAdapters.readinessMatrix(), null, 2));
 `;
+  const contractsScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+console.log(JSON.stringify(host.adapterContracts(), null, 2));
+`;
+  const contractAcceptanceScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+const report = host.adapterContractAcceptance({
+  acceptanceTarget: process.env.MEETING_PLATFORM_ACCEPTANCE_TARGET ?? 'contract',
+});
+
+console.log(JSON.stringify(report, null, 2));
+
+if (report.rejected_count > 0) {
+  process.exitCode = 1;
+}
+`;
   return {
     type: 'meeting_platform_host_integration_scaffold',
     schema: MEETING_PLATFORM_HOST_INTEGRATION_SCAFFOLD_SCHEMA,
@@ -311,6 +378,8 @@ console.log(JSON.stringify(host.liveAdapters.readinessMatrix(), null, 2));
       sourceFile('src/http-routes.mjs', routesSource(plan), 'http_routes_source', 'text/javascript'),
       sourceFile('scripts/print-handoff.mjs', handoffScript, 'handoff_script', 'text/javascript'),
       sourceFile('scripts/print-readiness.mjs', readinessScript, 'readiness_script', 'text/javascript'),
+      sourceFile('scripts/print-contracts.mjs', contractsScript, 'adapter_contract_script', 'text/javascript'),
+      sourceFile('scripts/verify-contracts.mjs', contractAcceptanceScript, 'adapter_contract_acceptance_script', 'text/javascript'),
       sourceFile('README.md', readmeSource(plan), 'readme', 'text/markdown'),
     ],
   };
@@ -328,6 +397,8 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     'src/http-routes.mjs',
     'scripts/print-handoff.mjs',
     'scripts/print-readiness.mjs',
+    'scripts/print-contracts.mjs',
+    'scripts/verify-contracts.mjs',
     'README.md',
   ];
   for (const path of requiredFiles) {
@@ -344,11 +415,20 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!host.includes('platformLiveAdapterSuite')) {
     issues.push(issue('error', 'missing_live_adapter_suite', 'Host source must create the live adapter suite.'));
   }
+  if (!host.includes('platformAdapterContractMatrix')) {
+    issues.push(issue('error', 'missing_adapter_contract_matrix', 'Host source must expose the adapter contract matrix.'));
+  }
+  if (!host.includes('platformAdapterContractAcceptanceMatrix')) {
+    issues.push(issue('error', 'missing_adapter_contract_acceptance_matrix', 'Host source must expose the adapter contract acceptance matrix.'));
+  }
   if (!host.includes('capturedAtMs')) {
     issues.push(issue('error', 'missing_captured_at_ms_write', 'Host source must write annotations with capturedAtMs.'));
   }
   if (!routes.includes('handleFetchRequest')) {
     issues.push(issue('error', 'missing_provider_route_handler', 'Route source must forward provider webhooks to the SDK handler.'));
+  }
+  if (!routes.includes('/api/meeting-platform/contracts')) {
+    issues.push(issue('error', 'missing_contract_route', 'Route source must expose the adapter contract matrix endpoint.'));
   }
   if (!readme.includes('captured_at_ms')) {
     issues.push(issue('warning', 'readme_missing_timestamp_contract', 'README should state the captured_at_ms contract.'));

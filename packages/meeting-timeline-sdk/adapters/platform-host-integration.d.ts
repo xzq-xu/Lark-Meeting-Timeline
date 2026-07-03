@@ -32,6 +32,8 @@ export interface MeetingPlatformHostIntegrationPlan {
   integration_plans: Record<string, Record<string, unknown>>;
   extension_install_plan: Record<string, unknown>;
   handoff_bundle: Record<string, unknown>;
+  adapter_contract_matrix: Record<string, unknown>;
+  adapter_contract_acceptance_matrix: Record<string, unknown>;
   next_actions: string[];
 }
 
