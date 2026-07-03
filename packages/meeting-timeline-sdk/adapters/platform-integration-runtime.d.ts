@@ -135,6 +135,30 @@ export interface MeetingPlatformIntegrationBrowserRuntime {
   reset(nextState?: Record<string, unknown>): Record<string, unknown>;
 }
 
+export interface MeetingPlatformIntegrationContentScriptBridge {
+  type: 'meeting_platform_integration_content_script_bridge';
+  schema: typeof MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA;
+  schema_version: typeof MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA_VERSION;
+  runtime: MeetingPlatformIntegrationBrowserRuntime | Record<string, unknown>;
+  integrationRuntime?: MeetingPlatformIntegrationRuntime;
+  integration_runtime?: MeetingPlatformIntegrationRuntime;
+  detect(
+    input?: Record<string, unknown>,
+    detectOptions?: Record<string, unknown>,
+  ): MeetingPlatformBrowserDetection | undefined;
+  dispatchMessage(
+    message?: Record<string, unknown>,
+    messageOptions?: Record<string, unknown>,
+  ): Promise<Record<string, unknown>>;
+  start(startOptions?: Record<string, unknown>): Record<string, unknown>;
+  stop(): Record<string, unknown>;
+  dispose(): Record<string, unknown>;
+  installExtensionMessaging(installOptions?: Record<string, unknown>): Record<string, unknown>;
+  installWindowMessaging(installOptions?: Record<string, unknown>): Record<string, unknown>;
+  removeMessaging(kind?: string): Record<string, unknown>;
+  getState(): Record<string, unknown>;
+}
+
 export function detectMeetingPlatformForBrowser(
   input?: Record<string, unknown>,
   options?: MeetingPlatformIntegrationRuntimeOptions,
@@ -158,3 +182,13 @@ export function createMeetingPlatformIntegrationBrowserRuntime(
   clientOrOptions: MeetingTimelineClient | MeetingPlatformIntegrationRuntimeOptions,
   options?: MeetingPlatformIntegrationRuntimeOptions,
 ): MeetingPlatformIntegrationBrowserRuntime;
+
+export function createMeetingPlatformIntegrationContentScriptBridge(
+  clientOrOptions: MeetingTimelineClient | MeetingPlatformIntegrationRuntimeOptions,
+  options?: MeetingPlatformIntegrationRuntimeOptions,
+): MeetingPlatformIntegrationContentScriptBridge;
+
+export function installMeetingPlatformIntegrationContentScriptBridge(
+  clientOrOptions: MeetingTimelineClient | MeetingPlatformIntegrationRuntimeOptions,
+  options?: MeetingPlatformIntegrationRuntimeOptions,
+): MeetingPlatformIntegrationContentScriptBridge;

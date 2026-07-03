@@ -115,8 +115,10 @@ import {
   assertMeetingPlatformIntegrationRuntimeManifest,
   buildMeetingPlatformIntegrationRuntimeManifest,
   createMeetingPlatformIntegrationBrowserRuntime,
+  createMeetingPlatformIntegrationContentScriptBridge,
   createMeetingPlatformIntegrationRuntime,
   detectMeetingPlatformForBrowser,
+  installMeetingPlatformIntegrationContentScriptBridge,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';
 import {
   assertMeetingPlatformRegistryManifest,
@@ -293,6 +295,13 @@ assert.equal(createMeetingPlatformIntegrationBrowserRuntime(client, {
   platforms: ['google-meet'],
   url: 'https://meet.google.com/abc-defg-hij',
 }).detect().platform, 'google_meet');
+assert.equal(createMeetingPlatformIntegrationContentScriptBridge(client, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+  url: 'https://meet.google.com/abc-defg-hij',
+  extensionMessaging: false,
+}).detect().platform, 'google_meet');
+assert.equal(typeof installMeetingPlatformIntegrationContentScriptBridge, 'function');
 assert.equal(integrationRuntime.timelineView('google-meet', {
   meeting: {
     platform: 'google_meet',

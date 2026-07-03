@@ -229,6 +229,19 @@ await browserRuntime.handleMessage({
 });
 ```
 
+如果注入点就是浏览器扩展 content script，可以直接安装平台版 bridge。它会创建 browser runtime、监听 extension message，并保留平台检测状态，background 或 native host 只需要发送统一的 `meeting_timeline.insert_mark` / `meeting_timeline.sample` 消息：
+
+```js
+import {
+  installMeetingPlatformIntegrationContentScriptBridge,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';
+
+installMeetingPlatformIntegrationContentScriptBridge({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+```
+
 `runtime.manifest()` 只证明 SDK 接线、runtime bundle、`captured_at_ms`、provider/transcript 非阻塞策略已经满足 host handoff；真实会议页 DOM 和官方事件证据仍然要用 `platform-real-intake` / `platform-handoff-readiness` 验收，不能用 runtime manifest 冒充 production ready。
 
 多平台正式接入前，可以先用 `platform-strategy` 输出机器可读策略。它把 Google Meet、Teams、Zoom、Webex、Lark 的共性收敛成同一条原则：实时标注轴由本地观察或 host detector 先建，provider webhook 只做 reconcile/backfill，post-meeting transcript 只做会后导入，不阻塞当前标注：

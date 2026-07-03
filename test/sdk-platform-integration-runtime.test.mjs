@@ -7,8 +7,10 @@ import {
   assertMeetingPlatformIntegrationRuntimeManifest,
   buildMeetingPlatformIntegrationRuntimeManifest,
   createMeetingPlatformIntegrationBrowserRuntime,
+  createMeetingPlatformIntegrationContentScriptBridge,
   createMeetingPlatformIntegrationRuntime,
   detectMeetingPlatformForBrowser,
+  installMeetingPlatformIntegrationContentScriptBridge,
 } from '../packages/meeting-timeline-sdk/adapters/platform-integration-runtime.mjs';
 import { buildPlatformFixtureEvent } from '../packages/meeting-timeline-sdk/adapters/platform-fixtures.mjs';
 
@@ -76,6 +78,37 @@ function fakeWindow(document) {
     },
     listenerCount(eventName) {
       return (listeners.get(eventName) ?? []).length;
+    },
+  };
+}
+
+function fakeExtensionRuntime() {
+  const listeners = [];
+  return {
+    onMessage: {
+      addListener(listener) {
+        listeners.push(listener);
+      },
+      removeListener(listener) {
+        const index = listeners.indexOf(listener);
+        if (index >= 0) listeners.splice(index, 1);
+      },
+    },
+    listenerCount() {
+      return listeners.length;
+    },
+    emit(message, sender = { tab: { id: 1 } }) {
+      if (listeners.length === 0) return Promise.resolve({ consumed: false });
+      return new Promise((resolve) => {
+        let settled = false;
+        const consumed = listeners[0](message, sender, (response) => {
+          settled = true;
+          resolve({ consumed, response });
+        });
+        if (consumed !== true && !settled) {
+          resolve({ consumed, response: undefined });
+        }
+      });
     },
   };
 }
@@ -286,5 +319,52 @@ assert.equal(browserInserted.handled, true);
 assert.equal(browserInserted.result.action, 'insert_annotation');
 assert.equal(calls.some((call) => call.method === 'insertMark' && call.input.id === 'browser-integration-note-1'), true);
 assert.equal(browserRuntime.getState().browser_detection.platform, 'google_meet');
+
+const extensionRuntime = fakeExtensionRuntime();
+const contentBridge = createMeetingPlatformIntegrationContentScriptBridge(client, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom'],
+  window: browserWindow,
+  now: () => browserStartMs,
+  applyOptions: { speakerAsAnnotation: true },
+  speakerOptions: { minStableMs: 0 },
+  extensionRuntime,
+  extensionMessaging: true,
+  windowMessaging: false,
+});
+const contentStart = contentBridge.start({ startRuntime: false });
+assert.equal(contentStart.installs[0].installed, true);
+assert.equal(extensionRuntime.listenerCount(), 1);
+assert.equal(contentBridge.detect().platform, 'google_meet');
+await contentBridge.runtime.sample();
+const extensionResponse = await extensionRuntime.emit({
+  type: 'meeting_timeline.insert_mark',
+  payload: {
+    mark: {
+      id: 'content-bridge-note-1',
+      label: 'what?',
+      captured_at_ms: browserStartMs + 4_000,
+    },
+  },
+});
+assert.equal(extensionResponse.consumed, true);
+assert.equal(extensionResponse.response.handled, true);
+assert.equal(extensionResponse.response.result.action, 'insert_annotation');
+assert.equal(calls.some((call) => call.method === 'insertMark' && call.input.id === 'content-bridge-note-1'), true);
+assert.equal(contentBridge.getState().browser_detection.platform, 'google_meet');
+contentBridge.dispose();
+assert.equal(extensionRuntime.listenerCount(), 0);
+
+const installedBridgeRuntime = fakeExtensionRuntime();
+const installedBridge = installMeetingPlatformIntegrationContentScriptBridge(client, {
+  baseUrl,
+  platforms: ['google-meet'],
+  window: browserWindow,
+  extensionRuntime: installedBridgeRuntime,
+  startOptions: { startRuntime: false },
+});
+assert.equal(installedBridgeRuntime.listenerCount(), 1);
+installedBridge.dispose();
+assert.equal(installedBridgeRuntime.listenerCount(), 0);
 
 console.log('ok meeting platform integration runtime');

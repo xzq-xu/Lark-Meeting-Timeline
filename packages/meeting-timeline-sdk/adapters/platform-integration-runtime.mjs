@@ -9,6 +9,7 @@ import {
   meetingAppBrowserInput,
   meetingAppBrowserRuntimePreset,
 } from './meeting-app-browser-runtime.mjs';
+import { createMeetingAppContentScriptBridge } from './meeting-app-content-script.mjs';
 import { createMeetingPlatformTimelineKit } from './platform-kit.mjs';
 import {
   buildMeetingPlatformAdaptationPackageMatrix,
@@ -642,4 +643,45 @@ export function createMeetingPlatformIntegrationBrowserRuntime(clientOrOptions, 
       };
     },
   };
+}
+
+export function createMeetingPlatformIntegrationContentScriptBridge(clientOrOptions, options = {}) {
+  const runtime = options.runtime
+    ?? options.browserRuntime
+    ?? options.browser_runtime
+    ?? createMeetingPlatformIntegrationBrowserRuntime(clientOrOptions, options);
+  const bridge = createMeetingAppContentScriptBridge(clientOrOptions, {
+    ...options,
+    runtime,
+  });
+  const integrationRuntime = runtime.integrationRuntime ?? runtime.integration_runtime;
+
+  return {
+    ...bridge,
+    type: 'meeting_platform_integration_content_script_bridge',
+    schema: MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA,
+    schema_version: MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA_VERSION,
+    runtime,
+    integrationRuntime,
+    integration_runtime: integrationRuntime,
+    detect(input = {}, detectOptions = {}) {
+      return runtime.detect?.(input, detectOptions);
+    },
+    getState() {
+      return {
+        ...bridge.getState(),
+        integration_runtime: integrationRuntime?.getState?.(),
+        browser_detection: runtime.detect?.(),
+      };
+    },
+    dispose() {
+      return bridge.dispose();
+    },
+  };
+}
+
+export function installMeetingPlatformIntegrationContentScriptBridge(clientOrOptions, options = {}) {
+  const bridge = createMeetingPlatformIntegrationContentScriptBridge(clientOrOptions, options);
+  bridge.start(options.startOptions ?? options.start_options ?? {});
+  return bridge;
 }
