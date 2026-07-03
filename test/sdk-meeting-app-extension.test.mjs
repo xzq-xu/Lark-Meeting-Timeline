@@ -77,6 +77,53 @@ function installGeneratedBackground(source) {
   };
 }
 
+function installGeneratedContentScript(source, options = {}) {
+  const originalChrome = globalThis.chrome;
+  const originalLocation = globalThis.location;
+  const originalBridge = globalThis.__meetingTimelineBridge;
+  const sentMessages = [];
+  const bridgeInstalls = [];
+  globalThis.location = {
+    hostname: options.hostname ?? 'meet.google.com',
+    href: options.href ?? 'https://meet.google.com/abc-defg-hij',
+  };
+  globalThis.chrome = {
+    runtime: {
+      sendMessage(message, callback) {
+        sentMessages.push(message);
+        callback?.({ ok: true, echoed_type: message.type, method: message.method });
+      },
+      lastError: undefined,
+    },
+  };
+  const runnableSource = source.replace(/^import .+;\n\n?/, '');
+  const installMeetingAppContentScriptBridge = (client, bridgeOptions) => {
+    const bridge = { client, options: bridgeOptions, installed: true };
+    bridgeInstalls.push(bridge);
+    return bridge;
+  };
+  try {
+    Function('installMeetingAppContentScriptBridge', runnableSource)(installMeetingAppContentScriptBridge);
+  } catch (error) {
+    globalThis.chrome = originalChrome;
+    globalThis.location = originalLocation;
+    if (originalBridge === undefined) delete globalThis.__meetingTimelineBridge;
+    else globalThis.__meetingTimelineBridge = originalBridge;
+    throw error;
+  }
+  assert.equal(bridgeInstalls.length, 1);
+  return {
+    sentMessages,
+    bridge: bridgeInstalls[0],
+    restore() {
+      globalThis.chrome = originalChrome;
+      globalThis.location = originalLocation;
+      if (originalBridge === undefined) delete globalThis.__meetingTimelineBridge;
+      else globalThis.__meetingTimelineBridge = originalBridge;
+    },
+  };
+}
+
 assert.deepEqual(MEETING_APP_EXTENSION_PLATFORM_KEYS, [
   'google_meet',
   'microsoft_teams',
@@ -147,6 +194,40 @@ assert.match(contentScriptSource, /installMeetingAppContentScriptBridge/);
 assert.match(contentScriptSource, /meet\.google\.com/);
 assert.match(contentScriptSource, /teams\.microsoft\.com/);
 assert.match(contentScriptSource, /startRuntime: true/);
+
+const contentScriptRuntime = installGeneratedContentScript(contentScriptSource);
+try {
+  assert.equal(contentScriptRuntime.bridge.options.browser_runtime_preset, 'google_meet');
+  assert.equal(contentScriptRuntime.bridge.options.source, 'meeting_app_extension');
+  assert.equal(contentScriptRuntime.bridge.options.startRuntime, true);
+  assert.equal(globalThis.__meetingTimelineBridge, contentScriptRuntime.bridge);
+  assert.equal(contentScriptRuntime.sentMessages.length, 1);
+  assert.equal(contentScriptRuntime.sentMessages[0].type, 'meeting_timeline.extension_attached');
+  assert.equal(contentScriptRuntime.sentMessages[0].platform, 'google_meet');
+
+  const startResult = await contentScriptRuntime.bridge.client.startMeeting({
+    meeting_id: 'meet-001',
+  });
+  assert.equal(startResult.ok, true);
+  assert.equal(contentScriptRuntime.sentMessages.length, 2);
+  assert.equal(contentScriptRuntime.sentMessages[1].type, 'meeting_timeline.client_call');
+  assert.equal(contentScriptRuntime.sentMessages[1].method, 'startMeeting');
+  assert.equal(contentScriptRuntime.sentMessages[1].platform, 'google_meet');
+  assert.equal(contentScriptRuntime.sentMessages[1].input.meeting_id, 'meet-001');
+} finally {
+  contentScriptRuntime.restore();
+}
+
+const teamsContentScriptRuntime = installGeneratedContentScript(contentScriptSource, {
+  hostname: 'teams.microsoft.com',
+  href: 'https://teams.microsoft.com/l/meetup-join/demo',
+});
+try {
+  assert.equal(teamsContentScriptRuntime.bridge.options.browser_runtime_preset, 'microsoft_teams');
+  assert.equal(teamsContentScriptRuntime.sentMessages[0].platform, 'microsoft_teams');
+} finally {
+  teamsContentScriptRuntime.restore();
+}
 
 const backgroundSource = buildMeetingAppExtensionBackgroundSource({
   baseUrl: 'https://timeline.example.com/',
