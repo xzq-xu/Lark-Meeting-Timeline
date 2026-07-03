@@ -400,7 +400,7 @@ SDK 还导出 `MEETING_PLATFORM_KEYS`、`MEETING_PLATFORM_ALIASES` 和 `normaliz
 
 `GET /api/platform-events/setup` 会返回 Google Meet、Microsoft Teams、Zoom、Webex 的接入 manifest：默认事件类型/资源、endpoint、权限/环境变量要求和操作步骤，同时包含 readiness 诊断，检查 endpoint 是否是 HTTPS/localhost、必需安全环境变量是否已配置。`GET /api/platform-events/:platform/setup` 可按平台返回，并支持用 query 生成订阅 request body，例如 Teams 的 `join_web_url` + `client_state`，Google 的 `target_resource` + `pubsub_topic`，或 Webex 的 `webex_subscription_name` + `webex_secret`。同一接口还会基于 `subscription_expires_at`、`subscription_id`、`subscription_name` 等 query 返回 maintenance 建议，用于 Graph / Workspace Events 订阅续期调度；Zoom/Webex 返回无需短周期续订。
 
-跨平台正式推进时，宿主项目应调用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-rollout` 做统一 gate。它会把官方 provider event gate 和本地会议 App DOM gate 合成一个 `status`：`production_ready` 表示低延迟本地观察和 provider 回填都可用；`realtime_ready_provider_pending` 表示标注可以实时落轴，但 provider 事件仍待接；`provider_ready_collect_local_evidence` 表示官方事件可用但还缺真实会议页 DOM 证据；`needs_live_dom_and_provider_evidence` 表示两条路径都还缺真实样本。这个状态比单独看 setup manifest 更接近上线决策。`platform-strategy` 是 rollout 的产品化读法，适合给宿主应用决定“现在能不能先开 pilot”；`buildMeetingPlatformAdaptationRunbook()` 会进一步给出现场采样步骤：安装 capture runtime、采 active speaker / ended DOM 快照、采 provider start/end 事件、运行本地 DOM gate、运行 provider event gate，最后合成 rollout plan。单场真实会议采样完成后，用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package` 把 provider capture records、本地 DOM record set、rollout plan、handoff 摘要和脱敏环境 key 封成一个可复验交接包；这个包可以交给另一个项目继续接入，也可以作为 pilot/production gate 的审计证据。收到包的一方应调用 `verifyMeetingPlatformEvidencePackage()` 或仓库命令 `npm run meeting-platform:evidence-package` 重新计算 rollout，不直接信任包内旧结论。仓库内的 `npm run meeting-platform:rollout-matrix` 会批量读取 `data/provider-evidence/`、`data/meeting-app-evidence/` 和 `data/meeting-platform-evidence-packages/`，适合做多平台验收看板。
+跨平台正式推进时，宿主项目应调用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-rollout` 做统一 gate。它会把官方 provider event gate 和本地会议 App DOM gate 合成一个 `status`：`production_ready` 表示低延迟本地观察和 provider 回填都可用；`realtime_ready_provider_pending` 表示标注可以实时落轴，但 provider 事件仍待接；`provider_ready_collect_local_evidence` 表示官方事件可用但还缺真实会议页 DOM 证据；`needs_live_dom_and_provider_evidence` 表示两条路径都还缺真实样本。这个状态比单独看 setup manifest 更接近上线决策。`platform-strategy` 是 rollout 的产品化读法，适合给宿主应用决定“现在能不能先开 pilot”；`buildMeetingPlatformAdaptationRunbook()` 会进一步给出现场采样步骤：安装 capture runtime、采 active speaker / ended DOM 快照、采 provider start/end 事件、运行本地 DOM gate、运行 provider event gate，最后合成 rollout plan。单场真实会议采样完成后，用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package` 把 provider capture records、本地 DOM record set、rollout plan、handoff 摘要和脱敏环境 key 封成一个可复验交接包；这个包可以交给另一个项目继续接入，也可以作为 pilot/production gate 的审计证据。包内会带 `platform-evidence-correlation` 结果，用 meeting id / URL 或时间窗口证明 provider 事件和本地 DOM 记录来自同一场会议。收到包的一方应调用 `verifyMeetingPlatformEvidencePackage()` 或仓库命令 `npm run meeting-platform:evidence-package` 重新计算 rollout 和 correlation，不直接信任包内旧结论。仓库内的 `npm run meeting-platform:rollout-matrix` 会批量读取 `data/provider-evidence/`、`data/meeting-app-evidence/` 和 `data/meeting-platform-evidence-packages/`，适合做多平台验收看板。
 
 SDK 包结构建议：
 
@@ -417,6 +417,8 @@ packages/meeting-timeline-sdk/
     platform-ingest.d.ts
     platform-rollout.mjs
     platform-rollout.d.ts
+    platform-evidence-correlation.mjs
+    platform-evidence-correlation.d.ts
     webhook-security.mjs
     webhook-security.d.ts
     transcript.mjs

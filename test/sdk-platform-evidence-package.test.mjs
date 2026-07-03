@@ -16,11 +16,17 @@ const googleEnv = {
 
 function providerRecords(platform) {
   return [
-    capturePlatformWebhookEvent(platform, buildPlatformFixtureEvent(platform, 'meeting_start'), {
+    capturePlatformWebhookEvent(platform, buildPlatformFixtureEvent(platform, 'meeting_start', {
+      startMs: capturedAtMs,
+      durationMs: 120_000,
+    }), {
       capturedAtMs,
       label: `${platform} start`,
     }),
-    capturePlatformWebhookEvent(platform, buildPlatformFixtureEvent(platform, 'meeting_end'), {
+    capturePlatformWebhookEvent(platform, buildPlatformFixtureEvent(platform, 'meeting_end', {
+      startMs: capturedAtMs,
+      durationMs: 120_000,
+    }), {
       capturedAtMs: capturedAtMs + 120_000,
       label: `${platform} end`,
     }),
@@ -69,8 +75,11 @@ assert.equal(googlePackage.provider_records.length, 2);
 assert.equal(googlePackage.meeting_app_record_set.record_count, 2);
 assert.equal(googlePackage.rollout_plan.status, 'production_ready');
 assert.equal(googlePackage.rollout_plan.production_ready, true);
+assert.equal(googlePackage.evidence_correlation.passed, true);
+assert.equal(googlePackage.evidence_correlation.confidence, 'high');
 assert.equal(googlePackage.evidence_summary.provider.evidence_level, 'captured_events');
 assert.equal(googlePackage.evidence_summary.local_dom.evidence_level, 'captured_dom');
+assert.equal(googlePackage.evidence_summary.correlation.passed, true);
 assert.deepEqual(googlePackage.env_summary.configured_keys, [
   'GOOGLE_PUBSUB_OIDC_AUDIENCE',
   'GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL',
@@ -85,6 +94,8 @@ assert.equal(googleSummary.package_id, googlePackage.id);
 assert.equal(googleSummary.production_ready, true);
 assert.equal(googleSummary.provider_record_count, 2);
 assert.equal(googleSummary.meeting_app_record_count, 2);
+assert.equal(googleSummary.correlation_passed, true);
+assert.equal(googleSummary.correlation_confidence, 'high');
 
 const googleVerification = verifyMeetingPlatformEvidencePackage(googlePackage, {
   baseUrl,
@@ -94,6 +105,8 @@ assert.equal(googleVerification.type, 'meeting_platform_evidence_package_verific
 assert.equal(googleVerification.passed, true);
 assert.equal(googleVerification.embedded_plan_matches, true);
 assert.equal(googleVerification.requirement, 'production_ready');
+assert.equal(googleVerification.correlation_required, true);
+assert.equal(googleVerification.correlation_passed, true);
 
 const zoomDomOnly = buildMeetingPlatformEvidencePackage({
   platform: 'zoom',
@@ -123,14 +136,20 @@ const builder = createMeetingPlatformEvidencePackageBuilder('webex', {
 builder.captureProviderWebhook({
   method: 'POST',
   url: `${baseUrl}/api/platform-events/webex`,
-  body: buildPlatformFixtureEvent('webex', 'meeting_start'),
+  body: buildPlatformFixtureEvent('webex', 'meeting_start', {
+    startMs: capturedAtMs,
+    durationMs: 120_000,
+  }),
 }, undefined, {
   capturedAtMs,
 });
 builder.captureProviderWebhook({
   method: 'POST',
   url: `${baseUrl}/api/platform-events/webex`,
-  body: buildPlatformFixtureEvent('webex', 'meeting_end'),
+  body: buildPlatformFixtureEvent('webex', 'meeting_end', {
+    startMs: capturedAtMs,
+    durationMs: 120_000,
+  }),
 }, undefined, {
   capturedAtMs: capturedAtMs + 120_000,
 });
@@ -156,6 +175,7 @@ assert.equal(builder.getState().meeting_app_record_count, 2);
 const webexPackage = builder.exportPackage({ label: 'webex field evidence' });
 assert.equal(webexPackage.platform, 'webex');
 assert.equal(webexPackage.rollout_plan.production_ready, true);
+assert.equal(webexPackage.evidence_correlation.passed, true);
 assert.equal(builder.summary().production_ready, true);
 
 const kit = createMeetingPlatformTimelineKit({ baseUrl, env: googleEnv, verify: false });
@@ -169,5 +189,29 @@ assert.equal(kit.verifyPlatformEvidencePackage(kitPackage).passed, true);
 const kitBuilder = kit.platformEvidencePackageBuilder('google-meet');
 kitBuilder.addProviderRecord(providerRecords('google-meet')[0]);
 assert.equal(kitBuilder.getState().provider_record_count, 1);
+
+const mismatchedPackage = buildMeetingPlatformEvidencePackage('google-meet', {
+  providerRecords: providerRecords('google-meet'),
+  meetingAppRecordSet: meetingAppRecordSet('google-meet'),
+}, {
+  baseUrl,
+  env: googleEnv,
+  createdAtMs: capturedAtMs + 5 * 60 * 60 * 1000,
+  maxClockSkewMs: 1_000,
+});
+mismatchedPackage.meeting_app_record_set.records = mismatchedPackage.meeting_app_record_set.records.map((record) => ({
+  ...record,
+  capturedAtMs: record.capturedAtMs + 3 * 60 * 60 * 1000,
+  captured_at_ms: record.captured_at_ms + 3 * 60 * 60 * 1000,
+}));
+const mismatchedVerification = verifyMeetingPlatformEvidencePackage(mismatchedPackage, {
+  baseUrl,
+  env: googleEnv,
+  maxClockSkewMs: 1_000,
+});
+assert.equal(mismatchedVerification.production_ready, true);
+assert.equal(mismatchedVerification.correlation_passed, false);
+assert.equal(mismatchedVerification.passed, false);
+assert.equal(mismatchedVerification.evidence_correlation.issues.some((item) => item.code === 'time_window_mismatch'), true);
 
 console.log('ok meeting platform evidence package');

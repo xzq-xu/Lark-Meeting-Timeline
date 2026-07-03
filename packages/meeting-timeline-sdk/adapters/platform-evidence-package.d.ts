@@ -1,5 +1,6 @@
 import type { MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type { PlatformCaptureOptions, PlatformCaptureRecord } from './platform-capture.mjs';
+import type { MeetingPlatformEvidenceCorrelation } from './platform-evidence-correlation.mjs';
 import type { MeetingPlatformAdaptationRunbook, MeetingPlatformRolloutOptions, MeetingPlatformRolloutPlan } from './platform-rollout.mjs';
 
 export const MEETING_PLATFORM_EVIDENCE_PACKAGE_SCHEMA: string;
@@ -32,6 +33,10 @@ export interface MeetingPlatformEvidencePackageOptions extends MeetingPlatformRo
   include_runbook?: boolean;
   includeEnvValues?: boolean;
   include_env_values?: boolean;
+  requireCorrelation?: boolean;
+  require_correlation?: boolean;
+  maxClockSkewMs?: number;
+  max_clock_skew_ms?: number;
   notes?: string;
   metadata?: Record<string, unknown>;
   [key: string]: unknown;
@@ -52,6 +57,7 @@ export interface MeetingPlatformEvidencePackage {
   provider_records: PlatformCaptureRecord[] | Record<string, unknown>[];
   provider_samples?: Record<string, unknown[]>;
   meeting_app_record_set?: MeetingAppSnapshotRecordSet | Record<string, unknown>;
+  evidence_correlation?: MeetingPlatformEvidenceCorrelation;
   rollout_plan: MeetingPlatformRolloutPlan;
   runbook?: MeetingPlatformAdaptationRunbook;
   handoff: Record<string, unknown>;
@@ -76,6 +82,9 @@ export interface MeetingPlatformEvidencePackageSummary {
   provider_record_count: number;
   provider_sample_count: number;
   meeting_app_record_count: number;
+  correlation_status?: string;
+  correlation_passed?: boolean;
+  correlation_confidence?: string;
   provider_missing_required_coverage: string[];
   local_dom_missing_required_coverage: string[];
   next_actions: string[];
@@ -96,6 +105,11 @@ export interface MeetingPlatformEvidencePackageVerification {
   provider_record_count: number;
   provider_sample_count: number;
   meeting_app_record_count: number;
+  correlation_required: boolean;
+  correlation_passed: boolean;
+  correlation_status?: string;
+  correlation_confidence?: string;
+  evidence_correlation?: MeetingPlatformEvidenceCorrelation;
   provider_missing_required_coverage: string[];
   local_dom_missing_required_coverage: string[];
   next_actions: string[];

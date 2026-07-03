@@ -23,6 +23,11 @@ import type {
   MeetingPlatformEvidencePackageVerification,
 } from './platform-evidence-package.mjs';
 import type {
+  MeetingPlatformEvidenceCorrelation,
+  MeetingPlatformEvidenceCorrelationInput,
+  MeetingPlatformEvidenceCorrelationOptions,
+} from './platform-evidence-correlation.mjs';
+import type {
   MeetingPlatformAdaptationStrategy,
   MeetingPlatformAdaptationStrategyMatrix,
 } from './platform-strategy.mjs';
@@ -117,6 +122,7 @@ export interface MeetingPlatformTimelineKit {
   platformEvidencePackageSummary(packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, summaryOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageSummary;
   platformEvidencePackageBuilder(platform: string, builderOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageBuilder;
   verifyPlatformEvidencePackage(packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions, verifyOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageVerification;
+  platformEvidenceCorrelation(platform: string, input?: MeetingPlatformEvidenceCorrelationInput, correlationOptions?: MeetingPlatformEvidenceCorrelationOptions): MeetingPlatformEvidenceCorrelation;
   meetingAppSnapshotRecorder(recorderOptions?: MeetingAppSnapshotRecordOptions): MeetingAppSnapshotRecorder;
   meetingAppGateInputFromRecords(records?: MeetingAppSnapshotRecord[] | MeetingAppSnapshotRecordSet, recordOptions?: MeetingAppSnapshotRecordOptions): Record<string, unknown>;
   meetingAppIntegrationProfile(platform: string, profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppIntegrationProfile;

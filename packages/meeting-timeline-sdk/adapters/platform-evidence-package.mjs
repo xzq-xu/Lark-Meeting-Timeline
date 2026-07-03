@@ -8,6 +8,9 @@ import {
   capturePlatformWebhookEvent,
 } from './platform-capture.mjs';
 import {
+  buildMeetingPlatformEvidenceCorrelation,
+} from './platform-evidence-correlation.mjs';
+import {
   buildMeetingPlatformAdaptationRunbook,
   buildMeetingPlatformRolloutPlan,
 } from './platform-rollout.mjs';
@@ -199,11 +202,16 @@ function providerSamplesOption(platform, samples = []) {
   return samples.length > 0 ? { [platform]: samples } : undefined;
 }
 
-function buildEvidenceSummary(rolloutPlan = {}, providerRecords = [], providerSamples = [], meetingAppRecordSet = undefined) {
+function buildEvidenceSummary(rolloutPlan = {}, providerRecords = [], providerSamples = [], meetingAppRecordSet = undefined, evidenceCorrelation = undefined) {
   return compactObject({
     status: rolloutPlan.status,
     production_ready: rolloutPlan.production_ready,
     ready_for_realtime_annotations: rolloutPlan.ready_for_realtime_annotations,
+    correlation: evidenceCorrelation ? {
+      status: evidenceCorrelation.status,
+      passed: evidenceCorrelation.passed,
+      confidence: evidenceCorrelation.confidence,
+    } : undefined,
     provider: {
       record_count: providerRecords.length,
       sample_count: providerSamples.length,
@@ -262,7 +270,11 @@ export function buildMeetingPlatformEvidencePackage(platformOrInput, inputOrOpti
   const runbook = includeRunbook === false
     ? undefined
     : buildMeetingPlatformAdaptationRunbook(key, rolloutOptions);
-  const evidenceSummary = buildEvidenceSummary(rolloutPlan, providerRecords, providerSamples, meetingAppRecordSet);
+  const evidenceCorrelation = buildMeetingPlatformEvidenceCorrelation(key, {
+    providerRecords,
+    meetingAppRecordSet,
+  }, options);
+  const evidenceSummary = buildEvidenceSummary(rolloutPlan, providerRecords, providerSamples, meetingAppRecordSet, evidenceCorrelation);
   return compactObject({
     schema: MEETING_PLATFORM_EVIDENCE_PACKAGE_SCHEMA,
     schema_version: MEETING_PLATFORM_EVIDENCE_PACKAGE_SCHEMA_VERSION,
@@ -282,6 +294,7 @@ export function buildMeetingPlatformEvidencePackage(platformOrInput, inputOrOpti
     provider_records: providerRecords,
     provider_samples: providerSamples.length > 0 ? { [key]: providerSamples } : undefined,
     meeting_app_record_set: meetingAppRecordSet,
+    evidence_correlation: evidenceCorrelation,
     rollout_plan: rolloutPlan,
     runbook,
     handoff: {
@@ -317,6 +330,9 @@ export function buildMeetingPlatformEvidencePackageSummary(packageOrInput, optio
     provider_record_count: pkg.provider_records?.length ?? 0,
     provider_sample_count: Object.values(pkg.provider_samples ?? {}).flat().length,
     meeting_app_record_count: pkg.meeting_app_record_set?.record_count ?? 0,
+    correlation_status: pkg.evidence_correlation?.status,
+    correlation_passed: pkg.evidence_correlation?.passed,
+    correlation_confidence: pkg.evidence_correlation?.confidence,
     provider_missing_required_coverage: plan.provider_events?.missing_required_coverage ?? [],
     local_dom_missing_required_coverage: plan.local_observer?.missing_required_coverage ?? [],
     next_actions: plan.next_actions ?? [],
@@ -352,15 +368,19 @@ export function verifyMeetingPlatformEvidencePackage(packageOrInput, options = {
   const verifiedPlan = verifiedPackage.rollout_plan ?? {};
   const requireProductionReady = options.requireProductionReady !== false
     && options.require_production_ready !== false;
+  const requireCorrelation = options.requireCorrelation !== false
+    && options.require_correlation !== false;
   const passed = requireProductionReady
     ? verifiedPlan.production_ready === true
     : verifiedPlan.ready_for_realtime_annotations === true;
+  const correlationPassed = verifiedPackage.evidence_correlation?.passed !== false;
+  const finalPassed = passed && (!requireCorrelation || correlationPassed);
   const embeddedPlanMatches = embeddedPlan ? statusMatches(embeddedPlan, verifiedPlan) : undefined;
   return compactObject({
     type: 'meeting_platform_evidence_package_verification',
     package_id: verifiedPackage.id,
     platform: verifiedPackage.platform,
-    passed,
+    passed: finalPassed,
     requirement: requireProductionReady ? 'production_ready' : 'ready_for_realtime_annotations',
     status: verifiedPlan.status,
     production_ready: Boolean(verifiedPlan.production_ready),
@@ -371,6 +391,11 @@ export function verifyMeetingPlatformEvidencePackage(packageOrInput, options = {
     provider_record_count: verifiedPackage.provider_records?.length ?? 0,
     provider_sample_count: Object.values(verifiedPackage.provider_samples ?? {}).flat().length,
     meeting_app_record_count: verifiedPackage.meeting_app_record_set?.record_count ?? 0,
+    correlation_required: requireCorrelation,
+    correlation_passed: correlationPassed,
+    correlation_status: verifiedPackage.evidence_correlation?.status,
+    correlation_confidence: verifiedPackage.evidence_correlation?.confidence,
+    evidence_correlation: verifiedPackage.evidence_correlation,
     provider_missing_required_coverage: verifiedPlan.provider_events?.missing_required_coverage ?? [],
     local_dom_missing_required_coverage: verifiedPlan.local_observer?.missing_required_coverage ?? [],
     next_actions: verifiedPlan.next_actions ?? [],

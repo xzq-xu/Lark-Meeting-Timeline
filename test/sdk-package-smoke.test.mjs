@@ -33,6 +33,8 @@ assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-evidence-correlation.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-evidence-correlation.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.d.ts'), true);
 assert.equal(packedFiles.includes('README.md'), true);
@@ -73,6 +75,9 @@ import {
   buildMeetingPlatformAdaptationStrategy,
   buildMeetingPlatformAdaptationStrategyMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-strategy';
+import {
+  buildMeetingPlatformEvidenceCorrelation,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-correlation';
 import {
   buildMeetingPlatformEvidencePackage,
   verifyMeetingPlatformEvidencePackage,
@@ -121,6 +126,7 @@ assert.equal(buildMeetingPlatformAdaptationStrategyMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).rows[0].platform, 'zoom');
+assert.equal(buildMeetingPlatformEvidenceCorrelation('zoom', {}).status, 'single_source');
 
 const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {
   providerRecords: [],

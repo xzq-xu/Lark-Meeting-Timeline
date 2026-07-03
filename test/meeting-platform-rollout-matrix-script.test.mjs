@@ -27,10 +27,16 @@ await mkdir(packageDir, { recursive: true });
 
 function providerRecords(platform) {
   return [
-    capturePlatformWebhookEvent(platform, buildPlatformFixtureEvent(platform, 'meeting_start'), {
+    capturePlatformWebhookEvent(platform, buildPlatformFixtureEvent(platform, 'meeting_start', {
+      startMs: observedAtMs,
+      durationMs: 60_000,
+    }), {
       capturedAtMs: observedAtMs,
     }),
-    capturePlatformWebhookEvent(platform, buildPlatformFixtureEvent(platform, 'meeting_end'), {
+    capturePlatformWebhookEvent(platform, buildPlatformFixtureEvent(platform, 'meeting_end', {
+      startMs: observedAtMs,
+      durationMs: 60_000,
+    }), {
       capturedAtMs: observedAtMs + 60_000,
     }),
   ];

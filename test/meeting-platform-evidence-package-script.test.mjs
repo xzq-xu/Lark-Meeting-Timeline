@@ -23,10 +23,16 @@ await mkdir(inputDir, { recursive: true });
 
 function providerRecords(platform) {
   return [
-    capturePlatformWebhookEvent(platform, buildPlatformFixtureEvent(platform, 'meeting_start'), {
+    capturePlatformWebhookEvent(platform, buildPlatformFixtureEvent(platform, 'meeting_start', {
+      startMs: observedAtMs,
+      durationMs: 90_000,
+    }), {
       capturedAtMs: observedAtMs,
     }),
-    capturePlatformWebhookEvent(platform, buildPlatformFixtureEvent(platform, 'meeting_end'), {
+    capturePlatformWebhookEvent(platform, buildPlatformFixtureEvent(platform, 'meeting_end', {
+      startMs: observedAtMs,
+      durationMs: 90_000,
+    }), {
       capturedAtMs: observedAtMs + 90_000,
     }),
   ];
@@ -104,9 +110,12 @@ assert.equal(report.evaluated_file_count, 2);
 assert.equal(report.passed_count, 1);
 assert.equal(report.production_ready_count, 1);
 assert.equal(report.realtime_ready_count, 2);
+assert.equal(report.correlation_passed_count, 2);
 assert.equal(report.stale_embedded_plan_count, 0);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').passed, true);
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').correlation_status, 'matched');
 assert.equal(report.rows.find((row) => row.platform === 'zoom').passed, false);
+assert.equal(report.rows.find((row) => row.platform === 'zoom').correlation_status, 'single_source');
 assert.equal(report.rows.find((row) => row.platform === 'zoom').ready_for_realtime_annotations, true);
 
 const writtenReport = JSON.parse(await readFile(reportFile, 'utf8'));
