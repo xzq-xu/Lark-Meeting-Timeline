@@ -47,6 +47,8 @@ assert.equal(packedFiles.includes('adapters/platform-subscription-handoff.mjs'),
 assert.equal(packedFiles.includes('adapters/platform-subscription-handoff.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-speaker-track.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-speaker-track.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-participant-track.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-participant-track.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.mjs'), true);
@@ -139,6 +141,11 @@ import {
   buildMeetingPlatformSpeakerTrackMatrix,
   buildMeetingPlatformSpeakerTrackPlan,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-speaker-track';
+import {
+  buildMeetingPlatformParticipantTrack,
+  buildMeetingPlatformParticipantTrackMatrix,
+  buildMeetingPlatformParticipantTrackPlan,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-participant-track';
 import {
   buildMeetingPlatformArtifactHandoff,
   buildMeetingPlatformArtifactHandoffMatrix,
@@ -234,6 +241,21 @@ assert.equal(kit.platformSpeakerTrack('zoom', {
       meeting: { platform: 'zoom', meeting_id: '987654321' },
       occurred_at_ms: 1_782_614_402_000,
       speaker_name: 'Ada',
+    },
+  ],
+}).mark_count, 1);
+assert.equal(kit.platformParticipantTrackPlan('zoom').schema, 'meeting_platform_participant_track_plan');
+assert.equal(kit.platformParticipantTrackMatrix({
+  platforms: ['zoom'],
+}).platform_count, 1);
+assert.equal(kit.platformParticipantTrack('zoom', {
+  signals: [
+    {
+      type: 'participant_joined',
+      meeting: { platform: 'zoom', meeting_id: '987654321' },
+      occurred_at_ms: 1_782_614_400_000,
+      participant_id: 'ada',
+      participant_name: 'Ada',
     },
   ],
 }).mark_count, 1);
@@ -365,6 +387,21 @@ assert.equal(buildMeetingPlatformSpeakerTrack('google-meet', {
     },
   ],
 }).marks[0].intent, 'speaker_track');
+assert.equal(buildMeetingPlatformParticipantTrackPlan('google-meet').transcript_blocks_realtime, false);
+assert.equal(buildMeetingPlatformParticipantTrackMatrix({
+  platforms: ['google-meet'],
+}).provider_blocking_count, 0);
+assert.equal(buildMeetingPlatformParticipantTrack('google-meet', {
+  signals: [
+    {
+      type: 'participant_joined',
+      meeting: { platform: 'google_meet', meeting_id: 'abc-defg-hij' },
+      occurred_at_ms: 1_782_614_400_000,
+      participant_id: 'ada',
+      participant_name: 'Ada',
+    },
+  ],
+}).marks[0].intent, 'participant_track');
 assert.equal(buildMeetingPlatformArtifactHandoffPlan('google-meet').transcript_blocks_realtime, false);
 assert.equal(buildMeetingPlatformArtifactHandoffMatrix({
   platforms: ['google-meet'],

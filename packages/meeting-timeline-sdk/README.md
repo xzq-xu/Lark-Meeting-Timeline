@@ -133,6 +133,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-subscription-handoff`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-speaker-track`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-participant-track`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-artifact-handoff`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness`
@@ -1459,6 +1460,48 @@ npm run meeting-platform:speaker-track -- \
   --samples-file=data/meeting-platform-speaker-samples.json \
   --out-dir=data/meeting-platform-speaker-tracks \
   --report-file=data/meeting-platform-speaker-track-report.json
+```
+
+参会人位置轨用 `platform-participant-track`。它只输出 `participant_track` marks，表示谁在什么时间加入或离开；输入可以是本地 roster snapshots，也可以是平台 adapter 已经归一化的 `participant_joined/participant_left` signals。默认不会把首帧 roster 当成“刚加入”，会过滤短窗口内的重复事件，并抑制短暂断线重连造成的 leave/join 抖动：
+
+```js
+import {
+  buildMeetingPlatformParticipantTrack,
+  buildMeetingPlatformParticipantTrackMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-participant-track';
+
+const matrix = buildMeetingPlatformParticipantTrackMatrix({
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+// matrix.rows[*].provider_events_block_realtime === false
+// matrix.rows[*].source_order[0] === 'local_roster_observer'
+
+const track = buildMeetingPlatformParticipantTrack('google-meet', {
+  snapshots: [
+    {
+      meeting: { platform: 'google_meet', meeting_id: 'abc-defg-hij' },
+      observed_at_ms: Date.now(),
+      participants: [{ id: 'ada', name: 'Ada' }],
+    },
+  ],
+}, {
+  leaveStableMs: 1500,
+  suppressReconnectGapMs: 10000,
+});
+
+// track.marks 可批量 insertMarks() 到会议时间轴的 participant rail。
+// track.diagnostics 会列出 dropped_duplicate_count / suppressed_reconnect_pair_count / pending_leave_count。
+```
+
+对应 CLI：
+
+```sh
+npm run meeting-platform:participant-track -- \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --input=data/meeting-platform-participant-input.json \
+  --out-dir=data/meeting-platform-participant-tracks \
+  --report-file=data/meeting-platform-participant-track-report.json
 ```
 
 ## 会后转写导入

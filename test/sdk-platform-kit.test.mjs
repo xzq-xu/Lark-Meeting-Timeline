@@ -309,6 +309,20 @@ await kit.insertMark({
 assert.equal(calls.at(-1).method, 'insertMark');
 assert.equal(calls.at(-1).input.id, 'kit-mark-1');
 
+assert.equal(kit.platformParticipantTrackPlan('google-meet').schema, 'meeting_platform_participant_track_plan');
+assert.equal(kit.platformParticipantTrackMatrix({ platforms: ['google-meet', 'zoom'] }).platform_count, 2);
+assert.equal(kit.platformParticipantTrack('google-meet', {
+  signals: [
+    {
+      type: 'participant_joined',
+      meeting: { platform: 'google_meet', meeting_id: 'abc-defg-hij' },
+      occurred_at_ms: 1_782_614_400_000,
+      participant_id: 'ada',
+      participant_name: 'Ada',
+    },
+  ],
+}).marks[0].intent, 'participant_track');
+
 const kitState = kit.getState();
 assert.equal(kitState.bridge.signal_reconciler.active_meetings.length, 0);
 assert.equal(kitState.webhook_router.active_meetings.length, 1);
@@ -357,6 +371,9 @@ assert.equal(report.platform_host_integration_acceptance.scaffold.files.some((fi
 assert.equal(report.platform_provider_connection_matrix.platform_count, 6);
 assert.equal(report.platform_provider_connection_matrix.rows.some((row) => row.platform === 'google_meet'), true);
 assert.equal(report.platform_provider_connection_matrix.rows.find((row) => row.platform === 'google_meet').docs.some((url) => url.includes('developers.google.com')), true);
+assert.equal(report.platform_participant_track_matrix.platform_count, 6);
+assert.equal(report.platform_participant_track_matrix.provider_blocking_count, 0);
+assert.equal(report.platform_participant_track_matrix.rows.some((row) => row.platform === 'google_meet'), true);
 assert.equal(report.platform_adapter_contract_matrix.platform_count, 6);
 assert.equal(report.platform_adapter_contract_matrix.rows.some((row) => row.platform === 'google_meet'), true);
 assert.equal(report.platform_adapter_contract_matrix.rows.find((row) => row.platform === 'google_meet').browser_observer, true);
