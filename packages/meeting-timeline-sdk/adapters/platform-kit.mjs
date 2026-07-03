@@ -62,12 +62,16 @@ import {
 import {
   assertMeetingAppRuntimeAdapterConfig,
   assertMeetingAppRuntimeAdapterValidation,
+  assertMeetingAppDeploymentManifest,
+  buildAllMeetingAppDeploymentManifestAcceptanceReports,
   buildAllMeetingAppDeploymentManifests,
   buildAllMeetingAppIntegrationProfiles,
   buildAllMeetingAppLiveSnapshotCapturePlans,
   buildAllMeetingAppRuntimeAdapterAcceptanceReports,
   buildAllMeetingAppRuntimeAdapterConfigs,
   buildAllMeetingAppRuntimeAdapterValidationReports,
+  buildMeetingAppDeploymentManifestAcceptanceReport,
+  buildMeetingAppDeploymentManifestAcceptanceSummary,
   buildMeetingAppDeploymentManifest,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
@@ -197,6 +201,8 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_extension_acceptance: buildMeetingAppExtensionScaffoldAcceptanceReport(options),
     meeting_app_integration_matrix: buildMeetingAppIntegrationMatrix(options),
     meeting_app_deployment_manifests: buildAllMeetingAppDeploymentManifests(options),
+    meeting_app_deployment_manifest_acceptance: buildAllMeetingAppDeploymentManifestAcceptanceReports(options),
+    meeting_app_deployment_manifest_acceptance_summary: buildMeetingAppDeploymentManifestAcceptanceSummary(options),
     meeting_app_runtime_adapter_configs: buildAllMeetingAppRuntimeAdapterConfigs(options),
     meeting_app_runtime_adapter_acceptance: buildAllMeetingAppRuntimeAdapterAcceptanceReports(options),
     meeting_app_live_snapshot_capture_plans: buildAllMeetingAppLiveSnapshotCapturePlans(options),
@@ -312,6 +318,18 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     allMeetingAppDeploymentManifests(manifestOptions = {}) {
       return buildAllMeetingAppDeploymentManifests(withDefaults(defaults, manifestOptions));
+    },
+    meetingAppDeploymentManifestAcceptance(manifestOrPlatform = {}, acceptanceOptions = {}) {
+      return buildMeetingAppDeploymentManifestAcceptanceReport(manifestOrPlatform, withDefaults(defaults, acceptanceOptions));
+    },
+    allMeetingAppDeploymentManifestAcceptanceReports(acceptanceOptions = {}) {
+      return buildAllMeetingAppDeploymentManifestAcceptanceReports(withDefaults(defaults, acceptanceOptions));
+    },
+    meetingAppDeploymentManifestAcceptanceSummary(acceptanceOptions = {}) {
+      return buildMeetingAppDeploymentManifestAcceptanceSummary(withDefaults(defaults, acceptanceOptions));
+    },
+    assertMeetingAppDeploymentManifest(manifestOrPlatform = {}, acceptanceOptions = {}) {
+      return assertMeetingAppDeploymentManifest(manifestOrPlatform, withDefaults(defaults, acceptanceOptions));
     },
     meetingAppRuntimeAdapterConfig(platform, configOptions = {}) {
       return buildMeetingAppRuntimeAdapterConfig(platform, withDefaults(defaults, configOptions));

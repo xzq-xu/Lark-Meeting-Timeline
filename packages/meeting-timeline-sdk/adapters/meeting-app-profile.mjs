@@ -148,6 +148,11 @@ function runtimeConfigFromInput(configOrPlatform = {}, options = {}) {
   return buildMeetingAppRuntimeAdapterConfig(configOrPlatform, options);
 }
 
+function deploymentManifestFromInput(manifestOrPlatform = {}, options = {}) {
+  if (manifestOrPlatform?.type === 'meeting_app_deployment_manifest') return manifestOrPlatform;
+  return buildMeetingAppDeploymentManifest(manifestOrPlatform, options);
+}
+
 function launchGateOptions(options = {}) {
   return {
     allowFixtureProduction: true,
@@ -710,6 +715,281 @@ export function buildAllMeetingAppDeploymentManifests(options = {}) {
     platform,
     buildMeetingAppDeploymentManifest(platform, options),
   ]));
+}
+
+export function buildMeetingAppDeploymentManifestAcceptanceReport(manifestOrPlatform = {}, options = {}) {
+  let manifest;
+  const issues = [];
+  try {
+    manifest = deploymentManifestFromInput(manifestOrPlatform, options);
+  } catch (error) {
+    return {
+      type: 'meeting_app_deployment_manifest_acceptance_report',
+      schema: MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA,
+      version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+      accepted: false,
+      production_ready: false,
+      platform: manifestOrPlatform?.platform,
+      manifest: manifestOrPlatform,
+      coverage: {},
+      issues: [issue('error', 'manifest_build_failed', 'Deployment manifest could not be built.', {
+        error: String(error?.message ?? error),
+      })],
+    };
+  }
+
+  let platform;
+  try {
+    platform = normalizeAppPlatform(manifest.platform);
+  } catch (error) {
+    issues.push(issue('error', 'unsupported_platform', 'Deployment manifest platform is unsupported.', {
+      platform: manifest.platform,
+      error: String(error?.message ?? error),
+    }));
+  }
+
+  if (manifest.type !== 'meeting_app_deployment_manifest') {
+    issues.push(issue('error', 'invalid_type', 'Deployment manifest type must be meeting_app_deployment_manifest.', {
+      actual: manifest.type,
+    }));
+  }
+  if (manifest.schema !== MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA) {
+    issues.push(issue('error', 'invalid_schema', 'Deployment manifest schema is invalid.', {
+      actual: manifest.schema,
+      expected: MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA,
+    }));
+  }
+
+  const platformMismatch = (source, value) => {
+    if (!platform || !value) return;
+    try {
+      const normalized = normalizeAppPlatform(value);
+      if (normalized !== platform) {
+        issues.push(issue('error', `${source}_platform_mismatch`, `${source} platform must match manifest platform.`, {
+          expected: platform,
+          actual: normalized,
+        }));
+      }
+    } catch (error) {
+      issues.push(issue('error', `${source}_unsupported_platform`, `${source} platform is unsupported.`, {
+        actual: value,
+        error: String(error?.message ?? error),
+      }));
+    }
+  };
+
+  if (!manifest.profile) {
+    issues.push(issue('error', 'missing_profile', 'Deployment manifest is missing profile.'));
+  } else {
+    if (manifest.profile.type !== 'meeting_app_integration_profile') {
+      issues.push(issue('error', 'invalid_profile_type', 'Deployment manifest profile type is invalid.', {
+        actual: manifest.profile.type,
+      }));
+    }
+    platformMismatch('profile', manifest.profile.platform);
+  }
+
+  let runtimeAcceptance = null;
+  if (!manifest.runtime_config) {
+    issues.push(issue('error', 'missing_runtime_config', 'Deployment manifest is missing runtime_config.'));
+  } else {
+    platformMismatch('runtime_config', manifest.runtime_config.platform);
+    runtimeAcceptance = buildMeetingAppRuntimeAdapterAcceptanceReport(manifest.runtime_config, options);
+    issues.push(...sourcedIssues('runtime_config', runtimeAcceptance.issues));
+  }
+
+  const extensionPlan = manifest.extension_install_plan ?? {};
+  if (!manifest.extension_install_plan) {
+    issues.push(issue('error', 'missing_extension_install_plan', 'Deployment manifest is missing extension_install_plan.'));
+  }
+  if (platform && !asArray(extensionPlan.platforms).some((item) => {
+    try {
+      return normalizeAppPlatform(item) === platform;
+    } catch {
+      return false;
+    }
+  })) {
+    issues.push(issue('error', 'extension_platform_missing', 'Extension install plan does not include the manifest platform.', {
+      platform,
+      platforms: extensionPlan.platforms,
+    }));
+  }
+  if (asArray(extensionPlan.matches).length === 0) {
+    issues.push(issue('error', 'missing_extension_matches', 'Deployment manifest extension install plan has no matches.'));
+  }
+  if (asArray(extensionPlan.host_permissions).length === 0) {
+    issues.push(issue('error', 'missing_extension_host_permissions', 'Deployment manifest extension install plan has no host permissions.'));
+  }
+  if (asArray(extensionPlan.host_permissions).includes('<all_urls>')) {
+    issues.push(issue('error', 'overbroad_host_permission', 'Deployment manifest must not request <all_urls>.'));
+  }
+  if (!extensionPlan.content_script_adapter || !extensionPlan.browser_runtime_adapter) {
+    issues.push(issue('error', 'missing_extension_adapters', 'Deployment manifest extension install plan is missing SDK adapters.'));
+  }
+
+  const capturePlan = manifest.live_snapshot_capture_plan ?? {};
+  if (!manifest.live_snapshot_capture_plan) {
+    issues.push(issue('error', 'missing_live_snapshot_capture_plan', 'Deployment manifest is missing live_snapshot_capture_plan.'));
+  } else {
+    platformMismatch('live_snapshot_capture_plan', capturePlan.platform);
+  }
+  const requiredSnapshots = asArray(capturePlan.required_snapshots);
+  const requiredSnapshotIds = requiredSnapshots.map((item) => item?.id);
+  if (requiredSnapshots.length === 0) {
+    issues.push(issue('error', 'missing_required_snapshots', 'Live snapshot capture plan has no required snapshots.'));
+  }
+  if (!requiredSnapshotIds.includes('active_speaker')) {
+    issues.push(issue('error', 'missing_active_speaker_snapshot', 'Live snapshot capture plan must require an active_speaker snapshot.'));
+  }
+  const requireMeetingEnd = options.requireMeetingEnd !== false
+    && options.require_meeting_end !== false
+    && asArray(capturePlan.validation?.required_coverage).includes('meeting_ended');
+  if (requireMeetingEnd && !requiredSnapshotIds.includes('meeting_ended')) {
+    issues.push(issue('error', 'missing_meeting_ended_snapshot', 'Live snapshot capture plan must require a meeting_ended snapshot.'));
+  }
+  if (Number(capturePlan.minimum_record_count ?? 0) < requiredSnapshots.length) {
+    issues.push(issue('error', 'minimum_record_count_too_low', 'Live snapshot minimum_record_count is lower than required_snapshots length.', {
+      minimum_record_count: capturePlan.minimum_record_count,
+      required_snapshot_count: requiredSnapshots.length,
+    }));
+  }
+
+  const contract = manifest.runtime_contract ?? {};
+  const requiredSignals = asArray(contract.required_signals);
+  if (contract.timestamp_field !== 'captured_at_ms') {
+    issues.push(issue('error', 'invalid_runtime_timestamp_field', 'Runtime contract timestamp_field must be captured_at_ms.', {
+      actual: contract.timestamp_field,
+    }));
+  }
+  for (const signal of ['meeting_started', 'speaker_started', ...(requireMeetingEnd ? ['meeting_ended'] : [])]) {
+    if (!requiredSignals.includes(signal)) {
+      issues.push(issue('error', 'missing_runtime_required_signal', `Runtime contract is missing ${signal}.`, { signal }));
+    }
+  }
+  if (contract.annotation_time_invariant !== 'write_annotations_with_absolute_capture_time_not_meeting_offset') {
+    issues.push(issue('error', 'invalid_annotation_time_invariant', 'Runtime contract must preserve absolute annotation capture time.', {
+      actual: contract.annotation_time_invariant,
+    }));
+  }
+
+  const integrationSurfaces = asArray(manifest.integration_targets).map((item) => item?.surface);
+  if (!integrationSurfaces.includes('chrome_or_edge_extension')) {
+    issues.push(issue('error', 'missing_extension_target', 'Deployment manifest must describe a browser extension integration target.'));
+  }
+  if (!integrationSurfaces.includes('electron_or_embedded_webview')) {
+    issues.push(issue('warning', 'missing_embedded_webview_target', 'Deployment manifest should describe an Electron/WebView integration target.'));
+  }
+  if (!integrationSurfaces.includes('native_desktop_accessibility_observer')) {
+    issues.push(issue('warning', 'missing_native_accessibility_target', 'Deployment manifest should describe a native accessibility observer target.'));
+  }
+
+  const validationReport = manifest.validation_report ?? {};
+  if (!manifest.validation_report) {
+    issues.push(issue('error', 'missing_validation_report', 'Deployment manifest is missing validation_report.'));
+  } else {
+    platformMismatch('validation_report', validationReport.platform);
+  }
+  if (runtimeAcceptance?.accepted === false) {
+    issues.push(issue('error', 'runtime_config_not_accepted', 'Deployment manifest runtime config is not accepted.'));
+  }
+
+  const productionGate = manifest.production_gate ?? {};
+  if (productionGate.requires_captured_dom !== true) {
+    issues.push(issue('error', 'production_gate_must_require_captured_dom', 'Deployment manifest production gate must require captured DOM evidence.'));
+  }
+  if (Number(productionGate.minimum_live_record_count ?? 0) < Number(capturePlan.minimum_record_count ?? 1)) {
+    issues.push(issue('error', 'production_gate_record_count_too_low', 'Production gate minimum live record count is lower than capture plan.', {
+      production_gate_minimum: productionGate.minimum_live_record_count,
+      capture_plan_minimum: capturePlan.minimum_record_count,
+    }));
+  }
+  if (productionGate.production_ready !== validationReport.production_ready) {
+    issues.push(issue('error', 'production_gate_validation_mismatch', 'Production gate production_ready must mirror validation_report.production_ready.', {
+      production_gate: productionGate.production_ready,
+      validation_report: validationReport.production_ready,
+    }));
+  }
+  if (validationReport.production_ready !== true) {
+    issues.push(issue('warning', 'live_dom_not_verified', 'Deployment manifest is handoff-ready but still needs captured DOM snapshots before production.', {
+      evidence_level: validationReport.evidence_level ?? productionGate.evidence_level,
+    }));
+  }
+
+  if (manifest.handoff?.primary_entry !== '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit') {
+    issues.push(issue('error', 'invalid_handoff_primary_entry', 'Deployment manifest handoff must point to platform-kit.', {
+      actual: manifest.handoff?.primary_entry,
+    }));
+  }
+  if (!asArray(manifest.rollout_checklist).includes('pass_runtime_validation_with_production_ready_true')) {
+    issues.push(issue('error', 'missing_rollout_validation_step', 'Rollout checklist must include the runtime validation production gate.'));
+  }
+
+  const accepted = issues.every((item) => item.severity !== 'error');
+  const productionReady = accepted
+    && productionGate.production_ready === true
+    && validationReport.production_ready === true;
+  return {
+    type: 'meeting_app_deployment_manifest_acceptance_report',
+    schema: MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    accepted,
+    production_ready: productionReady,
+    platform,
+    manifest,
+    coverage: {
+      profile: Boolean(manifest.profile),
+      runtime_config: runtimeAcceptance?.accepted === true,
+      extension_install_plan: Boolean(extensionPlan.content_script_adapter && extensionPlan.browser_runtime_adapter),
+      scoped_host_permissions: !asArray(extensionPlan.host_permissions).includes('<all_urls>'),
+      live_snapshot_capture_plan: requiredSnapshots.length > 0,
+      runtime_contract: contract.timestamp_field === 'captured_at_ms',
+      production_gate: productionGate.requires_captured_dom === true,
+      handoff: manifest.handoff?.primary_entry === '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
+      live_dom_verified: validationReport.production_ready === true,
+    },
+    issues,
+  };
+}
+
+export function assertMeetingAppDeploymentManifest(manifestOrPlatform = {}, options = {}) {
+  const report = buildMeetingAppDeploymentManifestAcceptanceReport(manifestOrPlatform, options);
+  if (!report.accepted) {
+    throw new MeetingTimelineSdkError('Meeting app deployment manifest acceptance failed', report);
+  }
+  return report;
+}
+
+export function buildAllMeetingAppDeploymentManifestAcceptanceReports(options = {}) {
+  return Object.fromEntries(platformList(options).map((platform) => [
+    platform,
+    buildMeetingAppDeploymentManifestAcceptanceReport(platform, options),
+  ]));
+}
+
+export function buildMeetingAppDeploymentManifestAcceptanceSummary(options = {}) {
+  const reports = Object.values(buildAllMeetingAppDeploymentManifestAcceptanceReports(options));
+  return {
+    type: 'meeting_app_deployment_manifest_acceptance_summary',
+    schema: MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    accepted: reports.every((report) => report.accepted),
+    production_ready: reports.every((report) => report.production_ready),
+    platform_count: reports.length,
+    accepted_count: reports.filter((report) => report.accepted).length,
+    production_ready_count: reports.filter((report) => report.production_ready).length,
+    rows: reports.map((report) => ({
+      platform: report.platform,
+      accepted: report.accepted,
+      production_ready: report.production_ready,
+      evidence_level: report.manifest?.validation_report?.evidence_level ?? report.manifest?.production_gate?.evidence_level,
+      error_count: report.issues.filter((item) => item.severity === 'error').length,
+      warning_count: report.issues.filter((item) => item.severity === 'warning').length,
+      next_actions: uniqueList([
+        ...(report.manifest?.production_gate?.next_actions ?? []),
+        ...report.issues.map((item) => item.code),
+      ]),
+    })),
+  };
 }
 
 export function buildMeetingAppRuntimeAdapterValidationReport(configOrPlatform = {}, options = {}) {

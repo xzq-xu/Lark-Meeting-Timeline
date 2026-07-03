@@ -501,6 +501,10 @@ const deploymentManifest = meetingKit.meetingAppDeploymentManifest('google-meet'
 // 它集中包含 profile、runtime_config、extension_install_plan、live_snapshot_capture_plan 和 production_gate。
 // Google Meet、Teams、Zoom、Lark/Feishu、Webex 都走同一个结构，只换平台 key。
 
+const manifestAcceptance = meetingKit.meetingAppDeploymentManifestAcceptance(deploymentManifest);
+// manifestAcceptance.accepted === true 表示契约结构完整、可以交付外部项目接入；
+// manifestAcceptance.production_ready === true 才表示已经用真实会议 DOM 快照通过生产 gate。
+
 const runtimeConfig = meetingKit.meetingAppRuntimeAdapterConfig('google-meet');
 // runtimeConfig 可以交给浏览器 extension content script、Electron WebView preload 或桌面宿主：
 // 它包含 bridge_options、runtime_options、capture_options、extension host 权限和 message_types。

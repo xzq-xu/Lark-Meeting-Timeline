@@ -7,13 +7,17 @@ import {
   MEETING_APP_INTEGRATION_PROFILE_SCHEMA,
   MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
+  assertMeetingAppDeploymentManifest,
   buildAllMeetingAppDeploymentManifests,
+  buildAllMeetingAppDeploymentManifestAcceptanceReports,
   buildAllMeetingAppIntegrationProfiles,
   buildAllMeetingAppLiveSnapshotCapturePlans,
   buildAllMeetingAppRuntimeAdapterAcceptanceReports,
   buildAllMeetingAppRuntimeAdapterConfigs,
   buildAllMeetingAppRuntimeAdapterValidationReports,
   buildMeetingAppDeploymentManifest,
+  buildMeetingAppDeploymentManifestAcceptanceReport,
+  buildMeetingAppDeploymentManifestAcceptanceSummary,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
   buildMeetingAppLiveSnapshotCapturePlan,
@@ -111,6 +115,27 @@ assert.equal(googleDeploymentManifest.runtime_contract.timestamp_field, 'capture
 assert.equal(googleDeploymentManifest.runtime_contract.required_signals.includes('speaker_started'), true);
 assert.equal(googleDeploymentManifest.handoff.kit_methods.includes('meetingAppDeploymentManifest'), true);
 assert.equal(googleDeploymentManifest.rollout_checklist.includes('pass_runtime_validation_with_production_ready_true'), true);
+const googleDeploymentAcceptance = buildMeetingAppDeploymentManifestAcceptanceReport(googleDeploymentManifest);
+assert.equal(googleDeploymentAcceptance.accepted, true);
+assert.equal(googleDeploymentAcceptance.production_ready, false);
+assert.equal(googleDeploymentAcceptance.coverage.runtime_config, true);
+assert.equal(googleDeploymentAcceptance.coverage.live_dom_verified, false);
+assert.equal(googleDeploymentAcceptance.issues.some((item) => item.code === 'live_dom_not_verified'), true);
+assert.equal(assertMeetingAppDeploymentManifest(googleDeploymentManifest).accepted, true);
+const unsafeDeploymentManifest = {
+  ...googleDeploymentManifest,
+  extension_install_plan: {
+    ...googleDeploymentManifest.extension_install_plan,
+    host_permissions: ['<all_urls>'],
+  },
+};
+const unsafeDeploymentAcceptance = buildMeetingAppDeploymentManifestAcceptanceReport(unsafeDeploymentManifest);
+assert.equal(unsafeDeploymentAcceptance.accepted, false);
+assert.equal(unsafeDeploymentAcceptance.issues.some((item) => item.code === 'overbroad_host_permission'), true);
+assert.throws(
+  () => assertMeetingAppDeploymentManifest(unsafeDeploymentManifest),
+  /Meeting app deployment manifest acceptance failed/,
+);
 const googleRuntimeAcceptance = buildMeetingAppRuntimeAdapterAcceptanceReport(googleRuntimeConfig);
 assert.equal(googleRuntimeAcceptance.type, 'meeting_app_runtime_adapter_acceptance_report');
 assert.equal(googleRuntimeAcceptance.accepted, true);
@@ -144,6 +169,13 @@ assert.equal(liveValidation.launch_gate.production_ready, true);
 assert.equal(assertMeetingAppRuntimeAdapterValidation(googleRuntimeConfig, {
   snapshots: liveSnapshots,
 }).production_ready, true);
+const liveDeploymentAcceptance = buildMeetingAppDeploymentManifestAcceptanceReport('google-meet', {
+  snapshots: liveSnapshots,
+});
+assert.equal(liveDeploymentAcceptance.accepted, true);
+assert.equal(liveDeploymentAcceptance.production_ready, true);
+assert.equal(liveDeploymentAcceptance.coverage.live_dom_verified, true);
+assert.equal(liveDeploymentAcceptance.issues.some((item) => item.code === 'live_dom_not_verified'), false);
 
 const unsafeRuntimeConfig = {
   ...googleRuntimeConfig,
@@ -204,6 +236,21 @@ const selectedDeploymentManifests = buildAllMeetingAppDeploymentManifests({
 assert.deepEqual(Object.keys(selectedDeploymentManifests), ['zoom', 'webex']);
 assert.equal(selectedDeploymentManifests.zoom.extension_install_plan.matches.includes('https://zoom.us/*'), true);
 assert.equal(selectedDeploymentManifests.webex.production_gate.requires_captured_dom, true);
+const selectedDeploymentAcceptance = buildAllMeetingAppDeploymentManifestAcceptanceReports({
+  platforms: ['zoom', 'webex'],
+});
+assert.deepEqual(Object.keys(selectedDeploymentAcceptance), ['zoom', 'webex']);
+assert.equal(selectedDeploymentAcceptance.zoom.accepted, true);
+assert.equal(selectedDeploymentAcceptance.webex.production_ready, false);
+const deploymentSummary = buildMeetingAppDeploymentManifestAcceptanceSummary({
+  platforms: ['zoom', 'webex'],
+});
+assert.equal(deploymentSummary.accepted, true);
+assert.equal(deploymentSummary.production_ready, false);
+assert.equal(deploymentSummary.platform_count, 2);
+assert.equal(deploymentSummary.accepted_count, 2);
+assert.equal(deploymentSummary.production_ready_count, 0);
+assert.equal(deploymentSummary.rows.every((row) => row.warning_count >= 1), true);
 
 const selectedRuntimeAcceptance = buildAllMeetingAppRuntimeAdapterAcceptanceReports({
   platforms: ['zoom', 'webex'],

@@ -12,6 +12,8 @@ import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunc
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type {
   MeetingAppDeploymentManifest,
+  MeetingAppDeploymentManifestAcceptanceReport,
+  MeetingAppDeploymentManifestAcceptanceSummary,
   MeetingAppIntegrationMatrix,
   MeetingAppIntegrationProfile,
   MeetingAppIntegrationProfileOptions,
@@ -88,6 +90,10 @@ export interface MeetingPlatformTimelineKit {
   meetingAppIntegrationMatrix(profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppIntegrationMatrix;
   meetingAppDeploymentManifest(platform: string, manifestOptions?: MeetingAppIntegrationProfileOptions): MeetingAppDeploymentManifest;
   allMeetingAppDeploymentManifests(manifestOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppDeploymentManifest>>;
+  meetingAppDeploymentManifestAcceptance(manifestOrPlatform?: MeetingAppDeploymentManifest | MeetingAppRuntimeAdapterConfig | string | MeetingAppIntegrationProfileOptions, acceptanceOptions?: MeetingAppIntegrationProfileOptions): MeetingAppDeploymentManifestAcceptanceReport;
+  allMeetingAppDeploymentManifestAcceptanceReports(acceptanceOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppDeploymentManifestAcceptanceReport>>;
+  meetingAppDeploymentManifestAcceptanceSummary(acceptanceOptions?: MeetingAppIntegrationProfileOptions): MeetingAppDeploymentManifestAcceptanceSummary;
+  assertMeetingAppDeploymentManifest(manifestOrPlatform?: MeetingAppDeploymentManifest | MeetingAppRuntimeAdapterConfig | string | MeetingAppIntegrationProfileOptions, acceptanceOptions?: MeetingAppIntegrationProfileOptions): MeetingAppDeploymentManifestAcceptanceReport;
   meetingAppRuntimeAdapterConfig(platform: string, configOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterConfig;
   meetingAppLiveSnapshotCapturePlan(platform: string, planOptions?: MeetingAppIntegrationProfileOptions): MeetingAppLiveSnapshotCapturePlan;
   allMeetingAppLiveSnapshotCapturePlans(planOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppLiveSnapshotCapturePlan>>;

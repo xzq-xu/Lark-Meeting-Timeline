@@ -126,6 +126,30 @@ export interface MeetingAppDeploymentManifest {
   rollout_checklist: string[];
 }
 
+export interface MeetingAppDeploymentManifestAcceptanceReport {
+  type: 'meeting_app_deployment_manifest_acceptance_report';
+  schema: 'meeting_app_deployment_manifest';
+  version: number;
+  accepted: boolean;
+  production_ready: boolean;
+  platform?: MeetingAppDomCaptureProfilePlatform | string;
+  manifest: MeetingAppDeploymentManifest | Record<string, unknown>;
+  coverage: Record<string, boolean>;
+  issues: Array<Record<string, unknown>>;
+}
+
+export interface MeetingAppDeploymentManifestAcceptanceSummary {
+  type: 'meeting_app_deployment_manifest_acceptance_summary';
+  schema: 'meeting_app_deployment_manifest';
+  version: number;
+  accepted: boolean;
+  production_ready: boolean;
+  platform_count: number;
+  accepted_count: number;
+  production_ready_count: number;
+  rows: Array<Record<string, unknown>>;
+}
+
 export function buildMeetingAppIntegrationProfile(
   platformOrInput?: MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
   options?: MeetingAppIntegrationProfileOptions,
@@ -179,6 +203,24 @@ export function buildMeetingAppDeploymentManifest(
 export function buildAllMeetingAppDeploymentManifests(
   options?: MeetingAppIntegrationProfileOptions,
 ): Partial<Record<MeetingAppDomCaptureProfilePlatform, MeetingAppDeploymentManifest>>;
+
+export function buildMeetingAppDeploymentManifestAcceptanceReport(
+  manifestOrPlatform?: MeetingAppDeploymentManifest | MeetingAppRuntimeAdapterConfig | MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppDeploymentManifestAcceptanceReport;
+
+export function assertMeetingAppDeploymentManifest(
+  manifestOrPlatform?: MeetingAppDeploymentManifest | MeetingAppRuntimeAdapterConfig | MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppDeploymentManifestAcceptanceReport;
+
+export function buildAllMeetingAppDeploymentManifestAcceptanceReports(
+  options?: MeetingAppIntegrationProfileOptions,
+): Partial<Record<MeetingAppDomCaptureProfilePlatform, MeetingAppDeploymentManifestAcceptanceReport>>;
+
+export function buildMeetingAppDeploymentManifestAcceptanceSummary(
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppDeploymentManifestAcceptanceSummary;
 
 export function buildMeetingAppRuntimeAdapterValidationReport(
   configOrPlatform?: MeetingAppRuntimeAdapterConfig | MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
