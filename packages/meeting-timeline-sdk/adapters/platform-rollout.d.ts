@@ -90,6 +90,53 @@ export interface MeetingPlatformRolloutSummary {
   plans: MeetingPlatformRolloutPlan[];
 }
 
+export interface MeetingPlatformAdaptationRunbook {
+  type: 'meeting_platform_adaptation_runbook';
+  platform: string;
+  display_name?: string;
+  rollout_status: MeetingPlatformRolloutStatus;
+  recommended_mode: string;
+  production_ready: boolean;
+  ready_for_realtime_annotations: boolean;
+  local_dom?: {
+    objective: string;
+    evidence_file: string;
+    capture_plan: Record<string, unknown>;
+    required_snapshots: Array<Record<string, unknown>>;
+    recommended_snapshots: Array<Record<string, unknown>>;
+    minimum_record_count: number;
+    capture_api: string[];
+    validation: Record<string, unknown>;
+  };
+  provider_events: {
+    objective: string;
+    evidence_file: string;
+    transport?: string;
+    endpoint?: string;
+    status_endpoint?: string;
+    event_types: string[];
+    lifecycle_event_types: string[];
+    required_coverage: string[];
+    current_missing_coverage: string[];
+    validation: Record<string, unknown>;
+  };
+  steps: Array<Record<string, unknown>>;
+  commands: Record<string, string>;
+  handoff: Record<string, string>;
+  next_actions: string[];
+  rollout_plan: MeetingPlatformRolloutPlan;
+}
+
+export interface MeetingPlatformAdaptationRunbookSummary {
+  type: 'meeting_platform_adaptation_runbook_summary';
+  runbook_count: number;
+  production_ready_count: number;
+  realtime_ready_count: number;
+  platforms: string[];
+  next_actions: string[];
+  runbooks: MeetingPlatformAdaptationRunbook[];
+}
+
 export const MEETING_PLATFORM_ROLLOUT_STATUSES: readonly MeetingPlatformRolloutStatus[];
 
 export function buildMeetingPlatformRolloutPlan(
@@ -104,3 +151,16 @@ export function buildAllMeetingPlatformRolloutPlans(
 export function buildMeetingPlatformRolloutSummary(
   options?: MeetingPlatformRolloutOptions,
 ): MeetingPlatformRolloutSummary;
+
+export function buildMeetingPlatformAdaptationRunbook(
+  platform: string,
+  options?: MeetingPlatformRolloutOptions,
+): MeetingPlatformAdaptationRunbook;
+
+export function buildAllMeetingPlatformAdaptationRunbooks(
+  options?: MeetingPlatformRolloutOptions,
+): MeetingPlatformAdaptationRunbook[];
+
+export function buildMeetingPlatformAdaptationRunbookSummary(
+  options?: MeetingPlatformRolloutOptions,
+): MeetingPlatformAdaptationRunbookSummary;

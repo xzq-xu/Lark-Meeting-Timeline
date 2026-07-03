@@ -1202,6 +1202,20 @@ const plan = buildMeetingPlatformRolloutPlan('google-meet', {
 
 `buildMeetingPlatformRolloutSummary()` 可同时汇总 Google Meet、Teams、Zoom、Webex、Lark 的 `production_ready`、`ready_for_realtime_annotations` 和 `next_actions`。如果只有本地 DOM 证据通过，会进入 `realtime_ready_provider_pending`；如果只有 provider 事件通过，会进入 `provider_ready_collect_local_evidence`，提醒继续采真实会议页 DOM。
 
+现场推进多平台适配时，可以再拿 `buildMeetingPlatformAdaptationRunbook()` 生成采样清单。它不会把 fixture 当成生产证据，而是把本地 DOM 快照、provider event 样本、验证命令和最终 rollout gate 放到同一份结构里：
+
+```js
+import { buildMeetingPlatformAdaptationRunbook } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-rollout';
+
+const runbook = buildMeetingPlatformAdaptationRunbook('zoom', {
+  baseUrl: 'https://timeline.example.com',
+});
+
+// runbook.local_dom.required_snapshots 描述 active speaker / meeting ended 等必须采的真实页面状态。
+// runbook.provider_events.required_coverage 描述 provider webhook 至少要证明 meeting_start / meeting_end。
+// runbook.steps 可以直接渲染成接入向导或 CI checklist。
+```
+
 ## Webhook 验证工具
 
 真实接 Zoom / Microsoft Graph / Google Pub/Sub push 时，建议先在 webhook 层完成平台验证，再把 payload 交给 normalizer：

@@ -1,6 +1,7 @@
 import { compactObject } from '../index.mjs';
 import { MEETING_APP_FIXTURE_PLATFORMS } from './meeting-app-fixtures.mjs';
 import { buildMeetingAppLaunchGate } from './meeting-app-gate.mjs';
+import { buildMeetingAppLiveSnapshotCapturePlan } from './meeting-app-profile.mjs';
 import { buildPlatformLaunchGate } from './platform-gate.mjs';
 import {
   MEETING_PLATFORM_KEYS,
@@ -180,6 +181,117 @@ function highLevelActions(platform, status, localGate, providerGate) {
   return actions;
 }
 
+function evidenceFileName(platform, suffix) {
+  return `data/${suffix}/${platform}.json`;
+}
+
+function captureCommands(platform) {
+  return {
+    build_extension: 'npm run meeting-app:extension:build',
+    validate_dom_evidence: `npm run meeting-app:evidence-gate -- --input=${evidenceFileName(platform, 'meeting-app-evidence')} --report-file=data/meeting-app-live-gate-report.json`,
+    validate_dom_matrix: 'npm run meeting-app:evidence-matrix',
+    validate_provider_events: 'buildPlatformLaunchGate(platform, { records: providerRecords, env, baseUrl })',
+    validate_rollout: 'buildMeetingPlatformRolloutPlan(platform, { providerRecords, meetingAppRecordSet, env, baseUrl })',
+  };
+}
+
+function localDomRunbook(platform, options = {}) {
+  if (!MEETING_APP_FIXTURE_PLATFORMS.includes(platform)) return undefined;
+  const capturePlan = buildMeetingAppLiveSnapshotCapturePlan(platform, options);
+  return {
+    objective: 'prove_low_latency_local_observer_for_realtime_annotation_axis',
+    evidence_file: evidenceFileName(platform, 'meeting-app-evidence'),
+    capture_plan: capturePlan,
+    required_snapshots: capturePlan.required_snapshots,
+    recommended_snapshots: capturePlan.recommended_snapshots,
+    minimum_record_count: capturePlan.minimum_record_count,
+    capture_api: [
+      'window.__meetingTimelineLiveCapture.captureActive()',
+      'window.__meetingTimelineLiveCapture.captureEnded()',
+      'window.__meetingTimelineLiveCapture.exportRecords()',
+      'window.__meetingTimelineLiveCapture.evidencePackage()',
+      'window.__meetingTimelineLiveCapture.diagnose()',
+    ],
+    validation: capturePlan.validation,
+  };
+}
+
+function providerRunbook(platform, integration = {}, providerGate = {}) {
+  const providerEvents = integration.provider_events ?? {};
+  const requiredCoverage = providerGate.required_coverage ?? ['meeting_start', 'meeting_end'];
+  return {
+    objective: platform === 'local_detector'
+      ? 'prove_host_detector_can_emit_start_end_with_absolute_time'
+      : 'prove_provider_events_can_reconcile_or_backfill_the_local_axis',
+    evidence_file: platform === 'local_detector'
+      ? evidenceFileName(platform, 'local-detector-evidence')
+      : evidenceFileName(platform, 'provider-evidence'),
+    transport: providerEvents.transport,
+    endpoint: providerEvents.endpoint,
+    status_endpoint: providerEvents.status_endpoint,
+    event_types: providerEvents.event_types ?? [],
+    lifecycle_event_types: providerEvents.lifecycle_event_types ?? [],
+    required_coverage: requiredCoverage,
+    current_missing_coverage: providerGate.missing_required_coverage ?? requiredCoverage,
+    validation: {
+      adapter: '@ai-annotation/meeting-timeline-sdk/adapters/platform-gate',
+      method: 'buildPlatformLaunchGate',
+      production_ready_requires: 'captured_events',
+      default_options: {
+        allowFixtureEvidence: false,
+      },
+    },
+  };
+}
+
+function runbookSteps(platform, plan, localDom, provider) {
+  const steps = [];
+  if (localDom) {
+    steps.push({
+      id: 'install_capture_runtime',
+      title: 'Install the browser or host capture runtime',
+      output: 'content_script_or_host_observer_running_on_real_meeting_surface',
+      command: captureCommands(platform).build_extension,
+    });
+    steps.push({
+      id: 'capture_local_dom_active_and_ended',
+      title: 'Capture active-speaker and ended DOM snapshots from the same real meeting',
+      output: localDom.evidence_file,
+      required_snapshot_ids: localDom.required_snapshots.map((item) => item.id),
+    });
+    steps.push({
+      id: 'validate_local_dom_gate',
+      title: 'Validate local DOM evidence for realtime annotation readiness',
+      output: 'meeting_app_launch_gate.production_ready',
+      command: captureCommands(platform).validate_dom_evidence,
+    });
+  }
+  steps.push({
+    id: platform === 'local_detector' ? 'capture_detector_events' : 'capture_provider_events',
+    title: platform === 'local_detector'
+      ? 'Capture host detector start/end events with absolute timestamps'
+      : 'Capture real provider start/end events from the configured webhook path',
+    output: provider.evidence_file,
+    required_coverage: provider.required_coverage,
+  });
+  steps.push({
+    id: 'validate_provider_gate',
+    title: 'Validate provider or detector event evidence',
+    output: 'platform_launch_gate.production_ready',
+    command: captureCommands(platform).validate_provider_events,
+  });
+  steps.push({
+    id: 'validate_rollout',
+    title: 'Combine local DOM and provider evidence into a rollout decision',
+    output: 'meeting_platform_rollout_plan.status',
+    command: captureCommands(platform).validate_rollout,
+    success_condition: plan.production_ready
+      ? 'status === "production_ready"'
+      : 'ready_for_realtime_annotations === true for pilot, production_ready === true for full rollout',
+  });
+  return steps;
+}
+
 export function buildMeetingPlatformRolloutPlan(platform, options = {}) {
   const key = normalizeMeetingPlatform(platform);
   const integration = buildPlatformIntegrationPlan(key, options);
@@ -256,5 +368,54 @@ export function buildMeetingPlatformRolloutSummary(options = {}) {
       .map((plan) => plan.platform),
     next_actions: uniqueList(plans.flatMap((plan) => plan.next_actions ?? [])),
     plans,
+  };
+}
+
+export function buildMeetingPlatformAdaptationRunbook(platform, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  const rolloutPlan = buildMeetingPlatformRolloutPlan(key, options);
+  const integration = rolloutPlan.integration_plan ?? buildPlatformIntegrationPlan(key, options);
+  const localDom = localDomRunbook(key, options);
+  const provider = providerRunbook(key, integration, rolloutPlan.provider_events?.gate);
+  const commands = captureCommands(key);
+  return compactObject({
+    type: 'meeting_platform_adaptation_runbook',
+    platform: key,
+    display_name: rolloutPlan.display_name,
+    rollout_status: rolloutPlan.status,
+    recommended_mode: rolloutPlan.recommended_mode,
+    production_ready: rolloutPlan.production_ready,
+    ready_for_realtime_annotations: rolloutPlan.ready_for_realtime_annotations,
+    local_dom: localDom,
+    provider_events: provider,
+    steps: runbookSteps(key, rolloutPlan, localDom, provider),
+    commands,
+    handoff: {
+      dom_evidence_input: 'meetingAppRecordSet or meetingAppSnapshots',
+      provider_evidence_input: 'providerRecords or providerSamples',
+      final_gate: 'buildMeetingPlatformRolloutPlan',
+      pilot_condition: 'ready_for_realtime_annotations === true',
+      production_condition: 'production_ready === true',
+    },
+    next_actions: rolloutPlan.next_actions,
+    rollout_plan: rolloutPlan,
+  });
+}
+
+export function buildAllMeetingPlatformAdaptationRunbooks(options = {}) {
+  const platforms = options.platforms ?? options.platform_keys ?? MEETING_PLATFORM_KEYS;
+  return asArray(platforms).map((platform) => buildMeetingPlatformAdaptationRunbook(platform, options));
+}
+
+export function buildMeetingPlatformAdaptationRunbookSummary(options = {}) {
+  const runbooks = buildAllMeetingPlatformAdaptationRunbooks(options);
+  return {
+    type: 'meeting_platform_adaptation_runbook_summary',
+    runbook_count: runbooks.length,
+    production_ready_count: runbooks.filter((item) => item.production_ready).length,
+    realtime_ready_count: runbooks.filter((item) => item.ready_for_realtime_annotations).length,
+    platforms: runbooks.map((item) => item.platform),
+    next_actions: uniqueList(runbooks.flatMap((item) => item.next_actions ?? [])),
+    runbooks,
   };
 }

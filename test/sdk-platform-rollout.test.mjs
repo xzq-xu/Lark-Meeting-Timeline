@@ -7,6 +7,8 @@ import { capturePlatformWebhookEvent } from '../packages/meeting-timeline-sdk/ad
 import {
   MEETING_PLATFORM_ROLLOUT_STATUSES,
   buildAllMeetingPlatformRolloutPlans,
+  buildMeetingPlatformAdaptationRunbook,
+  buildMeetingPlatformAdaptationRunbookSummary,
   buildMeetingPlatformRolloutPlan,
   buildMeetingPlatformRolloutSummary,
 } from '../packages/meeting-timeline-sdk/adapters/platform-rollout.mjs';
@@ -87,6 +89,25 @@ assert.equal(googleReady.provider_events.event_types.includes('google.workspace.
 assert.equal(googleReady.source_priority[0], 'local_observer');
 assert.equal(googleReady.next_actions.includes('enable_pilot_rollout_with_monitoring'), true);
 
+const googleRunbook = buildMeetingPlatformAdaptationRunbook('google-meet', {
+  baseUrl,
+  env: googleEnv,
+});
+assert.equal(googleRunbook.type, 'meeting_platform_adaptation_runbook');
+assert.equal(googleRunbook.platform, 'google_meet');
+assert.equal(googleRunbook.local_dom.required_snapshots.some((item) => item.id === 'active_speaker'), true);
+assert.equal(googleRunbook.local_dom.capture_api.includes('window.__meetingTimelineLiveCapture.captureActive()'), true);
+assert.equal(googleRunbook.provider_events.event_types.includes('google.workspace.meet.conference.v2.started'), true);
+assert.equal(googleRunbook.provider_events.required_coverage.includes('meeting_start'), true);
+assert.equal(googleRunbook.steps.some((item) => item.id === 'validate_rollout'), true);
+assert.match(googleRunbook.commands.validate_dom_evidence, /meeting-app:evidence-gate/);
+assert.equal(googleRunbook.handoff.production_condition, 'production_ready === true');
+
+const localDetectorRunbook = buildMeetingPlatformAdaptationRunbook('local-detector', { baseUrl });
+assert.equal(localDetectorRunbook.local_dom, undefined);
+assert.equal(localDetectorRunbook.provider_events.objective, 'prove_host_detector_can_emit_start_end_with_absolute_time');
+assert.equal(localDetectorRunbook.steps.some((item) => item.id === 'capture_detector_events'), true);
+
 const zoomLocalReady = buildMeetingPlatformRolloutPlan('zoom', {
   baseUrl,
   meetingAppRecordSet: meetingAppRecordSet('zoom'),
@@ -120,6 +141,15 @@ const allDefaultSummary = buildMeetingPlatformRolloutSummary({ baseUrl });
 assert.equal(allDefaultSummary.plans.some((plan) => plan.platform === 'local_detector'), true);
 assert.equal(allDefaultSummary.plans.find((plan) => plan.platform === 'local_detector').local_observer, undefined);
 
+const runbookSummary = buildMeetingPlatformAdaptationRunbookSummary({
+  baseUrl,
+  platforms: ['google-meet', 'zoom'],
+});
+assert.equal(runbookSummary.type, 'meeting_platform_adaptation_runbook_summary');
+assert.deepEqual(runbookSummary.platforms, ['google_meet', 'zoom']);
+assert.equal(runbookSummary.runbooks.length, 2);
+assert.equal(runbookSummary.next_actions.includes('capture_live_dom_snapshots_for_local_observer'), true);
+
 const kit = createMeetingPlatformTimelineKit({ baseUrl, env: googleEnv, verify: false });
 assert.equal(
   kit.platformRolloutPlan('google-meet', {
@@ -130,5 +160,8 @@ assert.equal(
 );
 assert.equal(kit.platformRolloutSummary({ platforms: ['google-meet'] }).plans.length, 1);
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_rollout.type, 'meeting_platform_rollout_summary');
+assert.equal(kit.platformAdaptationRunbook('google-meet').platform, 'google_meet');
+assert.equal(kit.platformAdaptationRunbookSummary({ platforms: ['google-meet'] }).runbooks.length, 1);
+assert.equal(kit.report({ platforms: ['google-meet'] }).platform_adaptation_runbook.type, 'meeting_platform_adaptation_runbook_summary');
 
 console.log('ok meeting platform rollout');
