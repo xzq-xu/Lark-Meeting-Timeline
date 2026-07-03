@@ -8,6 +8,7 @@ export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA: 'meeting_app_runtime_ada
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA: 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA: 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA: 'meeting_app_live_evidence_package';
+export const MEETING_APP_DOM_ADAPTATION_DIAGNOSIS_SCHEMA: 'meeting_app_dom_adaptation_diagnosis';
 
 export interface MeetingAppIntegrationProfileOptions extends MeetingAppLaunchGateOptions {
   platform?: MeetingAppDomCaptureProfilePlatform | string;
@@ -89,6 +90,26 @@ export interface MeetingAppRuntimeAdapterValidationReport {
   evidence_count: number;
   config_acceptance: MeetingAppRuntimeAdapterAcceptanceReport;
   launch_gate?: Record<string, unknown> | null;
+  next_actions: string[];
+  issues: Array<Record<string, unknown>>;
+}
+
+export interface MeetingAppDomAdaptationDiagnosis {
+  type: 'meeting_app_dom_adaptation_diagnosis';
+  schema: 'meeting_app_dom_adaptation_diagnosis';
+  version: number;
+  platform: MeetingAppDomCaptureProfilePlatform;
+  display_name: string;
+  accepted: boolean;
+  production_ready: boolean;
+  evidence_level: string;
+  evidence_count: number;
+  record_count: number;
+  phases: string[];
+  selector_probe: Record<string, unknown>;
+  observer_probe: Record<string, unknown>;
+  runtime_probe: Record<string, unknown>;
+  recommended_capture: Record<string, unknown>;
   next_actions: string[];
   issues: Array<Record<string, unknown>>;
 }
@@ -269,6 +290,15 @@ export function buildMeetingAppLiveEvidencePackageSummary(
   input?: MeetingAppLiveEvidencePackage | Record<string, unknown> | unknown[],
   options?: MeetingAppIntegrationProfileOptions,
 ): MeetingAppLiveEvidencePackageSummary;
+
+export function buildMeetingAppDomAdaptationDiagnosis(
+  platformOrInput?: MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions | Record<string, unknown> | unknown[],
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppDomAdaptationDiagnosis;
+
+export function buildAllMeetingAppDomAdaptationDiagnoses(
+  options?: MeetingAppIntegrationProfileOptions,
+): Partial<Record<MeetingAppDomCaptureProfilePlatform, MeetingAppDomAdaptationDiagnosis>>;
 
 export function buildMeetingAppRuntimeAdapterValidationReport(
   configOrPlatform?: MeetingAppRuntimeAdapterConfig | MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,

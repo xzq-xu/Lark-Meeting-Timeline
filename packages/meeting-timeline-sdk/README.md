@@ -512,6 +512,13 @@ const liveEvidence = meetingKit.meetingAppLiveEvidencePackage({
 // liveEvidence.summary.rows 会列出每个平台的 record_count、missing_required_coverage 和 next_actions。
 // 它适合放进现场采样工具或 CI，把真实 Google Meet / Teams / Zoom 页面快照变成生产 gate 结果。
 
+const domDiagnosis = meetingKit.meetingAppDomAdaptationDiagnosis('google-meet', {
+  snapshots: capturedLiveMeetingSnapshots,
+});
+// domDiagnosis 更适合现场调试：它会拆开 selector_probe、observer_probe 和 runtime_probe，
+// 明确指出当前真实页面快照是否命中 controls / participants / active speaker / meeting ended。
+// Google Meet、Teams、Zoom、Lark/Feishu、Webex 都可以用同一个诊断入口，只换平台 key。
+
 const runtimeConfig = meetingKit.meetingAppRuntimeAdapterConfig('google-meet');
 // runtimeConfig 可以交给浏览器 extension content script、Electron WebView preload 或桌面宿主：
 // 它包含 bridge_options、runtime_options、capture_options、extension host 权限和 message_types。

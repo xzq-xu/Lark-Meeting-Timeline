@@ -176,6 +176,24 @@ assert.equal(kitEvidencePackage.manifest_acceptance.google_meet.production_ready
 const kitEvidenceSummary = kit.meetingAppLiveEvidencePackageSummary(kitEvidencePackage);
 assert.equal(kitEvidenceSummary.production_ready_count, 1);
 assert.equal(kitEvidenceSummary.rows[0].record_count, 2);
+const kitDomDiagnosis = kit.meetingAppDomAdaptationDiagnosis('google-meet', {
+  snapshots: kitLiveSnapshots,
+});
+assert.equal(kitDomDiagnosis.platform, 'google_meet');
+assert.equal(kitDomDiagnosis.production_ready, true);
+assert.equal(kitDomDiagnosis.selector_probe.matched.active_speaker, true);
+assert.equal(kitDomDiagnosis.observer_probe.signal_types.includes('meeting_ended'), true);
+const kitDomDiagnoses = kit.allMeetingAppDomAdaptationDiagnoses({
+  platforms: ['zoom'],
+  snapshots: {
+    zoom: [
+      kit.meetingAppFixture('zoom', { state: 'active', observedAtMs: 1_783_356_000_000 }),
+      kit.meetingAppFixture('zoom', { state: 'prejoin', observedAtMs: 1_783_356_600_000 }),
+    ],
+  },
+});
+assert.deepEqual(Object.keys(kitDomDiagnoses), ['zoom']);
+assert.equal(kitDomDiagnoses.zoom.accepted, true);
 const runtimeAdapterConfigs = kit.allMeetingAppRuntimeAdapterConfigs({ platforms: ['zoom'] });
 assert.deepEqual(Object.keys(runtimeAdapterConfigs), ['zoom']);
 assert.equal(runtimeAdapterConfigs.zoom.runtime_options.runtimePreset, 'zoom');
@@ -292,6 +310,7 @@ assert.equal(report.meeting_app_integration_matrix.rows.some((row) => row.platfo
 assert.equal(report.meeting_app_deployment_manifests.google_meet.production_gate.requires_captured_dom, true);
 assert.equal(report.meeting_app_deployment_manifest_acceptance.google_meet.accepted, true);
 assert.equal(report.meeting_app_deployment_manifest_acceptance_summary.accepted_count, 5);
+assert.equal(report.meeting_app_dom_adaptation_diagnosis.google_meet.accepted, false);
 assert.equal(report.meeting_app_runtime_adapter_configs.google_meet.bridge_options.browser_runtime_preset, 'google_meet');
 assert.equal(report.meeting_app_runtime_adapter_acceptance.google_meet.accepted, true);
 assert.equal(report.meeting_app_live_snapshot_capture_plans.google_meet.minimum_record_count, 2);

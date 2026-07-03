@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { buildMeetingAppFixtureSnapshot } from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
 import {
   MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA,
+  MEETING_APP_DOM_ADAPTATION_DIAGNOSIS_SCHEMA,
   MEETING_APP_INTEGRATION_PROFILE_PLATFORMS,
   MEETING_APP_INTEGRATION_PROFILE_SCHEMA,
   MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA,
@@ -10,6 +11,7 @@ import {
   MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
   assertMeetingAppDeploymentManifest,
   buildAllMeetingAppDeploymentManifests,
+  buildAllMeetingAppDomAdaptationDiagnoses,
   buildAllMeetingAppDeploymentManifestAcceptanceReports,
   buildAllMeetingAppIntegrationProfiles,
   buildAllMeetingAppLiveSnapshotCapturePlans,
@@ -19,6 +21,7 @@ import {
   buildMeetingAppDeploymentManifest,
   buildMeetingAppDeploymentManifestAcceptanceReport,
   buildMeetingAppDeploymentManifestAcceptanceSummary,
+  buildMeetingAppDomAdaptationDiagnosis,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
   buildMeetingAppLiveEvidencePackage,
@@ -43,6 +46,7 @@ assert.equal(MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA, 'meeting_app_runtime_ada
 assert.equal(MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA, 'meeting_app_live_snapshot_capture_plan');
 assert.equal(MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA, 'meeting_app_deployment_manifest');
 assert.equal(MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA, 'meeting_app_live_evidence_package');
+assert.equal(MEETING_APP_DOM_ADAPTATION_DIAGNOSIS_SCHEMA, 'meeting_app_dom_adaptation_diagnosis');
 
 const googleProfile = buildMeetingAppIntegrationProfile('google-meet', {
   baseUrl: 'https://timeline.example.com',
@@ -200,6 +204,74 @@ assert.equal(liveEvidencePackage.summary.rows[0].missing_required_coverage.lengt
 const liveEvidenceSummary = buildMeetingAppLiveEvidencePackageSummary(liveEvidencePackage);
 assert.equal(liveEvidenceSummary.production_ready, true);
 assert.equal(liveEvidenceSummary.record_count, 2);
+const liveDomDiagnosis = buildMeetingAppDomAdaptationDiagnosis('google-meet', {
+  snapshots: liveSnapshots,
+});
+assert.equal(liveDomDiagnosis.type, 'meeting_app_dom_adaptation_diagnosis');
+assert.equal(liveDomDiagnosis.schema, MEETING_APP_DOM_ADAPTATION_DIAGNOSIS_SCHEMA);
+assert.equal(liveDomDiagnosis.platform, 'google_meet');
+assert.equal(liveDomDiagnosis.accepted, true);
+assert.equal(liveDomDiagnosis.production_ready, true);
+assert.equal(liveDomDiagnosis.selector_probe.matched.controls, true);
+assert.equal(liveDomDiagnosis.selector_probe.matched.participants, true);
+assert.equal(liveDomDiagnosis.selector_probe.matched.active_speaker, true);
+assert.equal(liveDomDiagnosis.observer_probe.signal_types.includes('meeting_started'), true);
+assert.equal(liveDomDiagnosis.observer_probe.signal_types.includes('speaker_started'), true);
+assert.equal(liveDomDiagnosis.observer_probe.signal_types.includes('meeting_ended'), true);
+assert.deepEqual(liveDomDiagnosis.recommended_capture.required_snapshot_ids, ['active_speaker', 'meeting_ended']);
+
+const noEvidenceDomDiagnosis = buildMeetingAppDomAdaptationDiagnosis('google-meet');
+assert.equal(noEvidenceDomDiagnosis.accepted, false);
+assert.equal(noEvidenceDomDiagnosis.production_ready, false);
+assert.equal(noEvidenceDomDiagnosis.issues.some((item) => item.code === 'missing_live_snapshots'), true);
+assert.equal(noEvidenceDomDiagnosis.next_actions.includes('capture_required_live_snapshots'), true);
+
+for (const [platformAlias, expectedPlatform] of [
+  ['google-meet', 'google_meet'],
+  ['teams', 'microsoft_teams'],
+  ['zoom', 'zoom'],
+  ['webex', 'webex'],
+]) {
+  const platformSnapshots = [
+    buildMeetingAppFixtureSnapshot(platformAlias, {
+      state: 'active',
+      observedAtMs: 1_783_356_000_000,
+    }),
+    buildMeetingAppFixtureSnapshot(platformAlias, {
+      state: 'prejoin',
+      observedAtMs: 1_783_356_600_000,
+    }),
+  ];
+  const diagnosis = buildMeetingAppDomAdaptationDiagnosis(platformAlias, {
+    snapshots: platformSnapshots,
+  });
+  assert.equal(diagnosis.platform, expectedPlatform);
+  assert.equal(diagnosis.accepted, true);
+  assert.equal(diagnosis.production_ready, true);
+  assert.equal(diagnosis.selector_probe.matched.controls, true);
+  assert.equal(diagnosis.selector_probe.matched.participants, true);
+  assert.equal(diagnosis.observer_probe.coverage.meeting_started, true);
+  assert.equal(diagnosis.observer_probe.coverage.speaker_started, true);
+  assert.equal(diagnosis.observer_probe.coverage.meeting_ended, true);
+}
+
+const selectedDomDiagnoses = buildAllMeetingAppDomAdaptationDiagnoses({
+  platforms: ['zoom'],
+  snapshots: {
+    zoom: [
+      buildMeetingAppFixtureSnapshot('zoom', {
+        state: 'active',
+        observedAtMs: 1_783_356_000_000,
+      }),
+      buildMeetingAppFixtureSnapshot('zoom', {
+        state: 'prejoin',
+        observedAtMs: 1_783_356_600_000,
+      }),
+    ],
+  },
+});
+assert.deepEqual(Object.keys(selectedDomDiagnoses), ['zoom']);
+assert.equal(selectedDomDiagnoses.zoom.production_ready, true);
 const missingEvidencePackage = buildMeetingAppLiveEvidencePackage({
   platforms: ['google-meet'],
   snapshots: [],

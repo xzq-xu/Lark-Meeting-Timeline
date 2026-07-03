@@ -63,6 +63,7 @@ import {
   assertMeetingAppRuntimeAdapterConfig,
   assertMeetingAppRuntimeAdapterValidation,
   assertMeetingAppDeploymentManifest,
+  buildAllMeetingAppDomAdaptationDiagnoses,
   buildAllMeetingAppDeploymentManifestAcceptanceReports,
   buildAllMeetingAppDeploymentManifests,
   buildAllMeetingAppIntegrationProfiles,
@@ -72,6 +73,7 @@ import {
   buildAllMeetingAppRuntimeAdapterValidationReports,
   buildMeetingAppDeploymentManifestAcceptanceReport,
   buildMeetingAppDeploymentManifestAcceptanceSummary,
+  buildMeetingAppDomAdaptationDiagnosis,
   buildMeetingAppDeploymentManifest,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
@@ -205,6 +207,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_deployment_manifests: buildAllMeetingAppDeploymentManifests(options),
     meeting_app_deployment_manifest_acceptance: buildAllMeetingAppDeploymentManifestAcceptanceReports(options),
     meeting_app_deployment_manifest_acceptance_summary: buildMeetingAppDeploymentManifestAcceptanceSummary(options),
+    meeting_app_dom_adaptation_diagnosis: buildAllMeetingAppDomAdaptationDiagnoses(options),
     meeting_app_runtime_adapter_configs: buildAllMeetingAppRuntimeAdapterConfigs(options),
     meeting_app_runtime_adapter_acceptance: buildAllMeetingAppRuntimeAdapterAcceptanceReports(options),
     meeting_app_live_snapshot_capture_plans: buildAllMeetingAppLiveSnapshotCapturePlans(options),
@@ -338,6 +341,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppLiveEvidencePackageSummary(input = {}, evidenceOptions = {}) {
       return buildMeetingAppLiveEvidencePackageSummary(input, withDefaults(defaults, evidenceOptions));
+    },
+    meetingAppDomAdaptationDiagnosis(platformOrInput = {}, diagnosisOptions = {}) {
+      return buildMeetingAppDomAdaptationDiagnosis(platformOrInput, withDefaults(defaults, diagnosisOptions));
+    },
+    allMeetingAppDomAdaptationDiagnoses(diagnosisOptions = {}) {
+      return buildAllMeetingAppDomAdaptationDiagnoses(withDefaults(defaults, diagnosisOptions));
     },
     meetingAppRuntimeAdapterConfig(platform, configOptions = {}) {
       return buildMeetingAppRuntimeAdapterConfig(platform, withDefaults(defaults, configOptions));

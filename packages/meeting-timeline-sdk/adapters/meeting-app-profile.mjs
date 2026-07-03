@@ -7,6 +7,7 @@ import {
   buildMeetingAppSnapshotRecordSet,
   meetingAppSnapshotRecords,
 } from './meeting-app-snapshot-recorder.mjs';
+import { normalizeMeetingAppSnapshot } from './meeting-apps.mjs';
 import {
   MEETING_APP_EXTENSION_MESSAGE_TYPES,
   MEETING_APP_EXTENSION_STATUS_STORAGE_KEY,
@@ -27,6 +28,7 @@ export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA = 'meeting_app_runtime_ad
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA = 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA = 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA = 'meeting_app_live_evidence_package';
+export const MEETING_APP_DOM_ADAPTATION_DIAGNOSIS_SCHEMA = 'meeting_app_dom_adaptation_diagnosis';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -1042,6 +1044,232 @@ function evidenceRows(value) {
     if (rows.length > 0) return rows;
   }
   return asArray(value);
+}
+
+function recordsForPlatform(recordSet = {}, platform) {
+  return meetingAppSnapshotRecords(recordSet).filter((record) => {
+    const candidate = record?.platform ?? record?.provider ?? record?.snapshot?.platform ?? record?.snapshot?.provider ?? record?.snapshot?.capture?.profile;
+    if (!candidate) return false;
+    try {
+      return normalizeAppPlatform(candidate) === platform;
+    } catch {
+      return false;
+    }
+  });
+}
+
+function arrayAtPath(input = {}, path) {
+  const value = path.split('.').reduce((node, part) => node?.[part], input);
+  return Array.isArray(value) ? value : [];
+}
+
+function maxNumberAtPaths(input = {}, paths = []) {
+  const values = paths.map((path) => path.split('.').reduce((node, part) => node?.[part], input));
+  const numbers = values.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+  return numbers.length > 0 ? Math.max(...numbers) : 0;
+}
+
+function collectionCountAtPaths(input = {}, paths = []) {
+  const direct = paths.reduce((count, path) => count + arrayAtPath(input, path).length, 0);
+  if (direct > 0) return direct;
+  if (paths.some((path) => path.includes('control') || path.includes('button'))) {
+    return maxNumberAtPaths(input, ['capture.control_count']);
+  }
+  if (paths.some((path) => path.includes('participant') || path.includes('tile'))) {
+    return maxNumberAtPaths(input, ['capture.participant_count']);
+  }
+  if (paths.some((path) => path.includes('text'))) {
+    return maxNumberAtPaths(input, ['capture.text_count']);
+  }
+  return 0;
+}
+
+function sumSnapshotCollections(snapshots = [], paths = []) {
+  return snapshots.reduce((count, snapshot) => count + collectionCountAtPaths(snapshot, paths), 0);
+}
+
+function diagnosisPlatform(input = {}, recordSet = {}) {
+  const explicit = firstNonEmpty(input.platform, input.provider, input.key, input.name);
+  if (explicit) return normalizeAppPlatform(explicit);
+  const candidates = uniqueList([
+    ...(recordSet.platforms ?? []),
+    ...meetingAppSnapshotRecords(recordSet).map((record) => (
+      record?.platform
+      ?? record?.provider
+      ?? record?.snapshot?.platform
+      ?? record?.snapshot?.provider
+      ?? record?.snapshot?.capture?.profile
+    )),
+  ]);
+  if (candidates.length === 0) {
+    throw new MeetingTimelineSdkError('Meeting app DOM adaptation diagnosis requires platform or evidence with platform.', {
+      supported_platforms: MEETING_APP_INTEGRATION_PROFILE_PLATFORMS,
+    });
+  }
+  return normalizeAppPlatform(candidates[0]);
+}
+
+function diagnosisIssue(severity, code, message, details = {}) {
+  return issue(severity, code, message, details);
+}
+
+function diagnosisNextActions(issues = [], launchGate = {}) {
+  const mapped = issues.map((item) => {
+    if (item.code === 'missing_live_snapshots') return 'capture_required_live_snapshots';
+    if (item.code === 'missing_controls') return 'tune_control_selectors_or_capture_toolbar_visible_state';
+    if (item.code === 'missing_participants') return 'capture_participants_visible_state_or_tune_participant_selectors';
+    if (item.code === 'missing_active_speaker') return 'capture_active_speaker_snapshot_with_audio_activity';
+    if (item.code === 'missing_meeting_end') return 'capture_after_leave_or_end_meeting';
+    if (item.code === 'missing_meeting_identity') return 'include_meeting_url_or_title_in_snapshot';
+    return item.code;
+  });
+  return uniqueList([
+    ...mapped,
+    ...(launchGate.next_actions ?? []),
+  ]);
+}
+
+export function buildMeetingAppDomAdaptationDiagnosis(platformOrInput = {}, options = {}) {
+  const input = typeof platformOrInput === 'string'
+    ? { platform: platformOrInput }
+    : (platformOrInput ?? {});
+  const merged = evidenceInputOptions(input, options);
+  const recordSet = buildEvidenceRecordSet(input, options);
+  const platform = diagnosisPlatform(merged, recordSet);
+  const config = buildMeetingAppRuntimeAdapterConfig(platform, {
+    ...merged,
+    includeLaunchGate: false,
+  });
+  const records = recordsForPlatform(recordSet, platform);
+  const snapshots = records.map((record) => record.snapshot).filter(Boolean);
+  const normalizedSnapshots = snapshots
+    .map((snapshot) => normalizeMeetingAppSnapshot(snapshot, { ...merged, platform }))
+    .filter(Boolean);
+  const launchGate = buildMeetingAppLaunchGate(platform, {
+    ...merged,
+    records: recordSet,
+    snapshotRecords: recordSet,
+    snapshot_records: recordSet,
+    allowFixtureEvidence: false,
+    allow_fixture_evidence: false,
+    requireProductionReady: false,
+    require_production_ready: false,
+  });
+  const selectorCounts = {
+    controls: sumSnapshotCollections(snapshots, [
+      'page.controls',
+      'page.buttons',
+      'dom.controls',
+      'controls',
+      'buttons',
+    ]),
+    participants: sumSnapshotCollections(snapshots, [
+      'page.participants',
+      'page.tiles',
+      'dom.participants',
+      'dom.tiles',
+      'participants',
+      'tiles',
+    ]),
+    texts: sumSnapshotCollections(snapshots, [
+      'page.texts',
+      'dom.texts',
+      'texts',
+    ]),
+    normalized_active_speaker_snapshots: normalizedSnapshots.filter((snapshot) => (
+      Boolean(snapshot.activeSpeaker?.id || snapshot.activeSpeaker?.name)
+    )).length,
+    normalized_in_meeting_snapshots: normalizedSnapshots.filter((snapshot) => snapshot.inMeeting === true).length,
+    normalized_ended_snapshots: normalizedSnapshots.filter((snapshot) => snapshot.inMeeting === false).length,
+  };
+  const signalTypes = launchGate.reports?.captured?.signal_types ?? [];
+  const requireMeetingEnd = merged.requireMeetingEnd !== false && merged.require_meeting_end !== false;
+  const capturePlan = buildMeetingAppLiveSnapshotCapturePlan(platform, merged);
+  const issues = [];
+  if (records.length === 0) {
+    issues.push(diagnosisIssue('error', 'missing_live_snapshots', 'No live DOM snapshots were supplied for this platform.', {
+      platform,
+    }));
+  }
+  if (selectorCounts.controls === 0) {
+    issues.push(diagnosisIssue('error', 'missing_controls', 'No meeting controls were detected; lifecycle detection is likely unreliable.', {
+      expected_selector_count: config.capture_options?.controlSelectors?.length ?? 0,
+    }));
+  }
+  if (selectorCounts.participants === 0) {
+    issues.push(diagnosisIssue('error', 'missing_participants', 'No participant tiles or roster rows were detected.', {
+      expected_selector_count: config.capture_options?.participantSelectors?.length ?? 0,
+    }));
+  }
+  if (launchGate.coverage?.meeting_id !== true) {
+    issues.push(diagnosisIssue('error', 'missing_meeting_identity', 'No stable meeting id or meeting URL was inferred from the snapshots.'));
+  }
+  if (launchGate.coverage?.meeting_started !== true) {
+    issues.push(diagnosisIssue('error', 'missing_meeting_start', 'The snapshots did not produce a meeting_started signal.'));
+  }
+  if (launchGate.coverage?.active_speaker !== true || launchGate.coverage?.speaker_started !== true) {
+    issues.push(diagnosisIssue('error', 'missing_active_speaker', 'The snapshots did not produce an active speaker / speaker_started signal.'));
+  }
+  if (requireMeetingEnd && launchGate.coverage?.meeting_ended !== true) {
+    issues.push(diagnosisIssue('error', 'missing_meeting_end', 'The snapshots did not prove a meeting_ended transition.'));
+  }
+  if (selectorCounts.texts === 0) {
+    issues.push(diagnosisIssue('warning', 'missing_text_surfaces', 'No status/title text surfaces were detected; provider-specific selector tuning may still be needed.'));
+  }
+  const accepted = issues.every((item) => item.severity !== 'error');
+  return compactObject({
+    type: 'meeting_app_dom_adaptation_diagnosis',
+    schema: MEETING_APP_DOM_ADAPTATION_DIAGNOSIS_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    platform,
+    display_name: config.display_name,
+    accepted,
+    production_ready: accepted && launchGate.production_ready === true,
+    evidence_level: launchGate.evidence_level,
+    evidence_count: launchGate.evidence_count,
+    record_count: records.length,
+    phases: uniqueList(records.map((record) => record.phase)),
+    selector_probe: {
+      capture_profile: config.capture_options?.captureProfile,
+      configured_selector_counts: {
+        controls: config.capture_options?.controlSelectors?.length ?? 0,
+        participants: config.capture_options?.participantSelectors?.length ?? 0,
+        texts: config.capture_options?.textSelectors?.length ?? 0,
+      },
+      matched_counts: selectorCounts,
+      matched: {
+        controls: selectorCounts.controls > 0,
+        participants: selectorCounts.participants > 0,
+        texts: selectorCounts.texts > 0,
+        active_speaker: selectorCounts.normalized_active_speaker_snapshots > 0,
+      },
+    },
+    observer_probe: {
+      signal_types: signalTypes,
+      coverage: launchGate.coverage,
+      missing_required_coverage: launchGate.missing_required_coverage ?? [],
+    },
+    runtime_probe: {
+      runtime_ready: launchGate.runtime_ready,
+      mutation_track_selector_count: config.runtime_options?.mutationTrackSelectors?.length ?? 0,
+      mutation_ignore_selector_count: config.runtime_options?.mutationIgnoreSelectors?.length ?? 0,
+      debounce_ms: config.runtime_options?.mutationDebounceMs,
+      speaker_stable_followup_ms: config.runtime_options?.speakerStableFollowupMs,
+    },
+    recommended_capture: {
+      minimum_record_count: capturePlan.minimum_record_count,
+      required_snapshot_ids: capturePlan.required_snapshots.map((step) => step.id),
+    },
+    next_actions: diagnosisNextActions(issues, launchGate),
+    issues,
+  });
+}
+
+export function buildAllMeetingAppDomAdaptationDiagnoses(options = {}) {
+  return Object.fromEntries(platformList(options).map((platform) => [
+    platform,
+    buildMeetingAppDomAdaptationDiagnosis(platform, options),
+  ]));
 }
 
 function buildEvidenceRecordSet(input = {}, options = {}) {
