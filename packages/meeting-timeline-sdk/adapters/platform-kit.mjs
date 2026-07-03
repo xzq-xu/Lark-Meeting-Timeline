@@ -64,6 +64,8 @@ import {
   buildMeetingAppExtensionInstallPlan,
   buildMeetingAppExtensionMatchPatterns,
   buildMeetingAppExtensionScaffold,
+  buildMeetingAppExtensionScaffoldAcceptanceReport,
+  assertMeetingAppExtensionScaffold,
 } from './meeting-app-extension.mjs';
 
 function firstNonEmpty(...values) {
@@ -170,6 +172,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
       env: fixtureInput.env,
     }),
     meeting_app_extension_install_plan: buildMeetingAppExtensionInstallPlan(options),
+    meeting_app_extension_acceptance: buildMeetingAppExtensionScaffoldAcceptanceReport(options),
     meeting_app_fixture_acceptance: meetingAppFixtureAcceptance,
     meeting_app_launch_gate: meetingAppLaunchGateSummary,
   };
@@ -278,6 +281,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppExtensionScaffold(extensionOptions = {}) {
       return buildMeetingAppExtensionScaffold(withDefaults(defaults, extensionOptions));
+    },
+    meetingAppExtensionAcceptance(extensionOptions = {}) {
+      return buildMeetingAppExtensionScaffoldAcceptanceReport(withDefaults(defaults, extensionOptions));
+    },
+    assertMeetingAppExtensionScaffold(extensionOptions = {}) {
+      return assertMeetingAppExtensionScaffold(withDefaults(defaults, extensionOptions));
     },
     assertMeetingAppLaunchGate(platform, gateOptions = {}) {
       return assertMeetingAppLaunchGate(platform, withDefaults(defaults, gateOptions));

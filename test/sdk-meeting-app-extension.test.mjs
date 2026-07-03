@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   MEETING_APP_EXTENSION_PLATFORM_KEYS,
   MEETING_APP_EXTENSION_PROFILES,
+  assertMeetingAppExtensionScaffold,
   buildMeetingAppContentScriptManifest,
   buildMeetingAppExtensionBackgroundSource,
   buildMeetingAppExtensionBuildSource,
@@ -11,6 +12,7 @@ import {
   buildMeetingAppExtensionMatchPatterns,
   buildMeetingAppExtensionPackageJson,
   buildMeetingAppExtensionScaffold,
+  buildMeetingAppExtensionScaffoldAcceptanceReport,
   meetingAppExtensionProfile,
   normalizeMeetingAppExtensionPlatform,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-extension.mjs';
@@ -131,6 +133,27 @@ assert.equal(scaffold.files.find((file) => file.path === 'manifest.json').mime, 
 assert.match(scaffold.files.find((file) => file.path === 'src/content-script.entry.mjs').content, /meeting-app-content-script/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /runtimeApi\(\)\?\.onMessage/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /npm run build/);
+
+const scaffoldReport = buildMeetingAppExtensionScaffoldAcceptanceReport(scaffold);
+assert.equal(scaffoldReport.accepted, true);
+assert.deepEqual(scaffoldReport.platforms, ['google_meet']);
+assert.equal(scaffoldReport.accepted_platform_count, 1);
+assert.equal(scaffoldReport.manifest.uses_all_urls, false);
+assert.deepEqual(scaffoldReport.issues, []);
+assert.equal(assertMeetingAppExtensionScaffold(scaffold).accepted, true);
+
+const unsafeScaffold = buildMeetingAppExtensionScaffold({ platforms: ['google_meet'] });
+const unsafeManifestFile = unsafeScaffold.files.find((file) => file.path === 'manifest.json');
+const unsafeManifest = JSON.parse(unsafeManifestFile.content);
+unsafeManifest.host_permissions = ['<all_urls>'];
+unsafeManifestFile.content = `${JSON.stringify(unsafeManifest, null, 2)}\n`;
+const unsafeReport = buildMeetingAppExtensionScaffoldAcceptanceReport(unsafeScaffold);
+assert.equal(unsafeReport.accepted, false);
+assert.equal(unsafeReport.issues.some((item) => item.code === 'overbroad_host_permission'), true);
+assert.throws(
+  () => assertMeetingAppExtensionScaffold(unsafeScaffold),
+  /Meeting app extension scaffold acceptance failed/,
+);
 
 assert.throws(
   () => meetingAppExtensionProfile('unknown-meeting'),

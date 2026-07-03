@@ -117,6 +117,21 @@ export interface MeetingAppExtensionScaffold {
   validation: Record<string, unknown>;
 }
 
+export interface MeetingAppExtensionScaffoldAcceptanceReport {
+  type: 'meeting_app_extension_scaffold_acceptance_report';
+  schema: 'meeting_app_extension_profile';
+  version: number;
+  accepted: boolean;
+  platforms: MeetingAppExtensionPlatform[];
+  accepted_platform_count: number;
+  platform_count: number;
+  coverage_by_platform: Partial<Record<MeetingAppExtensionPlatform, Record<string, unknown>>>;
+  files: string[];
+  manifest: Record<string, unknown>;
+  bundle: Record<string, unknown>;
+  issues: Array<Record<string, unknown>>;
+}
+
 export const MEETING_APP_EXTENSION_SCHEMA: 'meeting_app_extension_profile';
 export const MEETING_APP_EXTENSION_PLATFORM_KEYS: readonly MeetingAppExtensionPlatform[];
 export const MEETING_APP_EXTENSION_PROFILES: Readonly<Record<MeetingAppExtensionPlatform, Readonly<MeetingAppExtensionProfile>>>;
@@ -148,5 +163,15 @@ export function buildMeetingAppExtensionBuildSource(options?: MeetingAppExtensio
 export function buildMeetingAppExtensionReadme(options?: MeetingAppExtensionOptions): string;
 
 export function buildMeetingAppExtensionScaffold(options?: MeetingAppExtensionOptions): MeetingAppExtensionScaffold;
+
+export function buildMeetingAppExtensionScaffoldAcceptanceReport(
+  scaffoldOrOptions?: MeetingAppExtensionScaffold | MeetingAppExtensionOptions,
+  options?: MeetingAppExtensionOptions,
+): MeetingAppExtensionScaffoldAcceptanceReport;
+
+export function assertMeetingAppExtensionScaffold(
+  scaffoldOrOptions?: MeetingAppExtensionScaffold | MeetingAppExtensionOptions,
+  options?: MeetingAppExtensionOptions,
+): MeetingAppExtensionScaffoldAcceptanceReport;
 
 export default buildMeetingAppExtensionInstallPlan;

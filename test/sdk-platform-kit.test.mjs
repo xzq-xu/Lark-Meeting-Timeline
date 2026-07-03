@@ -137,6 +137,16 @@ const extensionScaffold = kit.meetingAppExtensionScaffold({
 assert.equal(extensionScaffold.type, 'meeting_app_extension_scaffold');
 assert.equal(extensionScaffold.manifest.host_permissions.includes(`${baseUrl}/*`), true);
 assert.equal(extensionScaffold.files.some((file) => file.path === 'src/content-script.entry.mjs'), true);
+const extensionAcceptance = kit.meetingAppExtensionAcceptance({
+  platforms: ['google-meet'],
+  baseUrl,
+});
+assert.equal(extensionAcceptance.accepted, true);
+assert.equal(extensionAcceptance.accepted_platform_count, 1);
+assert.equal(kit.assertMeetingAppExtensionScaffold({
+  platforms: ['google-meet'],
+  baseUrl,
+}).accepted, true);
 
 assert.equal(kit.assertMeetingAppLaunchGate('webex', {
   allowFixtureProduction: true,
@@ -182,6 +192,8 @@ assert.equal(report.webhook_router.base_path, basePath);
 assert.equal(report.fixture_acceptance.accepted_count, 6);
 assert.equal(report.meeting_app_extension_install_plan.platforms.length, 5);
 assert.equal(report.meeting_app_extension_install_plan.matches.includes('https://meet.google.com/*'), true);
+assert.equal(report.meeting_app_extension_acceptance.accepted, true);
+assert.equal(report.meeting_app_extension_acceptance.accepted_platform_count, 5);
 assert.equal(report.meeting_app_fixture_acceptance.accepted, true);
 assert.equal(report.meeting_app_fixture_acceptance.accepted_count, 5);
 assert.equal(report.meeting_app_launch_gate.ok, false);

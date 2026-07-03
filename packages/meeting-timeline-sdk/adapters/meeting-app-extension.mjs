@@ -164,6 +164,30 @@ function sourceFile(path, content, role, mime = 'text/plain') {
   };
 }
 
+function issue(severity, code, message, details = {}) {
+  return compactObject({ severity, code, message, ...details });
+}
+
+function fileByPath(scaffold = {}, path) {
+  return asArray(scaffold.files).find((file) => file?.path === path);
+}
+
+function jsonFromFile(scaffold = {}, path, issues = []) {
+  const file = fileByPath(scaffold, path);
+  if (!file) {
+    issues.push(issue('error', `missing_${path.replace(/[^a-z0-9]/gi, '_')}`, `Missing ${path}.`));
+    return undefined;
+  }
+  try {
+    return JSON.parse(file.content);
+  } catch (error) {
+    issues.push(issue('error', `invalid_${path.replace(/[^a-z0-9]/gi, '_')}`, `${path} is not valid JSON.`, {
+      error: String(error?.message ?? error),
+    }));
+    return undefined;
+  }
+}
+
 function platformList(input = {}) {
   const platforms = firstNonEmpty(
     input.platforms,
@@ -640,6 +664,177 @@ export function buildMeetingAppExtensionScaffold(options = {}) {
       platform_count: installPlan.platforms.length,
     },
   });
+}
+
+export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptions = {}, options = {}) {
+  const scaffold = scaffoldOrOptions?.type === 'meeting_app_extension_scaffold'
+    ? scaffoldOrOptions
+    : buildMeetingAppExtensionScaffold(scaffoldOrOptions);
+  const reportOptions = scaffoldOrOptions?.type === 'meeting_app_extension_scaffold' ? options : scaffoldOrOptions;
+  const issues = [];
+  const requiredPlatforms = platformList({
+    ...reportOptions,
+    platforms: firstNonEmpty(
+      reportOptions.platforms,
+      reportOptions.platform_keys,
+      reportOptions.platformKeys,
+      reportOptions.platform,
+      scaffold.install_plan?.platforms,
+    ),
+  });
+  const filePaths = asArray(scaffold.files).map((file) => file.path);
+  const requiredFiles = [
+    'package.json',
+    'build.mjs',
+    'manifest.json',
+    scaffold.bundle?.content_script_input ?? 'src/content-script.entry.mjs',
+    scaffold.bundle?.background_input ?? 'src/background.entry.mjs',
+    'README.md',
+  ];
+  for (const path of requiredFiles) {
+    if (!filePaths.includes(path)) {
+      issues.push(issue('error', 'missing_scaffold_file', `Missing generated scaffold file: ${path}.`, { path }));
+    }
+  }
+
+  const manifest = jsonFromFile(scaffold, 'manifest.json', issues) ?? scaffold.manifest ?? {};
+  const packageJson = jsonFromFile(scaffold, 'package.json', issues) ?? {};
+  const buildFile = fileByPath(scaffold, 'build.mjs');
+  const contentEntry = fileByPath(scaffold, scaffold.bundle?.content_script_input ?? 'src/content-script.entry.mjs');
+  const backgroundEntry = fileByPath(scaffold, scaffold.bundle?.background_input ?? 'src/background.entry.mjs');
+  const readme = fileByPath(scaffold, 'README.md');
+
+  if (manifest.manifest_version !== 3) {
+    issues.push(issue('error', 'manifest_not_mv3', 'Extension manifest must use manifest_version 3.', {
+      manifest_version: manifest.manifest_version,
+    }));
+  }
+  if (asArray(manifest.host_permissions).includes('<all_urls>')) {
+    issues.push(issue('error', 'overbroad_host_permission', 'Extension scaffold must not request <all_urls>.'));
+  }
+  if (!manifest.background?.service_worker) {
+    issues.push(issue('error', 'missing_background_worker', 'Manifest is missing a background service worker.'));
+  }
+  if (manifest.background?.type !== 'module') {
+    issues.push(issue('warning', 'background_worker_not_module', 'Background service worker should be module typed.'));
+  }
+  const contentScript = asArray(manifest.content_scripts)[0];
+  if (!contentScript) {
+    issues.push(issue('error', 'missing_content_script', 'Manifest is missing content_scripts[0].'));
+  } else {
+    if (asArray(contentScript.matches).length === 0) {
+      issues.push(issue('error', 'missing_content_script_matches', 'Content script has no match patterns.'));
+    }
+    if (!asArray(contentScript.js).includes(scaffold.bundle?.content_script_output ?? 'content-script.js')) {
+      issues.push(issue('error', 'content_script_output_mismatch', 'Manifest content script output does not match scaffold bundle output.', {
+        expected: scaffold.bundle?.content_script_output,
+        actual: contentScript.js,
+      }));
+    }
+  }
+  if (manifest.background?.service_worker !== scaffold.bundle?.background_output) {
+    issues.push(issue('error', 'background_output_mismatch', 'Manifest background worker does not match scaffold bundle output.', {
+      expected: scaffold.bundle?.background_output,
+      actual: manifest.background?.service_worker,
+    }));
+  }
+
+  if (!packageJson.dependencies?.['@ai-annotation/meeting-timeline-sdk']) {
+    issues.push(issue('error', 'missing_sdk_dependency', 'package.json must depend on @ai-annotation/meeting-timeline-sdk.'));
+  }
+  if (!packageJson.devDependencies?.esbuild) {
+    issues.push(issue('error', 'missing_esbuild_dependency', 'package.json must include esbuild as a devDependency.'));
+  }
+  if (packageJson.scripts?.build !== 'node build.mjs') {
+    issues.push(issue('warning', 'unexpected_build_script', 'package.json scripts.build should run node build.mjs.', {
+      actual: packageJson.scripts?.build,
+    }));
+  }
+
+  const buildContent = buildFile?.content ?? '';
+  if (!buildContent.includes(scaffold.bundle?.content_script_input ?? 'src/content-script.entry.mjs')) {
+    issues.push(issue('error', 'build_missing_content_entry', 'build.mjs does not include the content script entry.'));
+  }
+  if (!buildContent.includes(scaffold.bundle?.background_input ?? 'src/background.entry.mjs')) {
+    issues.push(issue('error', 'build_missing_background_entry', 'build.mjs does not include the background entry.'));
+  }
+  if (!buildContent.includes('format: "iife"')) {
+    issues.push(issue('error', 'build_missing_content_iife', 'build.mjs should bundle the content script as an IIFE.'));
+  }
+  if (!buildContent.includes('format: "esm"')) {
+    issues.push(issue('error', 'build_missing_background_esm', 'build.mjs should bundle the background worker as ESM.'));
+  }
+
+  const contentEntryContent = contentEntry?.content ?? '';
+  if (!contentEntryContent.includes('installMeetingAppContentScriptBridge')) {
+    issues.push(issue('error', 'content_entry_missing_bridge', 'Content script entry does not install the SDK bridge.'));
+  }
+  if (!contentEntryContent.includes('startRuntime: true')) {
+    issues.push(issue('error', 'content_entry_not_starting_runtime', 'Content script entry does not start the browser runtime.'));
+  }
+  const backgroundContent = backgroundEntry?.content ?? '';
+  for (const endpoint of ['/api/meeting-session/start', '/api/meeting-session/end', '/api/annotations', '/api/annotations/batch']) {
+    if (!backgroundContent.includes(endpoint)) {
+      issues.push(issue('error', 'background_missing_timeline_endpoint', `Background entry is missing ${endpoint}.`, { endpoint }));
+    }
+  }
+  if (!readme?.content?.includes('npm run build')) {
+    issues.push(issue('warning', 'readme_missing_build_step', 'README should document npm run build.'));
+  }
+
+  const matches = asArray(contentScript?.matches);
+  const hostPermissions = asArray(manifest.host_permissions);
+  const coverageByPlatform = Object.fromEntries(requiredPlatforms.map((platform) => {
+    const profile = MEETING_APP_EXTENSION_PROFILES[platform];
+    const missingMatches = profile.matches.filter((pattern) => !matches.includes(pattern));
+    const missingHostPermissions = profile.host_permissions.filter((pattern) => !hostPermissions.includes(pattern));
+    if (missingMatches.length > 0) {
+      issues.push(issue('error', 'missing_platform_match_patterns', `Missing content script match patterns for ${platform}.`, {
+        platform,
+        missing: missingMatches,
+      }));
+    }
+    if (missingHostPermissions.length > 0) {
+      issues.push(issue('error', 'missing_platform_host_permissions', `Missing host permissions for ${platform}.`, {
+        platform,
+        missing: missingHostPermissions,
+      }));
+    }
+    return [platform, {
+      matches: missingMatches.length === 0,
+      host_permissions: missingHostPermissions.length === 0,
+      accepted: missingMatches.length === 0 && missingHostPermissions.length === 0,
+    }];
+  }));
+  const accepted = issues.every((item) => item.severity !== 'error');
+  return compactObject({
+    type: 'meeting_app_extension_scaffold_acceptance_report',
+    schema: MEETING_APP_EXTENSION_SCHEMA,
+    version: 1,
+    accepted,
+    platforms: requiredPlatforms,
+    accepted_platform_count: Object.values(coverageByPlatform).filter((item) => item.accepted).length,
+    platform_count: requiredPlatforms.length,
+    coverage_by_platform: coverageByPlatform,
+    files: filePaths,
+    manifest: {
+      manifest_version: manifest.manifest_version,
+      host_permissions: hostPermissions,
+      content_script_count: asArray(manifest.content_scripts).length,
+      background_service_worker: manifest.background?.service_worker,
+      uses_all_urls: hostPermissions.includes('<all_urls>'),
+    },
+    bundle: scaffold.bundle,
+    issues,
+  });
+}
+
+export function assertMeetingAppExtensionScaffold(scaffoldOrOptions = {}, options = {}) {
+  const report = buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptions, options);
+  if (!report.accepted) {
+    throw new MeetingTimelineSdkError('Meeting app extension scaffold acceptance failed', report);
+  }
+  return report;
 }
 
 export default buildMeetingAppExtensionInstallPlan;
