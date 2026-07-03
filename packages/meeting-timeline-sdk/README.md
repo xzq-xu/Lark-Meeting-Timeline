@@ -243,6 +243,20 @@ const bundle = buildMeetingPlatformFieldEvidenceBundle('google-meet', {
 
 在宿主项目里也可以通过 `kit.platformFieldEvidenceBundle()` 和 `kit.platformFieldEvidenceMatrix()` 调用同一套逻辑，用于批量比较 Google Meet / Teams / Zoom / Webex 的真实采样进度。
 
+对应 CLI 可直接把现场采样目录转换成 bundle 和 evidence package。目录里的 JSON 可以是原始采样输入、按平台分组的对象、已有 evidence package，或上一次导出的 bundle：
+
+```sh
+npm run meeting-platform:field-evidence -- \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex \
+  --dir=data/meeting-platform-field-evidence \
+  --package-dir=data/meeting-platform-evidence-packages \
+  --bundle-dir=data/meeting-platform-field-evidence-bundles \
+  --report-file=data/meeting-platform-field-evidence-report.json
+```
+
+默认会要求 production-ready；如果只是验证“能否实时落轴”，可以加 `--require-production-ready=false`，此时 DOM-only 但缺 provider 回填的平台会按 pilot 状态通过。
+
 对应 CLI 可以直接放到现场采样工具或 CI：
 
 ```sh
