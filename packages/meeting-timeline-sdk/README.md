@@ -1446,6 +1446,18 @@ const providerMatrix = buildMeetingPlatformProviderConnectionMatrix({
 });
 ```
 
+对应的命令行报告可以在接入项目或 CI 里跑：
+
+```sh
+npm run meeting-platform:provider-connection -- \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex \
+  --subscriptions-file=data/provider-subscriptions.json \
+  --report-file=data/meeting-platform-provider-connection-report.json
+```
+
+`subscriptions-file` 可以是平台到订阅参数的 JSON map；例如 `google_meet.pubsubTopic`、`microsoft_teams.joinWebUrl`、`zoom.webhookUrl`、`webex.targetUrl`。报告会列出缺失的 secret/env、官方文档链接、事件映射和 `provider_events_block_realtime=false` 的实时标注约束。
+
 如果要给另一个项目一个更完整的“可改造骨架”，用 `platform-host-integration` 生成 host scaffold。它会输出 `package.json`、timeline client、host wrapper、framework-neutral HTTP route、handoff/readiness 脚本和 README：
 
 ```js
