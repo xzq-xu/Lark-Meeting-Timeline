@@ -404,6 +404,8 @@ SDK 还导出 `MEETING_PLATFORM_KEYS`、`MEETING_PLATFORM_ALIASES` 和 `normaliz
 
 适配开发早期可以先跑 `@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-sample`。`runMeetingPlatformAdapterSample('google-meet')` 会用 fixture 级本地会议页快照、provider start/end/participant/transcript 事件和一条 `capturedAtMs` 标注，完整调用 live adapter 的 `observeMeetingApp()`、`insertAnnotation()`、`ingestProvider()`、`exportPackage()` 和 `verify()`，产出 `meeting_platform_adapter_sample`。`runMeetingPlatformAdapterSampleMatrix()` 默认覆盖 Google Meet、Microsoft Teams、Zoom、Webex、Lark；仓库命令 `npm run meeting-platform:adapter-sample` 会把每个平台 sample 写到 `data/meeting-platform-adapter-samples/`。这不是生产证据，只是 adapter 开发的第一道 smoke gate：证明 SDK 调用面、时间戳契约、provider 非阻塞策略和 evidence package 复验链路同时跑通。通过 sample 后，仍然需要真实 DOM snapshot 和真实 provider capture records 才能进入 `production_ready` 结论。
 
+开始真实会议采样前，用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake` 生成现场接入计划。`buildMeetingPlatformFieldIntakePlan(platform, { baseUrl, env, evidenceDir })` 会把 provider connection、field capture manifest、collector config 和 real-intake gate 串成一个 `meeting_platform_field_intake_plan`：里面明确列出 provider endpoint、缺失安全环境变量、需要采的本地 observer 快照、provider start/end coverage、`captured_at_ms` 标注样本要求、输出文件路径、CLI 命令和 operator steps。`buildMeetingPlatformFieldIntakeMatrix()` 默认覆盖 Google Meet、Microsoft Teams、Zoom、Webex、Lark；仓库命令 `npm run meeting-platform:field-intake` 会写出 `data/meeting-platform-field-intake-plans/*.json` 和 `data/meeting-platform-field-intake-report.json`。这一步的定位是“采样前的执行单”，不是验收结论：如果它显示 `provider_setup_missing_env`，先补 provider 安全配置；如果显示 `needs_local_observer_capture` 或 `needs_provider_event_capture`，按计划采真实会议页和官方事件证据。
+
 进入真实平台验证时，用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-real-intake` 做第二道 gate。`buildMeetingPlatformRealEvidenceIntakeReport(platform, input)` 会同时检查真实 provider capture records、真实会议 App DOM/native observer records、`captured_at_ms`、fixture/synthetic 证据污染、evidence package 复验和 live adapter readiness；`assertMeetingPlatformRealEvidenceIntakeMatrix()` 可一次覆盖 Google Meet、Microsoft Teams、Zoom、Webex、Lark。这个入口默认拒绝 fixture evidence，只有 provider 安全配置、真实会议页观察和证据包复验都通过时才返回 `accepted=true`，适合作为“可以交给宿主项目进入 pilot/production”的 SDK 级验收对象。仓库命令 `npm run meeting-platform:real-intake` 会读取 `data/provider-evidence/`、`data/meeting-app-evidence/` 和 `data/meeting-platform-evidence-packages/`，输出 `data/meeting-platform-real-intake-report.json`；现场采样时也可以显式传 `--provider-dir`、`--dom-dir`、`--package-dir`、`--platforms` 和 `--fail-on-incomplete=true`。
 
 SDK 包结构建议：
@@ -431,6 +433,8 @@ packages/meeting-timeline-sdk/
     platform-adapter-contract.d.ts
     platform-adapter-sample.mjs
     platform-adapter-sample.d.ts
+    platform-field-intake.mjs
+    platform-field-intake.d.ts
     platform-real-intake.mjs
     platform-real-intake.d.ts
     platform-host-integration.mjs

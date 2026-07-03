@@ -93,6 +93,11 @@ import type {
   MeetingPlatformFieldCaptureOptions,
   MeetingPlatformFieldCapturePlan,
 } from './platform-field-capture.mjs';
+import type {
+  MeetingPlatformFieldIntakeMatrix,
+  MeetingPlatformFieldIntakeOptions,
+  MeetingPlatformFieldIntakePlan,
+} from './platform-field-intake.mjs';
 import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type {
@@ -256,6 +261,8 @@ export interface MeetingPlatformTimelineKit {
   platformFieldCollectorConfigMatrix(collectorOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCollectorConfigMatrix;
   platformFieldEvidenceBundle(platform: string, input?: MeetingPlatformEvidencePackage | MeetingPlatformEvidencePackageOptions, bundleOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldEvidenceBundle;
   platformFieldEvidenceMatrix(matrixOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldEvidenceMatrix;
+  platformFieldIntakePlan(platform: string, intakeOptions?: MeetingPlatformFieldIntakeOptions): MeetingPlatformFieldIntakePlan;
+  platformFieldIntakeMatrix(intakeOptions?: MeetingPlatformFieldIntakeOptions): MeetingPlatformFieldIntakeMatrix;
   meetingAppSnapshotRecorder(recorderOptions?: MeetingAppSnapshotRecordOptions): MeetingAppSnapshotRecorder;
   meetingAppGateInputFromRecords(records?: MeetingAppSnapshotRecord[] | MeetingAppSnapshotRecordSet, recordOptions?: MeetingAppSnapshotRecordOptions): Record<string, unknown>;
   meetingAppIntegrationProfile(platform: string, profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppIntegrationProfile;

@@ -132,6 +132,10 @@ import {
   buildMeetingPlatformFieldCapturePlan,
 } from './platform-field-capture.mjs';
 import {
+  buildMeetingPlatformFieldIntakeMatrix,
+  buildMeetingPlatformFieldIntakePlan,
+} from './platform-field-intake.mjs';
+import {
   assertAllMeetingAppLaunchGates,
   assertMeetingAppLaunchGate,
   buildMeetingAppLaunchGate,
@@ -311,6 +315,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_field_capture_matrix: buildMeetingPlatformFieldCaptureMatrix(options),
     platform_field_capture_manifest_matrix: buildMeetingPlatformFieldCaptureManifestMatrix(options),
     platform_field_collector_config_matrix: buildMeetingPlatformFieldCollectorConfigMatrix(options),
+    platform_field_intake_matrix: buildMeetingPlatformFieldIntakeMatrix(options),
   };
 }
 
@@ -590,6 +595,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformFieldEvidenceMatrix(matrixOptions = {}) {
       return buildMeetingPlatformFieldEvidenceMatrix(withDefaults(defaults, matrixOptions));
+    },
+    platformFieldIntakePlan(platform, intakeOptions = {}) {
+      return buildMeetingPlatformFieldIntakePlan(platform, withDefaults(defaults, intakeOptions));
+    },
+    platformFieldIntakeMatrix(intakeOptions = {}) {
+      return buildMeetingPlatformFieldIntakeMatrix(withDefaults(defaults, intakeOptions));
     },
     meetingAppSnapshotRecorder(recorderOptions = {}) {
       return createMeetingAppSnapshotRecorder(withDefaults(defaults, recorderOptions));

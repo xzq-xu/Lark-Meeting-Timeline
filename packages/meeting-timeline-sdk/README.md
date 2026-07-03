@@ -131,6 +131,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-host-integration`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures`
@@ -244,6 +245,29 @@ const bundle = buildMeetingPlatformFieldEvidenceBundle('google-meet', {
 
 在宿主项目里也可以通过 `kit.platformFieldEvidenceBundle()` 和 `kit.platformFieldEvidenceMatrix()` 调用同一套逻辑，用于批量比较 Google Meet / Teams / Zoom / Webex 的真实采样进度。
 
+现场第一次接入某个会议软件时，建议先生成 field intake plan。它把 provider connection、field capture manifest、collector config 和 real-intake gate 串成一份执行单：哪些环境变量缺失、provider endpoint 是什么、需要采哪些本地 observer 快照、provider start/end coverage 要求是什么、原始 JSON 和 evidence package 应写到哪里、下一步跑哪个命令：
+
+```js
+import {
+  buildMeetingPlatformFieldIntakeMatrix,
+  buildMeetingPlatformFieldIntakePlan,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake';
+
+const googleIntake = buildMeetingPlatformFieldIntakePlan('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+  env: process.env,
+  evidenceDir: 'data',
+});
+
+const matrix = buildMeetingPlatformFieldIntakeMatrix({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+// googleIntake.operator_steps 可直接渲染成现场采样流程。
+// matrix.rows 可用于多会议软件接入看板。
+```
+
 现场采样工具如果需要一份机器可读的接入说明，先生成 manifest。它会把“要采哪些 provider 事件 / DOM 快照、原始 JSON 允许哪些形态、输出文件写到哪里、用哪个 CLI 验收”放在同一个对象里：
 
 ```js
@@ -332,6 +356,16 @@ npm run meeting-platform:adapter-contract -- \
 CLI 报告会同时输出 `acceptance`。默认 `--acceptance-target=contract` 只检查 contract 是否能被宿主项目安全接入；如果要把真实证据也纳入 gate，可以用 `--acceptance-target=production --fail-on-rejected=true`，此时缺真实 DOM / provider start-end 样本的平台会失败。
 
 也可以直接导出每个平台一份 manifest 文件，给 Chrome 扩展、本地 host 或 provider recorder 读取：
+
+```sh
+npm run meeting-platform:field-intake -- \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --out-dir=data/meeting-platform-field-intake-plans \
+  --report-file=data/meeting-platform-field-intake-report.json
+```
+
+这一步输出的是“采样前执行单”，不是生产验收；最终仍要跑 `meeting-platform:real-intake` 或 `platform-live-adapter` readiness。
 
 ```sh
 npm run meeting-platform:field-manifest -- \

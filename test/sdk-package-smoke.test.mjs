@@ -49,6 +49,8 @@ assert.equal(packedFiles.includes('adapters/platform-adapter-sample.mjs'), true)
 assert.equal(packedFiles.includes('adapters/platform-adapter-sample.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-real-intake.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-real-intake.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-field-intake.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-field-intake.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.d.ts'), true);
 assert.equal(packedFiles.includes('README.md'), true);
@@ -136,6 +138,10 @@ import {
   buildMeetingPlatformRealEvidenceIntakePlan,
   buildMeetingPlatformRealEvidenceIntakeReport,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-real-intake';
+import {
+  buildMeetingPlatformFieldIntakeMatrix,
+  buildMeetingPlatformFieldIntakePlan,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake';
 import {
   buildMeetingPlatformFieldCaptureManifest,
   buildMeetingPlatformFieldCollectorConfig,
@@ -298,6 +304,13 @@ assert.equal(buildMeetingPlatformRealEvidenceIntakeReport('google-meet', {}, {
   baseUrl: 'http://localhost:8787',
   requireProductionReady: false,
 }).accepted, false);
+assert.equal(buildMeetingPlatformFieldIntakePlan('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).schema, 'meeting_platform_field_intake_plan');
+assert.equal(buildMeetingPlatformFieldIntakeMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet', 'zoom'],
+}).platform_count, 2);
 
 const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {
   providerRecords: [],
@@ -338,6 +351,8 @@ assert.equal(kit.platformFieldCollectorConfig('google-meet').schema, 'meeting_pl
 assert.equal(kit.platformFieldEvidenceBundle('google-meet', evidencePackage, {
   requireProductionReady: false,
 }).field_capture_plan.schema, 'meeting_platform_field_capture_plan');
+assert.equal(kit.platformFieldIntakePlan('google-meet').schema, 'meeting_platform_field_intake_plan');
+assert.equal(kit.platformFieldIntakeMatrix({ platforms: ['zoom'] }).platform_count, 1);
 
 const gate = buildMeetingAppLaunchGate('google-meet', {
   allowFixtureEvidence: true,
