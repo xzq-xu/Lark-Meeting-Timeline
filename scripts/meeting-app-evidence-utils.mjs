@@ -28,6 +28,9 @@ export function parseCliArgs(argv = process.argv.slice(2)) {
 export function extractRecordSet(input = {}) {
   if (input?.schema === 'meeting_app_snapshot_record_set') return input;
   if (input?.type === 'meeting_app_live_evidence_package' && input.record_set) return input.record_set;
+  if (input?.schema === 'meeting_platform_evidence_package' && input.meeting_app_record_set) return input.meeting_app_record_set;
+  if (input?.meeting_app_record_set) return input.meeting_app_record_set;
+  if (input?.meetingAppRecordSet) return input.meetingAppRecordSet;
   if (input?.record_set) return input.record_set;
   if (input?.recordSet) return input.recordSet;
   if (input?.snapshot_records) return buildMeetingAppSnapshotRecordSet(input.snapshot_records, {

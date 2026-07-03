@@ -64,7 +64,7 @@ npm run meeting-app:evidence-matrix
 npm run meeting-platform:rollout-matrix
 ```
 
-它会写出 `data/meeting-platform-rollout-matrix.json`，把 provider start/end 事件证据和本地 DOM 证据合成 `production_ready` / `realtime_ready_provider_pending` / `needs_live_dom_and_provider_evidence` 等状态，用来判断某个平台是否能先进入真实 pilot。
+它会写出 `data/meeting-platform-rollout-matrix.json`，把 provider start/end 事件证据、本地 DOM 证据，以及 `data/meeting-platform-evidence-packages/` 里的 SDK handoff 包合成 `production_ready` / `realtime_ready_provider_pending` / `needs_live_dom_and_provider_evidence` 等状态，用来判断某个平台是否能先进入真实 pilot。
 
 如果别的项目已经交付了 SDK `platform-evidence-package`，把 JSON 放进 `data/meeting-platform-evidence-packages/` 后直接复验：
 

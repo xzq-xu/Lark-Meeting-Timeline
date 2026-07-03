@@ -6,6 +6,9 @@ import {
   PLATFORM_EVENT_CAPTURE_SCHEMA,
 } from '../packages/meeting-timeline-sdk/adapters/platform-capture.mjs';
 import {
+  MEETING_PLATFORM_EVIDENCE_PACKAGE_SCHEMA,
+} from '../packages/meeting-timeline-sdk/adapters/platform-evidence-package.mjs';
+import {
   buildMeetingAppSnapshotRecordSet,
   meetingAppSnapshotRecords,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder.mjs';
@@ -38,8 +41,15 @@ const domDir = resolve(String(
     || args.get('app-dir')
     || 'data/meeting-app-evidence',
 ));
+const packageDir = resolve(String(
+  args.get('package-dir')
+    || args.get('evidence-package-dir')
+    || args.get('handoff-dir')
+    || 'data/meeting-platform-evidence-packages',
+));
 const providerInputList = String(args.get('provider-inputs') || args.get('provider-input') || '').split(',').map((item) => item.trim()).filter(Boolean);
 const domInputList = String(args.get('dom-inputs') || args.get('dom-input') || '').split(',').map((item) => item.trim()).filter(Boolean);
+const packageInputList = String(args.get('package-inputs') || args.get('package-input') || args.get('evidence-package-inputs') || args.get('evidence-package-input') || '').split(',').map((item) => item.trim()).filter(Boolean);
 const jsonOutput = args.get('json') === 'true';
 const reportFile = String(args.get('report-file') || args.get('write-report') || '');
 const baseUrl = String(args.get('base-url') || args.get('baseUrl') || 'http://localhost:8787');
@@ -176,6 +186,37 @@ async function readDomEvidence(file) {
   };
 }
 
+async function readPackageEvidence(file) {
+  const text = await readFile(file, 'utf8');
+  const input = JSON.parse(text);
+  const recordSet = extractRecordSet(input);
+  const records = providerRecordsFromInput(input);
+  const sampleGroups = sampleGroupsFromInput(input);
+  const domRecords = meetingAppSnapshotRecords(recordSet);
+  const platforms = unique([
+    ...asArray(input.platforms),
+    ...asArray(input.platform),
+    input.rollout_plan?.platform,
+    ...records.map((record) => record.platform ?? record.provider ?? record.adapter),
+    ...sampleGroups.keys(),
+    ...asArray(recordSet.platforms),
+    ...domRecords.map((record) => record.platform ?? record.provider),
+  ]).map((item) => normalizePlatformKey(item));
+  const stats = await stat(file);
+  return {
+    file,
+    input,
+    schema_ok: input?.schema === MEETING_PLATFORM_EVIDENCE_PACKAGE_SCHEMA,
+    records,
+    sampleGroups,
+    recordSet,
+    domRecords,
+    platforms,
+    bytes: Buffer.byteLength(text, 'utf8'),
+    modified_at_ms: Math.round(stats.mtimeMs),
+  };
+}
+
 function aggregateProvider(evaluations = []) {
   const recordsByPlatform = new Map();
   const samplesByPlatform = new Map();
@@ -198,7 +239,7 @@ function aggregateDom(evaluations = []) {
   const recordsByPlatform = new Map();
   const filesByPlatform = new Map();
   for (const evidence of evaluations) {
-    for (const record of evidence.records) {
+    for (const record of evidence.domRecords ?? evidence.records ?? []) {
       const platform = platformFromRecord(record);
       addMapList(recordsByPlatform, platform, [record]);
       addMapList(filesByPlatform, platform, [evidence.file]);
@@ -237,8 +278,10 @@ function summarizePlan(plan = {}, providerFiles = [], domFiles = []) {
 async function loadEvidence() {
   const providerFiles = await evidenceFiles(providerInputList, providerDir);
   const domFiles = await evidenceFiles(domInputList, domDir);
+  const packageFiles = await evidenceFiles(packageInputList, packageDir);
   const providerEvaluations = [];
   const domEvaluations = [];
+  const packageEvaluations = [];
   const errors = [];
   for (const file of providerFiles) {
     try {
@@ -254,12 +297,25 @@ async function loadEvidence() {
       errors.push({ kind: 'dom', file, error: String(error?.message ?? error) });
     }
   }
-  return { providerFiles, domFiles, providerEvaluations, domEvaluations, errors };
+  for (const file of packageFiles) {
+    try {
+      packageEvaluations.push(await readPackageEvidence(file));
+    } catch (error) {
+      errors.push({ kind: 'package', file, error: String(error?.message ?? error) });
+    }
+  }
+  return { providerFiles, domFiles, packageFiles, providerEvaluations, domEvaluations, packageEvaluations, errors };
 }
 
 function buildMatrix(loaded) {
-  const provider = aggregateProvider(loaded.providerEvaluations);
-  const dom = aggregateDom(loaded.domEvaluations);
+  const provider = aggregateProvider([
+    ...loaded.providerEvaluations,
+    ...loaded.packageEvaluations,
+  ]);
+  const dom = aggregateDom([
+    ...loaded.domEvaluations,
+    ...loaded.packageEvaluations,
+  ]);
   const rows = [];
   const plans = [];
   for (const rawPlatform of requiredPlatforms) {
@@ -298,12 +354,16 @@ function buildMatrix(loaded) {
     base_url: baseUrl,
     provider_evidence_dir: providerInputList.length > 0 ? null : providerDir,
     dom_evidence_dir: domInputList.length > 0 ? null : domDir,
+    package_evidence_dir: packageInputList.length > 0 ? null : packageDir,
     provider_input_files: loaded.providerFiles,
     dom_input_files: loaded.domFiles,
+    package_input_files: loaded.packageFiles,
     provider_file_count: loaded.providerFiles.length,
     dom_file_count: loaded.domFiles.length,
+    package_file_count: loaded.packageFiles.length,
     provider_evaluated_file_count: loaded.providerEvaluations.length,
     dom_evaluated_file_count: loaded.domEvaluations.length,
+    package_evaluated_file_count: loaded.packageEvaluations.length,
     required_platforms: requiredPlatforms,
     require_production_ready: requireProductionReady,
     production_ready_count: rows.filter((row) => row.production_ready).length,
@@ -330,7 +390,7 @@ try {
   if (jsonOutput) {
     console.log(JSON.stringify(summary, null, 2));
   } else {
-    console.log(`meeting_platform_rollout_matrix | ok=${boolLabel(summary.ok)} | production_ready=${boolLabel(summary.production_ready)} | realtime_ready=${boolLabel(summary.realtime_ready)} | provider_files=${summary.provider_evaluated_file_count}/${summary.provider_file_count} | dom_files=${summary.dom_evaluated_file_count}/${summary.dom_file_count}`);
+    console.log(`meeting_platform_rollout_matrix | ok=${boolLabel(summary.ok)} | production_ready=${boolLabel(summary.production_ready)} | realtime_ready=${boolLabel(summary.realtime_ready)} | provider_files=${summary.provider_evaluated_file_count}/${summary.provider_file_count} | dom_files=${summary.dom_evaluated_file_count}/${summary.dom_file_count} | package_files=${summary.package_evaluated_file_count}/${summary.package_file_count}`);
     for (const row of summary.rows) {
       console.log(`${row.platform}: status=${row.status} production_ready=${boolLabel(row.production_ready)} realtime_ready=${boolLabel(row.ready_for_realtime_annotations)} provider=${row.provider.evidence_level}/${row.provider.evidence_count} dom=${row.local_dom?.evidence_level ?? 'none'}/${row.local_dom?.evidence_count ?? 0}`);
     }
@@ -343,6 +403,7 @@ try {
     ok: false,
     provider_evidence_dir: providerDir,
     dom_evidence_dir: domDir,
+    package_evidence_dir: packageDir,
     error: String(error?.message ?? error),
   };
   if (jsonOutput) console.error(JSON.stringify(payload, null, 2));
