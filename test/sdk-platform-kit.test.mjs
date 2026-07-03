@@ -211,6 +211,9 @@ const contractMatrix = kit.platformAdapterContractMatrix({ platforms: ['google-m
 assert.equal(contractMatrix.platform_count, 2);
 assert.equal(contractMatrix.browser_observer_count, 2);
 assert.equal(contractMatrix.rows.find((row) => row.platform === 'microsoft_teams').provider_start_event_count, 1);
+assert.equal(kit.platformAdapterContractAcceptance('google-meet').accepted, true);
+assert.equal(kit.platformAdapterContractAcceptanceMatrix({ platforms: ['google-meet', 'teams'] }).accepted_count, 2);
+assert.equal(kit.assertPlatformAdapterContract('google-meet').accepted, true);
 
 const extensionMatches = kit.meetingAppExtensionMatches({ platforms: ['google-meet'] });
 assert.deepEqual(extensionMatches.matches, ['https://meet.google.com/*']);
@@ -346,5 +349,7 @@ assert.equal(report.platform_provider_connection_matrix.rows.find((row) => row.p
 assert.equal(report.platform_adapter_contract_matrix.platform_count, 6);
 assert.equal(report.platform_adapter_contract_matrix.rows.some((row) => row.platform === 'google_meet'), true);
 assert.equal(report.platform_adapter_contract_matrix.rows.find((row) => row.platform === 'google_meet').browser_observer, true);
+assert.equal(report.platform_adapter_contract_acceptance_matrix.platform_count, 6);
+assert.equal(report.platform_adapter_contract_acceptance_matrix.accepted_count, 6);
 
 console.log('ok meeting platform timeline kit');

@@ -117,6 +117,9 @@ import {
   buildMeetingPlatformProviderConnectionPack,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection';
 import {
+  assertMeetingPlatformAdapterContract,
+  buildMeetingPlatformAdapterContractAcceptanceMatrix,
+  buildMeetingPlatformAdapterContractAcceptanceReport,
   buildMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract';
@@ -255,6 +258,16 @@ assert.equal(buildMeetingPlatformAdapterContractMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).contracts[0].platform, 'zoom');
+assert.equal(buildMeetingPlatformAdapterContractAcceptanceReport('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).accepted, true);
+assert.equal(buildMeetingPlatformAdapterContractAcceptanceMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).accepted_count, 1);
+assert.equal(assertMeetingPlatformAdapterContract('zoom', {
+  baseUrl: 'http://localhost:8787',
+}).accepted, true);
 
 const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {
   providerRecords: [],
@@ -285,6 +298,8 @@ assert.equal(kit.platformFieldCaptureManifest('google-meet', {
 }).file_contract.files.evidence_package.endsWith('/google_meet.json'), true);
 assert.equal(kit.platformAdapterContract('google-meet').schema, 'meeting_platform_adapter_contract');
 assert.equal(kit.platformAdapterContractMatrix({ platforms: ['zoom'] }).platform_count, 1);
+assert.equal(kit.platformAdapterContractAcceptance('google-meet').accepted, true);
+assert.equal(kit.platformAdapterContractAcceptanceMatrix({ platforms: ['zoom'] }).accepted_count, 1);
 assert.equal(kit.platformFieldCollectorConfig('google-meet').schema, 'meeting_platform_field_collector_config');
 assert.equal(kit.platformFieldEvidenceBundle('google-meet', evidencePackage, {
   requireProductionReady: false,

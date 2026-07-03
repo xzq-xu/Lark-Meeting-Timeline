@@ -1,4 +1,4 @@
-import { compactObject } from '../index.mjs';
+import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
 import {
   MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
@@ -10,6 +10,8 @@ import { buildMeetingPlatformFieldCollectorConfig } from './platform-field-captu
 
 export const MEETING_PLATFORM_ADAPTER_CONTRACT_SCHEMA = 'meeting_platform_adapter_contract';
 export const MEETING_PLATFORM_ADAPTER_CONTRACT_MATRIX_SCHEMA = 'meeting_platform_adapter_contract_matrix';
+export const MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTANCE_SCHEMA = 'meeting_platform_adapter_contract_acceptance';
+export const MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTANCE_MATRIX_SCHEMA = 'meeting_platform_adapter_contract_acceptance_matrix';
 export const MEETING_PLATFORM_ADAPTER_CONTRACT_SCHEMA_VERSION = 1;
 
 function firstNonEmpty(...values) {
@@ -24,6 +26,10 @@ function asArray(value) {
 
 function unique(values = []) {
   return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
+}
+
+function issue(severity, code, message, details = {}) {
+  return compactObject({ severity, code, message, ...details });
 }
 
 function selectedPlatforms(options = {}) {
@@ -131,6 +137,125 @@ function readinessContract(provider = {}, collector = {}, runtime = {}) {
   };
 }
 
+function targetFromOptions(options = {}) {
+  return String(firstNonEmpty(
+    options.target,
+    options.acceptanceTarget,
+    options.acceptance_target,
+    options.requireProductionReady === true || options.require_production_ready === true ? 'production' : undefined,
+    options.requireRealtimeReady === true || options.require_realtime_ready === true ? 'pilot' : undefined,
+    'contract',
+  ));
+}
+
+function contractFromInput(contractOrPlatform, options = {}) {
+  if (contractOrPlatform?.schema === MEETING_PLATFORM_ADAPTER_CONTRACT_SCHEMA) return contractOrPlatform;
+  return buildMeetingPlatformAdapterContract(contractOrPlatform, options);
+}
+
+function hasValue(value) {
+  return value != null && value !== '';
+}
+
+function hasArrayItems(value) {
+  return Array.isArray(value) && value.length > 0;
+}
+
+function includesValue(value, expected) {
+  return Array.isArray(value) && value.includes(expected);
+}
+
+function buildAcceptanceIssues(contract = {}, target = 'contract') {
+  const issues = [];
+  if (contract.schema !== MEETING_PLATFORM_ADAPTER_CONTRACT_SCHEMA) {
+    issues.push(issue('error', 'invalid_schema', 'Contract schema must be meeting_platform_adapter_contract.', {
+      actual_schema: contract.schema,
+    }));
+  }
+  if (!hasValue(contract.platform)) {
+    issues.push(issue('error', 'missing_platform', 'Contract must include a normalized platform key.'));
+  }
+  if (contract.timebase?.annotation_timestamp_field !== 'captured_at_ms') {
+    issues.push(issue('error', 'invalid_annotation_timestamp_field', 'Realtime annotations must use captured_at_ms.', {
+      actual: contract.timebase?.annotation_timestamp_field,
+    }));
+  }
+  if (contract.timebase?.provider_events_block_realtime !== false) {
+    issues.push(issue('error', 'provider_blocks_realtime', 'Provider events must not block realtime annotation insertion.'));
+  }
+  if (contract.timebase?.transcript_blocks_realtime !== false) {
+    issues.push(issue('error', 'transcript_blocks_realtime', 'Post-meeting transcript import must not block realtime annotation insertion.'));
+  }
+  if (contract.supported_surfaces?.realtime_transcript_required !== false) {
+    issues.push(issue('error', 'realtime_transcript_required', 'Meeting timeline annotation must not require realtime transcript.'));
+  }
+  if (!hasValue(contract.annotations?.endpoints?.insertMark)) {
+    issues.push(issue('error', 'missing_insert_mark_endpoint', 'Contract must expose annotations.endpoints.insertMark.'));
+  }
+  if (contract.annotations?.timestamp_field !== 'captured_at_ms') {
+    issues.push(issue('error', 'invalid_annotation_endpoint_timestamp_field', 'Annotation endpoint contract must name captured_at_ms.'));
+  }
+  if (!includesValue(contract.realtime_axis?.rules, 'insert_annotation_by_captured_at_ms_on_the_active_axis')) {
+    issues.push(issue('error', 'missing_realtime_annotation_rule', 'Contract must state annotations are placed by captured_at_ms on the active axis.'));
+  }
+  if (!includesValue(contract.realtime_axis?.rules, 'use_provider_events_only_for_reconcile_and_backfill')) {
+    issues.push(issue('error', 'missing_provider_reconcile_rule', 'Contract must state provider events are reconcile/backfill only.'));
+  }
+  if (!hasValue(contract.realtime_axis?.start?.create_on)) {
+    issues.push(issue('error', 'missing_axis_start_policy', 'Contract must define realtime_axis.start.create_on.'));
+  }
+  if (!hasValue(contract.realtime_axis?.end?.create_on)) {
+    issues.push(issue('error', 'missing_axis_end_policy', 'Contract must define realtime_axis.end.create_on.'));
+  }
+  if (contract.supported_surfaces?.browser_observer === true) {
+    if (!hasArrayItems(contract.local_observer?.matches)) {
+      issues.push(issue('error', 'missing_browser_matches', 'Browser-observed platforms must declare URL match patterns.'));
+    }
+    if (!includesValue(contract.local_observer?.snapshot_collector?.required_snapshots, 'active_speaker')) {
+      issues.push(issue('error', 'missing_active_speaker_snapshot', 'Browser observer must require an active_speaker snapshot.'));
+    }
+    if (!includesValue(contract.local_observer?.snapshot_collector?.required_snapshots, 'meeting_ended')) {
+      issues.push(issue('error', 'missing_meeting_ended_snapshot', 'Browser observer must require a meeting_ended snapshot.'));
+    }
+  }
+  if (contract.supported_surfaces?.provider_webhook_or_event_subscription === true) {
+    if (contract.provider_observer?.required_for_realtime !== false) {
+      issues.push(issue('error', 'provider_required_for_realtime', 'Provider observer must be optional for realtime annotation insertion.'));
+    }
+    if (!hasArrayItems(contract.provider_observer?.events?.start_events)) {
+      issues.push(issue('error', 'missing_provider_start_events', 'Provider observer must list meeting start reconcile events.'));
+    }
+    if (!hasArrayItems(contract.provider_observer?.events?.end_events)) {
+      issues.push(issue('error', 'missing_provider_end_events', 'Provider observer must list meeting end reconcile events.'));
+    }
+    if (!hasValue(contract.provider_observer?.security?.verifier)) {
+      issues.push(issue('error', 'missing_provider_security_verifier', 'Provider observer must declare a security verifier.'));
+    }
+  }
+  if (contract.transcript?.realtime_dependency !== false) {
+    issues.push(issue('error', 'transcript_realtime_dependency', 'Transcript must be post-meeting or non-blocking for realtime annotation.'));
+  }
+  if (!includesValue(contract.implementation?.kit_methods, 'platformAdapterContract')) {
+    issues.push(issue('error', 'missing_kit_contract_method', 'Implementation handoff must mention platformAdapterContract.'));
+  }
+  if (!includesValue(contract.implementation?.kit_methods, 'insertMark')) {
+    issues.push(issue('error', 'missing_insert_mark_method', 'Implementation handoff must mention insertMark.'));
+  }
+  if (target === 'pilot' && contract.readiness?.ready_for_realtime_annotations !== true) {
+    issues.push(issue('error', 'pilot_not_ready', 'Pilot acceptance requires ready_for_realtime_annotations=true.', {
+      status: contract.readiness?.status,
+      missing_items: contract.readiness?.missing_items ?? [],
+    }));
+  }
+  if (target === 'production' && contract.readiness?.production_ready !== true) {
+    issues.push(issue('error', 'production_not_ready', 'Production acceptance requires production_ready=true.', {
+      status: contract.readiness?.status,
+      missing_items: contract.readiness?.missing_items ?? [],
+    }));
+  }
+  return issues;
+}
+
 export function buildMeetingPlatformAdapterContract(platform, options = {}) {
   const key = normalizeMeetingPlatform(platform);
   const capabilities = platformCapabilityContract(key, options);
@@ -224,4 +349,83 @@ export function buildMeetingPlatformAdapterContractMatrix(options = {}) {
     contracts,
     next_actions: unique(contracts.flatMap((contract) => contract.next_actions ?? [])),
   };
+}
+
+export function buildMeetingPlatformAdapterContractAcceptanceReport(contractOrPlatform, options = {}) {
+  const contract = contractFromInput(contractOrPlatform, options);
+  const target = targetFromOptions(options);
+  const issues = buildAcceptanceIssues(contract, target);
+  const errorCount = issues.filter((item) => item.severity === 'error').length;
+  const warningCount = issues.filter((item) => item.severity === 'warn').length;
+  return {
+    type: 'meeting_platform_adapter_contract_acceptance',
+    schema: MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTANCE_SCHEMA,
+    schema_version: MEETING_PLATFORM_ADAPTER_CONTRACT_SCHEMA_VERSION,
+    platform: contract.platform,
+    display_name: contract.display_name,
+    target,
+    accepted: errorCount === 0,
+    issue_count: issues.length,
+    error_count: errorCount,
+    warning_count: warningCount,
+    issues,
+    summary: {
+      mode: contract.mode,
+      browser_observer: contract.supported_surfaces?.browser_observer === true,
+      provider_observer: contract.supported_surfaces?.provider_webhook_or_event_subscription === true,
+      provider_ready: contract.readiness?.provider_ready === true,
+      production_ready: contract.readiness?.production_ready === true,
+      ready_for_realtime_annotations: contract.readiness?.ready_for_realtime_annotations === true,
+      insert_mark_endpoint: contract.annotations?.endpoints?.insertMark,
+      provider_start_event_count: contract.provider_observer?.events?.start_events?.length ?? 0,
+      provider_end_event_count: contract.provider_observer?.events?.end_events?.length ?? 0,
+      missing_item_count: contract.readiness?.missing_items?.length ?? 0,
+    },
+    contract,
+  };
+}
+
+export function buildMeetingPlatformAdapterContractAcceptanceMatrix(options = {}) {
+  const reports = selectedPlatforms(options).map((platform) => buildMeetingPlatformAdapterContractAcceptanceReport(platform, {
+    ...options,
+    platforms: undefined,
+    platform_keys: undefined,
+  }));
+  return {
+    type: 'meeting_platform_adapter_contract_acceptance_matrix',
+    schema: MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTANCE_MATRIX_SCHEMA,
+    schema_version: MEETING_PLATFORM_ADAPTER_CONTRACT_SCHEMA_VERSION,
+    target: targetFromOptions(options),
+    platform_count: reports.length,
+    accepted_count: reports.filter((report) => report.accepted).length,
+    rejected_count: reports.filter((report) => !report.accepted).length,
+    issue_count: reports.reduce((total, report) => total + report.issue_count, 0),
+    error_count: reports.reduce((total, report) => total + report.error_count, 0),
+    warning_count: reports.reduce((total, report) => total + report.warning_count, 0),
+    platforms: reports.map((report) => report.platform),
+    rows: reports.map((report) => ({
+      platform: report.platform,
+      display_name: report.display_name,
+      target: report.target,
+      accepted: report.accepted,
+      mode: report.summary.mode,
+      browser_observer: report.summary.browser_observer,
+      provider_observer: report.summary.provider_observer,
+      provider_ready: report.summary.provider_ready,
+      production_ready: report.summary.production_ready,
+      ready_for_realtime_annotations: report.summary.ready_for_realtime_annotations,
+      issue_count: report.issue_count,
+      error_count: report.error_count,
+      first_issue: report.issues[0]?.code,
+    })),
+    reports,
+  };
+}
+
+export function assertMeetingPlatformAdapterContract(contractOrPlatform, options = {}) {
+  const report = buildMeetingPlatformAdapterContractAcceptanceReport(contractOrPlatform, options);
+  if (!report.accepted) {
+    throw new MeetingTimelineSdkError('Meeting platform adapter contract acceptance failed', report);
+  }
+  return report;
 }

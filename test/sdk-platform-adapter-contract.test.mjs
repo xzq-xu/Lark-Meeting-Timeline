@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
 
 import {
+  MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTANCE_MATRIX_SCHEMA,
+  MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTANCE_SCHEMA,
   MEETING_PLATFORM_ADAPTER_CONTRACT_MATRIX_SCHEMA,
   MEETING_PLATFORM_ADAPTER_CONTRACT_SCHEMA,
+  assertMeetingPlatformAdapterContract,
+  buildMeetingPlatformAdapterContractAcceptanceMatrix,
+  buildMeetingPlatformAdapterContractAcceptanceReport,
   buildMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractMatrix,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-contract.mjs';
@@ -64,6 +69,35 @@ assert.deepEqual(matrix.platforms, ['google_meet', 'microsoft_teams', 'local_det
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').start_create_on, 'local_observer_active_meeting_detected');
 assert.equal(matrix.rows.find((row) => row.platform === 'local_detector').browser_observer, false);
 
+const googleAcceptance = buildMeetingPlatformAdapterContractAcceptanceReport(google);
+assert.equal(googleAcceptance.schema, MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTANCE_SCHEMA);
+assert.equal(googleAcceptance.platform, 'google_meet');
+assert.equal(googleAcceptance.target, 'contract');
+assert.equal(googleAcceptance.accepted, true);
+assert.equal(googleAcceptance.summary.insert_mark_endpoint, `${baseUrl}/api/annotations`);
+assert.equal(assertMeetingPlatformAdapterContract(google).accepted, true);
+assert.throws(
+  () => assertMeetingPlatformAdapterContract({
+    ...google,
+    timebase: {
+      ...google.timebase,
+      provider_events_block_realtime: true,
+    },
+  }),
+  /Meeting platform adapter contract acceptance failed/,
+);
+const productionAcceptance = buildMeetingPlatformAdapterContractAcceptanceReport(google, { target: 'production' });
+assert.equal(productionAcceptance.accepted, false);
+assert.equal(productionAcceptance.issues.some((item) => item.code === 'production_not_ready'), true);
+const acceptanceMatrix = buildMeetingPlatformAdapterContractAcceptanceMatrix({
+  baseUrl,
+  platforms: ['google-meet', 'teams', 'local-detector'],
+});
+assert.equal(acceptanceMatrix.schema, MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTANCE_MATRIX_SCHEMA);
+assert.equal(acceptanceMatrix.platform_count, 3);
+assert.equal(acceptanceMatrix.accepted_count, 3);
+assert.equal(acceptanceMatrix.rejected_count, 0);
+
 const client = {
   async startMeeting(input) { return { ok: true, input }; },
   async endMeeting(input) { return { ok: true, input }; },
@@ -74,6 +108,10 @@ const client = {
 const kit = createMeetingPlatformTimelineKit(client, { baseUrl, verify: false });
 assert.equal(kit.platformAdapterContract('google-meet').schema, MEETING_PLATFORM_ADAPTER_CONTRACT_SCHEMA);
 assert.equal(kit.platformAdapterContractMatrix({ platforms: ['zoom'] }).platform_count, 1);
+assert.equal(kit.platformAdapterContractAcceptance('google-meet').accepted, true);
+assert.equal(kit.platformAdapterContractAcceptanceMatrix({ platforms: ['zoom'] }).accepted_count, 1);
+assert.equal(kit.assertPlatformAdapterContract('zoom').accepted, true);
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_adapter_contract_matrix.platform_count, 1);
+assert.equal(kit.report({ platforms: ['google-meet'] }).platform_adapter_contract_acceptance_matrix.accepted_count, 1);
 
 console.log('ok meeting platform adapter contract');

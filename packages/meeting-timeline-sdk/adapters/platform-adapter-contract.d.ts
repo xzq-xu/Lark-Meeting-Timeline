@@ -2,6 +2,8 @@ import type { MeetingPlatformFieldCaptureOptions } from './platform-field-captur
 
 export const MEETING_PLATFORM_ADAPTER_CONTRACT_SCHEMA: 'meeting_platform_adapter_contract';
 export const MEETING_PLATFORM_ADAPTER_CONTRACT_MATRIX_SCHEMA: 'meeting_platform_adapter_contract_matrix';
+export const MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTANCE_SCHEMA: 'meeting_platform_adapter_contract_acceptance';
+export const MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTANCE_MATRIX_SCHEMA: 'meeting_platform_adapter_contract_acceptance_matrix';
 export const MEETING_PLATFORM_ADAPTER_CONTRACT_SCHEMA_VERSION: 1;
 
 export interface MeetingPlatformAdapterContractOptions extends MeetingPlatformFieldCaptureOptions {
@@ -59,6 +61,38 @@ export interface MeetingPlatformAdapterContractMatrix {
   next_actions: string[];
 }
 
+export interface MeetingPlatformAdapterContractAcceptanceReport {
+  type: 'meeting_platform_adapter_contract_acceptance';
+  schema: 'meeting_platform_adapter_contract_acceptance';
+  schema_version: 1;
+  platform: string;
+  display_name?: string;
+  target: string;
+  accepted: boolean;
+  issue_count: number;
+  error_count: number;
+  warning_count: number;
+  issues: Record<string, unknown>[];
+  summary: Record<string, unknown>;
+  contract: MeetingPlatformAdapterContract;
+}
+
+export interface MeetingPlatformAdapterContractAcceptanceMatrix {
+  type: 'meeting_platform_adapter_contract_acceptance_matrix';
+  schema: 'meeting_platform_adapter_contract_acceptance_matrix';
+  schema_version: 1;
+  target: string;
+  platform_count: number;
+  accepted_count: number;
+  rejected_count: number;
+  issue_count: number;
+  error_count: number;
+  warning_count: number;
+  platforms: string[];
+  rows: Record<string, unknown>[];
+  reports: MeetingPlatformAdapterContractAcceptanceReport[];
+}
+
 export function buildMeetingPlatformAdapterContract(
   platform: string,
   options?: MeetingPlatformAdapterContractOptions,
@@ -67,3 +101,17 @@ export function buildMeetingPlatformAdapterContract(
 export function buildMeetingPlatformAdapterContractMatrix(
   options?: MeetingPlatformAdapterContractOptions,
 ): MeetingPlatformAdapterContractMatrix;
+
+export function buildMeetingPlatformAdapterContractAcceptanceReport(
+  contractOrPlatform: string | MeetingPlatformAdapterContract,
+  options?: MeetingPlatformAdapterContractOptions,
+): MeetingPlatformAdapterContractAcceptanceReport;
+
+export function buildMeetingPlatformAdapterContractAcceptanceMatrix(
+  options?: MeetingPlatformAdapterContractOptions,
+): MeetingPlatformAdapterContractAcceptanceMatrix;
+
+export function assertMeetingPlatformAdapterContract(
+  contractOrPlatform: string | MeetingPlatformAdapterContract,
+  options?: MeetingPlatformAdapterContractOptions,
+): MeetingPlatformAdapterContractAcceptanceReport;

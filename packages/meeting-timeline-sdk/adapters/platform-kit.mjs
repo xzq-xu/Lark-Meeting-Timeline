@@ -101,6 +101,9 @@ import {
   buildMeetingPlatformRuntimeProfileMatrix,
 } from './platform-runtime-profile.mjs';
 import {
+  assertMeetingPlatformAdapterContract,
+  buildMeetingPlatformAdapterContractAcceptanceMatrix,
+  buildMeetingPlatformAdapterContractAcceptanceReport,
   buildMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractMatrix,
 } from './platform-adapter-contract.mjs';
@@ -290,6 +293,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_provider_connection_matrix: buildMeetingPlatformProviderConnectionMatrix(options),
     platform_runtime_profile_matrix: buildMeetingPlatformRuntimeProfileMatrix(options),
     platform_adapter_contract_matrix: buildMeetingPlatformAdapterContractMatrix(options),
+    platform_adapter_contract_acceptance_matrix: buildMeetingPlatformAdapterContractAcceptanceMatrix(options),
     platform_field_capture_matrix: buildMeetingPlatformFieldCaptureMatrix(options),
     platform_field_capture_manifest_matrix: buildMeetingPlatformFieldCaptureManifestMatrix(options),
     platform_field_collector_config_matrix: buildMeetingPlatformFieldCollectorConfigMatrix(options),
@@ -509,6 +513,15 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdapterContractMatrix(contractOptions = {}) {
       return buildMeetingPlatformAdapterContractMatrix(withDefaults(defaults, contractOptions));
+    },
+    platformAdapterContractAcceptance(contractOrPlatform, acceptanceOptions = {}) {
+      return buildMeetingPlatformAdapterContractAcceptanceReport(contractOrPlatform, withDefaults(defaults, acceptanceOptions));
+    },
+    platformAdapterContractAcceptanceMatrix(acceptanceOptions = {}) {
+      return buildMeetingPlatformAdapterContractAcceptanceMatrix(withDefaults(defaults, acceptanceOptions));
+    },
+    assertPlatformAdapterContract(contractOrPlatform, acceptanceOptions = {}) {
+      return assertMeetingPlatformAdapterContract(contractOrPlatform, withDefaults(defaults, acceptanceOptions));
     },
     platformFieldCapturePlan(platform, captureOptions = {}) {
       return buildMeetingPlatformFieldCapturePlan(platform, withDefaults(defaults, captureOptions));

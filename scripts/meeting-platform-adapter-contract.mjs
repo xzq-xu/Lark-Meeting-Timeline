@@ -3,6 +3,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import {
+  buildMeetingPlatformAdapterContractAcceptanceMatrix,
   buildMeetingPlatformAdapterContractMatrix,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-contract.mjs';
 import {
@@ -19,6 +20,8 @@ const reportFile = String(args.get('report-file') || args.get('write-report') ||
 const jsonOutput = args.get('json') === 'true';
 const writeContracts = args.get('write-contracts') !== 'false';
 const failOnIncomplete = args.get('fail-on-incomplete') === 'true' || args.get('fail-on-missing') === 'true';
+const failOnRejected = args.get('fail-on-rejected') === 'true' || args.get('fail-on-acceptance') === 'true';
+const acceptanceTarget = String(args.get('acceptance-target') || args.get('target') || 'contract');
 const requiredPlatforms = unique(String(
   args.get('required-platforms')
     || args.get('platforms')
@@ -59,11 +62,16 @@ function summarizeContract(contract = {}) {
 }
 
 async function buildReport() {
-  const matrix = buildMeetingPlatformAdapterContractMatrix({
+  const buildOptions = {
     baseUrl,
     env: process.env,
     evidenceDir,
     platforms: requiredPlatforms,
+  };
+  const matrix = buildMeetingPlatformAdapterContractMatrix(buildOptions);
+  const acceptance = buildMeetingPlatformAdapterContractAcceptanceMatrix({
+    ...buildOptions,
+    target: acceptanceTarget,
   });
   const writtenFiles = [];
   if (writeContracts) {
@@ -75,13 +83,18 @@ async function buildReport() {
   }
   const rows = matrix.contracts.map((contract) => summarizeContract(contract));
   const missingItemCount = rows.reduce((total, row) => total + row.missing_items.length, 0);
-  const ok = matrix.platform_count > 0 && (!failOnIncomplete || missingItemCount === 0);
+  const ok = matrix.platform_count > 0
+    && (!failOnIncomplete || missingItemCount === 0)
+    && (!failOnRejected || acceptance.rejected_count === 0);
   return {
     type: 'meeting_platform_adapter_contract_report',
     ok,
-    requirement: failOnIncomplete ? 'no_missing_adapter_evidence_items' : 'adapter_contract_exported',
+    requirement: failOnRejected
+      ? `adapter_contract_acceptance:${acceptanceTarget}`
+      : failOnIncomplete ? 'no_missing_adapter_evidence_items' : 'adapter_contract_exported',
     base_url: baseUrl,
     evidence_dir: evidenceDir,
+    acceptance_target: acceptanceTarget,
     out_dir: writeContracts ? outDir : undefined,
     write_contracts: writeContracts,
     platform_count: matrix.platform_count,
@@ -93,6 +106,7 @@ async function buildReport() {
     required_platforms: requiredPlatforms,
     written_files: writtenFiles,
     rows,
+    acceptance,
     matrix,
     next_actions: matrix.next_actions ?? [],
   };
@@ -104,13 +118,14 @@ try {
   if (jsonOutput) {
     console.log(JSON.stringify(report, null, 2));
   } else {
-    console.log(`meeting_platform_adapter_contract_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | browser_observers=${report.browser_observer_count} | providers=${report.provider_observer_count} | production_ready=${report.production_ready_count} | realtime_ready=${report.realtime_ready_count} | missing_items=${report.missing_item_count} | written=${report.written_files.length}`);
+    console.log(`meeting_platform_adapter_contract_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | browser_observers=${report.browser_observer_count} | providers=${report.provider_observer_count} | accepted=${report.acceptance.accepted_count}/${report.acceptance.platform_count} | production_ready=${report.production_ready_count} | realtime_ready=${report.realtime_ready_count} | missing_items=${report.missing_item_count} | written=${report.written_files.length}`);
     for (const row of report.rows) {
-      console.log(`${row.platform}: mode=${row.mode} browser=${boolLabel(row.browser_observer)} provider=${boolLabel(row.provider_observer)} provider_ready=${boolLabel(row.provider_ready)} missing=${row.missing_items.length} contract=${row.contract_file}`);
+      const acceptanceRow = report.acceptance.rows.find((item) => item.platform === row.platform);
+      console.log(`${row.platform}: mode=${row.mode} accepted=${boolLabel(acceptanceRow?.accepted)} browser=${boolLabel(row.browser_observer)} provider=${boolLabel(row.provider_observer)} provider_ready=${boolLabel(row.provider_ready)} missing=${row.missing_items.length} contract=${row.contract_file}`);
     }
     if (report.next_actions.length > 0) console.log(`next_actions=${report.next_actions.join(',')}`);
   }
-  if (!report.ok && failOnIncomplete) process.exitCode = 2;
+  if (!report.ok && (failOnIncomplete || failOnRejected)) process.exitCode = 2;
 } catch (error) {
   console.error(error?.stack ?? error);
   process.exitCode = 1;
