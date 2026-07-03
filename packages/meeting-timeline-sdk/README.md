@@ -494,6 +494,13 @@ const appProfile = meetingKit.meetingAppIntegrationProfile('google-meet', {
 const appMatrix = meetingKit.meetingAppIntegrationMatrix();
 // appMatrix.rows 可以直接用于产品侧展示 Google Meet / Teams / Zoom / Lark / Webex 的接入状态。
 
+const deploymentManifest = meetingKit.meetingAppDeploymentManifest('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+});
+// deploymentManifest 是给外部项目消费的一页式接入契约：
+// 它集中包含 profile、runtime_config、extension_install_plan、live_snapshot_capture_plan 和 production_gate。
+// Google Meet、Teams、Zoom、Lark/Feishu、Webex 都走同一个结构，只换平台 key。
+
 const runtimeConfig = meetingKit.meetingAppRuntimeAdapterConfig('google-meet');
 // runtimeConfig 可以交给浏览器 extension content script、Electron WebView preload 或桌面宿主：
 // 它包含 bridge_options、runtime_options、capture_options、extension host 权限和 message_types。

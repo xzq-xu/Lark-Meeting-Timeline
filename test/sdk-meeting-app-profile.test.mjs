@@ -2,15 +2,18 @@ import assert from 'node:assert/strict';
 
 import { buildMeetingAppFixtureSnapshot } from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
 import {
+  MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA,
   MEETING_APP_INTEGRATION_PROFILE_PLATFORMS,
   MEETING_APP_INTEGRATION_PROFILE_SCHEMA,
   MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
+  buildAllMeetingAppDeploymentManifests,
   buildAllMeetingAppIntegrationProfiles,
   buildAllMeetingAppLiveSnapshotCapturePlans,
   buildAllMeetingAppRuntimeAdapterAcceptanceReports,
   buildAllMeetingAppRuntimeAdapterConfigs,
   buildAllMeetingAppRuntimeAdapterValidationReports,
+  buildMeetingAppDeploymentManifest,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
   buildMeetingAppLiveSnapshotCapturePlan,
@@ -31,6 +34,7 @@ assert.deepEqual(MEETING_APP_INTEGRATION_PROFILE_PLATFORMS, [
 assert.equal(MEETING_APP_INTEGRATION_PROFILE_SCHEMA, 'meeting_app_integration_profile');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA, 'meeting_app_runtime_adapter_config');
 assert.equal(MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA, 'meeting_app_live_snapshot_capture_plan');
+assert.equal(MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA, 'meeting_app_deployment_manifest');
 
 const googleProfile = buildMeetingAppIntegrationProfile('google-meet', {
   baseUrl: 'https://timeline.example.com',
@@ -87,6 +91,26 @@ assert.equal(googleCapturePlan.required_snapshots.some((item) => item.id === 'me
 assert.equal(googleCapturePlan.required_snapshots.find((item) => item.id === 'active_speaker').required_coverage.includes('speaker_started'), true);
 assert.equal(googleCapturePlan.minimum_record_count, 2);
 assert.match(googleCapturePlan.handoff.success_condition, /production_ready/);
+
+const googleDeploymentManifest = buildMeetingAppDeploymentManifest('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+});
+assert.equal(googleDeploymentManifest.type, 'meeting_app_deployment_manifest');
+assert.equal(googleDeploymentManifest.schema, MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA);
+assert.equal(googleDeploymentManifest.platform, 'google_meet');
+assert.equal(googleDeploymentManifest.profile.platform, 'google_meet');
+assert.equal(googleDeploymentManifest.runtime_config.platform, 'google_meet');
+assert.deepEqual(googleDeploymentManifest.extension_install_plan.platforms, ['google_meet']);
+assert.equal(googleDeploymentManifest.live_snapshot_capture_plan.minimum_record_count, 2);
+assert.equal(googleDeploymentManifest.validation_report.accepted, false);
+assert.equal(googleDeploymentManifest.production_gate.requires_captured_dom, true);
+assert.equal(googleDeploymentManifest.production_gate.minimum_live_record_count, 2);
+assert.equal(googleDeploymentManifest.integration_targets.some((item) => item.surface === 'chrome_or_edge_extension'), true);
+assert.equal(googleDeploymentManifest.integration_targets.some((item) => item.surface === 'electron_or_embedded_webview'), true);
+assert.equal(googleDeploymentManifest.runtime_contract.timestamp_field, 'captured_at_ms');
+assert.equal(googleDeploymentManifest.runtime_contract.required_signals.includes('speaker_started'), true);
+assert.equal(googleDeploymentManifest.handoff.kit_methods.includes('meetingAppDeploymentManifest'), true);
+assert.equal(googleDeploymentManifest.rollout_checklist.includes('pass_runtime_validation_with_production_ready_true'), true);
 const googleRuntimeAcceptance = buildMeetingAppRuntimeAdapterAcceptanceReport(googleRuntimeConfig);
 assert.equal(googleRuntimeAcceptance.type, 'meeting_app_runtime_adapter_acceptance_report');
 assert.equal(googleRuntimeAcceptance.accepted, true);
@@ -173,6 +197,13 @@ const selectedCapturePlans = buildAllMeetingAppLiveSnapshotCapturePlans({
 assert.deepEqual(Object.keys(selectedCapturePlans), ['zoom', 'webex']);
 assert.equal(selectedCapturePlans.zoom.required_snapshots.length >= 2, true);
 assert.equal(selectedCapturePlans.webex.runtime_config.platform, 'webex');
+
+const selectedDeploymentManifests = buildAllMeetingAppDeploymentManifests({
+  platforms: ['zoom', 'webex'],
+});
+assert.deepEqual(Object.keys(selectedDeploymentManifests), ['zoom', 'webex']);
+assert.equal(selectedDeploymentManifests.zoom.extension_install_plan.matches.includes('https://zoom.us/*'), true);
+assert.equal(selectedDeploymentManifests.webex.production_gate.requires_captured_dom, true);
 
 const selectedRuntimeAcceptance = buildAllMeetingAppRuntimeAdapterAcceptanceReports({
   platforms: ['zoom', 'webex'],

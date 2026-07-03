@@ -62,11 +62,13 @@ import {
 import {
   assertMeetingAppRuntimeAdapterConfig,
   assertMeetingAppRuntimeAdapterValidation,
+  buildAllMeetingAppDeploymentManifests,
   buildAllMeetingAppIntegrationProfiles,
   buildAllMeetingAppLiveSnapshotCapturePlans,
   buildAllMeetingAppRuntimeAdapterAcceptanceReports,
   buildAllMeetingAppRuntimeAdapterConfigs,
   buildAllMeetingAppRuntimeAdapterValidationReports,
+  buildMeetingAppDeploymentManifest,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
   buildMeetingAppLiveSnapshotCapturePlan,
@@ -194,6 +196,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_extension_install_plan: buildMeetingAppExtensionInstallPlan(options),
     meeting_app_extension_acceptance: buildMeetingAppExtensionScaffoldAcceptanceReport(options),
     meeting_app_integration_matrix: buildMeetingAppIntegrationMatrix(options),
+    meeting_app_deployment_manifests: buildAllMeetingAppDeploymentManifests(options),
     meeting_app_runtime_adapter_configs: buildAllMeetingAppRuntimeAdapterConfigs(options),
     meeting_app_runtime_adapter_acceptance: buildAllMeetingAppRuntimeAdapterAcceptanceReports(options),
     meeting_app_live_snapshot_capture_plans: buildAllMeetingAppLiveSnapshotCapturePlans(options),
@@ -303,6 +306,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppIntegrationMatrix(profileOptions = {}) {
       return buildMeetingAppIntegrationMatrix(withDefaults(defaults, profileOptions));
+    },
+    meetingAppDeploymentManifest(platform, manifestOptions = {}) {
+      return buildMeetingAppDeploymentManifest(platform, withDefaults(defaults, manifestOptions));
+    },
+    allMeetingAppDeploymentManifests(manifestOptions = {}) {
+      return buildAllMeetingAppDeploymentManifests(withDefaults(defaults, manifestOptions));
     },
     meetingAppRuntimeAdapterConfig(platform, configOptions = {}) {
       return buildMeetingAppRuntimeAdapterConfig(platform, withDefaults(defaults, configOptions));

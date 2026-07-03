@@ -21,6 +21,7 @@ export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION = 1;
 export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS = MEETING_APP_FIXTURE_PLATFORMS;
 export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA = 'meeting_app_runtime_adapter_config';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA = 'meeting_app_live_snapshot_capture_plan';
+export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA = 'meeting_app_deployment_manifest';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -613,6 +614,101 @@ export function buildAllMeetingAppLiveSnapshotCapturePlans(options = {}) {
   return Object.fromEntries(platformList(options).map((platform) => [
     platform,
     buildMeetingAppLiveSnapshotCapturePlan(platform, options),
+  ]));
+}
+
+export function buildMeetingAppDeploymentManifest(platformOrInput = {}, options = {}) {
+  const config = runtimeConfigFromInput(platformOrInput, options);
+  const platform = normalizeAppPlatform(config.platform);
+  const profile = buildMeetingAppIntegrationProfile({
+    ...options,
+    platform,
+  });
+  const extensionInstallPlan = buildMeetingAppExtensionInstallPlan({
+    ...options,
+    platforms: [platform],
+  });
+  const capturePlan = buildMeetingAppLiveSnapshotCapturePlan(config, options);
+  const validationReport = buildMeetingAppRuntimeAdapterValidationReport(config, options);
+  return compactObject({
+    type: 'meeting_app_deployment_manifest',
+    schema: MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    platform,
+    display_name: config.display_name,
+    recommended_mode: profile.recommended_mode,
+    profile,
+    runtime_config: config,
+    extension_install_plan: extensionInstallPlan,
+    live_snapshot_capture_plan: capturePlan,
+    validation_report: validationReport,
+    runtime_contract: {
+      timestamp_field: 'captured_at_ms',
+      annotation_time_invariant: 'write_annotations_with_absolute_capture_time_not_meeting_offset',
+      required_signals: ['meeting_started', 'speaker_started', 'meeting_ended'],
+      supported_client_methods: config.supported_client_methods,
+      message_types: config.extension?.message_types,
+      timeline_endpoints: config.extension?.timeline_endpoints,
+    },
+    integration_targets: [
+      {
+        surface: 'chrome_or_edge_extension',
+        injection: 'manifest_v3_content_script',
+        matches: extensionInstallPlan.matches,
+        host_permissions: extensionInstallPlan.host_permissions,
+        content_script_adapter: extensionInstallPlan.content_script_adapter,
+        background_bridge: 'meeting_app_extension_background_forwarder',
+      },
+      {
+        surface: 'electron_or_embedded_webview',
+        injection: 'preload_bridge',
+        runtime_preset: config.runtime_options?.runtimePreset,
+        browser_runtime_adapter: extensionInstallPlan.browser_runtime_adapter,
+      },
+      {
+        surface: 'native_desktop_accessibility_observer',
+        injection: 'dom_or_accessibility_snapshot_adapter',
+        capture_profile: config.capture_options?.captureProfile,
+        snapshot_recorder_adapter: extensionInstallPlan.snapshot_recorder_adapter,
+      },
+    ],
+    production_gate: {
+      accepted: validationReport.accepted,
+      production_ready: validationReport.production_ready,
+      requires_captured_dom: true,
+      evidence_level: validationReport.evidence_level,
+      minimum_live_record_count: capturePlan.minimum_record_count,
+      required_coverage: capturePlan.validation?.required_coverage,
+      next_actions: validationReport.next_actions,
+    },
+    handoff: {
+      package: '@ai-annotation/meeting-timeline-sdk',
+      primary_entry: '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
+      kit_methods: [
+        'meetingAppDeploymentManifest',
+        'meetingAppRuntimeAdapterConfig',
+        'meetingAppExtensionScaffold',
+        'meetingAppLiveSnapshotCapturePlan',
+        'meetingAppRuntimeAdapterValidation',
+      ],
+      validation_input: capturePlan.handoff?.validation_input,
+      success_condition: capturePlan.handoff?.success_condition,
+    },
+    rollout_checklist: [
+      'install_or_embed_runtime_for_this_platform_only',
+      'verify_extension_or_preload_attached_status',
+      'capture_required_live_snapshots_from_a_real_meeting',
+      'pass_runtime_validation_with_production_ready_true',
+      'insert_live_annotations_with_captured_at_ms_from_device_or_mark_source',
+      'use_provider_events_or_post_meeting_artifacts_only_for_reconciliation',
+    ],
+  });
+}
+
+export function buildAllMeetingAppDeploymentManifests(options = {}) {
+  return Object.fromEntries(platformList(options).map((platform) => [
+    platform,
+    buildMeetingAppDeploymentManifest(platform, options),
   ]));
 }
 

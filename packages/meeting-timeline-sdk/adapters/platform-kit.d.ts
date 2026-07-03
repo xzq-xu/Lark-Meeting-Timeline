@@ -11,6 +11,7 @@ import type { PlatformLaunchGateOptions } from './platform-gate.mjs';
 import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type {
+  MeetingAppDeploymentManifest,
   MeetingAppIntegrationMatrix,
   MeetingAppIntegrationProfile,
   MeetingAppIntegrationProfileOptions,
@@ -85,6 +86,8 @@ export interface MeetingPlatformTimelineKit {
   meetingAppIntegrationProfile(platform: string, profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppIntegrationProfile;
   allMeetingAppIntegrationProfiles(profileOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppIntegrationProfile>>;
   meetingAppIntegrationMatrix(profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppIntegrationMatrix;
+  meetingAppDeploymentManifest(platform: string, manifestOptions?: MeetingAppIntegrationProfileOptions): MeetingAppDeploymentManifest;
+  allMeetingAppDeploymentManifests(manifestOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppDeploymentManifest>>;
   meetingAppRuntimeAdapterConfig(platform: string, configOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterConfig;
   meetingAppLiveSnapshotCapturePlan(platform: string, planOptions?: MeetingAppIntegrationProfileOptions): MeetingAppLiveSnapshotCapturePlan;
   allMeetingAppLiveSnapshotCapturePlans(planOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppLiveSnapshotCapturePlan>>;

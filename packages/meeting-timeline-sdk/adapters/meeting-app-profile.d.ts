@@ -6,6 +6,7 @@ export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION: number;
 export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS: readonly MeetingAppDomCaptureProfilePlatform[];
 export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA: 'meeting_app_runtime_adapter_config';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA: 'meeting_app_live_snapshot_capture_plan';
+export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA: 'meeting_app_deployment_manifest';
 
 export interface MeetingAppIntegrationProfileOptions extends MeetingAppLaunchGateOptions {
   platform?: MeetingAppDomCaptureProfilePlatform | string;
@@ -106,6 +107,25 @@ export interface MeetingAppLiveSnapshotCapturePlan {
   handoff: Record<string, unknown>;
 }
 
+export interface MeetingAppDeploymentManifest {
+  type: 'meeting_app_deployment_manifest';
+  schema: 'meeting_app_deployment_manifest';
+  version: number;
+  platform: MeetingAppDomCaptureProfilePlatform;
+  display_name: string;
+  recommended_mode: string;
+  profile: MeetingAppIntegrationProfile;
+  runtime_config: MeetingAppRuntimeAdapterConfig;
+  extension_install_plan: Record<string, unknown>;
+  live_snapshot_capture_plan: MeetingAppLiveSnapshotCapturePlan;
+  validation_report: MeetingAppRuntimeAdapterValidationReport;
+  runtime_contract: Record<string, unknown>;
+  integration_targets: Array<Record<string, unknown>>;
+  production_gate: Record<string, unknown>;
+  handoff: Record<string, unknown>;
+  rollout_checklist: string[];
+}
+
 export function buildMeetingAppIntegrationProfile(
   platformOrInput?: MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
   options?: MeetingAppIntegrationProfileOptions,
@@ -150,6 +170,15 @@ export function buildMeetingAppLiveSnapshotCapturePlan(
 export function buildAllMeetingAppLiveSnapshotCapturePlans(
   options?: MeetingAppIntegrationProfileOptions,
 ): Partial<Record<MeetingAppDomCaptureProfilePlatform, MeetingAppLiveSnapshotCapturePlan>>;
+
+export function buildMeetingAppDeploymentManifest(
+  platformOrInput?: MeetingAppRuntimeAdapterConfig | MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppDeploymentManifest;
+
+export function buildAllMeetingAppDeploymentManifests(
+  options?: MeetingAppIntegrationProfileOptions,
+): Partial<Record<MeetingAppDomCaptureProfilePlatform, MeetingAppDeploymentManifest>>;
 
 export function buildMeetingAppRuntimeAdapterValidationReport(
   configOrPlatform?: MeetingAppRuntimeAdapterConfig | MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
