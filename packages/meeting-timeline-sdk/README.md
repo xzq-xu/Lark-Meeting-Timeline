@@ -485,6 +485,15 @@ const appGate = meetingKit.meetingAppLaunchGate('google-meet', {
 });
 // appGate.runtime_ready === true 表示 browser runtime preset、capture profile 和 mutation 配置齐备。
 
+const appProfile = meetingKit.meetingAppIntegrationProfile('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+});
+// appProfile 聚合了这个平台的 extension host 权限、DOM 采集 selectors、browser runtime preset、
+// 本地实时事件模型、官方 provider 事件回填策略和 launch gate readiness。
+
+const appMatrix = meetingKit.meetingAppIntegrationMatrix();
+// appMatrix.rows 可以直接用于产品侧展示 Google Meet / Teams / Zoom / Lark / Webex 的接入状态。
+
 const extensionPlan = meetingKit.meetingAppExtensionInstallPlan({
   platforms: ['google-meet', 'microsoft-teams'],
   js: ['meeting-app-content-script.bundle.js'],

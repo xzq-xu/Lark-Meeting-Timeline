@@ -118,6 +118,17 @@ kitRecorder.add(kit.meetingAppFixture('google-meet'), { phase: 'active', label: 
 assert.equal(kitRecorder.getState().record_count, 1);
 assert.equal(kit.meetingAppGateInputFromRecords(kitRecorder.exportRecords()).snapshots.google_meet.length, 1);
 
+const integrationProfile = kit.meetingAppIntegrationProfile('google-meet');
+assert.equal(integrationProfile.platform, 'google_meet');
+assert.equal(integrationProfile.extension.matches.includes('https://meet.google.com/*'), true);
+assert.equal(integrationProfile.runtime.runtimePreset, 'google_meet');
+assert.equal(integrationProfile.event_model.realtime_axis.primary, 'browser_extension_local_observer');
+const integrationProfiles = kit.allMeetingAppIntegrationProfiles({ platforms: ['zoom'] });
+assert.deepEqual(Object.keys(integrationProfiles), ['zoom']);
+const integrationMatrix = kit.meetingAppIntegrationMatrix({ platforms: ['google-meet', 'teams'] });
+assert.deepEqual(integrationMatrix.platforms, ['google_meet', 'microsoft_teams']);
+assert.equal(integrationMatrix.rows.every((row) => row.sdk_wiring_ready === true), true);
+
 const extensionMatches = kit.meetingAppExtensionMatches({ platforms: ['google-meet'] });
 assert.deepEqual(extensionMatches.matches, ['https://meet.google.com/*']);
 const extensionManifest = kit.meetingAppContentScriptManifest({
@@ -221,6 +232,8 @@ assert.equal(report.meeting_app_extension_install_plan.platforms.length, 5);
 assert.equal(report.meeting_app_extension_install_plan.matches.includes('https://meet.google.com/*'), true);
 assert.equal(report.meeting_app_extension_acceptance.accepted, true);
 assert.equal(report.meeting_app_extension_acceptance.accepted_platform_count, 5);
+assert.equal(report.meeting_app_integration_matrix.platform_count, 5);
+assert.equal(report.meeting_app_integration_matrix.rows.some((row) => row.platform === 'google_meet'), true);
 assert.equal(report.meeting_app_fixture_acceptance.accepted, true);
 assert.equal(report.meeting_app_fixture_acceptance.accepted_count, 5);
 assert.equal(report.meeting_app_launch_gate.ok, false);
