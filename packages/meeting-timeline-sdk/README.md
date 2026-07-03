@@ -128,6 +128,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-strategy`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-correlation`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-session`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan`
@@ -176,6 +177,30 @@ console.log(matrix.rows);
 ```
 
 真实采样交接时，`platform-evidence-correlation` 会检查 provider 事件和本地 DOM 记录是否来自同一场会议。它优先用 meeting id / URL 匹配；没有共享 id 时会退到同平台时间窗口匹配。`verifyMeetingPlatformEvidencePackage()` 默认会要求 correlation 通过，避免把不同会议的 provider 样本和 DOM 样本混成一个 production-ready 包。
+
+业务项目如果要直接接入“会议中边写边标注”，优先用 `platform-live-adapter`。它把本地会议 App 观察、provider webhook 回填、实时标注插入和 evidence session 绑成一个对象；`observeMeetingApp()` 会同时尝试建轴并记录本地证据，`ingestProvider()` 会同时回填 provider 事件并记录 provider 证据，`insertAnnotation()` 会返回当前 live readiness：
+
+```js
+import { createMeetingPlatformLiveAdapter } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter';
+
+const live = createMeetingPlatformLiveAdapter('google-meet', timelineClient, {
+  baseUrl: 'https://timeline.example.com',
+  requireMeetingEnd: false,
+});
+
+await live.observeMeetingApp(activeDomSnapshot, {
+  capturedAtMs: Date.now(),
+});
+
+const inserted = await live.insertAnnotation({
+  capturedAtMs: Date.now(),
+  label: 'why?',
+  kind: 'question',
+});
+
+// inserted.live_evidence.can_insert_realtime_marks === true 表示当前本地观察足以支撑实时落轴。
+// live.exportPackage() 可在现场采样结束后交给另一个项目复验。
+```
 
 会议进行中可以用 `platform-evidence-session` 持续收集本地 DOM 和 provider webhook 证据。它的定位是 live object：每采到一个窗口快照或 webhook，就调用 `summary()` 看当前是否能实时落标注、是否还缺 provider reconcile 证据，以及后续能否导出 handoff 包：
 

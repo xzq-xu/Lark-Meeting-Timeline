@@ -70,6 +70,9 @@ import {
   createMeetingPlatformEvidenceSession,
 } from './platform-evidence-session.mjs';
 import {
+  createMeetingPlatformLiveAdapter,
+} from './platform-live-adapter.mjs';
+import {
   buildAllMeetingPlatformAdaptationStrategies,
   buildMeetingPlatformAdaptationStrategy,
   buildMeetingPlatformAdaptationStrategyMatrix,
@@ -386,6 +389,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformEvidenceSession(platform, sessionOptions = {}) {
       return createMeetingPlatformEvidenceSession(platform, withDefaults(defaults, sessionOptions));
+    },
+    platformLiveAdapter(platform, adapterOptions = {}) {
+      return createMeetingPlatformLiveAdapter(platform, bridge.client, withDefaults(defaults, adapterOptions));
     },
     meetingAppSnapshotRecorder(recorderOptions = {}) {
       return createMeetingAppSnapshotRecorder(withDefaults(defaults, recorderOptions));

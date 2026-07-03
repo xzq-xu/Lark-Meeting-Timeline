@@ -108,6 +108,7 @@ assert.equal(googleCorrelation.coverage.local_has_active, true);
 const googlePackage = googleSession.exportPackage({ label: 'google live evidence' });
 assert.equal(googlePackage.schema, 'meeting_platform_evidence_package');
 assert.equal(googlePackage.id, 'google-live-session-package');
+assert.equal(googleSession.exportPackage({ id: 'custom-google-package' }).id, 'custom-google-package');
 assert.equal(googlePackage.source, 'meeting_platform_evidence_session');
 assert.equal(googlePackage.rollout_plan.status, 'production_ready');
 assert.equal(googleSession.verify().passed, true);

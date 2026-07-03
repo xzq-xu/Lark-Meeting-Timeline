@@ -137,12 +137,15 @@ export function createMeetingPlatformEvidenceSession(platform, options = {}) {
 
   function exportPackage(packageOptions = {}) {
     const merged = mergeOptions(options, packageOptions);
+    const explicitPackageId = packageOptions.id && packageOptions.id !== sessionId
+      ? packageOptions.id
+      : undefined;
     return buildMeetingPlatformEvidencePackage(key, packageInput(merged), {
       ...merged,
       id: firstNonEmpty(
         packageOptions.packageId,
         packageOptions.package_id,
-        packageOptions.id,
+        explicitPackageId,
         options.packageId,
         options.package_id,
         `${sessionId}-package`,

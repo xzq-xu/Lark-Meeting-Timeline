@@ -14,6 +14,7 @@
 - 跨平台 webhook 安全入口：Zoom URL validation / HMAC 校验、Microsoft Graph validationToken / clientState 校验、Google Pub/Sub OIDC JWT / bearer gate
 - 跨平台 setup 诊断入口 `GET /api/platform-events/setup`，返回 Google Meet / Microsoft Teams / Zoom 所需事件、权限、回调地址、readiness 检查、订阅维护建议、平台能力契约和可选订阅 request body
 - SDK rollout planner，可把 Google Meet / Teams / Zoom / Webex / Lark 的 provider 事件 gate 与本地 DOM gate 合成 `production_ready` / `realtime_ready_provider_pending` / `needs_live_dom_and_provider_evidence` 等接入状态
+- SDK live adapter，可把本地会议 App 观察、provider webhook 回填和实时标注插入封成同一个跨平台入口
 - SDK live evidence session，可在真实会议进行中持续收集本地 DOM / provider 样本，实时判断能否把当前标注落到会议轴，并在采样完成后导出 handoff 包
 - SDK evidence package，可把单场真实会议的 provider webhook 记录、本地 DOM 记录、rollout plan 和 handoff 摘要封成可复验交接包
 - 本地手动开始/结束实时会议，用作没有公网 webhook 时的 fallback
@@ -81,7 +82,7 @@ SDK 包级交付前再跑一次 package smoke：
 npm run sdk:package-smoke
 ```
 
-它会对 `packages/meeting-timeline-sdk` 执行 `npm pack`，并在临时 consumer 项目里按包名导入 core、`platform-kit`、`platform-rollout`、`platform-strategy`、`platform-evidence-correlation`、`platform-evidence-session`、Google Meet adapter 和 meeting app gate，确认外部项目不是依赖仓库内部相对路径。
+它会对 `packages/meeting-timeline-sdk` 执行 `npm pack`，并在临时 consumer 项目里按包名导入 core、`platform-kit`、`platform-rollout`、`platform-strategy`、`platform-evidence-correlation`、`platform-evidence-session`、`platform-live-adapter`、Google Meet adapter 和 meeting app gate，确认外部项目不是依赖仓库内部相对路径。
 
 ## 启动
 
