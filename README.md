@@ -40,6 +40,14 @@ npm run meeting-app:extension:build
 
 然后在 `chrome://extensions` 或 `edge://extensions` 打开开发者模式，选择 `data/meeting-app-extension` 作为 unpacked extension。进入真实会议页面后，可在 DevTools 里调用 `window.__meetingTimelineLiveCapture.captureActive()`、`captureEnded()`、`evidencePackage()` 或 `diagnose()`，把真实页面的 active speaker、结束态和 DOM 适配问题变成 SDK 可验收的数据，而不是依赖 demo 模拟。
 
+把 `window.__meetingTimelineLiveCapture.exportRecords()` 或 `evidencePackage()` 的返回值保存成 JSON 后，用 evidence gate 校验是否真的满足生产接入：
+
+```bash
+npm run meeting-app:evidence-gate -- --input=data/meeting-app-live-evidence.json --report-file=data/meeting-app-live-gate-report.json
+```
+
+这个 gate 默认不允许 fixture 兜底，并要求 `production_ready=true`；如果缺 active speaker、meeting ended 或平台识别，会在报告里给出 `missing_required_coverage` 和 `next_actions`。
+
 ## 启动
 
 ```bash
