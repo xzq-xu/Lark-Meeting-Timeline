@@ -127,6 +127,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-rollout`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-strategy`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-correlation`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-session`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan`
@@ -175,6 +176,31 @@ console.log(matrix.rows);
 ```
 
 真实采样交接时，`platform-evidence-correlation` 会检查 provider 事件和本地 DOM 记录是否来自同一场会议。它优先用 meeting id / URL 匹配；没有共享 id 时会退到同平台时间窗口匹配。`verifyMeetingPlatformEvidencePackage()` 默认会要求 correlation 通过，避免把不同会议的 provider 样本和 DOM 样本混成一个 production-ready 包。
+
+会议进行中可以用 `platform-evidence-session` 持续收集本地 DOM 和 provider webhook 证据。它的定位是 live object：每采到一个窗口快照或 webhook，就调用 `summary()` 看当前是否能实时落标注、是否还缺 provider reconcile 证据，以及后续能否导出 handoff 包：
+
+```js
+import { createMeetingPlatformEvidenceSession } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-session';
+
+const session = createMeetingPlatformEvidenceSession('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+  env: process.env,
+});
+
+session.captureMeetingAppSnapshot(activeDomSnapshot, {
+  phase: 'active',
+  capturedAtMs: Date.now(),
+});
+
+const live = session.summary();
+// live.can_insert_realtime_marks === true 表示本地观察证据已经足够支持当前标注落轴。
+// live.provider_reconcile_ready === false 时，provider webhook 仍可后补，不阻塞当前标注。
+
+session.captureProviderWebhook(reqLikeObject);
+
+const packageForHandoff = session.exportPackage();
+const verification = session.verify();
+```
 
 如果宿主项目拿到的是桌面窗口、浏览器标签页或 native app 进程快照，先用 `meeting-session-discovery` 把这些低层信号转成统一会议候选，再交给 observer 建轴。这个路径适合 Google Meet 浏览器页，也适合 Zoom / Teams / Lark / Webex native app 没有 webhook 或 webhook 延迟较高的情况：
 

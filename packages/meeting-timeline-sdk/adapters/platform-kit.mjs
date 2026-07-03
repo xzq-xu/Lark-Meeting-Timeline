@@ -67,6 +67,9 @@ import {
   buildMeetingPlatformEvidenceCorrelation,
 } from './platform-evidence-correlation.mjs';
 import {
+  createMeetingPlatformEvidenceSession,
+} from './platform-evidence-session.mjs';
+import {
   buildAllMeetingPlatformAdaptationStrategies,
   buildMeetingPlatformAdaptationStrategy,
   buildMeetingPlatformAdaptationStrategyMatrix,
@@ -380,6 +383,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformEvidenceCorrelation(platform, input = {}, correlationOptions = {}) {
       return buildMeetingPlatformEvidenceCorrelation(platform, input, withDefaults(defaults, correlationOptions));
+    },
+    platformEvidenceSession(platform, sessionOptions = {}) {
+      return createMeetingPlatformEvidenceSession(platform, withDefaults(defaults, sessionOptions));
     },
     meetingAppSnapshotRecorder(recorderOptions = {}) {
       return createMeetingAppSnapshotRecorder(withDefaults(defaults, recorderOptions));

@@ -35,6 +35,8 @@ assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-correlation.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-correlation.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-evidence-session.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-evidence-session.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.d.ts'), true);
 assert.equal(packedFiles.includes('README.md'), true);
@@ -78,6 +80,9 @@ import {
 import {
   buildMeetingPlatformEvidenceCorrelation,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-correlation';
+import {
+  createMeetingPlatformEvidenceSession,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-session';
 import {
   buildMeetingPlatformEvidencePackage,
   verifyMeetingPlatformEvidencePackage,
@@ -127,6 +132,12 @@ assert.equal(buildMeetingPlatformAdaptationStrategyMatrix({
   platforms: ['zoom'],
 }).rows[0].platform, 'zoom');
 assert.equal(buildMeetingPlatformEvidenceCorrelation('zoom', {}).status, 'single_source');
+const session = createMeetingPlatformEvidenceSession('zoom', {
+  baseUrl: 'http://localhost:8787',
+});
+assert.equal(session.summary().platform, 'zoom');
+assert.equal(session.summary().package_ready_for_handoff, false);
+assert.equal(kit.platformEvidenceSession('google-meet').platform, 'google_meet');
 
 const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {
   providerRecords: [],
