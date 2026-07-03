@@ -57,6 +57,14 @@ npm run meeting-app:evidence-matrix
 
 矩阵会写出 `data/meeting-app-evidence-matrix.json`，汇总 Google Meet、Teams、Zoom、Webex、Lark 的 `production_ready` 状态和缺口，便于逐个平台收敛真实 DOM 适配。
 
+如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
+
+```bash
+npm run meeting-platform:rollout-matrix
+```
+
+它会写出 `data/meeting-platform-rollout-matrix.json`，把 provider start/end 事件证据和本地 DOM 证据合成 `production_ready` / `realtime_ready_provider_pending` / `needs_live_dom_and_provider_evidence` 等状态，用来判断某个平台是否能先进入真实 pilot。
+
 ## 启动
 
 ```bash
