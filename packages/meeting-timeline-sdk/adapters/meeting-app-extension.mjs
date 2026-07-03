@@ -908,8 +908,16 @@ export function buildMeetingAppExtensionBuildSource(options = {}) {
 export function buildMeetingAppExtensionReadme(options = {}) {
   const installPlan = buildMeetingAppExtensionInstallPlan(options);
   const scriptFile = installPlan.content_scripts[0]?.js?.[0] ?? 'content-script.js';
+  const includeLiveCapture = options.includeLiveCapture !== false && options.include_live_capture !== false;
   const liveCaptureFile = firstNonEmpty(options.liveCaptureScript, options.live_capture_script, 'live-capture.js');
   const backgroundFile = firstNonEmpty(options.backgroundScript, options.background_script, 'background.js');
+  const emittedFiles = includeLiveCapture
+    ? `\`${scriptFile}\`, \`${liveCaptureFile}\`, and \`${backgroundFile}\``
+    : `\`${scriptFile}\` and \`${backgroundFile}\``;
+  const liveCaptureDocs = includeLiveCapture ? [
+    '',
+    'When the extension is loaded, `window.__meetingTimelineLiveCapture` exposes `captureActive()`, `captureEnded()`, `exportRecords()`, and `evidencePackage()` for live DOM validation.',
+  ] : [];
   return [
     '# Meeting Timeline Browser Extension',
     '',
@@ -926,15 +934,14 @@ export function buildMeetingAppExtensionReadme(options = {}) {
     'npm run build',
     '```',
     '',
-    `The build emits \`${scriptFile}\`, \`${liveCaptureFile}\`, and \`${backgroundFile}\`, then \`manifest.json\` can be loaded as an unpacked Chrome/Edge extension.`,
+    `The build emits ${emittedFiles}, then \`manifest.json\` can be loaded as an unpacked Chrome/Edge extension.`,
     '',
     'The generated background worker forwards timeline client calls to the configured timeline service base URL.',
     '',
     'Protocol messages use `meeting_timeline.extension_attached`, `meeting_timeline.extension_status`, and `meeting_timeline.client_call`; build custom callers with the SDK message helpers instead of hardcoded strings.',
     '',
     'Before production rollout, capture real meeting app snapshots with `meeting-app-snapshot-recorder` and validate them with `meeting-app-gate`.',
-    '',
-    'When the extension is loaded, `window.__meetingTimelineLiveCapture` exposes `captureActive()`, `captureEnded()`, `exportRecords()`, and `evidencePackage()` for live DOM validation.',
+    ...liveCaptureDocs,
   ].join('\n');
 }
 

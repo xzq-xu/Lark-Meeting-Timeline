@@ -25,6 +25,8 @@ import {
   normalizeMeetingAppExtensionMessageType,
   normalizeMeetingAppExtensionPlatform,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-extension.mjs';
+import { buildMeetingAppLiveEvidencePackage } from '../packages/meeting-timeline-sdk/adapters/meeting-app-profile.mjs';
+import { createMeetingAppSnapshotRecorder } from '../packages/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder.mjs';
 
 function installGeneratedBackground(source) {
   const originalChrome = globalThis.chrome;
@@ -129,6 +131,82 @@ function installGeneratedContentScript(source, options = {}) {
       globalThis.location = originalLocation;
       if (originalBridge === undefined) delete globalThis.__meetingTimelineBridge;
       else globalThis.__meetingTimelineBridge = originalBridge;
+    },
+  };
+}
+
+function installGeneratedLiveCapture(source, options = {}) {
+  const originalLocation = globalThis.location;
+  const originalDocument = globalThis.document;
+  const originalCustomEvent = globalThis.CustomEvent;
+  const originalDispatchEvent = globalThis.dispatchEvent;
+  const originalCapture = globalThis.__meetingTimelineLiveCapture;
+  const dispatched = [];
+  globalThis.location = {
+    hostname: options.hostname ?? 'meet.google.com',
+    href: options.href ?? 'https://meet.google.com/abc-defg-hij',
+  };
+  globalThis.document = {
+    title: options.title ?? 'Design review - Google Meet',
+  };
+  globalThis.CustomEvent = class CustomEvent {
+    constructor(type, init = {}) {
+      this.type = type;
+      this.detail = init.detail;
+    }
+  };
+  globalThis.dispatchEvent = (event) => {
+    dispatched.push(event);
+    return true;
+  };
+  const captureMeetingAppDomSnapshot = (input = {}, captureOptions = {}) => ({
+    schema: 'meeting_app_dom_capture',
+    schema_version: 1,
+    source: captureOptions.source,
+    observedAtMs: captureOptions.observedAtMs,
+    platform: captureOptions.platform,
+    meeting_id: 'abc-defg-hij',
+    url: input.url,
+    title: input.title,
+    page: {
+      controls: [{ label: 'Leave call' }],
+      buttons: [{ label: 'Leave call' }],
+      participants: [{ id: 'ada', name: 'Ada Lovelace', speaking: true }],
+      tiles: [{ id: 'ada', name: 'Ada Lovelace', speaking: true }],
+    },
+    capture: {
+      profile: captureOptions.captureProfile,
+      participant_count: 1,
+    },
+  });
+  const runnableSource = source.replace(/^(import .+\n)+\n?/, '');
+  try {
+    Function(
+      'captureMeetingAppDomSnapshot',
+      'createMeetingAppSnapshotRecorder',
+      'buildMeetingAppLiveEvidencePackage',
+      runnableSource,
+    )(captureMeetingAppDomSnapshot, createMeetingAppSnapshotRecorder, buildMeetingAppLiveEvidencePackage);
+  } catch (error) {
+    globalThis.location = originalLocation;
+    globalThis.document = originalDocument;
+    globalThis.CustomEvent = originalCustomEvent;
+    globalThis.dispatchEvent = originalDispatchEvent;
+    if (originalCapture === undefined) delete globalThis.__meetingTimelineLiveCapture;
+    else globalThis.__meetingTimelineLiveCapture = originalCapture;
+    throw error;
+  }
+  assert.equal(typeof globalThis.__meetingTimelineLiveCapture?.captureActive, 'function');
+  return {
+    api: globalThis.__meetingTimelineLiveCapture,
+    dispatched,
+    restore() {
+      globalThis.location = originalLocation;
+      globalThis.document = originalDocument;
+      globalThis.CustomEvent = originalCustomEvent;
+      globalThis.dispatchEvent = originalDispatchEvent;
+      if (originalCapture === undefined) delete globalThis.__meetingTimelineLiveCapture;
+      else globalThis.__meetingTimelineLiveCapture = originalCapture;
     },
   };
 }
@@ -313,6 +391,39 @@ assert.match(liveCaptureSource, /captureActive/);
 assert.match(liveCaptureSource, /captureEnded/);
 assert.match(liveCaptureSource, /meet\.google\.com/);
 assert.match(liveCaptureSource, /teams\.microsoft\.com/);
+
+const liveCaptureRuntime = installGeneratedLiveCapture(liveCaptureSource);
+try {
+  assert.equal(liveCaptureRuntime.dispatched.length, 1);
+  assert.equal(liveCaptureRuntime.dispatched[0].type, 'meeting_timeline.live_capture_ready');
+  assert.equal(liveCaptureRuntime.dispatched[0].detail.platform, 'google_meet');
+
+  const activeRecord = liveCaptureRuntime.api.captureActive({
+    capturedAtMs: 1_782_442_820_000,
+  });
+  assert.equal(activeRecord.platform, 'google_meet');
+  assert.equal(activeRecord.phase, 'active');
+  assert.equal(activeRecord.snapshot.meeting_id, 'abc-defg-hij');
+  assert.equal(activeRecord.snapshot.capture.participant_count, 1);
+
+  const endedRecord = liveCaptureRuntime.api.captureEnded({
+    capturedAtMs: 1_782_442_830_000,
+  });
+  assert.equal(endedRecord.phase, 'ended');
+  assert.equal(liveCaptureRuntime.api.getState().record_count, 2);
+
+  const exported = liveCaptureRuntime.api.exportRecords({ id: 'live-capture-export' });
+  assert.equal(exported.id, 'live-capture-export');
+  assert.equal(exported.record_count, 2);
+  assert.equal(exported.records[0].phase, 'active');
+
+  const evidence = liveCaptureRuntime.api.evidencePackage({ packageId: 'live-capture-evidence' });
+  assert.equal(evidence.id, 'live-capture-evidence');
+  assert.equal(evidence.record_count, 2);
+  assert.equal(evidence.platforms.includes('google_meet'), true);
+} finally {
+  liveCaptureRuntime.restore();
+}
 
 const backgroundSource = buildMeetingAppExtensionBackgroundSource({
   baseUrl: 'https://timeline.example.com/',
