@@ -39,6 +39,7 @@ assert.equal(
 assert.equal(packageJson.scripts['device:preflight'], 'node scripts/device-preflight.mjs --report-file=data/device-preflight-report.json');
 assert.equal(packageJson.scripts['device:roundtrip'], 'node scripts/device-roundtrip.mjs');
 assert.equal(packageJson.scripts['meeting-app:extension'], 'node scripts/export-meeting-app-extension.mjs --out-dir=data/meeting-app-extension');
+assert.equal(packageJson.scripts['meeting-app:extension:build'], 'node scripts/export-meeting-app-extension.mjs --out-dir=data/meeting-app-extension --install=true --build=true');
 
 assert.match(readme, /`npm run start` 会设置 `REAL_DEMO_AUTO_ARM=1`/);
 assert.match(readme, /默认不会自动写入验收标注、虚拟墨水屏标注或设备流标注/);
@@ -63,6 +64,7 @@ assert.match(readme, /data\/onsite-device-preflight-report\.json/);
 assert.match(readme, /data\/onsite-strict-device-preflight-report\.json/);
 assert.match(readme, /npm run device:roundtrip/);
 assert.match(readme, /npm run meeting-app:extension/);
+assert.match(readme, /npm run meeting-app:extension:build/);
 assert.match(readme, /data\/meeting-app-extension/);
 assert.match(readme, /window\.__meetingTimelineLiveCapture\.captureActive\(\)/);
 assert.match(readme, /点击“启动事件等待”或“启动验收探针”只启动等待\/验收窗口，不会创建会议轴/);

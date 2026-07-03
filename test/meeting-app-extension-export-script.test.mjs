@@ -25,6 +25,9 @@ assert.equal(summary.base_url, 'https://timeline.example.com');
 assert.deepEqual(summary.platforms, ['google_meet', 'microsoft_teams']);
 assert.equal(summary.acceptance.accepted, true);
 assert.equal(summary.acceptance.uses_all_urls, false);
+assert.equal(summary.build_gate.requested, false);
+assert.equal(summary.build_gate.ok, true);
+assert.equal(summary.build_gate.validation.reason, 'build_not_requested');
 
 const filePaths = summary.files.map((file) => file.path);
 assert.deepEqual(filePaths, [

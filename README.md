@@ -32,6 +32,12 @@ npm install
 npm run build
 ```
 
+也可以直接跑完整构建验收：
+
+```bash
+npm run meeting-app:extension:build
+```
+
 然后在 `chrome://extensions` 或 `edge://extensions` 打开开发者模式，选择 `data/meeting-app-extension` 作为 unpacked extension。进入真实会议页面后，可在 DevTools 里调用 `window.__meetingTimelineLiveCapture.captureActive()`、`captureEnded()`、`evidencePackage()` 或 `diagnose()`，把真实页面的 active speaker、结束态和 DOM 适配问题变成 SDK 可验收的数据，而不是依赖 demo 模拟。
 
 ## 启动
