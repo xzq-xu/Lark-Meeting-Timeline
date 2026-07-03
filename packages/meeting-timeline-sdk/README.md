@@ -137,6 +137,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-timeline-view`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-annotation-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-clock-sync`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-session-binding`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-artifact-handoff`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness`
@@ -1586,6 +1587,41 @@ npm run meeting-platform:clock-sync -- \
   --input=data/meeting-platform-clock-sync-input.json \
   --out-dir=data/meeting-platform-clock-sync \
   --report-file=data/meeting-platform-clock-sync-report.json
+```
+
+跨 Google Meet、Teams、Zoom、Webex、Lark 适配时，还需要把本地观察、provider event 和当前标注绑定到同一场会议。`platform-session-binding` 会比较 `meeting_id`、`external_meeting_id`、URL 派生稳定 id、平台、标题和时间窗口，输出是否绑定当前轴、是否应该从本地观察或 provider start 开轴、是否 pending，或是否存在冲突：
+
+```js
+import {
+  buildMeetingPlatformSessionBinding,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-session-binding';
+
+const binding = buildMeetingPlatformSessionBinding('google-meet', {
+  current_meeting: currentAxis,
+  local_observer: {
+    url: 'https://meet.google.com/abc-defg-hij',
+    observed_at_ms: Date.now(),
+  },
+  signals: providerSignals,
+  annotation: clock.calibrated_annotation,
+});
+
+if (binding.status === 'bound_to_current_axis') {
+  await timeline.insertMark(decision.insert_payload);
+}
+if (binding.should_start_axis) {
+  await timeline.startMeeting(binding.start_payload);
+}
+```
+
+对应 CLI：
+
+```sh
+npm run meeting-platform:session-binding -- \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --input=data/meeting-platform-session-binding-input.json \
+  --out-dir=data/meeting-platform-session-binding \
+  --report-file=data/meeting-platform-session-binding-report.json
 ```
 
 如果下游项目只需要“把当前手写/标注插到会议时间轴上”，不要复制 demo 服务端里的条件判断，直接用 `platform-annotation-intake`。它不拉 provider、不等转写，只检查标注是否携带可靠 `captured_at_ms`，再根据当前会议轴状态给出动作：直接插入当前轴、先开一个 open session 再插入、进入 pending 等真实会议 start 回填，或者标记为缺时间戳/会后审计。

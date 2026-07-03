@@ -418,6 +418,8 @@ SDK 侧如果要把 provider 订阅创建交给另一个项目执行，优先用
 
 跨设备写入标注前，宿主应先调用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-clock-sync` 或等价算法校准设备时间。该 adapter 使用 `/api/time` 的 midpoint 采样契约计算 `clock_offset_ms`，输出 `recommended_offset_ms`、RTT、uncertainty、是否超过 500ms 推荐 skew，以及已校准的 `calibrated_annotation.captured_at_ms`。这一步是平台无关的：Google Meet、Teams、Zoom、Webex、Lark 的 provider 事件都不能替代设备端笔迹结束时刻；provider 事件最多用于会议轴回填和审计。
 
+跨平台绑定会议身份时，用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-session-binding` 把本地观察、provider signal、当前轴和 annotation 汇总成一个决策。它比较 `meeting_id`、`external_meeting_id`、URL 稳定 id、平台、标题和开始时间窗口，输出 `bound_to_current_axis`、`open_axis_from_local_observer`、`open_axis_from_provider_start`、`pending_binding`、`binding_conflict` 或 `insufficient_identity`。这层的作用是防止晚到 provider start 把用户正在写的当前会议轴切错，也让 Google Meet / Teams / Zoom / Webex / Lark 都使用同一套绑定证据和冲突策略。
+
 跨项目插入实时标注时，不要让宿主项目复刻 demo 服务端的 pending/open-session/after-end 分支，改用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-annotation-intake`。这个 adapter 接收当前会议轴状态和一条标注，唯一强约束是标注必须带可靠 `captured_at_ms` 或绝对 stroke 时间戳；它会输出 `ready_to_insert_current_axis`、`start_open_session_then_insert`、`pending_real_meeting`、`needs_device_captured_at`、`after_meeting_end` 等状态，并附带 `insert_payload`、`open_session_payload` 和下一步动作。这里同样不拉 provider、不等 transcript，provider start/end 只用于后续回填或校准；设备端一旦写完笔迹，应把 `ink_end_at_ms`/`captured_at_ms` 随标注一起上报。
 
 会后转写、录制和智能纪要统一走 `@ai-annotation/meeting-timeline-sdk/adapters/platform-artifact-handoff`。它把各平台的 `artifact_ready` signal 转成 fetch/import 请求骨架，并输出 transcript normalizer、token env、source event types 和 import endpoint。这个 handoff 的验收条件是“会后能补拉和导入”，不是“实时可用”：`realtime_blocking_count` 必须为 0，实时标注不能等待 transcript/recording/smart notes 生成，导入后的 transcript 只进入会后轨道或搜索索引，不允许重写用户当时的 `captured_at_ms` 标注位置。

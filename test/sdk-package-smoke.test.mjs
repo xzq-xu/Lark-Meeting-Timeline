@@ -55,6 +55,8 @@ assert.equal(packedFiles.includes('adapters/platform-annotation-intake.mjs'), tr
 assert.equal(packedFiles.includes('adapters/platform-annotation-intake.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-clock-sync.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-clock-sync.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-session-binding.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-session-binding.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.mjs'), true);
@@ -168,6 +170,11 @@ import {
   buildMeetingPlatformClockSyncPlan,
   buildMeetingPlatformClockSyncReport,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-clock-sync';
+import {
+  buildMeetingPlatformSessionBinding,
+  buildMeetingPlatformSessionBindingMatrix,
+  buildMeetingPlatformSessionBindingPlan,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-session-binding';
 import {
   buildMeetingPlatformArtifactHandoff,
   buildMeetingPlatformArtifactHandoffMatrix,
@@ -330,6 +337,16 @@ assert.equal(kit.platformClockSync('zoom', {
     rtt_ms: 40,
   },
 }).status, 'clock_sync_ready');
+assert.equal(kit.platformSessionBindingPlan('zoom').schema, 'meeting_platform_session_binding_plan');
+assert.equal(kit.platformSessionBindingMatrix({
+  platforms: ['zoom'],
+}).platform_count, 1);
+assert.equal(kit.platformSessionBinding('zoom', {
+  local_observer: {
+    url: 'https://zoom.us/j/987654321',
+    observed_at_ms: 1_782_614_400_000,
+  },
+}).status, 'open_axis_from_local_observer');
 assert.equal(kit.platformArtifactHandoffPlan('zoom').schema, 'meeting_platform_artifact_handoff_plan');
 assert.equal(kit.platformArtifactHandoffMatrix({
   platforms: ['zoom'],
@@ -525,6 +542,16 @@ assert.equal(buildMeetingPlatformClockSyncReport('google-meet', {
     },
   ],
 }).recommended_offset_ms, 10);
+assert.equal(buildMeetingPlatformSessionBindingPlan('google-meet').realtime_policy.provider_events_block_realtime, false);
+assert.equal(buildMeetingPlatformSessionBindingMatrix({
+  platforms: ['google-meet'],
+}).provider_blocking_count, 0);
+assert.equal(buildMeetingPlatformSessionBinding('google-meet', {
+  local_observer: {
+    url: 'https://meet.google.com/abc-defg-hij',
+    observed_at_ms: 1_782_614_400_000,
+  },
+}).status, 'open_axis_from_local_observer');
 assert.equal(buildMeetingPlatformArtifactHandoffPlan('google-meet').transcript_blocks_realtime, false);
 assert.equal(buildMeetingPlatformArtifactHandoffMatrix({
   platforms: ['google-meet'],

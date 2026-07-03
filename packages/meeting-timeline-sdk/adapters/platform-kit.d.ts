@@ -100,6 +100,13 @@ import type {
   MeetingPlatformClockSyncReport,
 } from './platform-clock-sync.mjs';
 import type {
+  MeetingPlatformSessionBinding,
+  MeetingPlatformSessionBindingInput,
+  MeetingPlatformSessionBindingMatrix,
+  MeetingPlatformSessionBindingOptions,
+  MeetingPlatformSessionBindingPlan,
+} from './platform-session-binding.mjs';
+import type {
   MeetingPlatformArtifactHandoff,
   MeetingPlatformArtifactHandoffInput,
   MeetingPlatformArtifactHandoffMatrix,
@@ -312,6 +319,13 @@ export interface MeetingPlatformTimelineKit {
     input?: MeetingPlatformClockSyncInput,
     clockOptions?: MeetingPlatformClockSyncOptions,
   ): MeetingPlatformClockSyncReport;
+  platformSessionBindingPlan(platform: string, bindingOptions?: MeetingPlatformSessionBindingOptions): MeetingPlatformSessionBindingPlan;
+  platformSessionBindingMatrix(bindingOptions?: MeetingPlatformSessionBindingOptions): MeetingPlatformSessionBindingMatrix;
+  platformSessionBinding(
+    platform: string,
+    input?: MeetingPlatformSessionBindingInput,
+    bindingOptions?: MeetingPlatformSessionBindingOptions,
+  ): MeetingPlatformSessionBinding;
   platformArtifactHandoffPlan(platform: string, artifactOptions?: MeetingPlatformArtifactHandoffOptions): MeetingPlatformArtifactHandoffPlan;
   platformArtifactHandoffMatrix(artifactOptions?: MeetingPlatformArtifactHandoffOptions): MeetingPlatformArtifactHandoffMatrix;
   platformArtifactHandoff(

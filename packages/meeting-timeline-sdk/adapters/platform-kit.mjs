@@ -129,6 +129,11 @@ import {
   buildMeetingPlatformClockSyncReport,
 } from './platform-clock-sync.mjs';
 import {
+  buildMeetingPlatformSessionBinding,
+  buildMeetingPlatformSessionBindingMatrix,
+  buildMeetingPlatformSessionBindingPlan,
+} from './platform-session-binding.mjs';
+import {
   buildMeetingPlatformArtifactHandoff,
   buildMeetingPlatformArtifactHandoffMatrix,
   buildMeetingPlatformArtifactHandoffPlan,
@@ -360,6 +365,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_timeline_view_matrix: buildMeetingPlatformTimelineViewMatrix(options),
     platform_annotation_intake_matrix: buildMeetingPlatformAnnotationIntakeMatrix(options),
     platform_clock_sync_matrix: buildMeetingPlatformClockSyncMatrix(options),
+    platform_session_binding_matrix: buildMeetingPlatformSessionBindingMatrix(options),
     platform_artifact_handoff_matrix: buildMeetingPlatformArtifactHandoffMatrix(options),
     platform_runtime_profile_matrix: buildMeetingPlatformRuntimeProfileMatrix(options),
     platform_adapter_contract_matrix: buildMeetingPlatformAdapterContractMatrix(options),
@@ -633,6 +639,15 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformClockSync(platform, input = {}, clockOptions = {}) {
       return buildMeetingPlatformClockSyncReport(platform, input, withDefaults(defaults, clockOptions));
+    },
+    platformSessionBindingPlan(platform, bindingOptions = {}) {
+      return buildMeetingPlatformSessionBindingPlan(platform, withDefaults(defaults, bindingOptions));
+    },
+    platformSessionBindingMatrix(bindingOptions = {}) {
+      return buildMeetingPlatformSessionBindingMatrix(withDefaults(defaults, bindingOptions));
+    },
+    platformSessionBinding(platform, input = {}, bindingOptions = {}) {
+      return buildMeetingPlatformSessionBinding(platform, input, withDefaults(defaults, bindingOptions));
     },
     platformArtifactHandoffPlan(platform, artifactOptions = {}) {
       return buildMeetingPlatformArtifactHandoffPlan(platform, withDefaults(defaults, artifactOptions));
