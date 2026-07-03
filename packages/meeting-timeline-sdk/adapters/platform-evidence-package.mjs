@@ -323,6 +323,63 @@ export function buildMeetingPlatformEvidencePackageSummary(packageOrInput, optio
   });
 }
 
+function normalizedStatus(plan = {}) {
+  return {
+    status: plan.status,
+    production_ready: Boolean(plan.production_ready),
+    ready_for_realtime_annotations: Boolean(plan.ready_for_realtime_annotations),
+    provider_evidence_level: plan.provider_events?.evidence_level,
+    provider_evidence_count: plan.provider_events?.evidence_count ?? 0,
+    local_dom_evidence_level: plan.local_observer?.evidence_level,
+    local_dom_evidence_count: plan.local_observer?.evidence_count ?? 0,
+  };
+}
+
+function statusMatches(left = {}, right = {}) {
+  const a = normalizedStatus(left);
+  const b = normalizedStatus(right);
+  return Object.keys(a).every((key) => a[key] === b[key]);
+}
+
+export function verifyMeetingPlatformEvidencePackage(packageOrInput, options = {}) {
+  const verifiedPackage = buildMeetingPlatformEvidencePackage(packageOrInput, {
+    ...options,
+    includeRunbook: firstNonEmpty(options.includeRunbook, options.include_runbook, false),
+  });
+  const embeddedPlan = packageOrInput?.schema === MEETING_PLATFORM_EVIDENCE_PACKAGE_SCHEMA
+    ? packageOrInput.rollout_plan
+    : undefined;
+  const verifiedPlan = verifiedPackage.rollout_plan ?? {};
+  const requireProductionReady = options.requireProductionReady !== false
+    && options.require_production_ready !== false;
+  const passed = requireProductionReady
+    ? verifiedPlan.production_ready === true
+    : verifiedPlan.ready_for_realtime_annotations === true;
+  const embeddedPlanMatches = embeddedPlan ? statusMatches(embeddedPlan, verifiedPlan) : undefined;
+  return compactObject({
+    type: 'meeting_platform_evidence_package_verification',
+    package_id: verifiedPackage.id,
+    platform: verifiedPackage.platform,
+    passed,
+    requirement: requireProductionReady ? 'production_ready' : 'ready_for_realtime_annotations',
+    status: verifiedPlan.status,
+    production_ready: Boolean(verifiedPlan.production_ready),
+    ready_for_realtime_annotations: Boolean(verifiedPlan.ready_for_realtime_annotations),
+    embedded_plan_matches: embeddedPlanMatches,
+    embedded_status: embeddedPlan ? normalizedStatus(embeddedPlan) : undefined,
+    verified_status: normalizedStatus(verifiedPlan),
+    provider_record_count: verifiedPackage.provider_records?.length ?? 0,
+    provider_sample_count: Object.values(verifiedPackage.provider_samples ?? {}).flat().length,
+    meeting_app_record_count: verifiedPackage.meeting_app_record_set?.record_count ?? 0,
+    provider_missing_required_coverage: verifiedPlan.provider_events?.missing_required_coverage ?? [],
+    local_dom_missing_required_coverage: verifiedPlan.local_observer?.missing_required_coverage ?? [],
+    next_actions: verifiedPlan.next_actions ?? [],
+    verified_package: options.includePackage === true || options.include_package === true
+      ? verifiedPackage
+      : undefined,
+  });
+}
+
 export function createMeetingPlatformEvidencePackageBuilder(platform, options = {}) {
   const key = normalizeMeetingPlatform(platform);
   const providerRecords = [];

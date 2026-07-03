@@ -69,6 +69,7 @@ import {
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-rollout';
 import {
   buildMeetingPlatformEvidencePackage,
+  verifyMeetingPlatformEvidencePackage,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package';
 import {
   normalizeGoogleMeetEvent,
@@ -114,6 +115,10 @@ const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {
 });
 assert.equal(evidencePackage.schema, 'meeting_platform_evidence_package');
 assert.equal(evidencePackage.platform, 'google_meet');
+assert.equal(verifyMeetingPlatformEvidencePackage(evidencePackage, {
+  baseUrl: 'http://localhost:8787',
+  requireProductionReady: false,
+}).type, 'meeting_platform_evidence_package_verification');
 
 const gate = buildMeetingAppLaunchGate('google-meet', {
   allowFixtureEvidence: true,

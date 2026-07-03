@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { buildMeetingAppFixtureSnapshot } from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
 import { buildMeetingAppSnapshotRecordSet } from '../packages/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder.mjs';
-import { buildMeetingPlatformEvidencePackage, buildMeetingPlatformEvidencePackageSummary, createMeetingPlatformEvidencePackageBuilder } from '../packages/meeting-timeline-sdk/adapters/platform-evidence-package.mjs';
+import { buildMeetingPlatformEvidencePackage, buildMeetingPlatformEvidencePackageSummary, createMeetingPlatformEvidencePackageBuilder, verifyMeetingPlatformEvidencePackage } from '../packages/meeting-timeline-sdk/adapters/platform-evidence-package.mjs';
 import { buildPlatformFixtureEvent } from '../packages/meeting-timeline-sdk/adapters/platform-fixtures.mjs';
 import { capturePlatformWebhookEvent } from '../packages/meeting-timeline-sdk/adapters/platform-capture.mjs';
 import { createMeetingPlatformTimelineKit } from '../packages/meeting-timeline-sdk/adapters/platform-kit.mjs';
@@ -86,6 +86,15 @@ assert.equal(googleSummary.production_ready, true);
 assert.equal(googleSummary.provider_record_count, 2);
 assert.equal(googleSummary.meeting_app_record_count, 2);
 
+const googleVerification = verifyMeetingPlatformEvidencePackage(googlePackage, {
+  baseUrl,
+  env: googleEnv,
+});
+assert.equal(googleVerification.type, 'meeting_platform_evidence_package_verification');
+assert.equal(googleVerification.passed, true);
+assert.equal(googleVerification.embedded_plan_matches, true);
+assert.equal(googleVerification.requirement, 'production_ready');
+
 const zoomDomOnly = buildMeetingPlatformEvidencePackage({
   platform: 'zoom',
   baseUrl,
@@ -98,6 +107,11 @@ assert.equal(zoomDomOnly.rollout_plan.production_ready, false);
 assert.equal(zoomDomOnly.runbook, undefined);
 assert.equal(zoomDomOnly.evidence_summary.provider.record_count, 0);
 assert.equal(zoomDomOnly.evidence_summary.local_dom.record_count, 2);
+assert.equal(verifyMeetingPlatformEvidencePackage(zoomDomOnly, { baseUrl }).passed, false);
+assert.equal(verifyMeetingPlatformEvidencePackage(zoomDomOnly, {
+  baseUrl,
+  requireProductionReady: false,
+}).passed, true);
 
 const builder = createMeetingPlatformEvidencePackageBuilder('webex', {
   baseUrl,
@@ -151,6 +165,7 @@ const kitPackage = kit.platformEvidencePackage('google-meet', {
 });
 assert.equal(kitPackage.rollout_plan.production_ready, true);
 assert.equal(kit.platformEvidencePackageSummary(kitPackage).provider_record_count, 2);
+assert.equal(kit.verifyPlatformEvidencePackage(kitPackage).passed, true);
 const kitBuilder = kit.platformEvidencePackageBuilder('google-meet');
 kitBuilder.addProviderRecord(providerRecords('google-meet')[0]);
 assert.equal(kitBuilder.getState().provider_record_count, 1);

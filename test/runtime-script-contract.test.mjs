@@ -43,6 +43,7 @@ assert.equal(packageJson.scripts['meeting-app:extension:build'], 'node scripts/e
 assert.equal(packageJson.scripts['meeting-app:evidence-gate'], 'node scripts/meeting-app-evidence-gate.mjs');
 assert.equal(packageJson.scripts['meeting-app:evidence-matrix'], 'node scripts/meeting-app-evidence-matrix.mjs --dir=data/meeting-app-evidence --report-file=data/meeting-app-evidence-matrix.json');
 assert.equal(packageJson.scripts['meeting-platform:rollout-matrix'], 'node scripts/meeting-platform-rollout-matrix.mjs --provider-dir=data/provider-evidence --dom-dir=data/meeting-app-evidence --report-file=data/meeting-platform-rollout-matrix.json');
+assert.equal(packageJson.scripts['meeting-platform:evidence-package'], 'node scripts/meeting-platform-evidence-package.mjs --dir=data/meeting-platform-evidence-packages --report-file=data/meeting-platform-evidence-package-report.json');
 assert.equal(packageJson.scripts['sdk:package-smoke'], 'node test/sdk-package-smoke.test.mjs');
 
 assert.match(readme, /`npm run start` 会设置 `REAL_DEMO_AUTO_ARM=1`/);
@@ -72,12 +73,15 @@ assert.match(readme, /npm run meeting-app:extension:build/);
 assert.match(readme, /npm run meeting-app:evidence-gate/);
 assert.match(readme, /npm run meeting-app:evidence-matrix/);
 assert.match(readme, /npm run meeting-platform:rollout-matrix/);
+assert.match(readme, /npm run meeting-platform:evidence-package/);
 assert.match(readme, /npm run sdk:package-smoke/);
 assert.match(readme, /data\/meeting-app-extension/);
 assert.match(readme, /data\/meeting-app-evidence/);
 assert.match(readme, /data\/meeting-app-evidence-matrix\.json/);
 assert.match(readme, /data\/provider-evidence/);
 assert.match(readme, /data\/meeting-platform-rollout-matrix\.json/);
+assert.match(readme, /data\/meeting-platform-evidence-packages/);
+assert.match(readme, /data\/meeting-platform-evidence-package-report\.json/);
 assert.match(readme, /data\/meeting-app-live-gate-report\.json/);
 assert.match(readme, /window\.__meetingTimelineLiveCapture\.captureActive\(\)/);
 assert.match(readme, /点击“启动事件等待”或“启动验收探针”只启动等待\/验收窗口，不会创建会议轴/);

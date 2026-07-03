@@ -61,6 +61,7 @@ import {
   buildMeetingPlatformEvidencePackage,
   buildMeetingPlatformEvidencePackageSummary,
   createMeetingPlatformEvidencePackageBuilder,
+  verifyMeetingPlatformEvidencePackage,
 } from './platform-evidence-package.mjs';
 import {
   assertAllMeetingAppLaunchGates,
@@ -355,6 +356,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformEvidencePackageBuilder(platform, builderOptions = {}) {
       return createMeetingPlatformEvidencePackageBuilder(platform, withDefaults(defaults, builderOptions));
+    },
+    verifyPlatformEvidencePackage(packageOrInput, verifyOptions = {}) {
+      return verifyMeetingPlatformEvidencePackage(packageOrInput, withDefaults(defaults, verifyOptions));
     },
     meetingAppSnapshotRecorder(recorderOptions = {}) {
       return createMeetingAppSnapshotRecorder(withDefaults(defaults, recorderOptions));

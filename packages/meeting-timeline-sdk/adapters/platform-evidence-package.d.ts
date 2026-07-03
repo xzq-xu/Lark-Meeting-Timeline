@@ -81,6 +81,27 @@ export interface MeetingPlatformEvidencePackageSummary {
   next_actions: string[];
 }
 
+export interface MeetingPlatformEvidencePackageVerification {
+  type: 'meeting_platform_evidence_package_verification';
+  package_id: string;
+  platform: string;
+  passed: boolean;
+  requirement: 'production_ready' | 'ready_for_realtime_annotations';
+  status: string;
+  production_ready: boolean;
+  ready_for_realtime_annotations: boolean;
+  embedded_plan_matches?: boolean;
+  embedded_status?: Record<string, unknown>;
+  verified_status: Record<string, unknown>;
+  provider_record_count: number;
+  provider_sample_count: number;
+  meeting_app_record_count: number;
+  provider_missing_required_coverage: string[];
+  local_dom_missing_required_coverage: string[];
+  next_actions: string[];
+  verified_package?: MeetingPlatformEvidencePackage;
+}
+
 export interface MeetingPlatformEvidencePackageBuilder {
   platform: string;
   addProviderRecord(record?: PlatformCaptureRecord | Record<string, unknown>): PlatformCaptureRecord | Record<string, unknown>;
@@ -107,6 +128,11 @@ export function buildMeetingPlatformEvidencePackageSummary(
   packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions,
   options?: MeetingPlatformEvidencePackageOptions,
 ): MeetingPlatformEvidencePackageSummary;
+
+export function verifyMeetingPlatformEvidencePackage(
+  packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions,
+  options?: MeetingPlatformEvidencePackageOptions,
+): MeetingPlatformEvidencePackageVerification;
 
 export function createMeetingPlatformEvidencePackageBuilder(
   platform: string,

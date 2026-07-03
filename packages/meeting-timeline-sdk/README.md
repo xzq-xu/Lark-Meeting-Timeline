@@ -1244,6 +1244,19 @@ const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {
 // evidencePackage.handoff 可直接交给另一个项目继续接入或复验。
 ```
 
+收到另一个项目交来的包时，不要直接信任包内旧的 `rollout_plan`，用 verify 重新计算：
+
+```js
+import { verifyMeetingPlatformEvidencePackage } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package';
+
+const verification = verifyMeetingPlatformEvidencePackage(evidencePackage, {
+  baseUrl: 'https://timeline.example.com',
+  env: process.env,
+});
+
+// verification.passed === true 表示当前环境下仍满足 production_ready。
+```
+
 如果采样过程在宿主里分步发生，可以用 builder 累积：
 
 ```js
