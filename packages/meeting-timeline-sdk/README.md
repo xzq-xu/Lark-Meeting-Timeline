@@ -222,6 +222,18 @@ const plan = buildMeetingPlatformFieldCapturePlan('zoom', {
 // 如果传入 evidencePackage，SDK 会返回 production_ready / pilot_ready_provider_pending 等状态。
 ```
 
+对应 CLI 可以直接放到现场采样工具或 CI：
+
+```sh
+npm run meeting-platform:field-capture -- \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex \
+  --dir=data/meeting-platform-evidence-packages \
+  --report-file=data/meeting-platform-field-capture-report.json
+```
+
+默认报告会读取已有 evidence package 并输出每个平台的 `missing_items`。如果只是生成空采样计划，用 `--plan-only=true`；如果要让 CI 在仍缺采样时失败，用 `--fail-on-incomplete=true`。
+
 真实采样交接时，`platform-evidence-correlation` 会检查 provider 事件和本地 DOM 记录是否来自同一场会议。它优先用 meeting id / URL 匹配；没有共享 id 时会退到同平台时间窗口匹配。`verifyMeetingPlatformEvidencePackage()` 默认会要求 correlation 通过，避免把不同会议的 provider 样本和 DOM 样本混成一个 production-ready 包。
 
 业务项目如果要直接接入“会议中边写边标注”，优先用 `platform-live-adapter`。它把本地会议 App 观察、provider webhook 回填、实时标注插入和 evidence session 绑成一个对象；`observeMeetingApp()` 会同时尝试建轴并记录本地证据，`ingestProvider()` 会同时回填 provider 事件并记录 provider 证据，`insertAnnotation()` 会返回当前 live readiness：
