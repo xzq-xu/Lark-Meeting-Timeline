@@ -410,6 +410,8 @@ SDK 侧如果要把 provider 订阅创建交给另一个项目执行，优先用
 
 下游开始选平台或做接入面板时，先读 `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry` 的 `buildMeetingPlatformRegistryManifest()`。这张 manifest 汇总 normalizer、runtime bundle、provider security verifier、insert endpoint、`captured_at_ms`、provider/transcript 非阻塞状态和 host endpoints；`assertMeetingPlatformRegistryManifest()` 可作为 CI gate，确保这些平台都满足 SDK 接入契约。仓库命令 `npm run meeting-platform:registry` 会输出同一份报告。它适合放在配置页或 CI 里作为“当前 Google Meet / Teams / Zoom / Webex / Lark 是否具备 SDK 接入面”的第一层总览。
 
+给其他项目真正写代码时，优先用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime`，而不是让接入方直接拼 `platform-kit`、live adapter、runtime bundle、registry 和 timeline view。`createMeetingPlatformIntegrationRuntime()` 暴露统一方法：`observeMeetingApp(platform, snapshot)`、`ingestProvider(platform, event)`、`insertAnnotation(platform, mark)`、`speakerTrack()`、`participantTrack()`、`timelineView()`、`runtimeBundles()`、`registry()` 和 `handoffReadiness()`。`buildMeetingPlatformIntegrationRuntimeManifest()` / `assertMeetingPlatformIntegrationRuntimeManifest()` 只验 SDK 接线、runtime bundle、`captured_at_ms`、provider/transcript 非阻塞策略，适合作为 host handoff gate；真实 DOM/provider 证据仍然必须走 `platform-real-intake` 或 `platform-handoff-readiness`，不能用 runtime manifest 代替 production ready。
+
 如果下游需要一个可改造的 host scaffold，而不是自己拼这些模块，用 `platform-host-integration`。生成的 host wrapper 会同时暴露 `runtimeBundles()`、`handoffBundle()`、`adapterContracts()`、`insertAnnotation()` 和 provider webhook route；`/api/meeting-platform/runtime-bundles` 可作为扩展/WebView/native host 拉取 runtime bundle 的统一入口。
 
 适配开发早期可以先跑 `@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-sample`。`runMeetingPlatformAdapterSample('google-meet')` 会用 fixture 级本地会议页快照、provider start/end/participant/transcript 事件和一条 `capturedAtMs` 标注，完整调用 live adapter 的 `observeMeetingApp()`、`insertAnnotation()`、`ingestProvider()`、`exportPackage()` 和 `verify()`，产出 `meeting_platform_adapter_sample`。`runMeetingPlatformAdapterSampleMatrix()` 默认覆盖 Google Meet、Microsoft Teams、Zoom、Webex、Lark；仓库命令 `npm run meeting-platform:adapter-sample` 会把每个平台 sample 写到 `data/meeting-platform-adapter-samples/`。这不是生产证据，只是 adapter 开发的第一道 smoke gate：证明 SDK 调用面、时间戳契约、provider 非阻塞策略和 evidence package 复验链路同时跑通。通过 sample 后，仍然需要真实 DOM snapshot 和真实 provider capture records 才能进入 `production_ready` 结论。
@@ -449,6 +451,8 @@ packages/meeting-timeline-sdk/
     platform-setup.d.ts
     platform-registry.mjs
     platform-registry.d.ts
+    platform-integration-runtime.mjs
+    platform-integration-runtime.d.ts
     platform-ingest.mjs
     platform-ingest.d.ts
     platform-rollout.mjs

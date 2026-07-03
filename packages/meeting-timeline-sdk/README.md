@@ -116,6 +116,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest`
 - `@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-kit`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime`
 - `@ai-annotation/meeting-timeline-sdk/adapters/signal-reconciler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-router`
@@ -176,6 +177,35 @@ await bridge.importTranscript({
   raw: googleTranscriptEntries,
 });
 ```
+
+如果接入方不是只验证单条链路，而是要把 Google Meet、Teams、Zoom、Webex、Lark 做成同一个会议标注 runtime，优先用 `platform-integration-runtime`。它是薄 facade：内部仍使用 `platform-kit`、live adapter、runtime bundle、registry 和 handoff readiness，但调用方面只需要面向统一方法。
+
+```js
+import {
+  createMeetingPlatformIntegrationRuntime,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';
+
+const runtime = createMeetingPlatformIntegrationRuntime({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom'],
+});
+
+await runtime.observeMeetingApp('google-meet', domSnapshot);
+await runtime.ingestProvider('google-meet', workspaceEvent);
+await runtime.insertAnnotation('google-meet', {
+  annotation: {
+    label: 'why?',
+    captured_at_ms: Date.now(),
+  },
+});
+
+const viewModel = runtime.timelineView('google-meet', {
+  meeting: currentMeeting,
+  annotations: currentMarks,
+});
+```
+
+`runtime.manifest()` 只证明 SDK 接线、runtime bundle、`captured_at_ms`、provider/transcript 非阻塞策略已经满足 host handoff；真实会议页 DOM 和官方事件证据仍然要用 `platform-real-intake` / `platform-handoff-readiness` 验收，不能用 runtime manifest 冒充 production ready。
 
 多平台正式接入前，可以先用 `platform-strategy` 输出机器可读策略。它把 Google Meet、Teams、Zoom、Webex、Lark 的共性收敛成同一条原则：实时标注轴由本地观察或 host detector 先建，provider webhook 只做 reconcile/backfill，post-meeting transcript 只做会后导入，不阻塞当前标注：
 

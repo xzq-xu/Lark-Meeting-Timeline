@@ -29,6 +29,8 @@ assert.equal(packedFiles.includes('index.mjs'), true);
 assert.equal(packedFiles.includes('index.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-integration-runtime.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-integration-runtime.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-registry.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-registry.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
@@ -109,6 +111,11 @@ import {
 import {
   createMeetingPlatformTimelineKit,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit';
+import {
+  assertMeetingPlatformIntegrationRuntimeManifest,
+  buildMeetingPlatformIntegrationRuntimeManifest,
+  createMeetingPlatformIntegrationRuntime,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';
 import {
   assertMeetingPlatformRegistryManifest,
   buildMeetingPlatformRegistryAcceptanceReport,
@@ -264,6 +271,30 @@ assert.equal(kit.platformRolloutPlan('google-meet').platform, 'google_meet');
 assert.equal(kit.platformAdaptationRunbook('zoom').platform, 'zoom');
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_rollout.type, 'meeting_platform_rollout_summary');
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_registry_manifest.platform_count, 1);
+const integrationRuntimeManifest = buildMeetingPlatformIntegrationRuntimeManifest({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet', 'zoom'],
+});
+assert.equal(integrationRuntimeManifest.host_integration_ready, true);
+assert.equal(assertMeetingPlatformIntegrationRuntimeManifest(integrationRuntimeManifest).platform_count, 2);
+const integrationRuntime = createMeetingPlatformIntegrationRuntime(client, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+});
+assert.equal(integrationRuntime.manifest().host_integration_ready, true);
+assert.equal(integrationRuntime.runtimeBundles().platform_count, 1);
+assert.equal(integrationRuntime.timelineView('google-meet', {
+  meeting: {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    start_time_ms: 1_782_614_400_000,
+  },
+  annotations: [{
+    id: 'runtime-smoke-note',
+    label: 'why?',
+    captured_at_ms: 1_782_614_401_000,
+  }],
+}).diagnostics.marker_count, 1);
 assert.equal(kit.platformRegistryEntry('google-meet').annotations.timestamp_field, 'captured_at_ms');
 assert.equal(kit.platformRegistryManifest({ platforms: ['zoom'] }).rows[0].platform, 'zoom');
 assert.equal(meetingPlatformEventAdapterFor('teams').key, 'microsoft_teams');
