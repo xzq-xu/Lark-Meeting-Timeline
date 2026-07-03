@@ -17,6 +17,66 @@ import {
   normalizeMeetingAppExtensionPlatform,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-extension.mjs';
 
+function installGeneratedBackground(source) {
+  const originalChrome = globalThis.chrome;
+  const originalFetch = globalThis.fetch;
+  const listeners = [];
+  const storage = {};
+  const fetchCalls = [];
+  globalThis.chrome = {
+    runtime: {
+      onMessage: {
+        addListener(listener) {
+          listeners.push(listener);
+        },
+      },
+    },
+    storage: {
+      local: {
+        set(value, callback) {
+          Object.assign(storage, value);
+          callback?.();
+        },
+        get(key, callback) {
+          const keys = Array.isArray(key) ? key : [key];
+          const result = Object.fromEntries(keys.map((item) => [item, storage[item]]));
+          callback?.(result);
+        },
+      },
+    },
+  };
+  globalThis.fetch = async (url, init) => {
+    fetchCalls.push({ url, init });
+    return new Response(JSON.stringify({ ok: true, stored: true }), {
+      status: 201,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  try {
+    Function(source)();
+  } catch (error) {
+    globalThis.chrome = originalChrome;
+    globalThis.fetch = originalFetch;
+    throw error;
+  }
+  assert.equal(listeners.length, 1);
+  const listener = listeners[0];
+  return {
+    storage,
+    fetchCalls,
+    send(message, sender = {}) {
+      return new Promise((resolve) => {
+        const returned = listener(message, sender, resolve);
+        if (returned === false) resolve({ handled: false });
+      });
+    },
+    restore() {
+      globalThis.chrome = originalChrome;
+      globalThis.fetch = originalFetch;
+    },
+  };
+}
+
 assert.deepEqual(MEETING_APP_EXTENSION_PLATFORM_KEYS, [
   'google_meet',
   'microsoft_teams',
@@ -98,6 +158,55 @@ assert.match(backgroundSource, /STATUS_STORAGE_KEY/);
 assert.match(backgroundSource, /setStorageValue/);
 assert.match(backgroundSource, /\/api\/meeting-session\/start/);
 assert.match(backgroundSource, /\/api\/annotations\/batch/);
+
+const backgroundRuntime = installGeneratedBackground(backgroundSource);
+try {
+  const attachedResponse = await backgroundRuntime.send({
+    type: 'meeting_timeline.extension_attached',
+    platform: 'google_meet',
+    captured_at_ms: 1_782_442_800_000,
+    url: 'https://meet.google.com/abc-defg-hij',
+  }, {
+    tab: { id: 7 },
+    frameId: 0,
+    url: 'https://meet.google.com/abc-defg-hij',
+  });
+  assert.equal(attachedResponse.ok, true);
+  assert.equal(attachedResponse.storage.stored, true);
+  assert.equal(attachedResponse.attached.platform, 'google_meet');
+  assert.equal(backgroundRuntime.storage.meeting_timeline_extension_status.platform, 'google_meet');
+
+  const statusResponse = await backgroundRuntime.send({ type: 'meeting_timeline.extension_status' });
+  assert.equal(statusResponse.ok, true);
+  assert.equal(statusResponse.attached.url, 'https://meet.google.com/abc-defg-hij');
+
+  const clientCallResponse = await backgroundRuntime.send({
+    type: 'meeting_timeline.client_call',
+    method: 'startMeeting',
+    platform: 'google_meet',
+    captured_at_ms: 1_782_442_810_000,
+    url: 'https://meet.google.com/abc-defg-hij',
+    input: {
+      meeting_id: 'meet-001',
+      title: 'Weekly sync',
+    },
+  }, {
+    tab: { id: 7 },
+    frameId: 0,
+    url: 'https://meet.google.com/abc-defg-hij',
+  });
+  assert.equal(clientCallResponse.ok, true);
+  assert.equal(clientCallResponse.status, 201);
+  assert.equal(backgroundRuntime.fetchCalls.length, 1);
+  assert.equal(backgroundRuntime.fetchCalls[0].url, 'https://timeline.example.com/api/meeting-session/start');
+  const postedPayload = JSON.parse(backgroundRuntime.fetchCalls[0].init.body);
+  assert.equal(postedPayload.platform, 'google_meet');
+  assert.equal(postedPayload.meeting_id, 'meet-001');
+  assert.equal(postedPayload.detector_source, 'meeting_app_extension');
+  assert.equal(postedPayload.extension_sender.tab_id, 7);
+} finally {
+  backgroundRuntime.restore();
+}
 
 const packageJson = buildMeetingAppExtensionPackageJson({
   packageName: 'demo-meeting-extension',
