@@ -43,6 +43,8 @@ assert.equal(packedFiles.includes('adapters/platform-host-integration.mjs'), tru
 assert.equal(packedFiles.includes('adapters/platform-host-integration.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-provider-connection.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-provider-connection.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-subscription-handoff.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-subscription-handoff.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-sample.mjs'), true);
@@ -125,6 +127,10 @@ import {
   buildMeetingPlatformProviderConnectionPack,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection';
 import {
+  buildMeetingPlatformSubscriptionHandoff,
+  buildMeetingPlatformSubscriptionHandoffMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-subscription-handoff';
+import {
   assertMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
   buildMeetingPlatformAdapterContractAcceptanceReport,
@@ -191,6 +197,10 @@ assert.equal(kit.platformHostIntegrationScaffold({
 }).files.some((file) => file.path === 'src/meeting-platform-host.mjs'), true);
 assert.equal(kit.platformProviderConnectionPack('zoom').security.verifier, 'verifyZoomWebhookEvent');
 assert.equal(kit.platformProviderConnectionMatrix({
+  platforms: ['zoom'],
+}).platform_count, 1);
+assert.equal(kit.platformSubscriptionHandoff('zoom').schema, 'meeting_platform_subscription_handoff');
+assert.equal(kit.platformSubscriptionHandoffMatrix({
   platforms: ['zoom'],
 }).platform_count, 1);
 
@@ -279,6 +289,13 @@ assert.equal(buildMeetingPlatformProviderConnectionMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).packs[0].official_docs.some((doc) => doc.url.includes('zoom.us')), true);
+assert.equal(buildMeetingPlatformSubscriptionHandoff('zoom', {
+  baseUrl: 'http://localhost:8787',
+}).schema, 'meeting_platform_subscription_handoff');
+assert.equal(buildMeetingPlatformSubscriptionHandoffMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+}).platform_count, 1);
 assert.equal(buildMeetingPlatformAdapterContract('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).supported_surfaces.browser_observer, true);

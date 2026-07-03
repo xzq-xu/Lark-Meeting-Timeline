@@ -131,6 +131,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-host-integration`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-subscription-handoff`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract`
@@ -1737,6 +1738,52 @@ npm run meeting-platform:provider-connection -- \
 ```
 
 `subscriptions-file` 可以是平台到订阅参数的 JSON map；例如 `google_meet.pubsubTopic`、`microsoft_teams.joinWebUrl`、`zoom.webhookUrl`、`webex.targetUrl`。报告会列出缺失的 secret/env、官方文档链接、事件映射和 `provider_events_block_realtime=false` 的实时标注约束。
+
+如果接入方已经拿到各平台的订阅参数，需要更直接地生成“可以创建订阅”的交接包，用 `platform-subscription-handoff`。它会复用 `platform-provider-connection` 的权限、安全和事件映射判断，但输出面向执行的请求列表：Google Workspace Events 的 `/v1beta/subscriptions` body、Microsoft Graph `/subscriptions` body、Zoom 事件订阅配置摘要、Webex 每个 webhook 的 `/v1/webhooks` body。Lark/飞书当前仍按控制台或长连接配置归为 `manual_setup`，不会伪造不存在的统一创建 API。
+
+```js
+import {
+  buildMeetingPlatformSubscriptionHandoff,
+  buildMeetingPlatformSubscriptionHandoffMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-subscription-handoff';
+
+const handoff = buildMeetingPlatformSubscriptionHandoff('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+  env: process.env,
+  subscription: {
+    targetResource: '//cloudidentity.googleapis.com/users/me',
+    pubsubTopic: 'projects/demo/topics/meet-events',
+    ttl: '86400s',
+  },
+});
+
+// handoff.ready_to_create === true 时，handoff.requests 可交给平台接入脚本执行。
+// handoff.handoff_contract.annotation_timestamp_field === 'captured_at_ms'
+
+const matrix = buildMeetingPlatformSubscriptionHandoffMatrix({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+  subscriptions: {
+    google_meet: { targetResource: '//cloudidentity.googleapis.com/users/me', pubsubTopic: 'projects/demo/topics/meet-events' },
+    microsoft_teams: { joinWebUrl: 'https://teams.microsoft.com/l/meetup-join/demo' },
+    zoom: { webhookUrl: 'https://timeline.example.com/api/platform-events/zoom' },
+    webex: { targetUrl: 'https://timeline.example.com/api/platform-events/webex' },
+  },
+});
+```
+
+对应命令适合作为下游项目的订阅准备 gate：
+
+```sh
+npm run meeting-platform:subscription-handoff -- \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --subscriptions-file=data/provider-subscriptions.json \
+  --out-dir=data/meeting-platform-subscription-handoffs \
+  --report-file=data/meeting-platform-subscription-handoff-report.json
+```
+
+报告里 `ready_to_create_count` 表示能直接创建订阅的平台数，`manual_setup_count` 表示必须去平台控制台或长连接配置的平台数，`security_blocked_count` 和 `parameter_missing_count` 直接给 CI/接入面板做失败原因。即使 provider 订阅已全部可创建，实时标注仍然以宿主捕获的 `captured_at_ms` 为准；provider 事件只做 start/end/artifact 的回填和审计。
 
 如果要给另一个项目一个更完整的“可改造骨架”，用 `platform-host-integration` 生成 host scaffold。它会输出 `package.json`、timeline client、host wrapper、framework-neutral HTTP route、handoff/readiness 脚本和 README：
 

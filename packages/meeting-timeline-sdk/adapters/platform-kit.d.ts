@@ -59,6 +59,11 @@ import type {
   MeetingPlatformProviderConnectionPack,
 } from './platform-provider-connection.mjs';
 import type {
+  MeetingPlatformSubscriptionHandoff,
+  MeetingPlatformSubscriptionHandoffMatrix,
+  MeetingPlatformSubscriptionHandoffOptions,
+} from './platform-subscription-handoff.mjs';
+import type {
   MeetingPlatformRuntimeProfile,
   MeetingPlatformRuntimeProfileMatrix,
   MeetingPlatformRuntimeProfileOptions,
@@ -219,6 +224,10 @@ export interface MeetingPlatformTimelineKit {
   ): MeetingPlatformHostIntegrationScaffoldAcceptanceReport;
   platformProviderConnectionPack(platform: string, providerOptions?: MeetingPlatformProviderConnectionOptions): MeetingPlatformProviderConnectionPack;
   platformProviderConnectionMatrix(providerOptions?: MeetingPlatformProviderConnectionOptions): MeetingPlatformProviderConnectionMatrix;
+  platformSubscriptionHandoff(platform: string, handoffOptions?: MeetingPlatformSubscriptionHandoffOptions): MeetingPlatformSubscriptionHandoff;
+  platformSubscriptionHandoffMatrix(handoffOptions?: MeetingPlatformSubscriptionHandoffOptions): MeetingPlatformSubscriptionHandoffMatrix;
+  assertPlatformSubscriptionHandoff(platform: string, handoffOptions?: MeetingPlatformSubscriptionHandoffOptions): MeetingPlatformSubscriptionHandoff;
+  assertPlatformSubscriptionHandoffMatrix(handoffOptions?: MeetingPlatformSubscriptionHandoffOptions): MeetingPlatformSubscriptionHandoffMatrix;
   platformRuntimeProfile(platform: string, profileOptions?: MeetingPlatformRuntimeProfileOptions): MeetingPlatformRuntimeProfile;
   platformRuntimeProfileMatrix(profileOptions?: MeetingPlatformRuntimeProfileOptions): MeetingPlatformRuntimeProfileMatrix;
   platformAdapterContract(platform: string, contractOptions?: MeetingPlatformAdapterContractOptions): MeetingPlatformAdapterContract;
