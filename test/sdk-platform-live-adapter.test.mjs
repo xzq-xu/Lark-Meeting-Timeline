@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { buildMeetingAppFixtureSnapshot } from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
 import { buildPlatformFixtureEvent } from '../packages/meeting-timeline-sdk/adapters/platform-fixtures.mjs';
 import {
+  assertMeetingPlatformLiveAdapterReadiness,
+  assertMeetingPlatformLiveAdapterReadinessMatrix,
   buildMeetingPlatformLiveAdapterMatrix,
   buildMeetingPlatformLiveAdapterPlan,
   buildMeetingPlatformLiveAdapterReadiness,
@@ -70,6 +72,15 @@ assert.equal(blockedReadiness.schema, 'meeting_platform_live_adapter_readiness')
 assert.equal(blockedReadiness.status, 'blocked');
 assert.equal(blockedReadiness.blocking_checks.some((item) => item.code === 'pilot_realtime_axis_ready'), true);
 assert.equal(blockedReadiness.warnings.some((item) => item.code === 'evidence_package_available'), true);
+assert.throws(
+  () => assertMeetingPlatformLiveAdapterReadiness('google-meet', {
+    baseUrl,
+    env: googleEnv,
+  }),
+  (error) => error.name === 'MeetingTimelineSdkError'
+    && error.details.platform === 'google_meet'
+    && error.details.blocking_checks.some((item) => item.code === 'pilot_realtime_axis_ready'),
+);
 
 const liveMatrix = buildMeetingPlatformLiveAdapterMatrix({
   baseUrl,
@@ -94,6 +105,11 @@ assert.equal(suite.adapter('google-meet'), suite.adapter('google-meet'));
 assert.equal(suite.adapters().zoom.platform, 'zoom');
 assert.equal(suite.readiness('google-meet').platform, 'google_meet');
 assert.equal(suite.readinessMatrix().platform_count, 2);
+assert.throws(
+  () => suite.assertReadiness('google-meet'),
+  (error) => error.name === 'MeetingTimelineSdkError'
+    && error.details.platform === 'google_meet',
+);
 
 const activeSnapshot = buildMeetingAppFixtureSnapshot('google-meet', {
   state: 'active',
@@ -175,6 +191,13 @@ assert.equal(productionReadiness.passed, true);
 assert.equal(productionReadiness.production_ready, true);
 assert.equal(productionReadiness.verification.passed, true);
 assert.equal(productionReadiness.checks.some((item) => item.code === 'adapter_methods_available' && item.passed), true);
+assert.equal(assertMeetingPlatformLiveAdapterReadiness('google-meet', {
+  baseUrl,
+  env: googleEnv,
+  target: 'production',
+  adapter,
+  evidencePackage: adapter.exportPackage(),
+}).status, 'ready');
 
 const readinessMatrix = buildMeetingPlatformLiveAdapterReadinessMatrix({
   baseUrl,
@@ -187,6 +210,34 @@ assert.equal(readinessMatrix.schema, 'meeting_platform_live_adapter_readiness_ma
 assert.equal(readinessMatrix.platform_count, 1);
 assert.equal(readinessMatrix.ready_count, 1);
 assert.equal(readinessMatrix.rows[0].status, 'ready');
+assert.equal(assertMeetingPlatformLiveAdapterReadinessMatrix({
+  baseUrl,
+  env: googleEnv,
+  target: 'production',
+  platforms: ['google-meet'],
+  evidencePackage: { google_meet: adapter.exportPackage() },
+}).passed_count, 1);
+assert.throws(
+  () => assertMeetingPlatformLiveAdapterReadinessMatrix({
+    baseUrl,
+    env: googleEnv,
+    target: 'production',
+    platforms: ['google-meet', 'teams'],
+    evidencePackage: { google_meet: adapter.exportPackage() },
+  }),
+  (error) => error.name === 'MeetingTimelineSdkError'
+    && error.details.failed_platforms.includes('microsoft_teams')
+    && error.details.matrix.blocked_count === 1,
+);
+assert.equal(suite.assertReadiness('google-meet', {
+  target: 'production',
+  evidencePackage: adapter.exportPackage(),
+}).status, 'ready');
+assert.equal(suite.assertReadinessMatrix({
+  target: 'production',
+  platforms: ['google-meet'],
+  evidencePackage: { google_meet: adapter.exportPackage() },
+}).passed_count, 1);
 
 const state = adapter.getState();
 assert.equal(state.platform, 'google_meet');
@@ -207,7 +258,14 @@ assert.equal(kit.platformLiveAdapterMatrix({ platforms: ['google-meet'] }).rows[
 assert.equal(kit.platformLiveAdapterReadiness('google-meet', {
   evidencePackage: adapter.exportPackage(),
 }).passed, true);
+assert.equal(kit.assertPlatformLiveAdapterReadiness('google-meet', {
+  evidencePackage: adapter.exportPackage(),
+}).passed, true);
 assert.equal(kit.platformLiveAdapterReadinessMatrix({
+  platforms: ['google-meet'],
+  evidencePackage: { google_meet: adapter.exportPackage() },
+}).passed_count, 1);
+assert.equal(kit.assertPlatformLiveAdapterReadinessMatrix({
   platforms: ['google-meet'],
   evidencePackage: { google_meet: adapter.exportPackage() },
 }).passed_count, 1);

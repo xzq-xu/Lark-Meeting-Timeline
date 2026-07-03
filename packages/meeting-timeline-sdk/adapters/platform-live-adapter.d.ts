@@ -182,8 +182,10 @@ export interface MeetingPlatformLiveAdapterSuite {
   adapters(adapterOptions?: MeetingPlatformLiveAdapterOptions): Record<string, MeetingPlatformLiveAdapter>;
   plan(platform: string, planOptions?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapterPlan;
   readiness(platform: string, readinessOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterReadiness;
+  assertReadiness(platform: string, readinessOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterReadiness;
   matrix(matrixOptions?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapterMatrix;
   readinessMatrix(readinessOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterReadinessMatrix;
+  assertReadinessMatrix(readinessOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterReadinessMatrix;
   summary(summaryOptions?: MeetingPlatformLiveAdapterOptions): Record<string, unknown>;
   getState(): Record<string, unknown>;
   reset(nextState?: Record<string, unknown>): Record<string, unknown>;
@@ -204,6 +206,15 @@ export function buildMeetingPlatformLiveAdapterReadiness(
 ): MeetingPlatformLiveAdapterReadiness;
 
 export function buildMeetingPlatformLiveAdapterReadinessMatrix(
+  options?: MeetingPlatformLiveAdapterReadinessOptions,
+): MeetingPlatformLiveAdapterReadinessMatrix;
+
+export function assertMeetingPlatformLiveAdapterReadiness(
+  platform: string,
+  options?: MeetingPlatformLiveAdapterReadinessOptions,
+): MeetingPlatformLiveAdapterReadiness;
+
+export function assertMeetingPlatformLiveAdapterReadinessMatrix(
   options?: MeetingPlatformLiveAdapterReadinessOptions,
 ): MeetingPlatformLiveAdapterReadinessMatrix;
 

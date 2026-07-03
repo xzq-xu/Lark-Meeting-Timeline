@@ -70,6 +70,8 @@ import {
   createMeetingPlatformEvidenceSession,
 } from './platform-evidence-session.mjs';
 import {
+  assertMeetingPlatformLiveAdapterReadiness,
+  assertMeetingPlatformLiveAdapterReadinessMatrix,
   buildMeetingPlatformLiveAdapterMatrix,
   buildMeetingPlatformLiveAdapterPlan,
   buildMeetingPlatformLiveAdapterReadiness,
@@ -406,11 +408,17 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     platformLiveAdapterReadiness(platform, readinessOptions = {}) {
       return buildMeetingPlatformLiveAdapterReadiness(platform, withDefaults(defaults, readinessOptions));
     },
+    assertPlatformLiveAdapterReadiness(platform, readinessOptions = {}) {
+      return assertMeetingPlatformLiveAdapterReadiness(platform, withDefaults(defaults, readinessOptions));
+    },
     platformLiveAdapterMatrix(matrixOptions = {}) {
       return buildMeetingPlatformLiveAdapterMatrix(withDefaults(defaults, matrixOptions));
     },
     platformLiveAdapterReadinessMatrix(matrixOptions = {}) {
       return buildMeetingPlatformLiveAdapterReadinessMatrix(withDefaults(defaults, matrixOptions));
+    },
+    assertPlatformLiveAdapterReadinessMatrix(matrixOptions = {}) {
+      return assertMeetingPlatformLiveAdapterReadinessMatrix(withDefaults(defaults, matrixOptions));
     },
     platformLiveAdapterSuite(suiteOptions = {}) {
       return createMeetingPlatformLiveAdapterSuite(bridge.client, withDefaults(defaults, suiteOptions));

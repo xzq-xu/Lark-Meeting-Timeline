@@ -1,4 +1,4 @@
-import { compactObject } from '../index.mjs';
+import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
 import { createMeetingSourceAggregator } from './meeting-source.mjs';
 import { verifyMeetingPlatformEvidencePackage } from './platform-evidence-package.mjs';
 import { createMeetingPlatformEvidenceSession } from './platform-evidence-session.mjs';
@@ -412,6 +412,45 @@ export function buildMeetingPlatformLiveAdapterReadinessMatrix(options = {}) {
   };
 }
 
+export function assertMeetingPlatformLiveAdapterReadiness(platform, options = {}) {
+  const readiness = buildMeetingPlatformLiveAdapterReadiness(platform, options);
+  if (readiness.passed !== true) {
+    throw new MeetingTimelineSdkError(`Meeting platform live adapter readiness failed for ${readiness.platform}`, {
+      platform: readiness.platform,
+      target: readiness.target,
+      status: readiness.status,
+      passed: readiness.passed,
+      production_ready: readiness.production_ready,
+      ready_for_realtime_annotations: readiness.ready_for_realtime_annotations,
+      rollout_status: readiness.rollout_status,
+      blocking_checks: readiness.blocking_checks,
+      warnings: readiness.warnings,
+      next_actions: readiness.next_actions,
+      readiness,
+    });
+  }
+  return readiness;
+}
+
+export function assertMeetingPlatformLiveAdapterReadinessMatrix(options = {}) {
+  const matrix = buildMeetingPlatformLiveAdapterReadinessMatrix(options);
+  if (matrix.reports.some((row) => row.passed !== true)) {
+    throw new MeetingTimelineSdkError('Meeting platform live adapter readiness matrix failed', {
+      platform_count: matrix.platform_count,
+      passed_count: matrix.passed_count,
+      ready_count: matrix.ready_count,
+      warning_count: matrix.warning_count,
+      blocked_count: matrix.blocked_count,
+      realtime_ready_count: matrix.realtime_ready_count,
+      production_ready_count: matrix.production_ready_count,
+      failed_platforms: matrix.reports.filter((row) => row.passed !== true).map((row) => row.platform),
+      next_actions: uniqueList(matrix.reports.flatMap((row) => row.next_actions ?? [])),
+      matrix,
+    });
+  }
+  return matrix;
+}
+
 export function createMeetingPlatformLiveAdapter(platform, clientOrOptions = {}, options = {}) {
   const key = normalizeMeetingPlatform(platform);
   const sourceInput = isTimelineClient(clientOrOptions)
@@ -600,6 +639,18 @@ export function createMeetingPlatformLiveAdapterSuite(clientOrOptions = {}, opti
         ),
       });
     },
+    assertReadiness(platform, readinessOptions = {}) {
+      return assertMeetingPlatformLiveAdapterReadiness(platform, {
+        ...options,
+        ...readinessOptions,
+        adapter: firstNonEmpty(
+          readinessOptions.adapter,
+          readinessOptions.liveAdapter,
+          readinessOptions.live_adapter,
+          adapter(platform, readinessOptions.adapterOptions ?? readinessOptions.adapter_options ?? {}),
+        ),
+      });
+    },
     matrix(matrixOptions = {}) {
       return buildMeetingPlatformLiveAdapterMatrix({
         ...options,
@@ -609,6 +660,13 @@ export function createMeetingPlatformLiveAdapterSuite(clientOrOptions = {}, opti
     },
     readinessMatrix(readinessOptions = {}) {
       return buildMeetingPlatformLiveAdapterReadinessMatrix({
+        ...options,
+        ...readinessOptions,
+        platforms: readinessOptions.platforms ?? readinessOptions.platform_keys ?? platforms,
+      });
+    },
+    assertReadinessMatrix(readinessOptions = {}) {
+      return assertMeetingPlatformLiveAdapterReadinessMatrix({
         ...options,
         ...readinessOptions,
         platforms: readinessOptions.platforms ?? readinessOptions.platform_keys ?? platforms,

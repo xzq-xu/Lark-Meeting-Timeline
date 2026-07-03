@@ -230,6 +230,11 @@ const readiness = suite.readiness('google-meet', {
 
 // readiness.status === 'ready' 表示 adapter 方法、captured_at_ms 时间戳约束、
 // 非阻塞 provider/transcript 策略和 evidence package 复验都通过。
+
+suite.assertReadiness('google-meet', {
+  target: 'production',
+  evidencePackage: googleLive.exportPackage(),
+});
 ```
 
 会议进行中可以用 `platform-evidence-session` 持续收集本地 DOM 和 provider webhook 证据。它的定位是 live object：每采到一个窗口快照或 webhook，就调用 `summary()` 看当前是否能实时落标注、是否还缺 provider reconcile 证据，以及后续能否导出 handoff 包：

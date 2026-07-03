@@ -86,6 +86,8 @@ import {
   createMeetingPlatformEvidenceSession,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-session';
 import {
+  assertMeetingPlatformLiveAdapterReadiness,
+  assertMeetingPlatformLiveAdapterReadinessMatrix,
   buildMeetingPlatformLiveAdapterMatrix,
   buildMeetingPlatformLiveAdapterPlan,
   buildMeetingPlatformLiveAdapterReadiness,
@@ -166,6 +168,19 @@ assert.equal(buildMeetingPlatformLiveAdapterReadinessMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).platform_count, 1);
+assert.throws(
+  () => assertMeetingPlatformLiveAdapterReadiness('zoom', {
+    baseUrl: 'http://localhost:8787',
+  }),
+  /Meeting platform live adapter readiness failed/,
+);
+assert.throws(
+  () => assertMeetingPlatformLiveAdapterReadinessMatrix({
+    baseUrl: 'http://localhost:8787',
+    platforms: ['zoom'],
+  }),
+  /Meeting platform live adapter readiness matrix failed/,
+);
 assert.equal(createMeetingPlatformLiveAdapterSuite(client, {
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
