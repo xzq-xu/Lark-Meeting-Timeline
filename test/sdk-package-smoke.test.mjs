@@ -499,9 +499,12 @@ assert.equal(kit.platformRuntimeBundle('google-meet').schema, 'meeting_platform_
 assert.equal(kit.platformRuntimeBundleMatrix({
   platforms: ['google-meet'],
 }).platform_count, 1);
-assert.equal(buildMeetingPlatformRuntimeBundle('google-meet', {
+const smokeGoogleRuntimeBundle = buildMeetingPlatformRuntimeBundle('google-meet', {
   baseUrl: 'http://localhost:8787',
-}).browser.matches.includes('https://meet.google.com/*'), true);
+});
+assert.equal(smokeGoogleRuntimeBundle.browser.matches.includes('https://meet.google.com/*'), true);
+assert.equal(smokeGoogleRuntimeBundle.runtime.content_script_bridge.install_function, 'installMeetingPlatformIntegrationContentScriptBridge');
+assert.equal(smokeGoogleRuntimeBundle.messaging.examples.content_script_insert_annotation.type, 'meeting_timeline.insert_mark');
 assert.equal(buildMeetingPlatformRuntimeBundleMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],

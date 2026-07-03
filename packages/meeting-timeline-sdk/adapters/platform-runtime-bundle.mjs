@@ -95,6 +95,26 @@ function messageExamples(platform, options = {}) {
       capturedAtMs,
       url,
     }),
+    content_script_sample: {
+      type: 'meeting_timeline.sample',
+      payload: compactObject({
+        platform: extensionPlatform,
+        captured_at_ms: capturedAtMs,
+        url,
+      }),
+    },
+    content_script_insert_annotation: {
+      type: 'meeting_timeline.insert_mark',
+      payload: {
+        mark: {
+          id: 'note-001',
+          label: 'why?',
+          captured_at_ms: capturedAtMs,
+          kind: 'question',
+          source: 'meeting_app_runtime_bundle',
+        },
+      },
+    },
   };
 }
 
@@ -134,6 +154,16 @@ function hostEndpoints(adaptationPackage = {}) {
     insertMark: adaptationPackage.annotation_pipeline?.insert_endpoint ?? endpoints.insertMark,
     insertMarks: endpoints.insertMarks,
     importTranscript: adaptationPackage.transcript?.import_endpoint ?? endpoints.importTranscript,
+  });
+}
+
+function contentScriptBridgeOptions(platform, start = {}, options = {}) {
+  return compactObject({
+    baseUrl: firstNonEmpty(options.baseUrl, options.base_url),
+    platforms: platform === 'local_detector' ? [] : [platform],
+    extensionMessaging: firstNonEmpty(options.extensionMessaging, options.extension_messaging, true),
+    windowMessaging: firstNonEmpty(options.windowMessaging, options.window_messaging, false),
+    startOptions: start,
   });
 }
 
@@ -181,6 +211,8 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
     objective: 'browser_or_native_host_runtime_configuration_for_realtime_meeting_timeline_annotations',
     runtime_contract: adaptationPackage.runtime_contract,
     modules: {
+      platform_integration_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime',
+      content_script_bridge: '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime',
       content_script: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script',
       browser_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime',
       timeline_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime',
@@ -205,9 +237,21 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
       capture_profile: start.captureOptions?.captureProfile,
       required_snapshots: adaptationPackage.local_observer?.required_snapshots ?? [],
       speaker_filter: adaptationPackage.speaker_markers?.filter,
+      content_script_bridge: {
+        module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime',
+        create_function: 'createMeetingPlatformIntegrationContentScriptBridge',
+        install_function: 'installMeetingPlatformIntegrationContentScriptBridge',
+        options: contentScriptBridgeOptions(key, start, options),
+      },
     },
     messaging: {
       message_types: MEETING_APP_EXTENSION_MESSAGE_TYPES,
+      bridge_message_types: [
+        'meeting_timeline.sample',
+        'meeting_timeline.insert_mark',
+        'meeting_timeline.insert_marks',
+        'meeting_timeline.provider_event',
+      ],
       accepted_methods: Object.keys(endpoints).filter((method) => endpoints[method]),
       examples: messages,
     },
@@ -228,6 +272,7 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
     adaptation_package: adaptationPackage,
     next_actions: unique([
       'install_content_script_or_native_preload',
+      'install_meeting_platform_integration_content_script_bridge',
       'start_meeting_app_content_script_bridge',
       'send_captured_at_ms_with_every_annotation',
       ...(adaptationPackage.next_actions ?? []),

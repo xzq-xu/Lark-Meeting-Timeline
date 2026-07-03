@@ -16,16 +16,24 @@ assert.equal(google.platform, 'google_meet');
 assert.equal(google.runtime_contract.annotation_timestamp_field, 'captured_at_ms');
 assert.deepEqual(google.browser.matches, ['https://meet.google.com/*']);
 assert.equal(google.browser.manifest.content_scripts[0].matches.includes('https://meet.google.com/*'), true);
+assert.equal(google.modules.platform_integration_runtime, '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime');
+assert.equal(google.modules.content_script_bridge, '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime');
 assert.equal(google.runtime.preset, 'google_meet');
 assert.equal(google.runtime.start_options.runtimePreset, 'google_meet');
 assert.equal(google.runtime.start_options.captureOptions.captureProfile, 'google_meet');
+assert.equal(google.runtime.content_script_bridge.install_function, 'installMeetingPlatformIntegrationContentScriptBridge');
+assert.deepEqual(google.runtime.content_script_bridge.options.platforms, ['google_meet']);
+assert.equal(google.runtime.content_script_bridge.options.startOptions.runtimePreset, 'google_meet');
 assert.equal(google.runtime.mutation_observer.enabled, true);
 assert.equal(google.runtime.mutation_observer.debounce_ms, 150);
 assert.equal(google.runtime.speaker_filter.min_stable_ms, 700);
 assert.equal(google.messaging.message_types.client_call, 'meeting_timeline.client_call');
+assert.equal(google.messaging.bridge_message_types.includes('meeting_timeline.insert_mark'), true);
 assert.equal(google.messaging.accepted_methods.includes('insertMark'), true);
 assert.equal(google.messaging.examples.insert_annotation.method, 'insertMark');
 assert.equal(google.messaging.examples.insert_annotation.input.captured_at_ms, 1_782_614_400_000);
+assert.equal(google.messaging.examples.content_script_insert_annotation.type, 'meeting_timeline.insert_mark');
+assert.equal(google.messaging.examples.content_script_insert_annotation.payload.mark.captured_at_ms, 1_782_614_400_000);
 assert.equal(google.host.endpoints.insertMark, `${baseUrl}/api/annotations`);
 assert.equal(google.host.annotation_timestamp_field, 'captured_at_ms');
 assert.equal(google.provider_reconcile.required_for_realtime, false);
@@ -39,6 +47,7 @@ const localDetector = buildMeetingPlatformRuntimeBundle('local-detector', { base
 assert.equal(localDetector.platform, 'local_detector');
 assert.equal(localDetector.browser.matches.length, 0);
 assert.equal(localDetector.browser.manifest.content_scripts.length, 0);
+assert.deepEqual(localDetector.runtime.content_script_bridge.options.platforms, []);
 assert.equal(localDetector.readiness.runtime_ready, true);
 
 const matrix = buildMeetingPlatformRuntimeBundleMatrix({
@@ -54,6 +63,7 @@ assert.equal(matrix.transcript_blocking_count, 0);
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').browser_match_count, 2);
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 assert.equal(matrix.rows.find((row) => row.platform === 'webex').transcript_blocks_realtime, false);
+assert.equal(matrix.next_actions.includes('install_meeting_platform_integration_content_script_bridge'), true);
 assert.equal(matrix.next_actions.includes('start_meeting_app_content_script_bridge'), true);
 
 const client = {

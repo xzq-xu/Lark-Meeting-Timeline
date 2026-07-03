@@ -49,9 +49,16 @@ export interface MeetingPlatformRuntimeBundle {
     capture_profile?: string;
     required_snapshots: unknown[];
     speaker_filter?: Record<string, unknown>;
+    content_script_bridge?: {
+      module: string;
+      create_function: string;
+      install_function: string;
+      options: Record<string, unknown>;
+    };
   };
   messaging: {
     message_types: Record<string, string>;
+    bridge_message_types?: string[];
     accepted_methods: string[];
     examples: Record<string, unknown>;
   };
