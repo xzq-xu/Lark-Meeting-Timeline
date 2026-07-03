@@ -364,6 +364,17 @@ assert.equal(kit.platformAnnotationIntake('lark', {
     captured_at_ms: 1_782_614_403_000,
   },
 }).status, 'start_open_session_then_insert');
+assert.equal(kit.platformClockSyncPlan('google-meet').schema, 'meeting_platform_clock_sync_plan');
+assert.equal(kit.platformClockSyncMatrix({ platforms: ['google-meet', 'zoom'] }).platform_count, 2);
+assert.equal(kit.platformClockSync('google-meet', {
+  samples: [
+    {
+      client_send_at_ms: 1_782_614_400_000,
+      server_time_ms: 1_782_614_400_060,
+      client_receive_at_ms: 1_782_614_400_100,
+    },
+  ],
+}).status, 'clock_sync_ready');
 
 const kitState = kit.getState();
 assert.equal(kitState.bridge.signal_reconciler.active_meetings.length, 0);
@@ -422,6 +433,9 @@ assert.equal(report.platform_timeline_view_matrix.rows.some((row) => row.platfor
 assert.equal(report.platform_annotation_intake_matrix.platform_count, 6);
 assert.equal(report.platform_annotation_intake_matrix.provider_blocking_count, 0);
 assert.equal(report.platform_annotation_intake_matrix.rows.some((row) => row.platform === 'google_meet'), true);
+assert.equal(report.platform_clock_sync_matrix.platform_count, 6);
+assert.equal(report.platform_clock_sync_matrix.provider_blocking_count, 0);
+assert.equal(report.platform_clock_sync_matrix.rows.some((row) => row.platform === 'google_meet'), true);
 assert.equal(report.platform_adapter_contract_matrix.platform_count, 6);
 assert.equal(report.platform_adapter_contract_matrix.rows.some((row) => row.platform === 'google_meet'), true);
 assert.equal(report.platform_adapter_contract_matrix.rows.find((row) => row.platform === 'google_meet').browser_observer, true);

@@ -53,6 +53,8 @@ assert.equal(packedFiles.includes('adapters/platform-timeline-view.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-timeline-view.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-annotation-intake.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-annotation-intake.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-clock-sync.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-clock-sync.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.mjs'), true);
@@ -161,6 +163,11 @@ import {
   buildMeetingPlatformAnnotationIntakeMatrix,
   buildMeetingPlatformAnnotationIntakePlan,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-annotation-intake';
+import {
+  buildMeetingPlatformClockSyncMatrix,
+  buildMeetingPlatformClockSyncPlan,
+  buildMeetingPlatformClockSyncReport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-clock-sync';
 import {
   buildMeetingPlatformArtifactHandoff,
   buildMeetingPlatformArtifactHandoffMatrix,
@@ -313,6 +320,16 @@ assert.equal(kit.platformAnnotationIntake('zoom', {
     captured_at_ms: 1_782_614_402_000,
   },
 }).status, 'ready_to_insert_current_axis');
+assert.equal(kit.platformClockSyncPlan('zoom').schema, 'meeting_platform_clock_sync_plan');
+assert.equal(kit.platformClockSyncMatrix({
+  platforms: ['zoom'],
+}).platform_count, 1);
+assert.equal(kit.platformClockSync('zoom', {
+  clock_sync: {
+    offset_ms: 10,
+    rtt_ms: 40,
+  },
+}).status, 'clock_sync_ready');
 assert.equal(kit.platformArtifactHandoffPlan('zoom').schema, 'meeting_platform_artifact_handoff_plan');
 assert.equal(kit.platformArtifactHandoffMatrix({
   platforms: ['zoom'],
@@ -495,6 +512,19 @@ assert.equal(buildMeetingPlatformAnnotationIntake('google-meet', {
     captured_at_ms: 1_782_614_403_000,
   },
 }).normalized_time_ms, 3_000);
+assert.equal(buildMeetingPlatformClockSyncPlan('google-meet').required, true);
+assert.equal(buildMeetingPlatformClockSyncMatrix({
+  platforms: ['google-meet'],
+}).provider_blocking_count, 0);
+assert.equal(buildMeetingPlatformClockSyncReport('google-meet', {
+  samples: [
+    {
+      client_send_at_ms: 1_782_614_400_000,
+      server_time_ms: 1_782_614_400_060,
+      client_receive_at_ms: 1_782_614_400_100,
+    },
+  ],
+}).recommended_offset_ms, 10);
 assert.equal(buildMeetingPlatformArtifactHandoffPlan('google-meet').transcript_blocks_realtime, false);
 assert.equal(buildMeetingPlatformArtifactHandoffMatrix({
   platforms: ['google-meet'],

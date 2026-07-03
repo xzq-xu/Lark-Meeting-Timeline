@@ -93,6 +93,13 @@ import type {
   MeetingPlatformAnnotationIntakePlan,
 } from './platform-annotation-intake.mjs';
 import type {
+  MeetingPlatformClockSyncInput,
+  MeetingPlatformClockSyncMatrix,
+  MeetingPlatformClockSyncOptions,
+  MeetingPlatformClockSyncPlan,
+  MeetingPlatformClockSyncReport,
+} from './platform-clock-sync.mjs';
+import type {
   MeetingPlatformArtifactHandoff,
   MeetingPlatformArtifactHandoffInput,
   MeetingPlatformArtifactHandoffMatrix,
@@ -298,6 +305,13 @@ export interface MeetingPlatformTimelineKit {
     input?: MeetingPlatformAnnotationIntakeInput,
     intakeOptions?: MeetingPlatformAnnotationIntakeOptions,
   ): MeetingPlatformAnnotationIntake;
+  platformClockSyncPlan(platform: string, clockOptions?: MeetingPlatformClockSyncOptions): MeetingPlatformClockSyncPlan;
+  platformClockSyncMatrix(clockOptions?: MeetingPlatformClockSyncOptions): MeetingPlatformClockSyncMatrix;
+  platformClockSync(
+    platform: string,
+    input?: MeetingPlatformClockSyncInput,
+    clockOptions?: MeetingPlatformClockSyncOptions,
+  ): MeetingPlatformClockSyncReport;
   platformArtifactHandoffPlan(platform: string, artifactOptions?: MeetingPlatformArtifactHandoffOptions): MeetingPlatformArtifactHandoffPlan;
   platformArtifactHandoffMatrix(artifactOptions?: MeetingPlatformArtifactHandoffOptions): MeetingPlatformArtifactHandoffMatrix;
   platformArtifactHandoff(

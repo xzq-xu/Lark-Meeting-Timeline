@@ -136,6 +136,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-participant-track`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-timeline-view`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-annotation-intake`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-clock-sync`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-artifact-handoff`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness`
@@ -1550,6 +1551,41 @@ npm run meeting-platform:timeline-view -- \
   --input=data/meeting-platform-timeline-view-input.json \
   --out-dir=data/meeting-platform-timeline-views \
   --report-file=data/meeting-platform-timeline-view-report.json
+```
+
+设备或宿主项目真正插入标注前，应先用 `platform-clock-sync` 把设备本地时间校准成服务端会议轴时间。它沿用 `/api/time` 的 midpoint 算法：`clock_offset_ms = server_time_ms - ((client_send_at_ms + client_receive_at_ms) / 2)`，再把原始 `device_mark_end_ms` 转成 `captured_at_ms`。这个模块同样和会议平台无关；Google Meet、Teams、Zoom、Webex、Lark 都使用同一套时钟契约：
+
+```js
+import {
+  buildMeetingPlatformClockSyncReport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-clock-sync';
+
+const clock = buildMeetingPlatformClockSyncReport('google-meet', {
+  samples: [
+    {
+      client_send_at_ms: sendAtMs,
+      server_time_ms: serverTimeMs,
+      client_receive_at_ms: receiveAtMs,
+    },
+  ],
+  annotation: {
+    id: 'note-1',
+    label: 'why?',
+    captured_at_ms: deviceMarkEndMs,
+  },
+});
+
+// clock.calibrated_annotation.captured_at_ms 才应该交给 annotation intake。
+```
+
+对应 CLI：
+
+```sh
+npm run meeting-platform:clock-sync -- \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --input=data/meeting-platform-clock-sync-input.json \
+  --out-dir=data/meeting-platform-clock-sync \
+  --report-file=data/meeting-platform-clock-sync-report.json
 ```
 
 如果下游项目只需要“把当前手写/标注插到会议时间轴上”，不要复制 demo 服务端里的条件判断，直接用 `platform-annotation-intake`。它不拉 provider、不等转写，只检查标注是否携带可靠 `captured_at_ms`，再根据当前会议轴状态给出动作：直接插入当前轴、先开一个 open session 再插入、进入 pending 等真实会议 start 回填，或者标记为缺时间戳/会后审计。
