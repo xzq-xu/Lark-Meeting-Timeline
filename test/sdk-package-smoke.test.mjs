@@ -261,9 +261,15 @@ assert.equal(kit.platformLiveAdapterHandoffBundle({
 assert.equal(kit.platformHostIntegrationPlan({
   platforms: ['zoom'],
 }).runtime_contract.annotation_timestamp_field, 'captured_at_ms');
+assert.equal(kit.platformHostIntegrationPlan({
+  platforms: ['zoom'],
+}).runtime_bundle_matrix.platform_count, 1);
 assert.equal(kit.platformHostIntegrationScaffold({
   platforms: ['zoom'],
 }).files.some((file) => file.path === 'src/meeting-platform-host.mjs'), true);
+assert.equal(kit.platformHostIntegrationScaffold({
+  platforms: ['zoom'],
+}).files.some((file) => file.path === 'scripts/print-runtime-bundles.mjs'), true);
 assert.equal(kit.platformProviderConnectionPack('zoom').security.verifier, 'verifyZoomWebhookEvent');
 assert.equal(kit.platformProviderConnectionMatrix({
   platforms: ['zoom'],
@@ -497,6 +503,10 @@ assert.equal(buildMeetingPlatformHostIntegrationPlan({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).platforms[0], 'zoom');
+assert.equal(buildMeetingPlatformHostIntegrationPlan({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).endpoints.runtime_bundles, '/api/meeting-platform/runtime-bundles');
 assert.equal(assertMeetingPlatformHostIntegrationScaffold(buildMeetingPlatformHostIntegrationScaffold({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],

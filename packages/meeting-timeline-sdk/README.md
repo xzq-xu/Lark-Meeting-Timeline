@@ -2219,7 +2219,7 @@ npm run meeting-platform:subscription-handoff -- \
 
 报告里 `ready_to_create_count` 表示能直接创建订阅的平台数，`manual_setup_count` 表示必须去平台控制台或长连接配置的平台数，`security_blocked_count` 和 `parameter_missing_count` 直接给 CI/接入面板做失败原因。即使 provider 订阅已全部可创建，实时标注仍然以宿主捕获的 `captured_at_ms` 为准；provider 事件只做 start/end/artifact 的回填和审计。
 
-如果要给另一个项目一个更完整的“可改造骨架”，用 `platform-host-integration` 生成 host scaffold。它会输出 `package.json`、timeline client、host wrapper、framework-neutral HTTP route、handoff/readiness 脚本和 README：
+如果要给另一个项目一个更完整的“可改造骨架”，用 `platform-host-integration` 生成 host scaffold。它会输出 `package.json`、timeline client、host wrapper、framework-neutral HTTP route、handoff/readiness/runtime-bundle 脚本和 README：
 
 ```js
 import {
@@ -2235,6 +2235,7 @@ const scaffold = buildMeetingPlatformHostIntegrationScaffold({
 
 assertMeetingPlatformHostIntegrationScaffold(scaffold);
 // scaffold.files 里包含 src/meeting-platform-host.mjs 和 src/http-routes.mjs。
+// host.runtimeBundles() 和 /api/meeting-platform/runtime-bundles 可直接给扩展/WebView/native host 读取。
 ```
 
 ## Webhook 验证工具
