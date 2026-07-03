@@ -47,6 +47,12 @@ import type {
   MeetingPlatformAdaptationStrategy,
   MeetingPlatformAdaptationStrategyMatrix,
 } from './platform-strategy.mjs';
+import type {
+  MeetingPlatformHostIntegrationOptions,
+  MeetingPlatformHostIntegrationPlan,
+  MeetingPlatformHostIntegrationScaffold,
+  MeetingPlatformHostIntegrationScaffoldAcceptanceReport,
+} from './platform-host-integration.mjs';
 import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type {
@@ -150,6 +156,16 @@ export interface MeetingPlatformTimelineKit {
   platformLiveAdapterHandoff(platform: string, handoffOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterHandoff;
   platformLiveAdapterHandoffBundle(handoffOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterHandoffBundle;
   platformLiveAdapterSuite(suiteOptions?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapterSuite;
+  platformHostIntegrationPlan(hostOptions?: MeetingPlatformHostIntegrationOptions): MeetingPlatformHostIntegrationPlan;
+  platformHostIntegrationScaffold(hostOptions?: MeetingPlatformHostIntegrationOptions): MeetingPlatformHostIntegrationScaffold;
+  platformHostIntegrationAcceptance(
+    scaffoldOrOptions?: MeetingPlatformHostIntegrationScaffold | MeetingPlatformHostIntegrationOptions,
+    acceptanceOptions?: MeetingPlatformHostIntegrationOptions,
+  ): MeetingPlatformHostIntegrationScaffoldAcceptanceReport;
+  assertPlatformHostIntegrationScaffold(
+    scaffoldOrOptions?: MeetingPlatformHostIntegrationScaffold | MeetingPlatformHostIntegrationOptions,
+    acceptanceOptions?: MeetingPlatformHostIntegrationOptions,
+  ): MeetingPlatformHostIntegrationScaffoldAcceptanceReport;
   meetingAppSnapshotRecorder(recorderOptions?: MeetingAppSnapshotRecordOptions): MeetingAppSnapshotRecorder;
   meetingAppGateInputFromRecords(records?: MeetingAppSnapshotRecord[] | MeetingAppSnapshotRecordSet, recordOptions?: MeetingAppSnapshotRecordOptions): Record<string, unknown>;
   meetingAppIntegrationProfile(platform: string, profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppIntegrationProfile;

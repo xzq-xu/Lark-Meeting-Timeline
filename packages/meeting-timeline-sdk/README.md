@@ -129,6 +129,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-correlation`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-session`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-host-integration`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan`
@@ -1415,6 +1416,24 @@ const handoff = kit.platformLiveAdapterHandoff('zoom');
 const bundle = kit.platformLiveAdapterHandoffBundle({
   platforms: ['google-meet', 'zoom'],
 });
+```
+
+如果要给另一个项目一个更完整的“可改造骨架”，用 `platform-host-integration` 生成 host scaffold。它会输出 `package.json`、timeline client、host wrapper、framework-neutral HTTP route、handoff/readiness 脚本和 README：
+
+```js
+import {
+  buildMeetingPlatformHostIntegrationScaffold,
+  assertMeetingPlatformHostIntegrationScaffold,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-host-integration';
+
+const scaffold = buildMeetingPlatformHostIntegrationScaffold({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'microsoft-teams', 'zoom'],
+  packageName: 'meeting-platform-host',
+});
+
+assertMeetingPlatformHostIntegrationScaffold(scaffold);
+// scaffold.files 里包含 src/meeting-platform-host.mjs 和 src/http-routes.mjs。
 ```
 
 ## Webhook 验证工具

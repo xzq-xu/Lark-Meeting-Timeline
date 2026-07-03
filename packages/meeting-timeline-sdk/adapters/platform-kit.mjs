@@ -87,6 +87,12 @@ import {
   buildMeetingPlatformAdaptationStrategyMatrix,
 } from './platform-strategy.mjs';
 import {
+  assertMeetingPlatformHostIntegrationScaffold,
+  buildMeetingPlatformHostIntegrationPlan,
+  buildMeetingPlatformHostIntegrationScaffold,
+  buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport,
+} from './platform-host-integration.mjs';
+import {
   assertAllMeetingAppLaunchGates,
   assertMeetingAppLaunchGate,
   buildMeetingAppLaunchGate,
@@ -257,6 +263,8 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_live_adapter_matrix: buildMeetingPlatformLiveAdapterMatrix(options),
     platform_live_adapter_readiness_matrix: buildMeetingPlatformLiveAdapterReadinessMatrix(options),
     platform_live_adapter_handoff_bundle: buildMeetingPlatformLiveAdapterHandoffBundle(options),
+    platform_host_integration: buildMeetingPlatformHostIntegrationPlan(options),
+    platform_host_integration_acceptance: buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(options),
   };
 }
 
@@ -431,6 +439,30 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformLiveAdapterSuite(suiteOptions = {}) {
       return createMeetingPlatformLiveAdapterSuite(bridge.client, withDefaults(defaults, suiteOptions));
+    },
+    platformHostIntegrationPlan(hostOptions = {}) {
+      return buildMeetingPlatformHostIntegrationPlan(withDefaults(defaults, hostOptions));
+    },
+    platformHostIntegrationScaffold(hostOptions = {}) {
+      return buildMeetingPlatformHostIntegrationScaffold(withDefaults(defaults, hostOptions));
+    },
+    platformHostIntegrationAcceptance(scaffoldOrOptions = {}, acceptanceOptions = {}) {
+      if (scaffoldOrOptions?.schema === 'meeting_platform_host_integration_scaffold') {
+        return buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(
+          scaffoldOrOptions,
+          withDefaults(defaults, acceptanceOptions),
+        );
+      }
+      return buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(withDefaults(defaults, scaffoldOrOptions));
+    },
+    assertPlatformHostIntegrationScaffold(scaffoldOrOptions = {}, acceptanceOptions = {}) {
+      if (scaffoldOrOptions?.schema === 'meeting_platform_host_integration_scaffold') {
+        return assertMeetingPlatformHostIntegrationScaffold(
+          scaffoldOrOptions,
+          withDefaults(defaults, acceptanceOptions),
+        );
+      }
+      return assertMeetingPlatformHostIntegrationScaffold(withDefaults(defaults, scaffoldOrOptions));
     },
     meetingAppSnapshotRecorder(recorderOptions = {}) {
       return createMeetingAppSnapshotRecorder(withDefaults(defaults, recorderOptions));
