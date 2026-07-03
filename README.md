@@ -13,6 +13,7 @@
 - 跨平台会议事件入口 `POST /api/platform-events/:platform`，可接 Google Meet / Microsoft Teams / Zoom adapter 归一化后的开始、结束、参会人和会后产物信号；参会人变化与 transcript/recording/smart notes ready 会进入事件轨道并做基础重复过滤，订阅 lifecycle 事件只进入接入诊断状态
 - 跨平台 webhook 安全入口：Zoom URL validation / HMAC 校验、Microsoft Graph validationToken / clientState 校验、Google Pub/Sub OIDC JWT / bearer gate
 - 跨平台 setup 诊断入口 `GET /api/platform-events/setup`，返回 Google Meet / Microsoft Teams / Zoom 所需事件、权限、回调地址、readiness 检查、订阅维护建议、平台能力契约和可选订阅 request body
+- SDK rollout planner，可把 Google Meet / Teams / Zoom / Webex / Lark 的 provider 事件 gate 与本地 DOM gate 合成 `production_ready` / `realtime_ready_provider_pending` / `needs_live_dom_and_provider_evidence` 等接入状态
 - 本地手动开始/结束实时会议，用作没有公网 webhook 时的 fallback
 - 会中实时写入外部标注事件，并通过 SSE 自动刷新页面
 - 开放标注接口 `POST /api/annotations`，供后续墨水屏/手写设备接入

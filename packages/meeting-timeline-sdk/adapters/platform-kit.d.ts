@@ -8,6 +8,11 @@ import type { MeetingPlatformFetchHandler, PlatformWebhookHttpOptions } from './
 import type { MeetingPlatformNodeHandler, PlatformWebhookNodeOptions } from './platform-node.mjs';
 import type { PlatformCaptureOptions, PlatformCaptureRecord } from './platform-capture.mjs';
 import type { PlatformLaunchGateOptions } from './platform-gate.mjs';
+import type {
+  MeetingPlatformRolloutOptions,
+  MeetingPlatformRolloutPlan,
+  MeetingPlatformRolloutSummary,
+} from './platform-rollout.mjs';
 import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type {
@@ -86,6 +91,9 @@ export interface MeetingPlatformTimelineKit {
   assertAllLaunchGates(gateOptions?: PlatformLaunchGateOptions): Record<string, unknown>;
   meetingAppLaunchGate(platform: string, gateOptions?: MeetingAppLaunchGateOptions): MeetingAppLaunchGate;
   meetingAppLaunchGateSummary(gateOptions?: MeetingAppLaunchGateOptions): MeetingAppLaunchGateSummary;
+  platformRolloutPlan(platform: string, rolloutOptions?: MeetingPlatformRolloutOptions): MeetingPlatformRolloutPlan;
+  allPlatformRolloutPlans(rolloutOptions?: MeetingPlatformRolloutOptions): MeetingPlatformRolloutPlan[];
+  platformRolloutSummary(rolloutOptions?: MeetingPlatformRolloutOptions): MeetingPlatformRolloutSummary;
   meetingAppSnapshotRecorder(recorderOptions?: MeetingAppSnapshotRecordOptions): MeetingAppSnapshotRecorder;
   meetingAppGateInputFromRecords(records?: MeetingAppSnapshotRecord[] | MeetingAppSnapshotRecordSet, recordOptions?: MeetingAppSnapshotRecordOptions): Record<string, unknown>;
   meetingAppIntegrationProfile(platform: string, profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppIntegrationProfile;

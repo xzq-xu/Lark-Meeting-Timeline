@@ -50,6 +50,11 @@ import {
   buildPlatformLaunchGate,
 } from './platform-gate.mjs';
 import {
+  buildAllMeetingPlatformRolloutPlans,
+  buildMeetingPlatformRolloutPlan,
+  buildMeetingPlatformRolloutSummary,
+} from './platform-rollout.mjs';
+import {
   assertAllMeetingAppLaunchGates,
   assertMeetingAppLaunchGate,
   buildMeetingAppLaunchGate,
@@ -214,6 +219,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_runtime_adapter_validation: buildAllMeetingAppRuntimeAdapterValidationReports(options),
     meeting_app_fixture_acceptance: meetingAppFixtureAcceptance,
     meeting_app_launch_gate: meetingAppLaunchGateSummary,
+    platform_rollout: buildMeetingPlatformRolloutSummary(options),
   };
 }
 
@@ -302,6 +308,15 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppLaunchGateSummary(gateOptions = {}) {
       return buildMeetingAppLaunchGateSummary(withDefaults(defaults, gateOptions));
+    },
+    platformRolloutPlan(platform, rolloutOptions = {}) {
+      return buildMeetingPlatformRolloutPlan(platform, withDefaults(defaults, rolloutOptions));
+    },
+    allPlatformRolloutPlans(rolloutOptions = {}) {
+      return buildAllMeetingPlatformRolloutPlans(withDefaults(defaults, rolloutOptions));
+    },
+    platformRolloutSummary(rolloutOptions = {}) {
+      return buildMeetingPlatformRolloutSummary(withDefaults(defaults, rolloutOptions));
     },
     meetingAppSnapshotRecorder(recorderOptions = {}) {
       return createMeetingAppSnapshotRecorder(withDefaults(defaults, recorderOptions));

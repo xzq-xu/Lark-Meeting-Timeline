@@ -116,6 +116,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-acceptance`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-capture`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-gate`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-rollout`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-fetch`
@@ -1180,6 +1181,26 @@ if (teamsMaintenance.renewal_due) {
 `platformSetupManifest()` 会暴露 Google Workspace subscription lifecycle event types、Microsoft Graph lifecycle events、Webex webhook resources。Teams 订阅 request 默认把 `lifecycleNotificationUrl` 指向同一个 webhook endpoint；如果宿主项目用独立 lifecycle endpoint，可以显式传 `lifecycleNotificationUrl` 覆盖。Webex 的 `buildWebexWebhookRequests()` 会按默认资源生成多条 webhook 创建请求，因为 Webex firehose 不覆盖 meetings started/ended 和 meetingParticipants joined/left。
 
 `platformCapabilityContract()` 是给宿主项目做接入决策的机器可读能力表：每个平台会声明实时建轴、参会人轨、发言人轨、会后转写、录制、订阅生命周期、实时转写是否可用，以及对应 SDK normalizer 和 fallback 建议。`buildPlatformPermissionPlan()` 用目标能力反推需要开启的 provider 权限、OAuth scope、webhook 安全环境变量和事件类型，适合配置页或验收脚本先检查“scope/事件/签名密钥是否和目标功能匹配”。`buildPlatformIntegrationPlan()` 会进一步把 capability、manifest、readiness 和 subscription maintenance 合成推荐接入路径：默认策略是 `hybrid_local_observer_first`，也就是本地 URL/window 观察优先建立低延迟会议轴，Google Meet / Teams / Zoom / Webex / Lark 官方事件随后校准或补充 participant/artifact，转写统一在会后导入，不把 transcript 当作实时标注前置依赖。
+
+进入真实适配推进时，用 `platform-rollout` 把官方事件 gate 和本地 DOM gate 合成一个上线决策：
+
+```js
+import { buildMeetingPlatformRolloutPlan } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-rollout';
+
+const plan = buildMeetingPlatformRolloutPlan('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+  env: {
+    GOOGLE_PUBSUB_OIDC_AUDIENCE: 'https://timeline.example.com/api/platform-events/google-meet',
+  },
+  providerRecords: capturedGoogleWorkspaceEvents,
+  meetingAppRecordSet: capturedGoogleMeetDomRecordSet,
+});
+
+// plan.status === 'production_ready' 表示本地低延迟观察和 provider 事件回填都已通过。
+// plan.ready_for_realtime_annotations === true 表示至少有一条路径可实时落标注。
+```
+
+`buildMeetingPlatformRolloutSummary()` 可同时汇总 Google Meet、Teams、Zoom、Webex、Lark 的 `production_ready`、`ready_for_realtime_annotations` 和 `next_actions`。如果只有本地 DOM 证据通过，会进入 `realtime_ready_provider_pending`；如果只有 provider 事件通过，会进入 `provider_ready_collect_local_evidence`，提醒继续采真实会议页 DOM。
 
 ## Webhook 验证工具
 
