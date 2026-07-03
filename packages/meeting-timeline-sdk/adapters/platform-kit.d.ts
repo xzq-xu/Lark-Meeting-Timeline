@@ -13,6 +13,10 @@ import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSn
 import type {
   MeetingAppExtensionInstallPlan,
   MeetingAppExtensionMatchPatterns,
+  MeetingAppExtensionClientCallMessageInput,
+  MeetingAppExtensionClientCallMethod,
+  MeetingAppExtensionMessageOptions,
+  MeetingAppExtensionMessageType,
   MeetingAppExtensionOptions,
   MeetingAppExtensionScaffold,
   MeetingAppExtensionScaffoldAcceptanceReport,
@@ -75,6 +79,15 @@ export interface MeetingPlatformTimelineKit {
   meetingAppExtensionScaffold(extensionOptions?: MeetingAppExtensionOptions): MeetingAppExtensionScaffold;
   meetingAppExtensionAcceptance(extensionOptions?: MeetingAppExtensionOptions): MeetingAppExtensionScaffoldAcceptanceReport;
   assertMeetingAppExtensionScaffold(extensionOptions?: MeetingAppExtensionOptions): MeetingAppExtensionScaffoldAcceptanceReport;
+  meetingAppExtensionAttachedMessage(input?: MeetingAppExtensionMessageOptions | string, messageOptions?: MeetingAppExtensionMessageOptions): Record<string, unknown>;
+  meetingAppExtensionStatusMessage(input?: MeetingAppExtensionMessageOptions, messageOptions?: MeetingAppExtensionMessageOptions): Record<string, unknown>;
+  meetingAppExtensionClientCallMessage(
+    methodOrInput: MeetingAppExtensionClientCallMethod | string | MeetingAppExtensionClientCallMessageInput,
+    input?: Record<string, unknown>,
+    messageOptions?: MeetingAppExtensionMessageOptions,
+  ): Record<string, unknown>;
+  meetingAppExtensionTimelineEndpoint(method: MeetingAppExtensionClientCallMethod | string): string;
+  normalizeMeetingAppExtensionMessageType(messageType: MeetingAppExtensionMessageType | string): MeetingAppExtensionMessageType;
   assertMeetingAppLaunchGate(platform: string, gateOptions?: MeetingAppLaunchGateOptions): MeetingAppLaunchGate;
   assertAllMeetingAppLaunchGates(gateOptions?: MeetingAppLaunchGateOptions): MeetingAppLaunchGateSummary;
   diagnose(platform: string, payload?: unknown, diagnosticOptions?: Record<string, unknown>): PlatformEventDiagnosticResult;

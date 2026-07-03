@@ -500,6 +500,20 @@ const extensionScaffold = meetingKit.meetingAppExtensionScaffold({
 // content script 入口用 SDK bridge 监听会议网页；background worker 把 start/end/mark 调用转发到 timeline 服务。
 // content script 注入后会发送 meeting_timeline.extension_attached；background 可用 meeting_timeline.extension_status 查询最近注入状态。
 
+const attachedMessage = meetingKit.meetingAppExtensionAttachedMessage({
+  platform: 'google-meet',
+  capturedAtMs: Date.now(),
+  url: 'https://meet.google.com/abc-defg-hij',
+});
+
+const markMessage = meetingKit.meetingAppExtensionClientCallMessage('insertMark', {
+  label: 'why?',
+  captured_at_ms: Date.now(),
+}, {
+  platform: 'google-meet',
+});
+// 业务项目接入不同会议软件时，优先复用这些 helper，而不是手写 meeting_timeline.* 字符串。
+
 const extensionAcceptance = meetingKit.meetingAppExtensionAcceptance({
   platforms: ['google-meet'],
   baseUrl: 'https://timeline.example.com',

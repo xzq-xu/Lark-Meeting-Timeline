@@ -130,6 +130,33 @@ assert.deepEqual(extensionManifest.content_scripts[0].js, ['content.js']);
 const extensionPlan = kit.meetingAppExtensionInstallPlan();
 assert.equal(extensionPlan.content_script_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script');
 assert.equal(extensionPlan.platforms.length, 5);
+assert.equal(extensionPlan.runtime_contract.message_types.client_call, 'meeting_timeline.client_call');
+assert.equal(kit.normalizeMeetingAppExtensionMessageType('attached'), 'meeting_timeline.extension_attached');
+assert.equal(kit.meetingAppExtensionTimelineEndpoint('endMeeting'), '/api/meeting-session/end');
+assert.deepEqual(kit.meetingAppExtensionAttachedMessage({
+  platform: 'google-meet',
+  capturedAtMs: 234,
+  url: 'https://meet.google.com/abc-defg-hij',
+}), {
+  type: 'meeting_timeline.extension_attached',
+  platform: 'google_meet',
+  captured_at_ms: 234,
+  url: 'https://meet.google.com/abc-defg-hij',
+});
+assert.deepEqual(kit.meetingAppExtensionClientCallMessage('insertMark', {
+  label: 'why?',
+}, {
+  platform: 'google-meet',
+  capturedAtMs: 235,
+}), {
+  type: 'meeting_timeline.client_call',
+  method: 'insertMark',
+  platform: 'google_meet',
+  captured_at_ms: 235,
+  input: {
+    label: 'why?',
+  },
+});
 const extensionScaffold = kit.meetingAppExtensionScaffold({
   platforms: ['google-meet'],
   baseUrl,

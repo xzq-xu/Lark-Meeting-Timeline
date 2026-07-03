@@ -60,12 +60,17 @@ import {
   createMeetingAppSnapshotRecorder,
 } from './meeting-app-snapshot-recorder.mjs';
 import {
+  buildMeetingAppExtensionAttachedMessage,
   buildMeetingAppContentScriptManifest,
+  buildMeetingAppExtensionClientCallMessage,
   buildMeetingAppExtensionInstallPlan,
   buildMeetingAppExtensionMatchPatterns,
   buildMeetingAppExtensionScaffold,
   buildMeetingAppExtensionScaffoldAcceptanceReport,
+  buildMeetingAppExtensionStatusMessage,
   assertMeetingAppExtensionScaffold,
+  meetingAppExtensionTimelineEndpoint,
+  normalizeMeetingAppExtensionMessageType,
 } from './meeting-app-extension.mjs';
 
 function firstNonEmpty(...values) {
@@ -287,6 +292,24 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertMeetingAppExtensionScaffold(extensionOptions = {}) {
       return assertMeetingAppExtensionScaffold(withDefaults(defaults, extensionOptions));
+    },
+    meetingAppExtensionAttachedMessage(input = {}, messageOptions = {}) {
+      return buildMeetingAppExtensionAttachedMessage(input, withDefaults(defaults, messageOptions));
+    },
+    meetingAppExtensionStatusMessage(input = {}, messageOptions = {}) {
+      return buildMeetingAppExtensionStatusMessage(input, withDefaults(defaults, messageOptions));
+    },
+    meetingAppExtensionClientCallMessage(methodOrInput, input = {}, messageOptions = {}) {
+      const objectInput = Boolean(methodOrInput) && typeof methodOrInput === 'object' && !Array.isArray(methodOrInput);
+      const resolvedInput = objectInput ? {} : input;
+      const resolvedOptions = objectInput && arguments.length === 2 ? input : messageOptions;
+      return buildMeetingAppExtensionClientCallMessage(methodOrInput, resolvedInput, withDefaults(defaults, resolvedOptions));
+    },
+    meetingAppExtensionTimelineEndpoint(method) {
+      return meetingAppExtensionTimelineEndpoint(method);
+    },
+    normalizeMeetingAppExtensionMessageType(messageType) {
+      return normalizeMeetingAppExtensionMessageType(messageType);
     },
     assertMeetingAppLaunchGate(platform, gateOptions = {}) {
       return assertMeetingAppLaunchGate(platform, withDefaults(defaults, gateOptions));

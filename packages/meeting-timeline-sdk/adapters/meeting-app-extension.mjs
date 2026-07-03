@@ -10,6 +10,22 @@ export const MEETING_APP_EXTENSION_PLATFORM_KEYS = Object.freeze([
   'webex',
 ]);
 
+export const MEETING_APP_EXTENSION_MESSAGE_TYPES = Object.freeze({
+  client_call: 'meeting_timeline.client_call',
+  extension_attached: 'meeting_timeline.extension_attached',
+  extension_status: 'meeting_timeline.extension_status',
+});
+
+export const MEETING_APP_EXTENSION_STATUS_STORAGE_KEY = 'meeting_timeline_extension_status';
+
+export const MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS = Object.freeze({
+  startMeeting: '/api/meeting-session/start',
+  endMeeting: '/api/meeting-session/end',
+  insertMark: '/api/annotations',
+  insertMarks: '/api/annotations/batch',
+  importTranscript: '/api/import/transcript',
+});
+
 const PLATFORM_ALIASES = Object.freeze({
   google: 'google_meet',
   google_meet: 'google_meet',
@@ -25,6 +41,20 @@ const PLATFORM_ALIASES = Object.freeze({
   larksuite: 'lark',
   larkoffice: 'lark',
   webex: 'webex',
+});
+
+const MESSAGE_TYPE_ALIASES = Object.freeze({
+  client_call: MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call,
+  clientcall: MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call,
+  'client-call': MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call,
+  attached: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached,
+  extension_attached: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached,
+  extensionattached: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached,
+  'extension-attached': MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached,
+  status: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status,
+  extension_status: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status,
+  extensionstatus: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status,
+  'extension-status': MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status,
 });
 
 export const MEETING_APP_EXTENSION_PROFILES = Object.freeze({
@@ -200,6 +230,14 @@ function platformList(input = {}) {
   return unique(asArray(platforms).map((platform) => normalizeMeetingAppExtensionPlatform(platform)));
 }
 
+function optionalPlatform(platform) {
+  if (platform == null || platform === '') return undefined;
+  const value = String(platform).trim();
+  if (!value) return undefined;
+  if (value.toLowerCase() === 'unknown') return 'unknown';
+  return normalizeMeetingAppExtensionPlatform(value);
+}
+
 export function normalizeMeetingAppExtensionPlatform(platform) {
   const key = String(platform ?? '').trim().toLowerCase().replaceAll(' ', '_');
   const normalized = PLATFORM_ALIASES[key] ?? PLATFORM_ALIASES[key.replaceAll('_', '-')];
@@ -210,6 +248,90 @@ export function normalizeMeetingAppExtensionPlatform(platform) {
     });
   }
   return normalized;
+}
+
+export function normalizeMeetingAppExtensionMessageType(messageType) {
+  const raw = String(messageType ?? '').trim();
+  if (Object.values(MEETING_APP_EXTENSION_MESSAGE_TYPES).includes(raw)) return raw;
+  const key = raw.toLowerCase().replaceAll(' ', '_');
+  const normalized = MESSAGE_TYPE_ALIASES[key]
+    ?? MESSAGE_TYPE_ALIASES[key.replaceAll('_', '-')]
+    ?? MESSAGE_TYPE_ALIASES[key.replaceAll('_', '')];
+  if (!normalized) {
+    throw new MeetingTimelineSdkError(`Unsupported meeting app extension message type: ${messageType}`, {
+      message_type: messageType,
+      supported_message_types: MEETING_APP_EXTENSION_MESSAGE_TYPES,
+    });
+  }
+  return normalized;
+}
+
+export function meetingAppExtensionTimelineEndpoint(method) {
+  const key = String(method ?? '').trim();
+  const endpoint = MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS[key];
+  if (!endpoint) {
+    throw new MeetingTimelineSdkError(`Unsupported meeting app extension client call method: ${method}`, {
+      method,
+      supported_methods: Object.keys(MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS),
+    });
+  }
+  return endpoint;
+}
+
+export function buildMeetingAppExtensionAttachedMessage(input = {}, options = {}) {
+  const merged = plainObject(input)
+    ? { ...input, ...options }
+    : { ...options, platform: input };
+  return compactObject({
+    type: normalizeMeetingAppExtensionMessageType(firstNonEmpty(
+      merged.type,
+      merged.messageType,
+      merged.message_type,
+      'extension_attached',
+    )),
+    platform: optionalPlatform(firstNonEmpty(merged.platform, merged.platform_key, merged.platformKey)),
+    captured_at_ms: firstNonEmpty(merged.captured_at_ms, merged.capturedAtMs, Date.now()),
+    url: firstNonEmpty(merged.url, merged.href, merged.meeting_url, merged.meetingUrl),
+  });
+}
+
+export function buildMeetingAppExtensionStatusMessage(input = {}, options = {}) {
+  const merged = plainObject(input) ? { ...input, ...options } : options;
+  return compactObject({
+    type: normalizeMeetingAppExtensionMessageType(firstNonEmpty(
+      merged.type,
+      merged.messageType,
+      merged.message_type,
+      'extension_status',
+    )),
+    request_id: firstNonEmpty(merged.request_id, merged.requestId),
+    platform: optionalPlatform(firstNonEmpty(merged.platform, merged.platform_key, merged.platformKey)),
+    url: firstNonEmpty(merged.url, merged.href, merged.meeting_url, merged.meetingUrl),
+    captured_at_ms: firstNonEmpty(merged.captured_at_ms, merged.capturedAtMs),
+  });
+}
+
+export function buildMeetingAppExtensionClientCallMessage(methodOrInput, input = {}, options = {}) {
+  const objectInput = plainObject(methodOrInput);
+  const merged = objectInput
+    ? { ...methodOrInput, ...(Object.keys(options).length > 0 ? options : input) }
+    : { ...options, method: methodOrInput, input };
+  const method = firstNonEmpty(merged.method, merged.action);
+  meetingAppExtensionTimelineEndpoint(method);
+  const payload = plainObject(merged.input) ? merged.input : {};
+  return compactObject({
+    type: normalizeMeetingAppExtensionMessageType(firstNonEmpty(
+      merged.type,
+      merged.messageType,
+      merged.message_type,
+      'client_call',
+    )),
+    method,
+    platform: optionalPlatform(firstNonEmpty(merged.platform, merged.platform_key, merged.platformKey)),
+    captured_at_ms: firstNonEmpty(merged.captured_at_ms, merged.capturedAtMs, Date.now()),
+    url: firstNonEmpty(merged.url, merged.href, merged.meeting_url, merged.meetingUrl),
+    input: payload,
+  });
 }
 
 export function meetingAppExtensionProfile(platformOrInput, options = {}) {
@@ -313,6 +435,9 @@ export function buildMeetingAppExtensionInstallPlan(options = {}) {
     launch_gate_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate',
     runtime_contract: {
       message_prefixes: ['meeting_timeline', 'meeting-timeline'],
+      message_types: { ...MEETING_APP_EXTENSION_MESSAGE_TYPES },
+      status_storage_key: MEETING_APP_EXTENSION_STATUS_STORAGE_KEY,
+      timeline_endpoints: { ...MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS },
       required_signals: ['meeting_started', 'speaker_started', 'meeting_ended'],
       timestamp_field: 'captured_at_ms',
     },
@@ -335,12 +460,17 @@ export function buildMeetingAppExtensionContentScriptSource(options = {}) {
     const profile = MEETING_APP_EXTENSION_PROFILES[platform];
     return [platform, profile.host_permissions.map((pattern) => matchPatternHost(pattern)).filter(Boolean)];
   }));
-  const messagePrefix = firstNonEmpty(options.messagePrefix, options.message_prefix, 'meeting_timeline.client_call');
+  const messagePrefix = firstNonEmpty(
+    options.messagePrefix,
+    options.message_prefix,
+    MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call,
+  );
   return [
     "import { installMeetingAppContentScriptBridge } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script';",
     '',
     `const PLATFORM_HOSTS = ${json(platformMap)};`,
     `const CLIENT_CALL_TYPE = ${JSON.stringify(messagePrefix)};`,
+    `const ATTACHED_TYPE = ${JSON.stringify(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached)};`,
     '',
     'function extensionRuntime() {',
     '  return globalThis.chrome?.runtime ?? globalThis.browser?.runtime;',
@@ -392,7 +522,7 @@ export function buildMeetingAppExtensionContentScriptSource(options = {}) {
     '',
     'globalThis.__meetingTimelineBridge = bridge;',
     'extensionRuntime()?.sendMessage?.({',
-    '  type: "meeting_timeline.extension_attached",',
+    '  type: ATTACHED_TYPE,',
     '  platform: inferPlatform(),',
     '  captured_at_ms: Date.now(),',
     '  url: globalThis.location?.href,',
@@ -402,20 +532,18 @@ export function buildMeetingAppExtensionContentScriptSource(options = {}) {
 
 export function buildMeetingAppExtensionBackgroundSource(options = {}) {
   const baseUrl = String(firstNonEmpty(options.baseUrl, options.base_url, 'https://timeline.example.com')).replace(/\/+$/, '');
-  const messagePrefix = firstNonEmpty(options.messagePrefix, options.message_prefix, 'meeting_timeline.client_call');
-  const endpoints = {
-    startMeeting: '/api/meeting-session/start',
-    endMeeting: '/api/meeting-session/end',
-    insertMark: '/api/annotations',
-    insertMarks: '/api/annotations/batch',
-    importTranscript: '/api/import/transcript',
-  };
+  const messagePrefix = firstNonEmpty(
+    options.messagePrefix,
+    options.message_prefix,
+    MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call,
+  );
+  const endpoints = { ...MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS };
   return [
     `const BASE_URL = ${JSON.stringify(baseUrl)};`,
     `const CLIENT_CALL_TYPE = ${JSON.stringify(messagePrefix)};`,
-    'const ATTACHED_TYPE = "meeting_timeline.extension_attached";',
-    'const STATUS_TYPE = "meeting_timeline.extension_status";',
-    'const STATUS_STORAGE_KEY = "meeting_timeline_extension_status";',
+    `const ATTACHED_TYPE = ${JSON.stringify(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached)};`,
+    `const STATUS_TYPE = ${JSON.stringify(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status)};`,
+    `const STATUS_STORAGE_KEY = ${JSON.stringify(MEETING_APP_EXTENSION_STATUS_STORAGE_KEY)};`,
     `const ENDPOINTS = ${json(endpoints)};`,
     'let lastAttached = null;',
     '',
@@ -658,6 +786,8 @@ export function buildMeetingAppExtensionReadme(options = {}) {
     `The build emits \`${scriptFile}\` and \`${backgroundFile}\`, then \`manifest.json\` can be loaded as an unpacked Chrome/Edge extension.`,
     '',
     'The generated background worker forwards timeline client calls to the configured timeline service base URL.',
+    '',
+    'Protocol messages use `meeting_timeline.extension_attached`, `meeting_timeline.extension_status`, and `meeting_timeline.client_call`; build custom callers with the SDK message helpers instead of hardcoded strings.',
     '',
     'Before production rollout, capture real meeting app snapshots with `meeting-app-snapshot-recorder` and validate them with `meeting-app-gate`.',
   ].join('\n');

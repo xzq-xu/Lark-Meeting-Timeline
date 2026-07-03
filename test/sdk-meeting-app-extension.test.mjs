@@ -1,19 +1,27 @@
 import assert from 'node:assert/strict';
 
 import {
+  MEETING_APP_EXTENSION_MESSAGE_TYPES,
   MEETING_APP_EXTENSION_PLATFORM_KEYS,
   MEETING_APP_EXTENSION_PROFILES,
+  MEETING_APP_EXTENSION_STATUS_STORAGE_KEY,
+  MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS,
   assertMeetingAppExtensionScaffold,
+  buildMeetingAppExtensionAttachedMessage,
   buildMeetingAppContentScriptManifest,
   buildMeetingAppExtensionBackgroundSource,
   buildMeetingAppExtensionBuildSource,
+  buildMeetingAppExtensionClientCallMessage,
   buildMeetingAppExtensionContentScriptSource,
   buildMeetingAppExtensionInstallPlan,
   buildMeetingAppExtensionMatchPatterns,
   buildMeetingAppExtensionPackageJson,
   buildMeetingAppExtensionScaffold,
   buildMeetingAppExtensionScaffoldAcceptanceReport,
+  buildMeetingAppExtensionStatusMessage,
+  meetingAppExtensionTimelineEndpoint,
   meetingAppExtensionProfile,
+  normalizeMeetingAppExtensionMessageType,
   normalizeMeetingAppExtensionPlatform,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-extension.mjs';
 
@@ -135,10 +143,70 @@ assert.equal(MEETING_APP_EXTENSION_PROFILES.google_meet.matches.includes('https:
 assert.equal(normalizeMeetingAppExtensionPlatform('google-meet'), 'google_meet');
 assert.equal(normalizeMeetingAppExtensionPlatform('teams'), 'microsoft_teams');
 assert.equal(normalizeMeetingAppExtensionPlatform('feishu'), 'lark');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call, 'meeting_timeline.client_call');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached, 'meeting_timeline.extension_attached');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status, 'meeting_timeline.extension_status');
+assert.equal(MEETING_APP_EXTENSION_STATUS_STORAGE_KEY, 'meeting_timeline_extension_status');
+assert.equal(MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS.insertMarks, '/api/annotations/batch');
+assert.equal(normalizeMeetingAppExtensionMessageType('client_call'), MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call);
+assert.equal(normalizeMeetingAppExtensionMessageType('attached'), MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached);
+assert.equal(normalizeMeetingAppExtensionMessageType('extension-status'), MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status);
+assert.equal(meetingAppExtensionTimelineEndpoint('insertMarks'), '/api/annotations/batch');
+assert.throws(
+  () => meetingAppExtensionTimelineEndpoint('deleteEverything'),
+  /Unsupported meeting app extension client call method/,
+);
 
 const google = meetingAppExtensionProfile('google-meet');
 assert.equal(google.platform, 'google_meet');
 assert.deepEqual(google.matches, ['https://meet.google.com/*']);
+
+const attachedMessage = buildMeetingAppExtensionAttachedMessage({
+  platform: 'google-meet',
+  capturedAtMs: 123,
+  href: 'https://meet.google.com/abc-defg-hij',
+});
+assert.deepEqual(attachedMessage, {
+  type: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached,
+  platform: 'google_meet',
+  captured_at_ms: 123,
+  url: 'https://meet.google.com/abc-defg-hij',
+});
+
+const statusMessage = buildMeetingAppExtensionStatusMessage({
+  requestId: 'status-001',
+  capturedAtMs: 124,
+});
+assert.deepEqual(statusMessage, {
+  type: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status,
+  request_id: 'status-001',
+  captured_at_ms: 124,
+});
+
+const clientCallMessage = buildMeetingAppExtensionClientCallMessage('startMeeting', {
+  meeting_id: 'meet-001',
+}, {
+  platform: 'google-meet',
+  capturedAtMs: 125,
+  url: 'https://meet.google.com/abc-defg-hij',
+});
+assert.deepEqual(clientCallMessage, {
+  type: MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call,
+  method: 'startMeeting',
+  platform: 'google_meet',
+  captured_at_ms: 125,
+  url: 'https://meet.google.com/abc-defg-hij',
+  input: {
+    meeting_id: 'meet-001',
+  },
+});
+assert.equal(buildMeetingAppExtensionClientCallMessage({
+  method: 'endMeeting',
+  input: { meeting_id: 'meet-001' },
+}, {
+  platform: 'google-meet',
+  capturedAtMs: 126,
+}).captured_at_ms, 126);
 
 const patterns = buildMeetingAppExtensionMatchPatterns();
 assert.equal(patterns.type, 'meeting_app_extension_match_patterns');
@@ -185,6 +253,9 @@ assert.equal(plan.browser_runtime_adapter, '@ai-annotation/meeting-timeline-sdk/
 assert.equal(plan.snapshot_recorder_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder');
 assert.equal(plan.launch_gate_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate');
 assert.equal(plan.runtime_contract.timestamp_field, 'captured_at_ms');
+assert.deepEqual(plan.runtime_contract.message_types, MEETING_APP_EXTENSION_MESSAGE_TYPES);
+assert.equal(plan.runtime_contract.status_storage_key, MEETING_APP_EXTENSION_STATUS_STORAGE_KEY);
+assert.deepEqual(plan.runtime_contract.timeline_endpoints, MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS);
 assert.deepEqual(plan.manifest.content_scripts[0].js, ['content.js']);
 
 const contentScriptSource = buildMeetingAppExtensionContentScriptSource({
@@ -202,7 +273,7 @@ try {
   assert.equal(contentScriptRuntime.bridge.options.startRuntime, true);
   assert.equal(globalThis.__meetingTimelineBridge, contentScriptRuntime.bridge);
   assert.equal(contentScriptRuntime.sentMessages.length, 1);
-  assert.equal(contentScriptRuntime.sentMessages[0].type, 'meeting_timeline.extension_attached');
+  assert.equal(contentScriptRuntime.sentMessages[0].type, MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached);
   assert.equal(contentScriptRuntime.sentMessages[0].platform, 'google_meet');
 
   const startResult = await contentScriptRuntime.bridge.client.startMeeting({
@@ -210,7 +281,7 @@ try {
   });
   assert.equal(startResult.ok, true);
   assert.equal(contentScriptRuntime.sentMessages.length, 2);
-  assert.equal(contentScriptRuntime.sentMessages[1].type, 'meeting_timeline.client_call');
+  assert.equal(contentScriptRuntime.sentMessages[1].type, MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call);
   assert.equal(contentScriptRuntime.sentMessages[1].method, 'startMeeting');
   assert.equal(contentScriptRuntime.sentMessages[1].platform, 'google_meet');
   assert.equal(contentScriptRuntime.sentMessages[1].input.meeting_id, 'meet-001');
@@ -243,7 +314,7 @@ assert.match(backgroundSource, /\/api\/annotations\/batch/);
 const backgroundRuntime = installGeneratedBackground(backgroundSource);
 try {
   const attachedResponse = await backgroundRuntime.send({
-    type: 'meeting_timeline.extension_attached',
+    type: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached,
     platform: 'google_meet',
     captured_at_ms: 1_782_442_800_000,
     url: 'https://meet.google.com/abc-defg-hij',
@@ -255,14 +326,14 @@ try {
   assert.equal(attachedResponse.ok, true);
   assert.equal(attachedResponse.storage.stored, true);
   assert.equal(attachedResponse.attached.platform, 'google_meet');
-  assert.equal(backgroundRuntime.storage.meeting_timeline_extension_status.platform, 'google_meet');
+  assert.equal(backgroundRuntime.storage[MEETING_APP_EXTENSION_STATUS_STORAGE_KEY].platform, 'google_meet');
 
-  const statusResponse = await backgroundRuntime.send({ type: 'meeting_timeline.extension_status' });
+  const statusResponse = await backgroundRuntime.send({ type: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status });
   assert.equal(statusResponse.ok, true);
   assert.equal(statusResponse.attached.url, 'https://meet.google.com/abc-defg-hij');
 
   const clientCallResponse = await backgroundRuntime.send({
-    type: 'meeting_timeline.client_call',
+    type: MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call,
     method: 'startMeeting',
     platform: 'google_meet',
     captured_at_ms: 1_782_442_810_000,

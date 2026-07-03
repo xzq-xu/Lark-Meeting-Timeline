@@ -5,6 +5,18 @@ export type MeetingAppExtensionPlatform =
   | 'lark'
   | 'webex';
 
+export type MeetingAppExtensionMessageType =
+  | 'meeting_timeline.client_call'
+  | 'meeting_timeline.extension_attached'
+  | 'meeting_timeline.extension_status';
+
+export type MeetingAppExtensionClientCallMethod =
+  | 'startMeeting'
+  | 'endMeeting'
+  | 'insertMark'
+  | 'insertMarks'
+  | 'importTranscript';
+
 export interface MeetingAppExtensionProfile {
   schema: 'meeting_app_extension_profile';
   version: number;
@@ -132,11 +144,62 @@ export interface MeetingAppExtensionScaffoldAcceptanceReport {
   issues: Array<Record<string, unknown>>;
 }
 
+export interface MeetingAppExtensionMessageOptions {
+  type?: MeetingAppExtensionMessageType | string;
+  messageType?: MeetingAppExtensionMessageType | string;
+  message_type?: MeetingAppExtensionMessageType | string;
+  platform?: MeetingAppExtensionPlatform | string;
+  platform_key?: MeetingAppExtensionPlatform | string;
+  platformKey?: MeetingAppExtensionPlatform | string;
+  captured_at_ms?: number;
+  capturedAtMs?: number;
+  url?: string;
+  href?: string;
+  meeting_url?: string;
+  meetingUrl?: string;
+  request_id?: string;
+  requestId?: string;
+  [key: string]: unknown;
+}
+
+export interface MeetingAppExtensionClientCallMessageInput extends MeetingAppExtensionMessageOptions {
+  method?: MeetingAppExtensionClientCallMethod | string;
+  action?: MeetingAppExtensionClientCallMethod | string;
+  input?: Record<string, unknown>;
+}
+
 export const MEETING_APP_EXTENSION_SCHEMA: 'meeting_app_extension_profile';
 export const MEETING_APP_EXTENSION_PLATFORM_KEYS: readonly MeetingAppExtensionPlatform[];
 export const MEETING_APP_EXTENSION_PROFILES: Readonly<Record<MeetingAppExtensionPlatform, Readonly<MeetingAppExtensionProfile>>>;
+export const MEETING_APP_EXTENSION_MESSAGE_TYPES: Readonly<{
+  client_call: 'meeting_timeline.client_call';
+  extension_attached: 'meeting_timeline.extension_attached';
+  extension_status: 'meeting_timeline.extension_status';
+}>;
+export const MEETING_APP_EXTENSION_STATUS_STORAGE_KEY: 'meeting_timeline_extension_status';
+export const MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS: Readonly<Record<MeetingAppExtensionClientCallMethod, string>>;
 
 export function normalizeMeetingAppExtensionPlatform(platform: MeetingAppExtensionPlatform | string): MeetingAppExtensionPlatform;
+
+export function normalizeMeetingAppExtensionMessageType(messageType: MeetingAppExtensionMessageType | string): MeetingAppExtensionMessageType;
+
+export function meetingAppExtensionTimelineEndpoint(method: MeetingAppExtensionClientCallMethod | string): string;
+
+export function buildMeetingAppExtensionAttachedMessage(
+  input?: MeetingAppExtensionMessageOptions | MeetingAppExtensionPlatform | string,
+  options?: MeetingAppExtensionMessageOptions,
+): Record<string, unknown>;
+
+export function buildMeetingAppExtensionStatusMessage(
+  input?: MeetingAppExtensionMessageOptions,
+  options?: MeetingAppExtensionMessageOptions,
+): Record<string, unknown>;
+
+export function buildMeetingAppExtensionClientCallMessage(
+  methodOrInput: MeetingAppExtensionClientCallMethod | string | MeetingAppExtensionClientCallMessageInput,
+  input?: Record<string, unknown>,
+  options?: MeetingAppExtensionMessageOptions,
+): Record<string, unknown>;
 
 export function meetingAppExtensionProfile(
   platformOrInput: MeetingAppExtensionPlatform | string | MeetingAppExtensionOptions,
