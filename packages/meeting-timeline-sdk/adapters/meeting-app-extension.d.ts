@@ -51,8 +51,28 @@ export interface MeetingAppExtensionOptions {
   output_script?: string;
   backgroundScript?: string;
   background_script?: string;
+  contentScriptEntry?: string;
+  content_script_entry?: string;
+  backgroundEntry?: string;
+  background_entry?: string;
+  buildTarget?: string[] | string;
+  build_target?: string[] | string;
   messagePrefix?: string;
   message_prefix?: string;
+  packageName?: string;
+  package_name?: string;
+  packageVersion?: string;
+  package_version?: string;
+  privatePackage?: boolean;
+  private_package?: boolean;
+  sdkDependencyVersion?: string;
+  sdk_dependency_version?: string;
+  esbuildVersion?: string;
+  esbuild_version?: string;
+  scripts?: Record<string, string>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  dev_dependencies?: Record<string, string>;
   [key: string]: unknown;
 }
 
@@ -120,6 +140,10 @@ export function buildMeetingAppExtensionInstallPlan(options?: MeetingAppExtensio
 export function buildMeetingAppExtensionContentScriptSource(options?: MeetingAppExtensionOptions): string;
 
 export function buildMeetingAppExtensionBackgroundSource(options?: MeetingAppExtensionOptions): string;
+
+export function buildMeetingAppExtensionPackageJson(options?: MeetingAppExtensionOptions): Record<string, unknown>;
+
+export function buildMeetingAppExtensionBuildSource(options?: MeetingAppExtensionOptions): string;
 
 export function buildMeetingAppExtensionReadme(options?: MeetingAppExtensionOptions): string;
 

@@ -496,7 +496,7 @@ const extensionScaffold = meetingKit.meetingAppExtensionScaffold({
   platforms: ['google-meet'],
   baseUrl: 'https://timeline.example.com',
 });
-// extensionScaffold.files 包含 manifest.json、src/content-script.entry.mjs、background.js 和 README.md。
+// extensionScaffold.files 包含 package.json、build.mjs、manifest.json、src/content-script.entry.mjs、src/background.entry.mjs 和 README.md。
 // content script 入口用 SDK bridge 监听会议网页；background worker 把 start/end/mark 调用转发到 timeline 服务。
 
 await meetingKit.handleWebhook({

@@ -5,9 +5,11 @@ import {
   MEETING_APP_EXTENSION_PROFILES,
   buildMeetingAppContentScriptManifest,
   buildMeetingAppExtensionBackgroundSource,
+  buildMeetingAppExtensionBuildSource,
   buildMeetingAppExtensionContentScriptSource,
   buildMeetingAppExtensionInstallPlan,
   buildMeetingAppExtensionMatchPatterns,
+  buildMeetingAppExtensionPackageJson,
   buildMeetingAppExtensionScaffold,
   meetingAppExtensionProfile,
   normalizeMeetingAppExtensionPlatform,
@@ -91,6 +93,25 @@ assert.match(backgroundSource, /const BASE_URL = "https:\/\/timeline\.example\.c
 assert.match(backgroundSource, /\/api\/meeting-session\/start/);
 assert.match(backgroundSource, /\/api\/annotations\/batch/);
 
+const packageJson = buildMeetingAppExtensionPackageJson({
+  packageName: 'demo-meeting-extension',
+  sdkDependencyVersion: 'workspace:*',
+});
+assert.equal(packageJson.name, 'demo-meeting-extension');
+assert.equal(packageJson.scripts.build, 'node build.mjs');
+assert.equal(packageJson.dependencies['@ai-annotation/meeting-timeline-sdk'], 'workspace:*');
+assert.equal(packageJson.devDependencies.esbuild, '^0.25.0');
+
+const buildSource = buildMeetingAppExtensionBuildSource({
+  outputScript: 'content-script.js',
+  backgroundScript: 'background.js',
+});
+assert.match(buildSource, /from 'esbuild'/);
+assert.match(buildSource, /src\/content-script\.entry\.mjs/);
+assert.match(buildSource, /src\/background\.entry\.mjs/);
+assert.match(buildSource, /format: "iife"/);
+assert.match(buildSource, /format: "esm"/);
+
 const scaffold = buildMeetingAppExtensionScaffold({
   platforms: ['google_meet'],
   baseUrl: 'https://timeline.example.com',
@@ -102,10 +123,14 @@ assert.equal(scaffold.manifest.background.service_worker, 'background.js');
 assert.equal(scaffold.manifest.background.type, 'module');
 assert.equal(scaffold.manifest.host_permissions.includes('https://timeline.example.com/*'), true);
 assert.deepEqual(scaffold.manifest.content_scripts[0].js, ['content-script.js']);
+assert.equal(scaffold.bundle.background_input, 'src/background.entry.mjs');
+assert.equal(scaffold.files.find((file) => file.path === 'package.json').mime, 'application/json');
+assert.match(scaffold.files.find((file) => file.path === 'package.json').content, /"esbuild"/);
+assert.match(scaffold.files.find((file) => file.path === 'build.mjs').content, /content-script\.js/);
 assert.equal(scaffold.files.find((file) => file.path === 'manifest.json').mime, 'application/json');
 assert.match(scaffold.files.find((file) => file.path === 'src/content-script.entry.mjs').content, /meeting-app-content-script/);
-assert.match(scaffold.files.find((file) => file.path === 'background.js').content, /runtimeApi\(\)\?\.onMessage/);
-assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /Bundle `src\/content-script\.entry\.mjs`/);
+assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /runtimeApi\(\)\?\.onMessage/);
+assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /npm run build/);
 
 assert.throws(
   () => meetingAppExtensionProfile('unknown-meeting'),

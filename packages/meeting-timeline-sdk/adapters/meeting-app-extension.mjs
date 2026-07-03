@@ -434,9 +434,113 @@ export function buildMeetingAppExtensionBackgroundSource(options = {}) {
   ].join('\n');
 }
 
+export function buildMeetingAppExtensionPackageJson(options = {}) {
+  const packageName = firstNonEmpty(
+    options.packageName,
+    options.package_name,
+    'meeting-timeline-meeting-app-extension',
+  );
+  const sdkVersion = firstNonEmpty(
+    options.sdkDependencyVersion,
+    options.sdk_dependency_version,
+    '^0.1.0',
+  );
+  const esbuildVersion = firstNonEmpty(
+    options.esbuildVersion,
+    options.esbuild_version,
+    '^0.25.0',
+  );
+  return compactObject({
+    name: packageName,
+    version: firstNonEmpty(options.packageVersion, options.package_version, '0.1.0'),
+    private: options.privatePackage ?? options.private_package ?? true,
+    type: 'module',
+    scripts: {
+      build: 'node build.mjs',
+      watch: 'node build.mjs --watch',
+      ...(options.scripts ?? {}),
+    },
+    dependencies: {
+      '@ai-annotation/meeting-timeline-sdk': sdkVersion,
+      ...(options.dependencies ?? {}),
+    },
+    devDependencies: {
+      esbuild: esbuildVersion,
+      ...(options.devDependencies ?? options.dev_dependencies ?? {}),
+    },
+  });
+}
+
+export function buildMeetingAppExtensionBuildSource(options = {}) {
+  const contentScriptEntry = firstNonEmpty(
+    options.contentScriptEntry,
+    options.content_script_entry,
+    'src/content-script.entry.mjs',
+  );
+  const contentScriptOutput = firstNonEmpty(
+    options.outputScript,
+    options.output_script,
+    'content-script.js',
+  );
+  const backgroundEntry = firstNonEmpty(
+    options.backgroundEntry,
+    options.background_entry,
+    'src/background.entry.mjs',
+  );
+  const backgroundOutput = firstNonEmpty(
+    options.backgroundScript,
+    options.background_script,
+    'background.js',
+  );
+  const target = asArray(firstNonEmpty(
+    options.buildTarget,
+    options.build_target,
+    ['chrome114', 'edge114'],
+  ));
+  return [
+    "import { build, context } from 'esbuild';",
+    '',
+    'const watch = process.argv.includes("--watch");',
+    'const production = process.env.NODE_ENV === "production";',
+    `const target = ${json(target)};`,
+    '',
+    'const configs = [',
+    '  {',
+    `    entryPoints: [${JSON.stringify(contentScriptEntry)}],`,
+    `    outfile: ${JSON.stringify(contentScriptOutput)},`,
+    '    bundle: true,',
+    '    platform: "browser",',
+    '    format: "iife",',
+    '    target,',
+    '    sourcemap: !production,',
+    '    minify: production,',
+    '  },',
+    '  {',
+    `    entryPoints: [${JSON.stringify(backgroundEntry)}],`,
+    `    outfile: ${JSON.stringify(backgroundOutput)},`,
+    '    bundle: true,',
+    '    platform: "browser",',
+    '    format: "esm",',
+    '    target,',
+    '    sourcemap: !production,',
+    '    minify: production,',
+    '  },',
+    '];',
+    '',
+    'if (watch) {',
+    '  const contexts = await Promise.all(configs.map((config) => context(config)));',
+    '  await Promise.all(contexts.map((item) => item.watch()));',
+    '  console.log("watching meeting timeline extension sources");',
+    '} else {',
+    '  await Promise.all(configs.map((config) => build(config)));',
+    '}',
+  ].join('\n');
+}
+
 export function buildMeetingAppExtensionReadme(options = {}) {
   const installPlan = buildMeetingAppExtensionInstallPlan(options);
   const scriptFile = installPlan.content_scripts[0]?.js?.[0] ?? 'content-script.js';
+  const backgroundFile = firstNonEmpty(options.backgroundScript, options.background_script, 'background.js');
   return [
     '# Meeting Timeline Browser Extension',
     '',
@@ -448,7 +552,12 @@ export function buildMeetingAppExtensionReadme(options = {}) {
     '',
     '## Build',
     '',
-    `Bundle \`src/content-script.entry.mjs\` to \`${scriptFile}\` with your application bundler, then load this directory as an unpacked Chrome/Edge extension.`,
+    '```sh',
+    'npm install',
+    'npm run build',
+    '```',
+    '',
+    `The build emits \`${scriptFile}\` and \`${backgroundFile}\`, then \`manifest.json\` can be loaded as an unpacked Chrome/Edge extension.`,
     '',
     'The generated background worker forwards timeline client calls to the configured timeline service base URL.',
     '',
@@ -459,8 +568,18 @@ export function buildMeetingAppExtensionReadme(options = {}) {
 export function buildMeetingAppExtensionScaffold(options = {}) {
   const scriptFile = firstNonEmpty(options.outputScript, options.output_script, 'content-script.js');
   const backgroundFile = firstNonEmpty(options.backgroundScript, options.background_script, 'background.js');
+  const contentScriptEntry = firstNonEmpty(options.contentScriptEntry, options.content_script_entry, 'src/content-script.entry.mjs');
+  const backgroundEntry = firstNonEmpty(options.backgroundEntry, options.background_entry, 'src/background.entry.mjs');
   const baseUrl = firstNonEmpty(options.baseUrl, options.base_url);
   const endpointPermission = endpointOriginPattern(baseUrl);
+  const packageJson = buildMeetingAppExtensionPackageJson(options);
+  const buildSource = buildMeetingAppExtensionBuildSource({
+    ...options,
+    outputScript: scriptFile,
+    backgroundScript: backgroundFile,
+    contentScriptEntry,
+    backgroundEntry,
+  });
   const manifest = buildMeetingAppContentScriptManifest({
     ...options,
     js: scriptFile,
@@ -494,6 +613,7 @@ export function buildMeetingAppExtensionScaffold(options = {}) {
   const readme = buildMeetingAppExtensionReadme({
     ...options,
     js: scriptFile,
+    backgroundScript: backgroundFile,
   });
   return compactObject({
     type: 'meeting_app_extension_scaffold',
@@ -502,14 +622,17 @@ export function buildMeetingAppExtensionScaffold(options = {}) {
     install_plan: installPlan,
     manifest,
     files: [
+      sourceFile('package.json', `${json(packageJson)}\n`, 'package_manifest', 'application/json'),
+      sourceFile('build.mjs', buildSource, 'build_script', 'text/javascript'),
       sourceFile('manifest.json', `${json(manifest)}\n`, 'manifest', 'application/json'),
-      sourceFile('src/content-script.entry.mjs', contentScriptSource, 'content_script_entry', 'text/javascript'),
-      sourceFile(backgroundFile, backgroundSource, 'background_service_worker', 'text/javascript'),
+      sourceFile(contentScriptEntry, contentScriptSource, 'content_script_entry', 'text/javascript'),
+      sourceFile(backgroundEntry, backgroundSource, 'background_service_worker_entry', 'text/javascript'),
       sourceFile('README.md', readme, 'readme', 'text/markdown'),
     ],
     bundle: {
-      content_script_input: 'src/content-script.entry.mjs',
+      content_script_input: contentScriptEntry,
       content_script_output: scriptFile,
+      background_input: backgroundEntry,
       background_output: backgroundFile,
     },
     validation: {
