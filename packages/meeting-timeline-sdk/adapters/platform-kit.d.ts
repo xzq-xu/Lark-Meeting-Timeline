@@ -14,6 +14,7 @@ import type {
   MeetingAppIntegrationMatrix,
   MeetingAppIntegrationProfile,
   MeetingAppIntegrationProfileOptions,
+  MeetingAppRuntimeAdapterConfig,
 } from './meeting-app-profile.mjs';
 import type {
   MeetingAppExtensionInstallPlan,
@@ -81,6 +82,8 @@ export interface MeetingPlatformTimelineKit {
   meetingAppIntegrationProfile(platform: string, profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppIntegrationProfile;
   allMeetingAppIntegrationProfiles(profileOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppIntegrationProfile>>;
   meetingAppIntegrationMatrix(profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppIntegrationMatrix;
+  meetingAppRuntimeAdapterConfig(platform: string, configOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterConfig;
+  allMeetingAppRuntimeAdapterConfigs(configOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppRuntimeAdapterConfig>>;
   meetingAppExtensionInstallPlan(extensionOptions?: MeetingAppExtensionOptions): MeetingAppExtensionInstallPlan;
   meetingAppContentScriptManifest(extensionOptions?: MeetingAppExtensionOptions): Record<string, unknown>;
   meetingAppExtensionMatches(extensionOptions?: MeetingAppExtensionOptions): MeetingAppExtensionMatchPatterns;

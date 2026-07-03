@@ -494,6 +494,10 @@ const appProfile = meetingKit.meetingAppIntegrationProfile('google-meet', {
 const appMatrix = meetingKit.meetingAppIntegrationMatrix();
 // appMatrix.rows 可以直接用于产品侧展示 Google Meet / Teams / Zoom / Lark / Webex 的接入状态。
 
+const runtimeConfig = meetingKit.meetingAppRuntimeAdapterConfig('google-meet');
+// runtimeConfig 可以交给浏览器 extension content script、Electron WebView preload 或桌面宿主：
+// 它包含 bridge_options、runtime_options、capture_options、extension host 权限和 message_types。
+
 const extensionPlan = meetingKit.meetingAppExtensionInstallPlan({
   platforms: ['google-meet', 'microsoft-teams'],
   js: ['meeting-app-content-script.bundle.js'],

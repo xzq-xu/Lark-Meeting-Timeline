@@ -19,6 +19,7 @@ import {
 export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA = 'meeting_app_integration_profile';
 export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION = 1;
 export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS = MEETING_APP_FIXTURE_PLATFORMS;
+export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA = 'meeting_app_runtime_adapter_config';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -76,6 +77,58 @@ function runtimeSummary(runtimePreset = {}) {
     unchangedObserveEveryMs: runtimePreset.unchangedObserveEveryMs,
     mutation_track_selector_count: runtimePreset.mutationTrackSelectors?.length ?? 0,
     mutation_ignore_selector_count: runtimePreset.mutationIgnoreSelectors?.length ?? 0,
+  });
+}
+
+function runtimeOptions(runtimePreset = {}) {
+  return compactObject({
+    runtimePreset: runtimePreset.platform,
+    runtime_preset: runtimePreset.platform,
+    browserRuntimePreset: runtimePreset.platform,
+    browser_runtime_preset: runtimePreset.platform,
+    captureOptions: runtimePreset.captureOptions,
+    capture_options: runtimePreset.capture_options ?? runtimePreset.captureOptions,
+    observeMutations: runtimePreset.observeMutations,
+    observe_mutations: runtimePreset.observe_mutations,
+    mutationDebounceMs: runtimePreset.mutationDebounceMs,
+    mutation_debounce_ms: runtimePreset.mutation_debounce_ms,
+    speakerStableFollowupMs: runtimePreset.speakerStableFollowupMs,
+    speaker_stable_followup_ms: runtimePreset.speaker_stable_followup_ms,
+    sampleIntervalMs: runtimePreset.sampleIntervalMs,
+    sample_interval_ms: runtimePreset.sample_interval_ms,
+    unchangedObserveEveryMs: runtimePreset.unchangedObserveEveryMs,
+    unchanged_observe_every_ms: runtimePreset.unchanged_observe_every_ms,
+    mutationTrackSelectors: runtimePreset.mutationTrackSelectors,
+    mutation_track_selectors: runtimePreset.mutation_track_selectors,
+    mutationIgnoreSelectors: runtimePreset.mutationIgnoreSelectors,
+    mutation_ignore_selectors: runtimePreset.mutation_ignore_selectors,
+  });
+}
+
+function captureOptions(captureProfile = {}) {
+  return compactObject({
+    platform: captureProfile.platform,
+    captureProfile: captureProfile.platform,
+    capture_profile: captureProfile.platform,
+    controlSelectors: captureProfile.controlSelectors,
+    control_selectors: captureProfile.controlSelectors,
+    participantSelectors: captureProfile.participantSelectors,
+    participant_selectors: captureProfile.participantSelectors,
+    textSelectors: captureProfile.textSelectors,
+    text_selectors: captureProfile.textSelectors,
+  });
+}
+
+function bridgeOptions(platform, options = {}) {
+  return compactObject({
+    browser_runtime_preset: platform,
+    source: firstNonEmpty(options.source, options.detectorSource, options.detector_source, 'meeting_app_extension'),
+    extensionMessaging: firstNonEmpty(options.extensionMessaging, options.extension_messaging, true),
+    extension_messaging: firstNonEmpty(options.extensionMessaging, options.extension_messaging, true),
+    windowMessaging: firstNonEmpty(options.windowMessaging, options.window_messaging, true),
+    window_messaging: firstNonEmpty(options.windowMessaging, options.window_messaging, true),
+    startRuntime: firstNonEmpty(options.startRuntime, options.start_runtime, true),
+    start_runtime: firstNonEmpty(options.startRuntime, options.start_runtime, true),
   });
 }
 
@@ -247,6 +300,61 @@ export function buildMeetingAppIntegrationMatrix(options = {}) {
       next_actions: profile.readiness?.next_actions ?? [],
     })),
   };
+}
+
+export function buildMeetingAppRuntimeAdapterConfig(platformOrInput = {}, options = {}) {
+  const input = typeof platformOrInput === 'string'
+    ? { platform: platformOrInput }
+    : (platformOrInput ?? {});
+  const merged = { ...input, ...options };
+  const profile = buildMeetingAppIntegrationProfile({
+    ...merged,
+    includeLaunchGate: firstNonEmpty(merged.includeLaunchGate, merged.include_launch_gate, false),
+  });
+  const platform = profile.platform;
+  const captureProfile = profile.capture.profile;
+  const runtimePreset = meetingAppBrowserRuntimePreset(platform, merged);
+  const resolvedBridgeOptions = bridgeOptions(platform, merged);
+  return compactObject({
+    type: 'meeting_app_runtime_adapter_config',
+    schema: MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    platform,
+    display_name: profile.display_name,
+    source: firstNonEmpty(merged.source, merged.detectorSource, merged.detector_source, 'meeting_app_extension'),
+    extension: {
+      matches: profile.extension.matches,
+      host_permissions: profile.extension.host_permissions,
+      permissions: profile.extension.recommended_permissions,
+      message_types: profile.extension.message_types,
+      status_storage_key: profile.extension.status_storage_key,
+      timeline_endpoints: profile.extension.timeline_endpoints,
+    },
+    bridge_options: resolvedBridgeOptions,
+    runtime_options: runtimeOptions(runtimePreset),
+    capture_options: captureOptions(captureProfile),
+    startup: {
+      start_runtime: resolvedBridgeOptions.startRuntime,
+      send_attached_message: true,
+      attached_message_type: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached,
+      timestamp_field: 'captured_at_ms',
+    },
+    supported_client_methods: Object.keys(MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS),
+    readiness: compactObject({
+      runtime_ready: (runtimePreset?.mutationTrackSelectors?.length ?? 0) > 0
+        && (runtimePreset?.mutationIgnoreSelectors?.length ?? 0) > 0
+        && Boolean(captureProfile?.platform),
+      requires_live_snapshot_before_production: true,
+      validation_gate: 'buildMeetingAppLaunchGate',
+    }),
+  });
+}
+
+export function buildAllMeetingAppRuntimeAdapterConfigs(options = {}) {
+  return Object.fromEntries(platformList(options).map((platform) => [
+    platform,
+    buildMeetingAppRuntimeAdapterConfig(platform, options),
+  ]));
 }
 
 export default buildMeetingAppIntegrationProfile;

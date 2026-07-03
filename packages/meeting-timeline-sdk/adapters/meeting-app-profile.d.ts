@@ -4,6 +4,7 @@ import type { MeetingAppLaunchGateOptions } from './meeting-app-gate.mjs';
 export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA: 'meeting_app_integration_profile';
 export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION: number;
 export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS: readonly MeetingAppDomCaptureProfilePlatform[];
+export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA: 'meeting_app_runtime_adapter_config';
 
 export interface MeetingAppIntegrationProfileOptions extends MeetingAppLaunchGateOptions {
   platform?: MeetingAppDomCaptureProfilePlatform | string;
@@ -47,6 +48,22 @@ export interface MeetingAppIntegrationMatrix {
   rows: Array<Record<string, unknown>>;
 }
 
+export interface MeetingAppRuntimeAdapterConfig {
+  type: 'meeting_app_runtime_adapter_config';
+  schema: 'meeting_app_runtime_adapter_config';
+  version: number;
+  platform: MeetingAppDomCaptureProfilePlatform;
+  display_name: string;
+  source: string;
+  extension: Record<string, unknown>;
+  bridge_options: Record<string, unknown>;
+  runtime_options: Record<string, unknown>;
+  capture_options: Record<string, unknown>;
+  startup: Record<string, unknown>;
+  supported_client_methods: string[];
+  readiness: Record<string, unknown>;
+}
+
 export function buildMeetingAppIntegrationProfile(
   platformOrInput?: MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
   options?: MeetingAppIntegrationProfileOptions,
@@ -59,5 +76,14 @@ export function buildAllMeetingAppIntegrationProfiles(
 export function buildMeetingAppIntegrationMatrix(
   options?: MeetingAppIntegrationProfileOptions,
 ): MeetingAppIntegrationMatrix;
+
+export function buildMeetingAppRuntimeAdapterConfig(
+  platformOrInput?: MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppRuntimeAdapterConfig;
+
+export function buildAllMeetingAppRuntimeAdapterConfigs(
+  options?: MeetingAppIntegrationProfileOptions,
+): Partial<Record<MeetingAppDomCaptureProfilePlatform, MeetingAppRuntimeAdapterConfig>>;
 
 export default buildMeetingAppIntegrationProfile;

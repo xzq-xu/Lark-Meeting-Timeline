@@ -3,9 +3,12 @@ import assert from 'node:assert/strict';
 import {
   MEETING_APP_INTEGRATION_PROFILE_PLATFORMS,
   MEETING_APP_INTEGRATION_PROFILE_SCHEMA,
+  MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
   buildAllMeetingAppIntegrationProfiles,
+  buildAllMeetingAppRuntimeAdapterConfigs,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
+  buildMeetingAppRuntimeAdapterConfig,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-profile.mjs';
 
 assert.deepEqual(MEETING_APP_INTEGRATION_PROFILE_PLATFORMS, [
@@ -16,6 +19,7 @@ assert.deepEqual(MEETING_APP_INTEGRATION_PROFILE_PLATFORMS, [
   'webex',
 ]);
 assert.equal(MEETING_APP_INTEGRATION_PROFILE_SCHEMA, 'meeting_app_integration_profile');
+assert.equal(MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA, 'meeting_app_runtime_adapter_config');
 
 const googleProfile = buildMeetingAppIntegrationProfile('google-meet', {
   baseUrl: 'https://timeline.example.com',
@@ -45,6 +49,30 @@ assert.equal(googleProfile.launch_gate.passed, true);
 assert.equal(googleProfile.launch_gate.production_ready, false);
 assert.equal(googleProfile.implementation_steps.includes('insert_annotations_with_absolute_captured_at_ms'), true);
 
+const googleRuntimeConfig = buildMeetingAppRuntimeAdapterConfig('google-meet');
+assert.equal(googleRuntimeConfig.type, 'meeting_app_runtime_adapter_config');
+assert.equal(googleRuntimeConfig.platform, 'google_meet');
+assert.deepEqual(googleRuntimeConfig.extension.matches, ['https://meet.google.com/*']);
+assert.equal(googleRuntimeConfig.extension.permissions.includes('storage'), true);
+assert.equal(googleRuntimeConfig.bridge_options.browser_runtime_preset, 'google_meet');
+assert.equal(googleRuntimeConfig.bridge_options.extensionMessaging, true);
+assert.equal(googleRuntimeConfig.bridge_options.windowMessaging, true);
+assert.equal(googleRuntimeConfig.runtime_options.runtimePreset, 'google_meet');
+assert.equal(googleRuntimeConfig.runtime_options.observeMutations, true);
+assert.equal(googleRuntimeConfig.capture_options.captureProfile, 'google_meet');
+assert.equal(googleRuntimeConfig.capture_options.participantSelectors.length > 0, true);
+assert.equal(googleRuntimeConfig.startup.attached_message_type, 'meeting_timeline.extension_attached');
+assert.equal(googleRuntimeConfig.supported_client_methods.includes('insertMark'), true);
+assert.equal(googleRuntimeConfig.readiness.runtime_ready, true);
+
+const stoppedRuntimeConfig = buildMeetingAppRuntimeAdapterConfig('google-meet', {
+  startRuntime: false,
+  windowMessaging: false,
+});
+assert.equal(stoppedRuntimeConfig.bridge_options.startRuntime, false);
+assert.equal(stoppedRuntimeConfig.bridge_options.windowMessaging, false);
+assert.equal(stoppedRuntimeConfig.startup.start_runtime, false);
+
 const teamsProfile = buildMeetingAppIntegrationProfile({
   platform: 'teams',
   includeLaunchGate: false,
@@ -60,6 +88,13 @@ const selectedProfiles = buildAllMeetingAppIntegrationProfiles({
 assert.deepEqual(Object.keys(selectedProfiles), ['zoom', 'webex']);
 assert.equal(selectedProfiles.zoom.extension.matches.includes('https://zoom.us/*'), true);
 assert.equal(selectedProfiles.webex.capture.profile.platform, 'webex');
+
+const selectedRuntimeConfigs = buildAllMeetingAppRuntimeAdapterConfigs({
+  platforms: ['zoom', 'webex'],
+});
+assert.deepEqual(Object.keys(selectedRuntimeConfigs), ['zoom', 'webex']);
+assert.equal(selectedRuntimeConfigs.zoom.bridge_options.browser_runtime_preset, 'zoom');
+assert.equal(selectedRuntimeConfigs.webex.extension.matches.includes('https://*.webex.com/*'), true);
 
 const matrix = buildMeetingAppIntegrationMatrix({
   baseUrl: 'https://timeline.example.com',

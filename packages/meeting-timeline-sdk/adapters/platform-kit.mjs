@@ -61,8 +61,10 @@ import {
 } from './meeting-app-snapshot-recorder.mjs';
 import {
   buildAllMeetingAppIntegrationProfiles,
+  buildAllMeetingAppRuntimeAdapterConfigs,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
+  buildMeetingAppRuntimeAdapterConfig,
 } from './meeting-app-profile.mjs';
 import {
   buildMeetingAppExtensionAttachedMessage,
@@ -184,6 +186,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_extension_install_plan: buildMeetingAppExtensionInstallPlan(options),
     meeting_app_extension_acceptance: buildMeetingAppExtensionScaffoldAcceptanceReport(options),
     meeting_app_integration_matrix: buildMeetingAppIntegrationMatrix(options),
+    meeting_app_runtime_adapter_configs: buildAllMeetingAppRuntimeAdapterConfigs(options),
     meeting_app_fixture_acceptance: meetingAppFixtureAcceptance,
     meeting_app_launch_gate: meetingAppLaunchGateSummary,
   };
@@ -289,6 +292,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppIntegrationMatrix(profileOptions = {}) {
       return buildMeetingAppIntegrationMatrix(withDefaults(defaults, profileOptions));
+    },
+    meetingAppRuntimeAdapterConfig(platform, configOptions = {}) {
+      return buildMeetingAppRuntimeAdapterConfig(platform, withDefaults(defaults, configOptions));
+    },
+    allMeetingAppRuntimeAdapterConfigs(configOptions = {}) {
+      return buildAllMeetingAppRuntimeAdapterConfigs(withDefaults(defaults, configOptions));
     },
     meetingAppExtensionInstallPlan(extensionOptions = {}) {
       return buildMeetingAppExtensionInstallPlan(withDefaults(defaults, extensionOptions));
