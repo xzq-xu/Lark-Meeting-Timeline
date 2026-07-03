@@ -92,6 +92,10 @@ const backgroundSource = buildMeetingAppExtensionBackgroundSource({
   baseUrl: 'https://timeline.example.com/',
 });
 assert.match(backgroundSource, /const BASE_URL = "https:\/\/timeline\.example\.com";/);
+assert.match(backgroundSource, /meeting_timeline\.extension_attached/);
+assert.match(backgroundSource, /meeting_timeline\.extension_status/);
+assert.match(backgroundSource, /STATUS_STORAGE_KEY/);
+assert.match(backgroundSource, /setStorageValue/);
 assert.match(backgroundSource, /\/api\/meeting-session\/start/);
 assert.match(backgroundSource, /\/api\/annotations\/batch/);
 
@@ -123,6 +127,7 @@ assert.equal(scaffold.type, 'meeting_app_extension_scaffold');
 assert.equal(scaffold.validation.uses_all_urls, false);
 assert.equal(scaffold.manifest.background.service_worker, 'background.js');
 assert.equal(scaffold.manifest.background.type, 'module');
+assert.equal(scaffold.manifest.permissions.includes('storage'), true);
 assert.equal(scaffold.manifest.host_permissions.includes('https://timeline.example.com/*'), true);
 assert.deepEqual(scaffold.manifest.content_scripts[0].js, ['content-script.js']);
 assert.equal(scaffold.bundle.background_input, 'src/background.entry.mjs');
@@ -132,6 +137,7 @@ assert.match(scaffold.files.find((file) => file.path === 'build.mjs').content, /
 assert.equal(scaffold.files.find((file) => file.path === 'manifest.json').mime, 'application/json');
 assert.match(scaffold.files.find((file) => file.path === 'src/content-script.entry.mjs').content, /meeting-app-content-script/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /runtimeApi\(\)\?\.onMessage/);
+assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /extension_status/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /npm run build/);
 
 const scaffoldReport = buildMeetingAppExtensionScaffoldAcceptanceReport(scaffold);
@@ -139,6 +145,7 @@ assert.equal(scaffoldReport.accepted, true);
 assert.deepEqual(scaffoldReport.platforms, ['google_meet']);
 assert.equal(scaffoldReport.accepted_platform_count, 1);
 assert.equal(scaffoldReport.manifest.uses_all_urls, false);
+assert.equal(scaffoldReport.manifest.permissions.includes('storage'), true);
 assert.deepEqual(scaffoldReport.issues, []);
 assert.equal(assertMeetingAppExtensionScaffold(scaffold).accepted, true);
 

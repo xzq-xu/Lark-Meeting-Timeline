@@ -498,6 +498,7 @@ const extensionScaffold = meetingKit.meetingAppExtensionScaffold({
 });
 // extensionScaffold.files 包含 package.json、build.mjs、manifest.json、src/content-script.entry.mjs、src/background.entry.mjs 和 README.md。
 // content script 入口用 SDK bridge 监听会议网页；background worker 把 start/end/mark 调用转发到 timeline 服务。
+// content script 注入后会发送 meeting_timeline.extension_attached；background 可用 meeting_timeline.extension_status 查询最近注入状态。
 
 const extensionAcceptance = meetingKit.meetingAppExtensionAcceptance({
   platforms: ['google-meet'],

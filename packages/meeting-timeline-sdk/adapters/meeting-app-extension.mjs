@@ -413,10 +413,62 @@ export function buildMeetingAppExtensionBackgroundSource(options = {}) {
   return [
     `const BASE_URL = ${JSON.stringify(baseUrl)};`,
     `const CLIENT_CALL_TYPE = ${JSON.stringify(messagePrefix)};`,
+    'const ATTACHED_TYPE = "meeting_timeline.extension_attached";',
+    'const STATUS_TYPE = "meeting_timeline.extension_status";',
+    'const STATUS_STORAGE_KEY = "meeting_timeline_extension_status";',
     `const ENDPOINTS = ${json(endpoints)};`,
+    'let lastAttached = null;',
     '',
     'function runtimeApi() {',
     '  return globalThis.chrome?.runtime ?? globalThis.browser?.runtime;',
+    '}',
+    '',
+    'function storageArea() {',
+    '  return globalThis.chrome?.storage?.local ?? globalThis.browser?.storage?.local;',
+    '}',
+    '',
+    'function setStorageValue(key, value) {',
+    '  const area = storageArea();',
+    '  if (!area?.set) return Promise.resolve({ stored: false, reason: "missing_storage_api" });',
+    '  return new Promise((resolve) => {',
+    '    let settled = false;',
+    '    const finish = (payload) => {',
+    '      if (settled) return;',
+    '      settled = true;',
+    '      resolve(payload);',
+    '    };',
+    '    try {',
+    '      const maybePromise = area.set({ [key]: value }, () => finish({ stored: true }));',
+    '      if (maybePromise?.then) {',
+    '        maybePromise.then(() => finish({ stored: true })).catch((error) => finish({',
+    '          stored: false,',
+    '          reason: "storage_set_failed",',
+    '          error: String(error?.message ?? error),',
+    '        }));',
+    '      }',
+    '    } catch (error) {',
+    '      finish({ stored: false, reason: "storage_set_failed", error: String(error?.message ?? error) });',
+    '    }',
+    '  });',
+    '}',
+    '',
+    'function getStorageValue(key) {',
+    '  const area = storageArea();',
+    '  if (!area?.get) return Promise.resolve(undefined);',
+    '  return new Promise((resolve) => {',
+    '    let settled = false;',
+    '    const finish = (value) => {',
+    '      if (settled) return;',
+    '      settled = true;',
+    '      resolve(value);',
+    '    };',
+    '    try {',
+    '      const maybePromise = area.get(key, (value) => finish(value?.[key]));',
+    '      if (maybePromise?.then) maybePromise.then((value) => finish(value?.[key])).catch(() => finish(undefined));',
+    '    } catch {',
+    '      finish(undefined);',
+    '    }',
+    '  });',
     '}',
     '',
     'async function postJson(path, payload) {',
@@ -432,6 +484,28 @@ export function buildMeetingAppExtensionBackgroundSource(options = {}) {
     '}',
     '',
     'runtimeApi()?.onMessage?.addListener?.((message, sender, sendResponse) => {',
+    '  if (message?.type === ATTACHED_TYPE) {',
+    '    lastAttached = {',
+    '      platform: message.platform,',
+    '      url: message.url,',
+    '      captured_at_ms: message.captured_at_ms ?? Date.now(),',
+    '      sender: {',
+    '        tab_id: sender?.tab?.id,',
+    '        frame_id: sender?.frameId,',
+    '        url: sender?.url,',
+    '      },',
+    '    };',
+    '    setStorageValue(STATUS_STORAGE_KEY, lastAttached).then((storage) => {',
+    '      sendResponse({ ok: true, type: ATTACHED_TYPE, attached: lastAttached, storage });',
+    '    });',
+    '    return true;',
+    '  }',
+    '  if (message?.type === STATUS_TYPE) {',
+    '    getStorageValue(STATUS_STORAGE_KEY).then((stored) => {',
+    '      sendResponse({ ok: true, type: STATUS_TYPE, attached: stored ?? lastAttached });',
+    '    });',
+    '    return true;',
+    '  }',
     '  if (!message || message.type !== CLIENT_CALL_TYPE) return false;',
     '  const path = ENDPOINTS[message.method];',
     '  if (!path) {',
@@ -712,6 +786,9 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
   if (asArray(manifest.host_permissions).includes('<all_urls>')) {
     issues.push(issue('error', 'overbroad_host_permission', 'Extension scaffold must not request <all_urls>.'));
   }
+  if (!asArray(manifest.permissions).includes('storage')) {
+    issues.push(issue('error', 'missing_storage_permission', 'Manifest must request storage permission for extension diagnostics.'));
+  }
   if (!manifest.background?.service_worker) {
     issues.push(issue('error', 'missing_background_worker', 'Manifest is missing a background service worker.'));
   }
@@ -773,6 +850,15 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
     issues.push(issue('error', 'content_entry_not_starting_runtime', 'Content script entry does not start the browser runtime.'));
   }
   const backgroundContent = backgroundEntry?.content ?? '';
+  if (!backgroundContent.includes('meeting_timeline.extension_attached')) {
+    issues.push(issue('error', 'background_missing_attached_diagnostic', 'Background entry does not handle extension_attached diagnostics.'));
+  }
+  if (!backgroundContent.includes('meeting_timeline.extension_status')) {
+    issues.push(issue('error', 'background_missing_status_diagnostic', 'Background entry does not handle extension_status diagnostics.'));
+  }
+  if (!backgroundContent.includes('setStorageValue')) {
+    issues.push(issue('error', 'background_missing_diagnostic_storage', 'Background entry does not persist extension diagnostics.'));
+  }
   for (const endpoint of ['/api/meeting-session/start', '/api/meeting-session/end', '/api/annotations', '/api/annotations/batch']) {
     if (!backgroundContent.includes(endpoint)) {
       issues.push(issue('error', 'background_missing_timeline_endpoint', `Background entry is missing ${endpoint}.`, { endpoint }));
@@ -819,6 +905,7 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
     files: filePaths,
     manifest: {
       manifest_version: manifest.manifest_version,
+      permissions: asArray(manifest.permissions),
       host_permissions: hostPermissions,
       content_script_count: asArray(manifest.content_scripts).length,
       background_service_worker: manifest.background?.service_worker,
