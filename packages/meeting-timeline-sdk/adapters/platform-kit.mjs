@@ -58,6 +58,11 @@ import {
   buildMeetingPlatformRolloutSummary,
 } from './platform-rollout.mjs';
 import {
+  buildMeetingPlatformEvidencePackage,
+  buildMeetingPlatformEvidencePackageSummary,
+  createMeetingPlatformEvidencePackageBuilder,
+} from './platform-evidence-package.mjs';
+import {
   assertAllMeetingAppLaunchGates,
   assertMeetingAppLaunchGate,
   buildMeetingAppLaunchGate,
@@ -330,6 +335,26 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdaptationRunbookSummary(runbookOptions = {}) {
       return buildMeetingPlatformAdaptationRunbookSummary(withDefaults(defaults, runbookOptions));
+    },
+    platformEvidencePackage(platformOrInput, input = {}, packageOptions = {}) {
+      if (platformOrInput && typeof platformOrInput === 'object' && !Array.isArray(platformOrInput)) {
+        return buildMeetingPlatformEvidencePackage(platformOrInput, withDefaults(defaults, input));
+      }
+      return buildMeetingPlatformEvidencePackage(platformOrInput, input, withDefaults(defaults, packageOptions));
+    },
+    platformEvidencePackageSummary(packageOrInput, input = {}, summaryOptions = {}) {
+      if (packageOrInput?.schema === 'meeting_platform_evidence_package') {
+        return buildMeetingPlatformEvidencePackageSummary(packageOrInput, withDefaults(defaults, input));
+      }
+      if (packageOrInput && typeof packageOrInput === 'object' && !Array.isArray(packageOrInput)) {
+        return buildMeetingPlatformEvidencePackageSummary(packageOrInput, withDefaults(defaults, input));
+      }
+      return buildMeetingPlatformEvidencePackageSummary(
+        buildMeetingPlatformEvidencePackage(packageOrInput, input, withDefaults(defaults, summaryOptions)),
+      );
+    },
+    platformEvidencePackageBuilder(platform, builderOptions = {}) {
+      return createMeetingPlatformEvidencePackageBuilder(platform, withDefaults(defaults, builderOptions));
     },
     meetingAppSnapshotRecorder(recorderOptions = {}) {
       return createMeetingAppSnapshotRecorder(withDefaults(defaults, recorderOptions));

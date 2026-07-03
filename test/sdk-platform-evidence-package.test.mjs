@@ -1,0 +1,158 @@
+import assert from 'node:assert/strict';
+
+import { buildMeetingAppFixtureSnapshot } from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
+import { buildMeetingAppSnapshotRecordSet } from '../packages/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder.mjs';
+import { buildMeetingPlatformEvidencePackage, buildMeetingPlatformEvidencePackageSummary, createMeetingPlatformEvidencePackageBuilder } from '../packages/meeting-timeline-sdk/adapters/platform-evidence-package.mjs';
+import { buildPlatformFixtureEvent } from '../packages/meeting-timeline-sdk/adapters/platform-fixtures.mjs';
+import { capturePlatformWebhookEvent } from '../packages/meeting-timeline-sdk/adapters/platform-capture.mjs';
+import { createMeetingPlatformTimelineKit } from '../packages/meeting-timeline-sdk/adapters/platform-kit.mjs';
+
+const baseUrl = 'https://timeline.example.com';
+const capturedAtMs = 1_783_702_000_000;
+const googleEnv = {
+  GOOGLE_PUBSUB_OIDC_AUDIENCE: `${baseUrl}/api/platform-events/google-meet`,
+  GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL: 'meet-events@example.iam.gserviceaccount.com',
+};
+
+function providerRecords(platform) {
+  return [
+    capturePlatformWebhookEvent(platform, buildPlatformFixtureEvent(platform, 'meeting_start'), {
+      capturedAtMs,
+      label: `${platform} start`,
+    }),
+    capturePlatformWebhookEvent(platform, buildPlatformFixtureEvent(platform, 'meeting_end'), {
+      capturedAtMs: capturedAtMs + 120_000,
+      label: `${platform} end`,
+    }),
+  ];
+}
+
+function meetingAppRecordSet(platform) {
+  return buildMeetingAppSnapshotRecordSet([
+    {
+      platform,
+      phase: 'active',
+      capturedAtMs,
+      snapshot: buildMeetingAppFixtureSnapshot(platform, {
+        observedAtMs: capturedAtMs,
+        state: 'active',
+      }),
+    },
+    {
+      platform,
+      phase: 'ended',
+      capturedAtMs: capturedAtMs + 120_000,
+      snapshot: buildMeetingAppFixtureSnapshot(platform, {
+        observedAtMs: capturedAtMs + 120_000,
+        state: 'prejoin',
+      }),
+    },
+  ], {
+    id: `${platform}-meeting-app-record-set`,
+    createdAtMs: capturedAtMs + 121_000,
+  });
+}
+
+const googlePackage = buildMeetingPlatformEvidencePackage('google-meet', {
+  providerRecords: providerRecords('google-meet'),
+  meetingAppRecordSet: meetingAppRecordSet('google-meet'),
+}, {
+  baseUrl,
+  env: googleEnv,
+  createdAtMs: capturedAtMs + 122_000,
+  label: 'google meet pilot evidence',
+});
+
+assert.equal(googlePackage.schema, 'meeting_platform_evidence_package');
+assert.equal(googlePackage.platform, 'google_meet');
+assert.equal(googlePackage.provider_records.length, 2);
+assert.equal(googlePackage.meeting_app_record_set.record_count, 2);
+assert.equal(googlePackage.rollout_plan.status, 'production_ready');
+assert.equal(googlePackage.rollout_plan.production_ready, true);
+assert.equal(googlePackage.evidence_summary.provider.evidence_level, 'captured_events');
+assert.equal(googlePackage.evidence_summary.local_dom.evidence_level, 'captured_dom');
+assert.deepEqual(googlePackage.env_summary.configured_keys, [
+  'GOOGLE_PUBSUB_OIDC_AUDIENCE',
+  'GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL',
+]);
+assert.equal(googlePackage.env_summary.values, undefined);
+assert.equal(googlePackage.handoff.final_gate, 'buildMeetingPlatformRolloutPlan');
+assert.equal(googlePackage.runbook.steps.some((item) => item.id === 'validate_rollout'), true);
+
+const googleSummary = buildMeetingPlatformEvidencePackageSummary(googlePackage);
+assert.equal(googleSummary.type, 'meeting_platform_evidence_package_summary');
+assert.equal(googleSummary.package_id, googlePackage.id);
+assert.equal(googleSummary.production_ready, true);
+assert.equal(googleSummary.provider_record_count, 2);
+assert.equal(googleSummary.meeting_app_record_count, 2);
+
+const zoomDomOnly = buildMeetingPlatformEvidencePackage({
+  platform: 'zoom',
+  baseUrl,
+  meetingAppRecordSet: meetingAppRecordSet('zoom'),
+  includeRunbook: false,
+});
+assert.equal(zoomDomOnly.rollout_plan.status, 'realtime_ready_provider_pending');
+assert.equal(zoomDomOnly.rollout_plan.ready_for_realtime_annotations, true);
+assert.equal(zoomDomOnly.rollout_plan.production_ready, false);
+assert.equal(zoomDomOnly.runbook, undefined);
+assert.equal(zoomDomOnly.evidence_summary.provider.record_count, 0);
+assert.equal(zoomDomOnly.evidence_summary.local_dom.record_count, 2);
+
+const builder = createMeetingPlatformEvidencePackageBuilder('webex', {
+  baseUrl,
+  env: {
+    WEBEX_WEBHOOK_SECRET: 'secret',
+  },
+  createdAtMs: capturedAtMs + 200_000,
+});
+builder.captureProviderWebhook({
+  method: 'POST',
+  url: `${baseUrl}/api/platform-events/webex`,
+  body: buildPlatformFixtureEvent('webex', 'meeting_start'),
+}, undefined, {
+  capturedAtMs,
+});
+builder.captureProviderWebhook({
+  method: 'POST',
+  url: `${baseUrl}/api/platform-events/webex`,
+  body: buildPlatformFixtureEvent('webex', 'meeting_end'),
+}, undefined, {
+  capturedAtMs: capturedAtMs + 120_000,
+});
+builder.addMeetingAppRecord({
+  phase: 'active',
+  capturedAtMs,
+  snapshot: buildMeetingAppFixtureSnapshot('webex', {
+    observedAtMs: capturedAtMs,
+    state: 'active',
+  }),
+});
+builder.addMeetingAppRecord({
+  phase: 'ended',
+  capturedAtMs: capturedAtMs + 120_000,
+  snapshot: buildMeetingAppFixtureSnapshot('webex', {
+    observedAtMs: capturedAtMs + 120_000,
+    state: 'prejoin',
+  }),
+});
+
+assert.equal(builder.getState().provider_record_count, 2);
+assert.equal(builder.getState().meeting_app_record_count, 2);
+const webexPackage = builder.exportPackage({ label: 'webex field evidence' });
+assert.equal(webexPackage.platform, 'webex');
+assert.equal(webexPackage.rollout_plan.production_ready, true);
+assert.equal(builder.summary().production_ready, true);
+
+const kit = createMeetingPlatformTimelineKit({ baseUrl, env: googleEnv, verify: false });
+const kitPackage = kit.platformEvidencePackage('google-meet', {
+  providerRecords: providerRecords('google-meet'),
+  meetingAppRecordSet: meetingAppRecordSet('google-meet'),
+});
+assert.equal(kitPackage.rollout_plan.production_ready, true);
+assert.equal(kit.platformEvidencePackageSummary(kitPackage).provider_record_count, 2);
+const kitBuilder = kit.platformEvidencePackageBuilder('google-meet');
+kitBuilder.addProviderRecord(providerRecords('google-meet')[0]);
+assert.equal(kitBuilder.getState().provider_record_count, 1);
+
+console.log('ok meeting platform evidence package');

@@ -31,6 +31,8 @@ assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-evidence-package.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-evidence-package.d.ts'), true);
 assert.equal(packedFiles.includes('README.md'), true);
 assert.equal(packedFiles.some((item) => item.startsWith('test/')), false);
 assert.equal(packedFiles.some((item) => item.startsWith('scripts/')), false);
@@ -66,6 +68,9 @@ import {
   buildMeetingPlatformRolloutPlan,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-rollout';
 import {
+  buildMeetingPlatformEvidencePackage,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package';
+import {
   normalizeGoogleMeetEvent,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/google-meet';
 import {
@@ -99,6 +104,16 @@ const runbook = buildMeetingPlatformAdaptationRunbook('webex', {
 });
 assert.equal(runbook.type, 'meeting_platform_adaptation_runbook');
 assert.equal(runbook.steps.some((item) => item.id === 'validate_rollout'), true);
+
+const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {
+  providerRecords: [],
+  meetingAppRecords: [],
+}, {
+  baseUrl: 'http://localhost:8787',
+  includeRunbook: false,
+});
+assert.equal(evidencePackage.schema, 'meeting_platform_evidence_package');
+assert.equal(evidencePackage.platform, 'google_meet');
 
 const gate = buildMeetingAppLaunchGate('google-meet', {
   allowFixtureEvidence: true,

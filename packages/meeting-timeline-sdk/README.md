@@ -125,6 +125,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-capture`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-gate`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-rollout`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-fetch`
@@ -1222,6 +1223,41 @@ const runbook = buildMeetingPlatformAdaptationRunbook('zoom', {
 // runbook.local_dom.required_snapshots 描述 active speaker / meeting ended 等必须采的真实页面状态。
 // runbook.provider_events.required_coverage 描述 provider webhook 至少要证明 meeting_start / meeting_end。
 // runbook.steps 可以直接渲染成接入向导或 CI checklist。
+```
+
+现场接入时，推荐把一次真实会议的本地 DOM 证据、provider webhook 证据和 rollout 判断打包成 `platform-evidence-package`。包默认只保存环境变量 key，不保存 secret value；provider 事件仍沿用 `platform-capture` 的 header 脱敏和 raw body 默认不保存策略：
+
+```js
+import { buildMeetingPlatformEvidencePackage } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package';
+
+const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {
+  providerRecords,
+  meetingAppRecordSet,
+}, {
+  baseUrl: 'https://timeline.example.com',
+  env: {
+    GOOGLE_PUBSUB_OIDC_AUDIENCE: 'https://timeline.example.com/api/platform-events/google-meet',
+  },
+});
+
+// evidencePackage.rollout_plan.status === 'production_ready' 才表示本地实时观察和 provider 回填都已验证。
+// evidencePackage.handoff 可直接交给另一个项目继续接入或复验。
+```
+
+如果采样过程在宿主里分步发生，可以用 builder 累积：
+
+```js
+import { createMeetingPlatformEvidencePackageBuilder } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package';
+
+const evidence = createMeetingPlatformEvidencePackageBuilder('zoom', {
+  baseUrl: 'https://timeline.example.com',
+});
+
+evidence.captureProviderWebhook(reqLikeObject);
+evidence.addMeetingAppRecord(activeSnapshotRecord);
+evidence.addMeetingAppRecord(endedSnapshotRecord);
+
+const handoff = evidence.exportPackage();
 ```
 
 ## Webhook 验证工具
