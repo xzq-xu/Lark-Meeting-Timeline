@@ -113,6 +113,12 @@ import {
   buildMeetingPlatformParticipantTrackPlan,
 } from './platform-participant-track.mjs';
 import {
+  buildMeetingPlatformTimelineView,
+  buildMeetingPlatformTimelineViewMatrix,
+  buildMeetingPlatformTimelineViewPlan,
+  zoomMeetingPlatformTimelineViewport,
+} from './platform-timeline-view.mjs';
+import {
   buildMeetingPlatformArtifactHandoff,
   buildMeetingPlatformArtifactHandoffMatrix,
   buildMeetingPlatformArtifactHandoffPlan,
@@ -341,6 +347,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_subscription_handoff_matrix: buildMeetingPlatformSubscriptionHandoffMatrix(options),
     platform_speaker_track_matrix: buildMeetingPlatformSpeakerTrackMatrix(options),
     platform_participant_track_matrix: buildMeetingPlatformParticipantTrackMatrix(options),
+    platform_timeline_view_matrix: buildMeetingPlatformTimelineViewMatrix(options),
     platform_artifact_handoff_matrix: buildMeetingPlatformArtifactHandoffMatrix(options),
     platform_runtime_profile_matrix: buildMeetingPlatformRuntimeProfileMatrix(options),
     platform_adapter_contract_matrix: buildMeetingPlatformAdapterContractMatrix(options),
@@ -584,6 +591,18 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformParticipantTrack(platform, input = {}, trackOptions = {}) {
       return buildMeetingPlatformParticipantTrack(platform, input, withDefaults(defaults, trackOptions));
+    },
+    platformTimelineViewPlan(platform, viewOptions = {}) {
+      return buildMeetingPlatformTimelineViewPlan(platform, withDefaults(defaults, viewOptions));
+    },
+    platformTimelineViewMatrix(viewOptions = {}) {
+      return buildMeetingPlatformTimelineViewMatrix(withDefaults(defaults, viewOptions));
+    },
+    platformTimelineView(platform, input = {}, viewOptions = {}) {
+      return buildMeetingPlatformTimelineView(platform, input, withDefaults(defaults, viewOptions));
+    },
+    zoomPlatformTimelineViewport(viewport = {}, factor = 1, anchorRatio = 0.5, viewOptions = {}) {
+      return zoomMeetingPlatformTimelineViewport(viewport, factor, anchorRatio, withDefaults(defaults, viewOptions));
     },
     platformArtifactHandoffPlan(platform, artifactOptions = {}) {
       return buildMeetingPlatformArtifactHandoffPlan(platform, withDefaults(defaults, artifactOptions));

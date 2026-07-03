@@ -134,6 +134,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-subscription-handoff`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-speaker-track`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-participant-track`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-timeline-view`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-artifact-handoff`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness`
@@ -1502,6 +1503,52 @@ npm run meeting-platform:participant-track -- \
   --input=data/meeting-platform-participant-input.json \
   --out-dir=data/meeting-platform-participant-tracks \
   --report-file=data/meeting-platform-participant-track-report.json
+```
+
+如果另一个项目需要直接渲染时间轴，优先用 `platform-timeline-view` 把会议轴、用户标注、speaker/participant/artifact/transcript 轨道合成 renderer-agnostic 数据包。它不输出 SVG/Canvas/HTML，只输出 rails、viewport、ticks、marker `x_ratio`、可见 marker 和未校准 marker：
+
+```js
+import {
+  buildMeetingPlatformTimelineView,
+  buildMeetingPlatformTimelineViewMatrix,
+  zoomMeetingPlatformTimelineViewport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-timeline-view';
+
+const matrix = buildMeetingPlatformTimelineViewMatrix({
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+// matrix.rows[*].provider_events_block_realtime === false
+// matrix.rows[*].transcript_blocks_realtime === false
+
+const view = buildMeetingPlatformTimelineView('google-meet', {
+  meeting: {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    start_time_ms: Date.now(),
+    duration_ms: 10 * 60 * 1000,
+  },
+  annotations: [{ id: 'note-1', label: 'why?', time_ms: 90_000 }],
+  speakerTrack: { marks: speakerTrack.marks },
+  participantTrack: { marks: participantTrack.marks },
+  artifactHandoff: { rows: artifactHandoff.rows },
+}, {
+  viewportStartMs: 60_000,
+  viewportDurationMs: 240_000,
+});
+
+// view.visible_markers[*].x_ratio 可直接映射到任意 UI 宽度。
+const zoomedViewport = zoomMeetingPlatformTimelineViewport(view.viewport, 2);
+```
+
+对应 CLI：
+
+```sh
+npm run meeting-platform:timeline-view -- \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --input=data/meeting-platform-timeline-view-input.json \
+  --out-dir=data/meeting-platform-timeline-views \
+  --report-file=data/meeting-platform-timeline-view-report.json
 ```
 
 ## 会后转写导入

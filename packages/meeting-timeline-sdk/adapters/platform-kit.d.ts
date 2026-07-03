@@ -78,6 +78,14 @@ import type {
   MeetingPlatformParticipantTrackPlan,
 } from './platform-participant-track.mjs';
 import type {
+  MeetingPlatformTimelineView,
+  MeetingPlatformTimelineViewInput,
+  MeetingPlatformTimelineViewMatrix,
+  MeetingPlatformTimelineViewOptions,
+  MeetingPlatformTimelineViewPlan,
+  MeetingPlatformTimelineViewport,
+} from './platform-timeline-view.mjs';
+import type {
   MeetingPlatformArtifactHandoff,
   MeetingPlatformArtifactHandoffInput,
   MeetingPlatformArtifactHandoffMatrix,
@@ -263,6 +271,19 @@ export interface MeetingPlatformTimelineKit {
     input?: MeetingPlatformParticipantTrackInput | Record<string, unknown>[],
     trackOptions?: MeetingPlatformParticipantTrackOptions,
   ): MeetingPlatformParticipantTrack;
+  platformTimelineViewPlan(platform: string, viewOptions?: MeetingPlatformTimelineViewOptions): MeetingPlatformTimelineViewPlan;
+  platformTimelineViewMatrix(viewOptions?: MeetingPlatformTimelineViewOptions): MeetingPlatformTimelineViewMatrix;
+  platformTimelineView(
+    platform: string,
+    input?: MeetingPlatformTimelineViewInput,
+    viewOptions?: MeetingPlatformTimelineViewOptions,
+  ): MeetingPlatformTimelineView;
+  zoomPlatformTimelineViewport(
+    viewport?: Partial<MeetingPlatformTimelineViewport>,
+    factor?: number,
+    anchorRatio?: number,
+    viewOptions?: MeetingPlatformTimelineViewOptions,
+  ): MeetingPlatformTimelineViewport;
   platformArtifactHandoffPlan(platform: string, artifactOptions?: MeetingPlatformArtifactHandoffOptions): MeetingPlatformArtifactHandoffPlan;
   platformArtifactHandoffMatrix(artifactOptions?: MeetingPlatformArtifactHandoffOptions): MeetingPlatformArtifactHandoffMatrix;
   platformArtifactHandoff(

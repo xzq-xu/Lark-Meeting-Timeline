@@ -49,6 +49,8 @@ assert.equal(packedFiles.includes('adapters/platform-speaker-track.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-speaker-track.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-participant-track.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-participant-track.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-timeline-view.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-timeline-view.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.mjs'), true);
@@ -146,6 +148,12 @@ import {
   buildMeetingPlatformParticipantTrackMatrix,
   buildMeetingPlatformParticipantTrackPlan,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-participant-track';
+import {
+  buildMeetingPlatformTimelineView,
+  buildMeetingPlatformTimelineViewMatrix,
+  buildMeetingPlatformTimelineViewPlan,
+  zoomMeetingPlatformTimelineViewport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-timeline-view';
 import {
   buildMeetingPlatformArtifactHandoff,
   buildMeetingPlatformArtifactHandoffMatrix,
@@ -259,6 +267,29 @@ assert.equal(kit.platformParticipantTrack('zoom', {
     },
   ],
 }).mark_count, 1);
+assert.equal(kit.platformTimelineViewPlan('zoom').schema, 'meeting_platform_timeline_view_plan');
+assert.equal(kit.platformTimelineViewMatrix({
+  platforms: ['zoom'],
+}).platform_count, 1);
+assert.equal(kit.platformTimelineView('zoom', {
+  meeting: {
+    platform: 'zoom',
+    meeting_id: '987654321',
+    start_time_ms: 1_782_614_400_000,
+  },
+  annotations: [
+    {
+      id: 'note-1',
+      label: 'why?',
+      captured_at_ms: 1_782_614_401_000,
+    },
+  ],
+}).diagnostics.marker_count, 1);
+assert.equal(kit.zoomPlatformTimelineViewport({
+  start_ms: 0,
+  duration_ms: 600_000,
+  full_duration_ms: 600_000,
+}, 2).duration_ms, 300_000);
 assert.equal(kit.platformArtifactHandoffPlan('zoom').schema, 'meeting_platform_artifact_handoff_plan');
 assert.equal(kit.platformArtifactHandoffMatrix({
   platforms: ['zoom'],
@@ -402,6 +433,29 @@ assert.equal(buildMeetingPlatformParticipantTrack('google-meet', {
     },
   ],
 }).marks[0].intent, 'participant_track');
+assert.equal(buildMeetingPlatformTimelineViewPlan('google-meet').output_contract.renderer_agnostic, true);
+assert.equal(buildMeetingPlatformTimelineViewMatrix({
+  platforms: ['google-meet'],
+}).provider_blocking_count, 0);
+assert.equal(buildMeetingPlatformTimelineView('google-meet', {
+  meeting: {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    start_time_ms: 1_782_614_400_000,
+  },
+  annotations: [
+    {
+      id: 'note-1',
+      label: 'why?',
+      captured_at_ms: 1_782_614_401_000,
+    },
+  ],
+}).markers[0].x_ratio, 0.001667);
+assert.equal(zoomMeetingPlatformTimelineViewport({
+  start_ms: 0,
+  duration_ms: 600_000,
+  full_duration_ms: 600_000,
+}, 2).duration_ms, 300_000);
 assert.equal(buildMeetingPlatformArtifactHandoffPlan('google-meet').transcript_blocks_realtime, false);
 assert.equal(buildMeetingPlatformArtifactHandoffMatrix({
   platforms: ['google-meet'],
