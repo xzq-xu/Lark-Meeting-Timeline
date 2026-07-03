@@ -207,6 +207,21 @@ const googleProfile = kit.platformRuntimeProfile('google-meet');
 // googleProfile.speaker_markers.filter 可直接传给 active-speaker observer。
 ```
 
+采真实 Google Meet / Teams / Zoom / Webex 样本时，用 `platform-field-capture` 生成采样清单。它面向现场工具，而不是最终验收：告诉采集器至少要采 active speaker DOM、meeting ended DOM、provider start/end 事件，以及这些数据最后应该导出到哪个 evidence package：
+
+```js
+import {
+  buildMeetingPlatformFieldCapturePlan,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-field-capture';
+
+const plan = buildMeetingPlatformFieldCapturePlan('zoom', {
+  baseUrl: 'https://timeline.example.com',
+});
+
+// plan.checklist 可直接渲染为采样 UI；plan.missing_items 表示当前 evidence package 还缺什么。
+// 如果传入 evidencePackage，SDK 会返回 production_ready / pilot_ready_provider_pending 等状态。
+```
+
 真实采样交接时，`platform-evidence-correlation` 会检查 provider 事件和本地 DOM 记录是否来自同一场会议。它优先用 meeting id / URL 匹配；没有共享 id 时会退到同平台时间窗口匹配。`verifyMeetingPlatformEvidencePackage()` 默认会要求 correlation 通过，避免把不同会议的 provider 样本和 DOM 样本混成一个 production-ready 包。
 
 业务项目如果要直接接入“会议中边写边标注”，优先用 `platform-live-adapter`。它把本地会议 App 观察、provider webhook 回填、实时标注插入和 evidence session 绑成一个对象；`observeMeetingApp()` 会同时尝试建轴并记录本地证据，`ingestProvider()` 会同时回填 provider 事件并记录 provider 证据，`insertAnnotation()` 会返回当前 live readiness：
