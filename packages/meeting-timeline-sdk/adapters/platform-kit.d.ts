@@ -107,6 +107,13 @@ import type {
   MeetingPlatformSessionBindingPlan,
 } from './platform-session-binding.mjs';
 import type {
+  MeetingPlatformRealtimeAnnotation,
+  MeetingPlatformRealtimeAnnotationInput,
+  MeetingPlatformRealtimeAnnotationMatrix,
+  MeetingPlatformRealtimeAnnotationOptions,
+  MeetingPlatformRealtimeAnnotationPlan,
+} from './platform-realtime-annotation.mjs';
+import type {
   MeetingPlatformArtifactHandoff,
   MeetingPlatformArtifactHandoffInput,
   MeetingPlatformArtifactHandoffMatrix,
@@ -326,6 +333,13 @@ export interface MeetingPlatformTimelineKit {
     input?: MeetingPlatformSessionBindingInput,
     bindingOptions?: MeetingPlatformSessionBindingOptions,
   ): MeetingPlatformSessionBinding;
+  platformRealtimeAnnotationPlan(platform: string, realtimeOptions?: MeetingPlatformRealtimeAnnotationOptions): MeetingPlatformRealtimeAnnotationPlan;
+  platformRealtimeAnnotationMatrix(realtimeOptions?: MeetingPlatformRealtimeAnnotationOptions): MeetingPlatformRealtimeAnnotationMatrix;
+  platformRealtimeAnnotation(
+    platform: string,
+    input?: MeetingPlatformRealtimeAnnotationInput,
+    realtimeOptions?: MeetingPlatformRealtimeAnnotationOptions,
+  ): MeetingPlatformRealtimeAnnotation;
   platformArtifactHandoffPlan(platform: string, artifactOptions?: MeetingPlatformArtifactHandoffOptions): MeetingPlatformArtifactHandoffPlan;
   platformArtifactHandoffMatrix(artifactOptions?: MeetingPlatformArtifactHandoffOptions): MeetingPlatformArtifactHandoffMatrix;
   platformArtifactHandoff(

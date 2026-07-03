@@ -138,6 +138,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-annotation-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-clock-sync`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-session-binding`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-realtime-annotation`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-artifact-handoff`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness`
@@ -1622,6 +1623,55 @@ npm run meeting-platform:session-binding -- \
   --input=data/meeting-platform-session-binding-input.json \
   --out-dir=data/meeting-platform-session-binding \
   --report-file=data/meeting-platform-session-binding-report.json
+```
+
+正式交给外部项目接入时，推荐直接用 `platform-realtime-annotation`，它把 `platform-clock-sync`、`platform-session-binding` 和 `platform-annotation-intake` 合成一条决策链。输入是一条设备标注、设备/服务端时钟同步样本、本地会议观察或 provider signal；输出是明确动作：`insert_mark`、`start_meeting_session + insert_mark`、`store_pending_mark`、`run_clock_sync_before_realtime_insert` 或冲突阻断。这样宿主项目不用复刻 demo 的“当前轴/待绑定/开轴/冲突/缺时间戳”分支。
+
+```js
+import {
+  buildMeetingPlatformRealtimeAnnotation,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-realtime-annotation';
+
+const decision = buildMeetingPlatformRealtimeAnnotation('google-meet', {
+  clock_sync: {
+    offset_ms: 12,
+    rtt_ms: 48,
+  },
+  current_meeting: {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    start_time_ms: meetingStartMs,
+  },
+  local_observer: {
+    url: 'https://meet.google.com/abc-defg-hij',
+    observed_at_ms: Date.now(),
+  },
+  annotation: {
+    id: 'mark-001',
+    label: 'why?',
+    captured_at_ms: deviceInkEndMs,
+    strokes: rawStrokes,
+  },
+});
+
+if (decision.actions.includes('start_meeting_session')) {
+  await timeline.startMeeting(decision.start_payload);
+}
+if (decision.actions.includes('insert_mark')) {
+  await timeline.insertMark(decision.insert_payload);
+}
+if (decision.actions.includes('store_pending_mark')) {
+  await pendingStore.put(decision.pending_payload);
+}
+```
+
+对应 CLI 可以批量导出多平台链路报告：
+
+```sh
+npm run meeting-platform:realtime-annotation -- \
+  --input=data/meeting-platform-realtime-annotation-input.json \
+  --out-dir=data/meeting-platform-realtime-annotation \
+  --report-file=data/meeting-platform-realtime-annotation-report.json
 ```
 
 如果下游项目只需要“把当前手写/标注插到会议时间轴上”，不要复制 demo 服务端里的条件判断，直接用 `platform-annotation-intake`。它不拉 provider、不等转写，只检查标注是否携带可靠 `captured_at_ms`，再根据当前会议轴状态给出动作：直接插入当前轴、先开一个 open session 再插入、进入 pending 等真实会议 start 回填，或者标记为缺时间戳/会后审计。

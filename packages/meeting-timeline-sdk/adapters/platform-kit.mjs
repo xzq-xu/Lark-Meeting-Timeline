@@ -134,6 +134,11 @@ import {
   buildMeetingPlatformSessionBindingPlan,
 } from './platform-session-binding.mjs';
 import {
+  buildMeetingPlatformRealtimeAnnotation,
+  buildMeetingPlatformRealtimeAnnotationMatrix,
+  buildMeetingPlatformRealtimeAnnotationPlan,
+} from './platform-realtime-annotation.mjs';
+import {
   buildMeetingPlatformArtifactHandoff,
   buildMeetingPlatformArtifactHandoffMatrix,
   buildMeetingPlatformArtifactHandoffPlan,
@@ -366,6 +371,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_annotation_intake_matrix: buildMeetingPlatformAnnotationIntakeMatrix(options),
     platform_clock_sync_matrix: buildMeetingPlatformClockSyncMatrix(options),
     platform_session_binding_matrix: buildMeetingPlatformSessionBindingMatrix(options),
+    platform_realtime_annotation_matrix: buildMeetingPlatformRealtimeAnnotationMatrix(options),
     platform_artifact_handoff_matrix: buildMeetingPlatformArtifactHandoffMatrix(options),
     platform_runtime_profile_matrix: buildMeetingPlatformRuntimeProfileMatrix(options),
     platform_adapter_contract_matrix: buildMeetingPlatformAdapterContractMatrix(options),
@@ -648,6 +654,15 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformSessionBinding(platform, input = {}, bindingOptions = {}) {
       return buildMeetingPlatformSessionBinding(platform, input, withDefaults(defaults, bindingOptions));
+    },
+    platformRealtimeAnnotationPlan(platform, realtimeOptions = {}) {
+      return buildMeetingPlatformRealtimeAnnotationPlan(platform, withDefaults(defaults, realtimeOptions));
+    },
+    platformRealtimeAnnotationMatrix(realtimeOptions = {}) {
+      return buildMeetingPlatformRealtimeAnnotationMatrix(withDefaults(defaults, realtimeOptions));
+    },
+    platformRealtimeAnnotation(platform, input = {}, realtimeOptions = {}) {
+      return buildMeetingPlatformRealtimeAnnotation(platform, input, withDefaults(defaults, realtimeOptions));
     },
     platformArtifactHandoffPlan(platform, artifactOptions = {}) {
       return buildMeetingPlatformArtifactHandoffPlan(platform, withDefaults(defaults, artifactOptions));

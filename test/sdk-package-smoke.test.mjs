@@ -57,6 +57,8 @@ assert.equal(packedFiles.includes('adapters/platform-clock-sync.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-clock-sync.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-session-binding.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-session-binding.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-realtime-annotation.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-realtime-annotation.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.mjs'), true);
@@ -175,6 +177,11 @@ import {
   buildMeetingPlatformSessionBindingMatrix,
   buildMeetingPlatformSessionBindingPlan,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-session-binding';
+import {
+  buildMeetingPlatformRealtimeAnnotation,
+  buildMeetingPlatformRealtimeAnnotationMatrix,
+  buildMeetingPlatformRealtimeAnnotationPlan,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-realtime-annotation';
 import {
   buildMeetingPlatformArtifactHandoff,
   buildMeetingPlatformArtifactHandoffMatrix,
@@ -347,6 +354,25 @@ assert.equal(kit.platformSessionBinding('zoom', {
     observed_at_ms: 1_782_614_400_000,
   },
 }).status, 'open_axis_from_local_observer');
+assert.equal(kit.platformRealtimeAnnotationPlan('zoom').schema, 'meeting_platform_realtime_annotation_plan');
+assert.equal(kit.platformRealtimeAnnotationMatrix({
+  platforms: ['zoom'],
+}).platform_count, 1);
+assert.equal(kit.platformRealtimeAnnotation('zoom', {
+  clock_sync: {
+    offset_ms: 0,
+    rtt_ms: 40,
+  },
+  local_observer: {
+    url: 'https://zoom.us/j/987654321',
+    observed_at_ms: 1_782_614_400_000,
+  },
+  annotation: {
+    id: 'note-realtime-smoke',
+    label: 'why?',
+    captured_at_ms: 1_782_614_402_000,
+  },
+}).status, 'start_axis_then_insert');
 assert.equal(kit.platformArtifactHandoffPlan('zoom').schema, 'meeting_platform_artifact_handoff_plan');
 assert.equal(kit.platformArtifactHandoffMatrix({
   platforms: ['zoom'],
@@ -552,6 +578,25 @@ assert.equal(buildMeetingPlatformSessionBinding('google-meet', {
     observed_at_ms: 1_782_614_400_000,
   },
 }).status, 'open_axis_from_local_observer');
+assert.equal(buildMeetingPlatformRealtimeAnnotationPlan('google-meet').pipeline.includes('clock_sync'), true);
+assert.equal(buildMeetingPlatformRealtimeAnnotationMatrix({
+  platforms: ['google-meet'],
+}).provider_blocking_count, 0);
+assert.equal(buildMeetingPlatformRealtimeAnnotation('google-meet', {
+  clock_sync: {
+    offset_ms: 0,
+    rtt_ms: 40,
+  },
+  local_observer: {
+    url: 'https://meet.google.com/abc-defg-hij',
+    observed_at_ms: 1_782_614_400_000,
+  },
+  annotation: {
+    id: 'note-realtime-direct',
+    label: 'why?',
+    captured_at_ms: 1_782_614_402_000,
+  },
+}).status, 'start_axis_then_insert');
 assert.equal(buildMeetingPlatformArtifactHandoffPlan('google-meet').transcript_blocks_realtime, false);
 assert.equal(buildMeetingPlatformArtifactHandoffMatrix({
   platforms: ['google-meet'],
