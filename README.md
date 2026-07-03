@@ -71,6 +71,12 @@ npm run meeting-platform:rollout-matrix
 如果别的项目已经交付了 SDK `platform-evidence-package`，把 JSON 放进 `data/meeting-platform-evidence-packages/` 后直接复验：
 
 ```bash
+npm run meeting-platform:live-readiness
+```
+
+它会写出 `data/meeting-platform-live-readiness-report.json`，把每个平台的 live adapter 方法、`captured_at_ms` 时间戳约束、provider/transcript 非阻塞策略和 evidence package 复验合成一个 CI/配置页可直接消费的 readiness matrix。默认按 production 验收；只看 pilot 能否实时落标注时用 `-- --require-production-ready=false`。
+
+```bash
 npm run meeting-platform:evidence-package
 ```
 
