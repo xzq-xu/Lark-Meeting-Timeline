@@ -1,4 +1,8 @@
 import { compactObject } from '../index.mjs';
+import {
+  MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS,
+  buildMeetingAppExtensionMatchPatterns,
+} from './meeting-app-extension.mjs';
 import { MEETING_APP_FIXTURE_PLATFORMS } from './meeting-app-fixtures.mjs';
 import { buildMeetingAppLiveSnapshotCapturePlan } from './meeting-app-profile.mjs';
 import {
@@ -17,6 +21,8 @@ export const MEETING_PLATFORM_FIELD_CAPTURE_PLAN_SCHEMA = 'meeting_platform_fiel
 export const MEETING_PLATFORM_FIELD_CAPTURE_MATRIX_SCHEMA = 'meeting_platform_field_capture_matrix';
 export const MEETING_PLATFORM_FIELD_CAPTURE_MANIFEST_SCHEMA = 'meeting_platform_field_capture_manifest';
 export const MEETING_PLATFORM_FIELD_CAPTURE_MANIFEST_MATRIX_SCHEMA = 'meeting_platform_field_capture_manifest_matrix';
+export const MEETING_PLATFORM_FIELD_COLLECTOR_CONFIG_SCHEMA = 'meeting_platform_field_collector_config';
+export const MEETING_PLATFORM_FIELD_COLLECTOR_CONFIG_MATRIX_SCHEMA = 'meeting_platform_field_collector_config_matrix';
 export const MEETING_PLATFORM_FIELD_EVIDENCE_BUNDLE_SCHEMA = 'meeting_platform_field_evidence_bundle';
 export const MEETING_PLATFORM_FIELD_EVIDENCE_MATRIX_SCHEMA = 'meeting_platform_field_evidence_matrix';
 export const MEETING_PLATFORM_FIELD_CAPTURE_SCHEMA_VERSION = 1;
@@ -321,6 +327,34 @@ function manifestCommands(platform, paths = {}, options = {}) {
   };
 }
 
+function endpointMap(options = {}) {
+  const baseUrl = firstNonEmpty(options.baseUrl, options.base_url);
+  const entries = Object.entries(MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS).map(([key, path]) => [
+    key,
+    baseUrl ? new URL(path, String(baseUrl)).toString() : path,
+  ]);
+  return Object.fromEntries(entries);
+}
+
+function extensionCollector(platform, options = {}) {
+  if (!MEETING_APP_FIXTURE_PLATFORMS.includes(platform)) return undefined;
+  const patterns = buildMeetingAppExtensionMatchPatterns([platform], {
+    js: firstNonEmpty(options.collectorScript, options.collector_script, options.contentScriptJs, options.content_script_js, 'meeting-app-field-collector.bundle.js'),
+    runAt: firstNonEmpty(options.runAt, options.run_at, 'document_idle'),
+    allFrames: firstNonEmpty(options.allFrames, options.all_frames, false),
+    extraMatches: options.extraMatches ?? options.extra_matches,
+    extraHostPermissions: options.extraHostPermissions ?? options.extra_host_permissions,
+  });
+  return {
+    type: 'browser_extension_or_webview_preload',
+    platforms: patterns.platforms,
+    matches: patterns.matches,
+    host_permissions: patterns.host_permissions,
+    content_scripts: patterns.content_scripts,
+    timeline_endpoints: endpointMap(options),
+  };
+}
+
 export function buildMeetingPlatformFieldCapturePlan(platform, options = {}) {
   const key = normalizeMeetingPlatform(platform);
   const runtime = buildMeetingPlatformRuntimeProfile(key, options);
@@ -527,6 +561,91 @@ export function buildMeetingPlatformFieldCaptureManifestMatrix(options = {}) {
     })),
     manifests,
     next_actions: unique(manifests.flatMap((manifest) => manifest.next_actions ?? [])),
+  };
+}
+
+export function buildMeetingPlatformFieldCollectorConfig(platform, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  const manifest = buildMeetingPlatformFieldCaptureManifest(key, options);
+  const extension = extensionCollector(key, options);
+  return compactObject({
+    type: 'meeting_platform_field_collector_config',
+    schema: MEETING_PLATFORM_FIELD_COLLECTOR_CONFIG_SCHEMA,
+    schema_version: MEETING_PLATFORM_FIELD_CAPTURE_SCHEMA_VERSION,
+    platform: key,
+    display_name: manifest.display_name,
+    mode: extension ? 'hybrid_browser_observer_and_provider_events' : 'provider_or_host_detector_only',
+    objective: 'runtime_configuration_for_real_meeting_field_capture_tools',
+    browser_observer: extension,
+    provider_observer: {
+      transport: manifest.provider_contract?.transport,
+      endpoint: manifest.provider_contract?.endpoint,
+      status_endpoint: manifest.provider_contract?.status_endpoint,
+      required_coverage: manifest.provider_contract?.required_coverage ?? [],
+      minimum_record_count: manifest.provider_contract?.minimum_record_count ?? 0,
+      start_events: manifest.provider_contract?.start_events ?? [],
+      end_events: manifest.provider_contract?.end_events ?? [],
+      participant_events: manifest.provider_contract?.participant_events ?? [],
+      artifact_events: manifest.provider_contract?.artifact_events ?? [],
+      lifecycle_events: manifest.provider_contract?.lifecycle_events ?? [],
+      security: manifest.provider_contract?.security,
+    },
+    local_snapshot_collector: manifest.local_observer_contract ? {
+      required_snapshots: manifest.local_observer_contract.required_snapshots ?? [],
+      minimum_record_count: manifest.local_observer_contract.minimum_record_count ?? 0,
+      recorder: manifest.local_observer_contract.recorder,
+      validation: manifest.local_observer_contract.validation,
+    } : undefined,
+    timeline_ingest: {
+      endpoints: endpointMap(options),
+      annotation_timestamp_field: manifest.runtime_contract?.annotation_timestamp_field,
+      realtime_annotation_policy: {
+        use_captured_at_ms: true,
+        do_not_wait_for_transcript: true,
+        provider_events_are_reconciliation_only: true,
+      },
+    },
+    storage: {
+      input_contract: manifest.input_contract,
+      files: manifest.file_contract?.files,
+      write_policy: manifest.file_contract?.write_policy,
+    },
+    acceptance: manifest.acceptance,
+    automation: manifest.automation,
+    manifest,
+    next_actions: manifest.next_actions ?? [],
+  });
+}
+
+export function buildMeetingPlatformFieldCollectorConfigMatrix(options = {}) {
+  const configs = selectedPlatforms(options).map((platform) => buildMeetingPlatformFieldCollectorConfig(platform, {
+    ...options,
+    platforms: undefined,
+    platform_keys: undefined,
+  }));
+  return {
+    type: 'meeting_platform_field_collector_config_matrix',
+    schema: MEETING_PLATFORM_FIELD_COLLECTOR_CONFIG_MATRIX_SCHEMA,
+    schema_version: MEETING_PLATFORM_FIELD_CAPTURE_SCHEMA_VERSION,
+    platform_count: configs.length,
+    browser_observer_count: configs.filter((config) => config.browser_observer).length,
+    production_ready_count: configs.filter((config) => config.acceptance?.current_missing_items?.length === 0 && config.manifest?.production_ready).length,
+    realtime_ready_count: configs.filter((config) => config.manifest?.ready_for_realtime_annotations).length,
+    platforms: configs.map((config) => config.platform),
+    rows: configs.map((config) => ({
+      platform: config.platform,
+      display_name: config.display_name,
+      mode: config.mode,
+      browser_matches: config.browser_observer?.matches ?? [],
+      provider_required_coverage: config.provider_observer?.required_coverage ?? [],
+      local_required_snapshots: config.local_snapshot_collector?.required_snapshots ?? [],
+      input_file: config.storage?.files?.field_evidence_input,
+      bundle_file: config.storage?.files?.field_evidence_bundle,
+      evidence_package_file: config.storage?.files?.evidence_package,
+      missing_items: config.acceptance?.current_missing_items ?? [],
+    })),
+    configs,
+    next_actions: unique(configs.flatMap((config) => config.next_actions ?? [])),
   };
 }
 

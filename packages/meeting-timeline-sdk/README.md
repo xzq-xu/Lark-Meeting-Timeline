@@ -259,6 +259,22 @@ const manifest = buildMeetingPlatformFieldCaptureManifest('teams', {
 // manifest.automation.commands.build_field_evidence 可直接交给 CI 或现场采样脚本执行。
 ```
 
+采样端运行时更适合读取 collector config。它在 manifest 基础上补了浏览器 URL match patterns、content script 配置、timeline ingest endpoint 和实时标注策略：
+
+```js
+import {
+  buildMeetingPlatformFieldCollectorConfig,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-field-capture';
+
+const collector = buildMeetingPlatformFieldCollectorConfig('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+});
+
+// collector.browser_observer.matches 可直接用于 Chrome extension / WebView preload 的白名单。
+// collector.timeline_ingest.endpoints.insertMark 是实时标注写入 endpoint。
+// collector.storage.files.field_evidence_input 是采样端应写入的 raw JSON 路径。
+```
+
 也可以直接导出每个平台一份 manifest 文件，给 Chrome 扩展、本地 host 或 provider recorder 读取：
 
 ```sh

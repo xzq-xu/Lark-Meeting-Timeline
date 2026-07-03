@@ -103,6 +103,8 @@ import {
 import {
   buildMeetingPlatformFieldCaptureManifest,
   buildMeetingPlatformFieldCaptureManifestMatrix,
+  buildMeetingPlatformFieldCollectorConfig,
+  buildMeetingPlatformFieldCollectorConfigMatrix,
   buildMeetingPlatformFieldEvidenceBundle,
   buildMeetingPlatformFieldEvidenceMatrix,
   buildMeetingPlatformFieldCaptureMatrix,
@@ -285,6 +287,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_runtime_profile_matrix: buildMeetingPlatformRuntimeProfileMatrix(options),
     platform_field_capture_matrix: buildMeetingPlatformFieldCaptureMatrix(options),
     platform_field_capture_manifest_matrix: buildMeetingPlatformFieldCaptureManifestMatrix(options),
+    platform_field_collector_config_matrix: buildMeetingPlatformFieldCollectorConfigMatrix(options),
   };
 }
 
@@ -507,6 +510,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformFieldCaptureManifestMatrix(manifestOptions = {}) {
       return buildMeetingPlatformFieldCaptureManifestMatrix(withDefaults(defaults, manifestOptions));
+    },
+    platformFieldCollectorConfig(platform, collectorOptions = {}) {
+      return buildMeetingPlatformFieldCollectorConfig(platform, withDefaults(defaults, collectorOptions));
+    },
+    platformFieldCollectorConfigMatrix(collectorOptions = {}) {
+      return buildMeetingPlatformFieldCollectorConfigMatrix(withDefaults(defaults, collectorOptions));
     },
     platformFieldEvidenceBundle(platform, input = {}, bundleOptions = {}) {
       return buildMeetingPlatformFieldEvidenceBundle(platform, input, withDefaults(defaults, bundleOptions));

@@ -66,6 +66,8 @@ import type {
 import type {
   MeetingPlatformFieldCaptureManifest,
   MeetingPlatformFieldCaptureManifestMatrix,
+  MeetingPlatformFieldCollectorConfig,
+  MeetingPlatformFieldCollectorConfigMatrix,
   MeetingPlatformFieldEvidenceBundle,
   MeetingPlatformFieldEvidenceMatrix,
   MeetingPlatformFieldCaptureMatrix,
@@ -193,6 +195,8 @@ export interface MeetingPlatformTimelineKit {
   platformFieldCaptureMatrix(captureOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCaptureMatrix;
   platformFieldCaptureManifest(platform: string, manifestOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCaptureManifest;
   platformFieldCaptureManifestMatrix(manifestOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCaptureManifestMatrix;
+  platformFieldCollectorConfig(platform: string, collectorOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCollectorConfig;
+  platformFieldCollectorConfigMatrix(collectorOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCollectorConfigMatrix;
   platformFieldEvidenceBundle(platform: string, input?: MeetingPlatformEvidencePackage | MeetingPlatformEvidencePackageOptions, bundleOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldEvidenceBundle;
   platformFieldEvidenceMatrix(matrixOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldEvidenceMatrix;
   meetingAppSnapshotRecorder(recorderOptions?: MeetingAppSnapshotRecordOptions): MeetingAppSnapshotRecorder;

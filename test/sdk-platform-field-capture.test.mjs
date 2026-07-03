@@ -9,6 +9,8 @@ import {
   MEETING_PLATFORM_FIELD_CAPTURE_PLAN_SCHEMA,
   buildMeetingPlatformFieldCaptureManifest,
   buildMeetingPlatformFieldCaptureManifestMatrix,
+  buildMeetingPlatformFieldCollectorConfig,
+  buildMeetingPlatformFieldCollectorConfigMatrix,
   buildMeetingPlatformFieldEvidenceBundle,
   buildMeetingPlatformFieldEvidenceMatrix,
   buildMeetingPlatformFieldCaptureMatrix,
@@ -173,6 +175,27 @@ assert.equal(manifestMatrix.production_ready_count, 1);
 assert.equal(manifestMatrix.realtime_ready_count, 2);
 assert.equal(manifestMatrix.rows.find((row) => row.platform === 'zoom').missing_items.includes('capture_real_provider_start_end_events'), true);
 
+const teamsCollector = buildMeetingPlatformFieldCollectorConfig('teams', { baseUrl });
+assert.equal(teamsCollector.schema, 'meeting_platform_field_collector_config');
+assert.equal(teamsCollector.platform, 'microsoft_teams');
+assert.equal(teamsCollector.mode, 'hybrid_browser_observer_and_provider_events');
+assert.equal(teamsCollector.browser_observer.matches.includes('https://teams.microsoft.com/*'), true);
+assert.equal(teamsCollector.timeline_ingest.endpoints.insertMark, `${baseUrl}/api/annotations`);
+assert.equal(teamsCollector.timeline_ingest.realtime_annotation_policy.do_not_wait_for_transcript, true);
+assert.equal(teamsCollector.storage.files.field_evidence_input.endsWith('/meeting-platform-field-evidence/microsoft_teams.json'), true);
+assert.equal(teamsCollector.local_snapshot_collector.required_snapshots.includes('active_speaker'), true);
+assert.equal(teamsCollector.provider_observer.required_coverage.includes('meeting_start'), true);
+
+const collectorMatrix = buildMeetingPlatformFieldCollectorConfigMatrix({
+  baseUrl,
+  platforms: ['google-meet', 'local-detector'],
+});
+assert.equal(collectorMatrix.schema, 'meeting_platform_field_collector_config_matrix');
+assert.equal(collectorMatrix.platform_count, 2);
+assert.equal(collectorMatrix.browser_observer_count, 1);
+assert.equal(collectorMatrix.rows.find((row) => row.platform === 'google_meet').browser_matches.includes('https://meet.google.com/*'), true);
+assert.deepEqual(collectorMatrix.rows.find((row) => row.platform === 'local_detector').browser_matches, []);
+
 const zoomDomOnlyBundle = buildMeetingPlatformFieldEvidenceBundle('zoom', {
   meetingAppRecordSet: meetingAppRecordSet('zoom'),
 }, { baseUrl });
@@ -235,6 +258,8 @@ assert.equal(kit.platformFieldCapturePlan('webex', { evidencePackage: webexPacka
 assert.equal(kit.platformFieldCaptureMatrix({ platforms: ['google-meet'] }).platform_count, 1);
 assert.equal(kit.platformFieldCaptureManifest('webex', { evidencePackage: webexPackage }).production_ready, true);
 assert.equal(kit.platformFieldCaptureManifestMatrix({ platforms: ['zoom'] }).platform_count, 1);
+assert.equal(kit.platformFieldCollectorConfig('teams').browser_observer.matches.includes('https://teams.microsoft.com/*'), true);
+assert.equal(kit.platformFieldCollectorConfigMatrix({ platforms: ['webex'] }).browser_observer_count, 1);
 assert.equal(kit.platformFieldEvidenceBundle('webex', {
   providerRecords: providerRecords('webex'),
   meetingAppRecordSet: meetingAppRecordSet('webex'),
@@ -251,5 +276,6 @@ assert.equal(kit.platformFieldEvidenceMatrix({
 const kitReport = kit.report({ platforms: ['webex'], evidencePackage: { webex: webexPackage } });
 assert.equal(kitReport.platform_field_capture_matrix.production_ready_count, 1);
 assert.equal(kitReport.platform_field_capture_manifest_matrix.production_ready_count, 1);
+assert.equal(kitReport.platform_field_collector_config_matrix.browser_observer_count, 1);
 
 console.log('ok meeting platform field capture');

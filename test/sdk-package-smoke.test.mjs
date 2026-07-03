@@ -116,6 +116,7 @@ import {
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection';
 import {
   buildMeetingPlatformFieldCaptureManifest,
+  buildMeetingPlatformFieldCollectorConfig,
   buildMeetingPlatformFieldEvidenceBundle,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-field-capture';
 import {
@@ -263,9 +264,13 @@ assert.equal(buildMeetingPlatformFieldCaptureManifest('google-meet', {
   baseUrl: 'http://localhost:8787',
   evidencePackage,
 }).schema, 'meeting_platform_field_capture_manifest');
+assert.equal(buildMeetingPlatformFieldCollectorConfig('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).browser_observer.matches.includes('https://meet.google.com/*'), true);
 assert.equal(kit.platformFieldCaptureManifest('google-meet', {
   evidencePackage,
 }).file_contract.files.evidence_package.endsWith('/google_meet.json'), true);
+assert.equal(kit.platformFieldCollectorConfig('google-meet').schema, 'meeting_platform_field_collector_config');
 assert.equal(kit.platformFieldEvidenceBundle('google-meet', evidencePackage, {
   requireProductionReady: false,
 }).field_capture_plan.schema, 'meeting_platform_field_capture_plan');
