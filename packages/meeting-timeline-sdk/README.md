@@ -259,6 +259,16 @@ const manifest = buildMeetingPlatformFieldCaptureManifest('teams', {
 // manifest.automation.commands.build_field_evidence 可直接交给 CI 或现场采样脚本执行。
 ```
 
+也可以直接导出每个平台一份 manifest 文件，给 Chrome 扩展、本地 host 或 provider recorder 读取：
+
+```sh
+npm run meeting-platform:field-manifest -- \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex \
+  --out-dir=data/meeting-platform-field-manifests \
+  --report-file=data/meeting-platform-field-manifest-report.json
+```
+
 对应 CLI 可直接把现场采样目录转换成 bundle 和 evidence package。目录里的 JSON 可以是原始采样输入、按平台分组的对象、已有 evidence package，或上一次导出的 bundle：
 
 ```sh
