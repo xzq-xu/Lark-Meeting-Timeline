@@ -126,6 +126,11 @@ import type {
   MeetingPlatformRuntimeProfileOptions,
 } from './platform-runtime-profile.mjs';
 import type {
+  MeetingPlatformAdaptationPackage,
+  MeetingPlatformAdaptationPackageMatrix,
+  MeetingPlatformAdaptationPackageOptions,
+} from './platform-adaptation-package.mjs';
+import type {
   MeetingPlatformAdapterContract,
   MeetingPlatformAdapterContractAcceptanceMatrix,
   MeetingPlatformAdapterContractAcceptanceReport,
@@ -349,6 +354,8 @@ export interface MeetingPlatformTimelineKit {
   ): MeetingPlatformArtifactHandoff;
   platformRuntimeProfile(platform: string, profileOptions?: MeetingPlatformRuntimeProfileOptions): MeetingPlatformRuntimeProfile;
   platformRuntimeProfileMatrix(profileOptions?: MeetingPlatformRuntimeProfileOptions): MeetingPlatformRuntimeProfileMatrix;
+  platformAdaptationPackage(platform: string, packageOptions?: MeetingPlatformAdaptationPackageOptions): MeetingPlatformAdaptationPackage;
+  platformAdaptationPackageMatrix(packageOptions?: MeetingPlatformAdaptationPackageOptions): MeetingPlatformAdaptationPackageMatrix;
   platformAdapterContract(platform: string, contractOptions?: MeetingPlatformAdapterContractOptions): MeetingPlatformAdapterContract;
   platformAdapterContractMatrix(contractOptions?: MeetingPlatformAdapterContractOptions): MeetingPlatformAdapterContractMatrix;
   platformAdapterContractAcceptance(

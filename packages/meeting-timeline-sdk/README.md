@@ -140,6 +140,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-session-binding`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-realtime-annotation`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-artifact-handoff`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-adaptation-package`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract`
@@ -364,6 +365,43 @@ npm run meeting-platform:adapter-contract -- \
 每个平台会生成一份 `{platform}.json`，例如 `google_meet.json`。其中 `annotations.endpoints` 给实时标注写入地址，`local_observer` 给浏览器扩展或 native host 的观察配置，`provider_observer` 给官方事件订阅/校准配置，`evidence.missing_items` 表示离 production-ready 还缺哪些真实会议样本。
 
 CLI 报告会同时输出 `acceptance`。默认 `--acceptance-target=contract` 只检查 contract 是否能被宿主项目安全接入；如果要把真实证据也纳入 gate，可以用 `--acceptance-target=production --fail-on-rejected=true`，此时缺真实 DOM / provider start-end 样本的平台会失败。
+
+如果宿主项目需要“直接接入包”而不是单独拼 contract、runtime profile、extension matches、provider setup 和 live readiness，用 `platform-adaptation-package`。它把 Google Meet / Teams / Zoom / Webex / Lark 的本地观察、provider 回填、实时标注、发言人 marker、会后转写、证据路径、SDK import 和命令行验收压成一个机器可读对象：
+
+```js
+import {
+  buildMeetingPlatformAdaptationPackage,
+  buildMeetingPlatformAdaptationPackageMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adaptation-package';
+
+const googlePackage = buildMeetingPlatformAdaptationPackage('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+});
+
+// googlePackage.extension.matches 可直接给浏览器扩展 / WebView preload。
+// googlePackage.annotation_pipeline.insert_endpoint 是设备端实时标注写入地址。
+// googlePackage.provider_observer.required_for_realtime === false。
+// googlePackage.transcript.blocks_realtime_annotation === false。
+
+const packageMatrix = buildMeetingPlatformAdaptationPackageMatrix({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+console.log(packageMatrix.rows);
+```
+
+`platform-kit` 也暴露同一层：`kit.platformAdaptationPackage('google-meet')` 和 `kit.platformAdaptationPackageMatrix()`。CLI 可直接导出每个平台的 package JSON：
+
+```sh
+npm run meeting-platform:adaptation-package -- \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --out-dir=data/meeting-platform-adaptation-packages \
+  --report-file=data/meeting-platform-adaptation-package-report.json
+```
+
+这份 package 的定位是“交给另一个项目开始接入”的 SDK 汇总，不替代真实会议采样；`readiness.sdk_wiring_ready=true` 只说明协议和 SDK 调用面可接，是否能 production 仍要看 evidence package / handoff readiness。
 
 也可以直接导出每个平台一份 manifest 文件，给 Chrome 扩展、本地 host 或 provider recorder 读取：
 

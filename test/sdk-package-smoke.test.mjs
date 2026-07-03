@@ -61,6 +61,8 @@ assert.equal(packedFiles.includes('adapters/platform-realtime-annotation.mjs'), 
 assert.equal(packedFiles.includes('adapters/platform-realtime-annotation.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adaptation-package.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adaptation-package.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-sample.mjs'), true);
@@ -187,6 +189,10 @@ import {
   buildMeetingPlatformArtifactHandoffMatrix,
   buildMeetingPlatformArtifactHandoffPlan,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-artifact-handoff';
+import {
+  buildMeetingPlatformAdaptationPackage,
+  buildMeetingPlatformAdaptationPackageMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adaptation-package';
 import {
   assertMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
@@ -388,6 +394,17 @@ assert.equal(kit.platformArtifactHandoff('zoom', {
     },
   ],
 }).fetch_request_count, 1);
+assert.equal(kit.platformAdaptationPackage('zoom').schema, 'meeting_platform_adaptation_package');
+assert.equal(kit.platformAdaptationPackageMatrix({
+  platforms: ['google-meet', 'zoom'],
+}).platform_count, 2);
+assert.equal(buildMeetingPlatformAdaptationPackage('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).extension.matches.includes('https://meet.google.com/*'), true);
+assert.equal(buildMeetingPlatformAdaptationPackageMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).rows[0].sdk_wiring_ready, true);
 
 const rollout = buildMeetingPlatformRolloutPlan('teams', {
   baseUrl: 'http://localhost:8787',
