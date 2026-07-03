@@ -6,15 +6,15 @@ import {
   buildMeetingAppLaunchGate,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-gate.mjs';
 import {
-  buildMeetingAppSnapshotRecordSet,
-  meetingAppSnapshotRecords,
-} from '../packages/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder.mjs';
+  boolLabel,
+  extractRecordSet,
+  parseCliArgs,
+  platformsFor,
+  summarizeGate,
+  unique,
+} from './meeting-app-evidence-utils.mjs';
 
-const args = new Map();
-for (const raw of process.argv.slice(2)) {
-  const [key, ...rest] = raw.replace(/^--/, '').split('=');
-  args.set(key, rest.length ? rest.join('=') : 'true');
-}
+const args = parseCliArgs();
 
 const inputFile = String(args.get('input') || args.get('file') || args.get('evidence') || '');
 const jsonOutput = args.get('json') === 'true';
@@ -22,71 +22,6 @@ const reportFile = String(args.get('report-file') || args.get('write-report') ||
 const allowFixtureEvidence = args.get('allow-fixture') === 'true' || args.get('allow-fixture-evidence') === 'true';
 const requireProductionReady = args.get('require-production-ready') !== 'false';
 const platformArg = String(args.get('platforms') || args.get('platform') || '').trim();
-
-function asArray(value) {
-  if (Array.isArray(value)) return value;
-  return value == null ? [] : [value];
-}
-
-function boolLabel(value) {
-  return value ? 'yes' : 'no';
-}
-
-function unique(values = []) {
-  return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
-}
-
-function extractRecordSet(input = {}) {
-  if (input?.schema === 'meeting_app_snapshot_record_set') return input;
-  if (input?.type === 'meeting_app_live_evidence_package' && input.record_set) return input.record_set;
-  if (input?.record_set) return input.record_set;
-  if (input?.recordSet) return input.recordSet;
-  if (input?.snapshot_records) return buildMeetingAppSnapshotRecordSet(input.snapshot_records, {
-    id: input.id,
-    label: input.label,
-    source: input.source,
-    createdAtMs: input.createdAtMs ?? input.created_at_ms,
-  });
-  if (input?.snapshotRecords) return buildMeetingAppSnapshotRecordSet(input.snapshotRecords, {
-    id: input.id,
-    label: input.label,
-    source: input.source,
-    createdAtMs: input.createdAtMs ?? input.created_at_ms,
-  });
-  if (input?.records) return buildMeetingAppSnapshotRecordSet(input.records, {
-    id: input.id,
-    label: input.label,
-    source: input.source,
-    createdAtMs: input.createdAtMs ?? input.created_at_ms,
-  });
-  if (Array.isArray(input)) return buildMeetingAppSnapshotRecordSet(input);
-  return buildMeetingAppSnapshotRecordSet([]);
-}
-
-function platformsFor(recordSet = {}, input = {}) {
-  if (platformArg) return unique(platformArg.split(',').map((item) => item.trim()));
-  return unique([
-    ...asArray(input.platforms),
-    ...asArray(input.platform),
-    ...asArray(recordSet.platforms),
-    ...meetingAppSnapshotRecords(recordSet).map((record) => record.platform ?? record.provider),
-  ]);
-}
-
-function summarizeGate(gate = {}) {
-  return {
-    platform: gate.platform,
-    status: gate.status,
-    passed: gate.passed,
-    production_ready: gate.production_ready,
-    evidence_level: gate.evidence_level,
-    evidence_count: gate.evidence_count,
-    missing_required_coverage: gate.missing_required_coverage ?? [],
-    blocking_issue_codes: (gate.blocking_issues ?? []).map((item) => item.code),
-    warning_codes: (gate.warnings ?? []).map((item) => item.code),
-    next_actions: gate.next_actions ?? [],
-  };
-}
 
 function buildSummary({ input, recordSet, platforms, gates }) {
   const rows = gates.map((gate) => summarizeGate(gate));
@@ -119,7 +54,7 @@ try {
   }
   const input = JSON.parse(await readFile(resolve(inputFile), 'utf8'));
   const recordSet = extractRecordSet(input);
-  const platforms = platformsFor(recordSet, input);
+  const platforms = platformsFor(recordSet, input, platformArg);
   if (platforms.length === 0) {
     throw new Error('No meeting app platform was found in evidence. Pass --platform=google-meet or include platform in captured records.');
   }

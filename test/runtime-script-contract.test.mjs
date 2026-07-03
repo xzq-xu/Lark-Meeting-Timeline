@@ -41,6 +41,7 @@ assert.equal(packageJson.scripts['device:roundtrip'], 'node scripts/device-round
 assert.equal(packageJson.scripts['meeting-app:extension'], 'node scripts/export-meeting-app-extension.mjs --out-dir=data/meeting-app-extension');
 assert.equal(packageJson.scripts['meeting-app:extension:build'], 'node scripts/export-meeting-app-extension.mjs --out-dir=data/meeting-app-extension --install=true --build=true');
 assert.equal(packageJson.scripts['meeting-app:evidence-gate'], 'node scripts/meeting-app-evidence-gate.mjs');
+assert.equal(packageJson.scripts['meeting-app:evidence-matrix'], 'node scripts/meeting-app-evidence-matrix.mjs --dir=data/meeting-app-evidence --report-file=data/meeting-app-evidence-matrix.json');
 
 assert.match(readme, /`npm run start` 会设置 `REAL_DEMO_AUTO_ARM=1`/);
 assert.match(readme, /默认不会自动写入验收标注、虚拟墨水屏标注或设备流标注/);
@@ -67,7 +68,10 @@ assert.match(readme, /npm run device:roundtrip/);
 assert.match(readme, /npm run meeting-app:extension/);
 assert.match(readme, /npm run meeting-app:extension:build/);
 assert.match(readme, /npm run meeting-app:evidence-gate/);
+assert.match(readme, /npm run meeting-app:evidence-matrix/);
 assert.match(readme, /data\/meeting-app-extension/);
+assert.match(readme, /data\/meeting-app-evidence/);
+assert.match(readme, /data\/meeting-app-evidence-matrix\.json/);
 assert.match(readme, /data\/meeting-app-live-gate-report\.json/);
 assert.match(readme, /window\.__meetingTimelineLiveCapture\.captureActive\(\)/);
 assert.match(readme, /点击“启动事件等待”或“启动验收探针”只启动等待\/验收窗口，不会创建会议轴/);

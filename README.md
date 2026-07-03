@@ -48,6 +48,14 @@ npm run meeting-app:evidence-gate -- --input=data/meeting-app-live-evidence.json
 
 这个 gate 默认不允许 fixture 兜底，并要求 `production_ready=true`；如果缺 active speaker、meeting ended 或平台识别，会在报告里给出 `missing_required_coverage` 和 `next_actions`。
 
+多平台推进时，把各平台的采样 JSON 放进 `data/meeting-app-evidence/`，再生成矩阵报告：
+
+```bash
+npm run meeting-app:evidence-matrix
+```
+
+矩阵会写出 `data/meeting-app-evidence-matrix.json`，汇总 Google Meet、Teams、Zoom、Webex、Lark 的 `production_ready` 状态和缺口，便于逐个平台收敛真实 DOM 适配。
+
 ## 启动
 
 ```bash

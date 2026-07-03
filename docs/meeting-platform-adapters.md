@@ -328,7 +328,7 @@ Teams SDK 可以让会议内 app/bot 接收 meetingStart、meetingEnd、particip
 1. **保留并强化 local detector path**
    - 宿主应用、桌面观察器、电子纸 companion app 发现“用户已经在会议中”时，直接调用本地 `startMeeting`。
    - 对 Google Meet / Teams / Zoom / Lark / Webex 的浏览器 DOM，浏览器扩展优先用 `adapters/meeting-app-browser-runtime`，其他宿主用 `adapters/meeting-app-runtime`；内部用 `meeting-app-monitor` 管理轮询和 keep-alive，用 `meeting-app-capture` 采集按钮、participant tile、ariaLabel 和音量/发言状态，再用 `meeting-apps` preset 归一化。
-   - 每个平台进入 P0 前都要跑真实 DOM 采样 gate：`npm run meeting-app:extension:build` 生成并构建扩展，在真实会议页保存 `window.__meetingTimelineLiveCapture.exportRecords()` 或 `evidencePackage()`，再用 `npm run meeting-app:evidence-gate -- --input=<evidence.json>` 验收。默认不允许 fixture 兜底，只有 `production_ready=true` 才算该平台的本地观察路径可交付。
+   - 每个平台进入 P0 前都要跑真实 DOM 采样 gate：`npm run meeting-app:extension:build` 生成并构建扩展，在真实会议页保存 `window.__meetingTimelineLiveCapture.exportRecords()` 或 `evidencePackage()`，再用 `npm run meeting-app:evidence-gate -- --input=<evidence.json>` 验收。默认不允许 fixture 兜底，只有 `production_ready=true` 才算该平台的本地观察路径可交付。多平台状态用 `npm run meeting-app:evidence-matrix` 汇总，逐项追踪 Google Meet / Teams / Zoom / Webex / Lark 的真实 DOM 缺口。
    - 对桌面 Accessibility 快照，直接交给 `adapters/meeting-apps` 或 `adapters/native-meeting`；它们负责识别 Leave/Join 按钮、participant tile、ariaLabel 和 active speaker。
    - 这是跨平台最低延迟、最低权限依赖的路径。
 
