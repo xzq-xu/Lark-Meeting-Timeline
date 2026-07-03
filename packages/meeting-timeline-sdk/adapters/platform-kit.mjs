@@ -101,6 +101,8 @@ import {
   buildMeetingPlatformRuntimeProfileMatrix,
 } from './platform-runtime-profile.mjs';
 import {
+  buildMeetingPlatformFieldEvidenceBundle,
+  buildMeetingPlatformFieldEvidenceMatrix,
   buildMeetingPlatformFieldCaptureMatrix,
   buildMeetingPlatformFieldCapturePlan,
 } from './platform-field-capture.mjs';
@@ -496,6 +498,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformFieldCaptureMatrix(captureOptions = {}) {
       return buildMeetingPlatformFieldCaptureMatrix(withDefaults(defaults, captureOptions));
+    },
+    platformFieldEvidenceBundle(platform, input = {}, bundleOptions = {}) {
+      return buildMeetingPlatformFieldEvidenceBundle(platform, input, withDefaults(defaults, bundleOptions));
+    },
+    platformFieldEvidenceMatrix(matrixOptions = {}) {
+      return buildMeetingPlatformFieldEvidenceMatrix(withDefaults(defaults, matrixOptions));
     },
     meetingAppSnapshotRecorder(recorderOptions = {}) {
       return createMeetingAppSnapshotRecorder(withDefaults(defaults, recorderOptions));

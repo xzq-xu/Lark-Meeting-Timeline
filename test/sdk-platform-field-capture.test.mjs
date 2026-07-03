@@ -4,7 +4,10 @@ import { buildMeetingAppFixtureSnapshot } from '../packages/meeting-timeline-sdk
 import { buildMeetingAppSnapshotRecordSet } from '../packages/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder.mjs';
 import { capturePlatformWebhookEvent } from '../packages/meeting-timeline-sdk/adapters/platform-capture.mjs';
 import {
+  MEETING_PLATFORM_FIELD_EVIDENCE_BUNDLE_SCHEMA,
   MEETING_PLATFORM_FIELD_CAPTURE_PLAN_SCHEMA,
+  buildMeetingPlatformFieldEvidenceBundle,
+  buildMeetingPlatformFieldEvidenceMatrix,
   buildMeetingPlatformFieldCaptureMatrix,
   buildMeetingPlatformFieldCapturePlan,
 } from '../packages/meeting-timeline-sdk/adapters/platform-field-capture.mjs';
@@ -132,6 +135,58 @@ assert.equal(matrix.rows.find((row) => row.platform === 'webex').status, 'produc
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').status, 'pilot_ready_provider_pending');
 assert.equal(matrix.missing_item_count > 0, true);
 
+const zoomDomOnlyBundle = buildMeetingPlatformFieldEvidenceBundle('zoom', {
+  meetingAppRecordSet: meetingAppRecordSet('zoom'),
+}, { baseUrl });
+assert.equal(zoomDomOnlyBundle.schema, MEETING_PLATFORM_FIELD_EVIDENCE_BUNDLE_SCHEMA);
+assert.equal(zoomDomOnlyBundle.platform, 'zoom');
+assert.equal(zoomDomOnlyBundle.status, 'pilot_ready_provider_pending');
+assert.equal(zoomDomOnlyBundle.ready_for_realtime_annotations, true);
+assert.equal(zoomDomOnlyBundle.production_ready, false);
+assert.equal(zoomDomOnlyBundle.verification.passed, false);
+assert.equal(zoomDomOnlyBundle.evidence_package.schema, 'meeting_platform_evidence_package');
+assert.equal(zoomDomOnlyBundle.evidence_summary.meeting_app_record_count, 2);
+assert.equal(zoomDomOnlyBundle.field_capture_plan.missing_items.includes('capture_real_provider_start_end_events'), true);
+
+const webexBundle = buildMeetingPlatformFieldEvidenceBundle('webex', {
+  providerRecords: providerRecords('webex'),
+  meetingAppRecordSet: meetingAppRecordSet('webex'),
+}, {
+  baseUrl,
+  env: {
+    WEBEX_WEBHOOK_SECRET: 'secret',
+  },
+});
+assert.equal(webexBundle.status, 'production_ready');
+assert.equal(webexBundle.production_ready, true);
+assert.equal(webexBundle.verification.passed, true);
+assert.equal(webexBundle.evidence_summary.provider_record_count, 2);
+assert.equal(webexBundle.evidence_summary.meeting_app_record_count, 2);
+assert.deepEqual(webexBundle.next_actions, ['ship_with_monitoring_and_keep_collecting_regression_evidence']);
+
+const evidenceMatrix = buildMeetingPlatformFieldEvidenceMatrix({
+  baseUrl,
+  platforms: ['zoom', 'webex'],
+  inputs: {
+    zoom: {
+      meetingAppRecordSet: meetingAppRecordSet('zoom'),
+    },
+    webex: {
+      providerRecords: providerRecords('webex'),
+      meetingAppRecordSet: meetingAppRecordSet('webex'),
+    },
+  },
+  env: {
+    WEBEX_WEBHOOK_SECRET: 'secret',
+  },
+});
+assert.equal(evidenceMatrix.schema, 'meeting_platform_field_evidence_matrix');
+assert.equal(evidenceMatrix.platform_count, 2);
+assert.equal(evidenceMatrix.production_ready_count, 1);
+assert.equal(evidenceMatrix.realtime_ready_count, 2);
+assert.equal(evidenceMatrix.verified_count, 1);
+assert.equal(evidenceMatrix.rows.find((row) => row.platform === 'webex').verified, true);
+
 const kit = createMeetingPlatformTimelineKit({
   baseUrl,
   env: {
@@ -140,6 +195,19 @@ const kit = createMeetingPlatformTimelineKit({
 });
 assert.equal(kit.platformFieldCapturePlan('webex', { evidencePackage: webexPackage }).production_ready, true);
 assert.equal(kit.platformFieldCaptureMatrix({ platforms: ['google-meet'] }).platform_count, 1);
+assert.equal(kit.platformFieldEvidenceBundle('webex', {
+  providerRecords: providerRecords('webex'),
+  meetingAppRecordSet: meetingAppRecordSet('webex'),
+}).production_ready, true);
+assert.equal(kit.platformFieldEvidenceMatrix({
+  platforms: ['webex'],
+  inputs: {
+    webex: {
+      providerRecords: providerRecords('webex'),
+      meetingAppRecordSet: meetingAppRecordSet('webex'),
+    },
+  },
+}).verified_count, 1);
 assert.equal(kit.report({ platforms: ['webex'], evidencePackage: { webex: webexPackage } }).platform_field_capture_matrix.production_ready_count, 1);
 
 console.log('ok meeting platform field capture');

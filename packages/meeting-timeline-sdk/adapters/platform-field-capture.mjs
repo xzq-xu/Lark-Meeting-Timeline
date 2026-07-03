@@ -2,7 +2,9 @@ import { compactObject } from '../index.mjs';
 import { MEETING_APP_FIXTURE_PLATFORMS } from './meeting-app-fixtures.mjs';
 import { buildMeetingAppLiveSnapshotCapturePlan } from './meeting-app-profile.mjs';
 import {
+  buildMeetingPlatformEvidencePackage,
   buildMeetingPlatformEvidencePackageSummary,
+  verifyMeetingPlatformEvidencePackage,
 } from './platform-evidence-package.mjs';
 import { buildMeetingPlatformProviderConnectionPack } from './platform-provider-connection.mjs';
 import {
@@ -13,6 +15,8 @@ import { buildMeetingPlatformRuntimeProfile } from './platform-runtime-profile.m
 
 export const MEETING_PLATFORM_FIELD_CAPTURE_PLAN_SCHEMA = 'meeting_platform_field_capture_plan';
 export const MEETING_PLATFORM_FIELD_CAPTURE_MATRIX_SCHEMA = 'meeting_platform_field_capture_matrix';
+export const MEETING_PLATFORM_FIELD_EVIDENCE_BUNDLE_SCHEMA = 'meeting_platform_field_evidence_bundle';
+export const MEETING_PLATFORM_FIELD_EVIDENCE_MATRIX_SCHEMA = 'meeting_platform_field_evidence_matrix';
 export const MEETING_PLATFORM_FIELD_CAPTURE_SCHEMA_VERSION = 1;
 
 function firstNonEmpty(...values) {
@@ -64,6 +68,60 @@ function selectedEvidencePackage(platform, options = {}) {
     }
   }
   return undefined;
+}
+
+function selectedFieldEvidenceInput(platform, options = {}) {
+  const input = firstNonEmpty(
+    options.fieldEvidence,
+    options.field_evidence,
+    options.fieldCaptureEvidence,
+    options.field_capture_evidence,
+    options.evidenceInput,
+    options.evidence_input,
+    options.inputs,
+    options.input,
+    options.evidence,
+  );
+  if (!input) return {};
+  if (Array.isArray(input)) {
+    return input.find((item) => matchesPlatform(item?.platform ?? item?.rollout_plan?.platform, platform)) ?? {};
+  }
+  if (input.schema === 'meeting_platform_evidence_package' || input.providerRecords || input.provider_records || input.meetingAppRecordSet || input.meeting_app_record_set) {
+    return matchesPlatform(input.platform ?? input.rollout_plan?.platform, platform) ? input : {};
+  }
+  if (typeof input === 'object') {
+    for (const [key, value] of Object.entries(input)) {
+      if (matchesPlatform(key, platform)) return value ?? {};
+    }
+  }
+  return {};
+}
+
+function evidencePackageFromFieldInput(platform, input = {}, options = {}) {
+  if (input?.schema === 'meeting_platform_evidence_package') return input;
+  const nestedPackage = firstNonEmpty(
+    input?.evidencePackage,
+    input?.evidence_package,
+    input?.platformEvidencePackage,
+    input?.platform_evidence_package,
+    options.evidencePackage,
+    options.evidence_package,
+    options.platformEvidencePackage,
+    options.platform_evidence_package,
+  );
+  const selected = selectedEvidencePackage(platform, { evidencePackage: nestedPackage });
+  if (selected) return selected;
+  return buildMeetingPlatformEvidencePackage(platform, input, {
+    ...options,
+    includeRunbook: firstNonEmpty(
+      options.includeRunbook,
+      options.include_runbook,
+      input?.includeRunbook,
+      input?.include_runbook,
+      false,
+    ),
+    source: firstNonEmpty(options.source, input?.source, 'meeting_platform_field_evidence_bundle'),
+  });
 }
 
 function outputPaths(platform, options = {}) {
@@ -282,5 +340,94 @@ export function buildMeetingPlatformFieldCaptureMatrix(options = {}) {
     })),
     plans,
     next_actions: unique(plans.flatMap((plan) => plan.next_actions ?? [])),
+  };
+}
+
+export function buildMeetingPlatformFieldEvidenceBundle(platform, input = {}, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  const evidencePackage = evidencePackageFromFieldInput(key, input, options);
+  const fieldCapturePlan = buildMeetingPlatformFieldCapturePlan(key, {
+    ...options,
+    evidencePackage,
+  });
+  const verification = verifyMeetingPlatformEvidencePackage(evidencePackage, {
+    ...options,
+    requireProductionReady: firstNonEmpty(options.requireProductionReady, options.require_production_ready, true),
+    requireCorrelation: firstNonEmpty(options.requireCorrelation, options.require_correlation, true),
+  });
+  const summary = buildMeetingPlatformEvidencePackageSummary(evidencePackage, options);
+  return compactObject({
+    type: 'meeting_platform_field_evidence_bundle',
+    schema: MEETING_PLATFORM_FIELD_EVIDENCE_BUNDLE_SCHEMA,
+    schema_version: MEETING_PLATFORM_FIELD_CAPTURE_SCHEMA_VERSION,
+    platform: key,
+    status: fieldCapturePlan.status,
+    production_ready: fieldCapturePlan.production_ready,
+    ready_for_realtime_annotations: fieldCapturePlan.ready_for_realtime_annotations,
+    package_id: evidencePackage.id,
+    evidence_package: evidencePackage,
+    evidence_summary: summary,
+    verification,
+    field_capture_plan: fieldCapturePlan,
+    handoff: {
+      package_schema: 'meeting_platform_evidence_package',
+      field_capture_schema: MEETING_PLATFORM_FIELD_CAPTURE_PLAN_SCHEMA,
+      build_method: 'buildMeetingPlatformFieldEvidenceBundle(platform, input, options)',
+      package_method: 'buildMeetingPlatformEvidencePackage(platform, input, options)',
+      verify_method: 'verifyMeetingPlatformEvidencePackage(evidencePackage)',
+      production_condition: 'field_capture_plan.production_ready === true && verification.passed === true',
+      pilot_condition: 'field_capture_plan.ready_for_realtime_annotations === true',
+    },
+    next_actions: fieldCapturePlan.production_ready && verification.passed
+      ? ['ship_with_monitoring_and_keep_collecting_regression_evidence']
+      : unique([
+        ...(fieldCapturePlan.next_actions ?? []),
+        ...(verification.next_actions ?? []),
+      ]),
+  });
+}
+
+export function buildMeetingPlatformFieldEvidenceMatrix(options = {}) {
+  const bundles = selectedPlatforms(options).map((platform) => buildMeetingPlatformFieldEvidenceBundle(
+    platform,
+    selectedFieldEvidenceInput(platform, options),
+    {
+      ...options,
+      platforms: undefined,
+      platform_keys: undefined,
+      input: undefined,
+      inputs: undefined,
+      evidence: undefined,
+      evidenceInput: undefined,
+      evidence_input: undefined,
+      fieldEvidence: undefined,
+      field_evidence: undefined,
+      fieldCaptureEvidence: undefined,
+      field_capture_evidence: undefined,
+    },
+  ));
+  return {
+    type: 'meeting_platform_field_evidence_matrix',
+    schema: MEETING_PLATFORM_FIELD_EVIDENCE_MATRIX_SCHEMA,
+    schema_version: MEETING_PLATFORM_FIELD_CAPTURE_SCHEMA_VERSION,
+    platform_count: bundles.length,
+    production_ready_count: bundles.filter((bundle) => bundle.production_ready).length,
+    realtime_ready_count: bundles.filter((bundle) => bundle.ready_for_realtime_annotations).length,
+    verified_count: bundles.filter((bundle) => bundle.verification?.passed).length,
+    missing_item_count: bundles.reduce((total, bundle) => total + (bundle.field_capture_plan?.missing_items?.length ?? 0), 0),
+    platforms: bundles.map((bundle) => bundle.platform),
+    rows: bundles.map((bundle) => ({
+      platform: bundle.platform,
+      status: bundle.status,
+      production_ready: bundle.production_ready,
+      ready_for_realtime_annotations: bundle.ready_for_realtime_annotations,
+      verified: bundle.verification?.passed,
+      package_id: bundle.package_id,
+      provider_record_count: bundle.evidence_summary?.provider_record_count ?? 0,
+      meeting_app_record_count: bundle.evidence_summary?.meeting_app_record_count ?? 0,
+      missing_items: bundle.field_capture_plan?.missing_items ?? [],
+    })),
+    bundles,
+    next_actions: unique(bundles.flatMap((bundle) => bundle.next_actions ?? [])),
   };
 }

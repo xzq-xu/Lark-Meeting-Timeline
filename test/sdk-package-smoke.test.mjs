@@ -115,6 +115,9 @@ import {
   buildMeetingPlatformProviderConnectionPack,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection';
 import {
+  buildMeetingPlatformFieldEvidenceBundle,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-field-capture';
+import {
   normalizeGoogleMeetEvent,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/google-meet';
 import {
@@ -251,6 +254,13 @@ assert.equal(verifyMeetingPlatformEvidencePackage(evidencePackage, {
   baseUrl: 'http://localhost:8787',
   requireProductionReady: false,
 }).type, 'meeting_platform_evidence_package_verification');
+assert.equal(buildMeetingPlatformFieldEvidenceBundle('google-meet', evidencePackage, {
+  baseUrl: 'http://localhost:8787',
+  requireProductionReady: false,
+}).schema, 'meeting_platform_field_evidence_bundle');
+assert.equal(kit.platformFieldEvidenceBundle('google-meet', evidencePackage, {
+  requireProductionReady: false,
+}).field_capture_plan.schema, 'meeting_platform_field_capture_plan');
 
 const gate = buildMeetingAppLaunchGate('google-meet', {
   allowFixtureEvidence: true,

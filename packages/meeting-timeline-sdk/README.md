@@ -222,6 +222,27 @@ const plan = buildMeetingPlatformFieldCapturePlan('zoom', {
 // 如果传入 evidencePackage，SDK 会返回 production_ready / pilot_ready_provider_pending 等状态。
 ```
 
+如果现场采样工具已经拿到了 DOM snapshot、provider webhook 记录或 provider sample，可以直接用一站式 bundle 把原始采样输入转换成可复验的 evidence package，并同步得到采样缺口：
+
+```js
+import {
+  buildMeetingPlatformFieldEvidenceBundle,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-field-capture';
+
+const bundle = buildMeetingPlatformFieldEvidenceBundle('google-meet', {
+  meetingAppRecordSet,
+  providerRecords,
+}, {
+  baseUrl: 'https://timeline.example.com',
+});
+
+// bundle.evidence_package 可落盘交给 CI 或下游项目。
+// bundle.field_capture_plan.missing_items 表示还缺哪些真实会议样本。
+// bundle.verification.passed 表示是否已经达到 production-ready 验收。
+```
+
+在宿主项目里也可以通过 `kit.platformFieldEvidenceBundle()` 和 `kit.platformFieldEvidenceMatrix()` 调用同一套逻辑，用于批量比较 Google Meet / Teams / Zoom / Webex 的真实采样进度。
+
 对应 CLI 可以直接放到现场采样工具或 CI：
 
 ```sh
