@@ -60,10 +60,13 @@ import {
   createMeetingAppSnapshotRecorder,
 } from './meeting-app-snapshot-recorder.mjs';
 import {
+  assertMeetingAppRuntimeAdapterConfig,
   buildAllMeetingAppIntegrationProfiles,
+  buildAllMeetingAppRuntimeAdapterAcceptanceReports,
   buildAllMeetingAppRuntimeAdapterConfigs,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
+  buildMeetingAppRuntimeAdapterAcceptanceReport,
   buildMeetingAppRuntimeAdapterConfig,
 } from './meeting-app-profile.mjs';
 import {
@@ -187,6 +190,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_extension_acceptance: buildMeetingAppExtensionScaffoldAcceptanceReport(options),
     meeting_app_integration_matrix: buildMeetingAppIntegrationMatrix(options),
     meeting_app_runtime_adapter_configs: buildAllMeetingAppRuntimeAdapterConfigs(options),
+    meeting_app_runtime_adapter_acceptance: buildAllMeetingAppRuntimeAdapterAcceptanceReports(options),
     meeting_app_fixture_acceptance: meetingAppFixtureAcceptance,
     meeting_app_launch_gate: meetingAppLaunchGateSummary,
   };
@@ -298,6 +302,15 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     allMeetingAppRuntimeAdapterConfigs(configOptions = {}) {
       return buildAllMeetingAppRuntimeAdapterConfigs(withDefaults(defaults, configOptions));
+    },
+    allMeetingAppRuntimeAdapterAcceptanceReports(acceptanceOptions = {}) {
+      return buildAllMeetingAppRuntimeAdapterAcceptanceReports(withDefaults(defaults, acceptanceOptions));
+    },
+    meetingAppRuntimeAdapterAcceptance(configOrPlatform = {}, acceptanceOptions = {}) {
+      return buildMeetingAppRuntimeAdapterAcceptanceReport(configOrPlatform, withDefaults(defaults, acceptanceOptions));
+    },
+    assertMeetingAppRuntimeAdapterConfig(configOrPlatform = {}, acceptanceOptions = {}) {
+      return assertMeetingAppRuntimeAdapterConfig(configOrPlatform, withDefaults(defaults, acceptanceOptions));
     },
     meetingAppExtensionInstallPlan(extensionOptions = {}) {
       return buildMeetingAppExtensionInstallPlan(withDefaults(defaults, extensionOptions));

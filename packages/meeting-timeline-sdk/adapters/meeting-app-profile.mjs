@@ -35,6 +35,15 @@ function uniqueList(values = []) {
   return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
 }
 
+function issue(severity, code, message, details = {}) {
+  return compactObject({
+    severity,
+    code,
+    message,
+    ...details,
+  });
+}
+
 function normalizeAppPlatform(platform) {
   const key = normalizeMeetingPlatform(platform);
   if (!MEETING_APP_INTEGRATION_PROFILE_PLATFORMS.includes(key)) {
@@ -130,6 +139,11 @@ function bridgeOptions(platform, options = {}) {
     startRuntime: firstNonEmpty(options.startRuntime, options.start_runtime, true),
     start_runtime: firstNonEmpty(options.startRuntime, options.start_runtime, true),
   });
+}
+
+function runtimeConfigFromInput(configOrPlatform = {}, options = {}) {
+  if (configOrPlatform?.type === 'meeting_app_runtime_adapter_config') return configOrPlatform;
+  return buildMeetingAppRuntimeAdapterConfig(configOrPlatform, options);
 }
 
 function launchGateOptions(options = {}) {
@@ -354,6 +368,133 @@ export function buildAllMeetingAppRuntimeAdapterConfigs(options = {}) {
   return Object.fromEntries(platformList(options).map((platform) => [
     platform,
     buildMeetingAppRuntimeAdapterConfig(platform, options),
+  ]));
+}
+
+export function buildMeetingAppRuntimeAdapterAcceptanceReport(configOrPlatform = {}, options = {}) {
+  const config = runtimeConfigFromInput(configOrPlatform, options);
+  const issues = [];
+  let platform;
+  try {
+    platform = normalizeAppPlatform(config.platform);
+  } catch (error) {
+    issues.push(issue('error', 'unsupported_platform', 'Runtime adapter config platform is unsupported.', {
+      platform: config.platform,
+      error: String(error?.message ?? error),
+    }));
+  }
+  if (config.type !== 'meeting_app_runtime_adapter_config') {
+    issues.push(issue('error', 'invalid_type', 'Runtime adapter config type must be meeting_app_runtime_adapter_config.', {
+      actual: config.type,
+    }));
+  }
+  if (config.schema !== MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA) {
+    issues.push(issue('error', 'invalid_schema', 'Runtime adapter config schema is invalid.', {
+      actual: config.schema,
+      expected: MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
+    }));
+  }
+  if (asArray(config.extension?.host_permissions).includes('<all_urls>')) {
+    issues.push(issue('error', 'overbroad_host_permission', 'Runtime adapter config must not request <all_urls>.'));
+  }
+  if (asArray(config.extension?.matches).length === 0) {
+    issues.push(issue('error', 'missing_extension_matches', 'Runtime adapter config is missing extension match patterns.'));
+  }
+  if (!asArray(config.extension?.permissions).includes('storage')) {
+    issues.push(issue('error', 'missing_storage_permission', 'Runtime adapter config must request storage for extension diagnostics.'));
+  }
+  if (config.extension?.message_types?.client_call !== MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call) {
+    issues.push(issue('error', 'missing_client_call_message_type', 'Runtime adapter config is missing the client_call message type.'));
+  }
+  if (config.extension?.message_types?.extension_attached !== MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached) {
+    issues.push(issue('error', 'missing_attached_message_type', 'Runtime adapter config is missing the extension_attached message type.'));
+  }
+  if (config.extension?.status_storage_key !== MEETING_APP_EXTENSION_STATUS_STORAGE_KEY) {
+    issues.push(issue('error', 'invalid_status_storage_key', 'Runtime adapter config has an unexpected status storage key.', {
+      actual: config.extension?.status_storage_key,
+    }));
+  }
+  for (const method of Object.keys(MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS)) {
+    if (!asArray(config.supported_client_methods).includes(method)) {
+      issues.push(issue('error', 'missing_supported_client_method', `Runtime adapter config is missing ${method}.`, {
+        method,
+      }));
+    }
+  }
+  if (platform && config.bridge_options?.browser_runtime_preset !== platform) {
+    issues.push(issue('error', 'bridge_preset_mismatch', 'Bridge runtime preset must match the config platform.', {
+      platform,
+      actual: config.bridge_options?.browser_runtime_preset,
+    }));
+  }
+  if (platform && config.runtime_options?.runtimePreset !== platform) {
+    issues.push(issue('error', 'runtime_preset_mismatch', 'Runtime preset must match the config platform.', {
+      platform,
+      actual: config.runtime_options?.runtimePreset,
+    }));
+  }
+  if (platform && config.capture_options?.captureProfile !== platform) {
+    issues.push(issue('error', 'capture_profile_mismatch', 'Capture profile must match the config platform.', {
+      platform,
+      actual: config.capture_options?.captureProfile,
+    }));
+  }
+  if (config.runtime_options?.observeMutations !== true) {
+    issues.push(issue('error', 'mutation_observer_disabled', 'Runtime adapter config must enable mutation observation.'));
+  }
+  if (asArray(config.runtime_options?.mutationTrackSelectors).length === 0) {
+    issues.push(issue('error', 'missing_mutation_track_selectors', 'Runtime adapter config has no mutation track selectors.'));
+  }
+  if (asArray(config.runtime_options?.mutationIgnoreSelectors).length === 0) {
+    issues.push(issue('error', 'missing_mutation_ignore_selectors', 'Runtime adapter config has no mutation ignore selectors.'));
+  }
+  if (asArray(config.capture_options?.participantSelectors).length === 0) {
+    issues.push(issue('error', 'missing_participant_selectors', 'Runtime adapter config has no participant selectors.'));
+  }
+  if (config.startup?.attached_message_type !== MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached) {
+    issues.push(issue('error', 'invalid_attached_startup_message', 'Startup attached message type is invalid.', {
+      actual: config.startup?.attached_message_type,
+    }));
+  }
+  if (config.readiness?.requires_live_snapshot_before_production !== true) {
+    issues.push(issue('warning', 'missing_live_snapshot_requirement', 'Runtime adapter config should require live snapshot validation before production.'));
+  }
+
+  const accepted = issues.every((item) => item.severity !== 'error');
+  return {
+    type: 'meeting_app_runtime_adapter_acceptance_report',
+    schema: MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    accepted,
+    platform: config.platform,
+    config,
+    coverage: {
+      extension_matches: asArray(config.extension?.matches).length > 0,
+      storage_permission: asArray(config.extension?.permissions).includes('storage'),
+      message_types: Boolean(config.extension?.message_types?.client_call && config.extension?.message_types?.extension_attached),
+      bridge_preset: platform ? config.bridge_options?.browser_runtime_preset === platform : false,
+      runtime_preset: platform ? config.runtime_options?.runtimePreset === platform : false,
+      capture_profile: platform ? config.capture_options?.captureProfile === platform : false,
+      mutation_observer: config.runtime_options?.observeMutations === true,
+      mutation_selectors: asArray(config.runtime_options?.mutationTrackSelectors).length > 0,
+      participant_selectors: asArray(config.capture_options?.participantSelectors).length > 0,
+    },
+    issues,
+  };
+}
+
+export function assertMeetingAppRuntimeAdapterConfig(configOrPlatform = {}, options = {}) {
+  const report = buildMeetingAppRuntimeAdapterAcceptanceReport(configOrPlatform, options);
+  if (!report.accepted) {
+    throw new MeetingTimelineSdkError('Meeting app runtime adapter config acceptance failed', report);
+  }
+  return report;
+}
+
+export function buildAllMeetingAppRuntimeAdapterAcceptanceReports(options = {}) {
+  return Object.fromEntries(platformList(options).map((platform) => [
+    platform,
+    buildMeetingAppRuntimeAdapterAcceptanceReport(platform, options),
   ]));
 }
 

@@ -5,10 +5,13 @@ import {
   MEETING_APP_INTEGRATION_PROFILE_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
   buildAllMeetingAppIntegrationProfiles,
+  buildAllMeetingAppRuntimeAdapterAcceptanceReports,
   buildAllMeetingAppRuntimeAdapterConfigs,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
+  buildMeetingAppRuntimeAdapterAcceptanceReport,
   buildMeetingAppRuntimeAdapterConfig,
+  assertMeetingAppRuntimeAdapterConfig,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-profile.mjs';
 
 assert.deepEqual(MEETING_APP_INTEGRATION_PROFILE_PLATFORMS, [
@@ -64,6 +67,27 @@ assert.equal(googleRuntimeConfig.capture_options.participantSelectors.length > 0
 assert.equal(googleRuntimeConfig.startup.attached_message_type, 'meeting_timeline.extension_attached');
 assert.equal(googleRuntimeConfig.supported_client_methods.includes('insertMark'), true);
 assert.equal(googleRuntimeConfig.readiness.runtime_ready, true);
+const googleRuntimeAcceptance = buildMeetingAppRuntimeAdapterAcceptanceReport(googleRuntimeConfig);
+assert.equal(googleRuntimeAcceptance.type, 'meeting_app_runtime_adapter_acceptance_report');
+assert.equal(googleRuntimeAcceptance.accepted, true);
+assert.equal(googleRuntimeAcceptance.coverage.bridge_preset, true);
+assert.equal(googleRuntimeAcceptance.coverage.participant_selectors, true);
+assert.equal(assertMeetingAppRuntimeAdapterConfig(googleRuntimeConfig).accepted, true);
+
+const unsafeRuntimeConfig = {
+  ...googleRuntimeConfig,
+  extension: {
+    ...googleRuntimeConfig.extension,
+    host_permissions: ['<all_urls>'],
+  },
+};
+const unsafeAcceptance = buildMeetingAppRuntimeAdapterAcceptanceReport(unsafeRuntimeConfig);
+assert.equal(unsafeAcceptance.accepted, false);
+assert.equal(unsafeAcceptance.issues.some((item) => item.code === 'overbroad_host_permission'), true);
+assert.throws(
+  () => assertMeetingAppRuntimeAdapterConfig(unsafeRuntimeConfig),
+  /Meeting app runtime adapter config acceptance failed/,
+);
 
 const stoppedRuntimeConfig = buildMeetingAppRuntimeAdapterConfig('google-meet', {
   startRuntime: false,
@@ -95,6 +119,13 @@ const selectedRuntimeConfigs = buildAllMeetingAppRuntimeAdapterConfigs({
 assert.deepEqual(Object.keys(selectedRuntimeConfigs), ['zoom', 'webex']);
 assert.equal(selectedRuntimeConfigs.zoom.bridge_options.browser_runtime_preset, 'zoom');
 assert.equal(selectedRuntimeConfigs.webex.extension.matches.includes('https://*.webex.com/*'), true);
+
+const selectedRuntimeAcceptance = buildAllMeetingAppRuntimeAdapterAcceptanceReports({
+  platforms: ['zoom', 'webex'],
+});
+assert.deepEqual(Object.keys(selectedRuntimeAcceptance), ['zoom', 'webex']);
+assert.equal(selectedRuntimeAcceptance.zoom.accepted, true);
+assert.equal(selectedRuntimeAcceptance.webex.coverage.storage_permission, true);
 
 const matrix = buildMeetingAppIntegrationMatrix({
   baseUrl: 'https://timeline.example.com',

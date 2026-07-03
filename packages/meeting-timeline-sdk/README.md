@@ -498,6 +498,10 @@ const runtimeConfig = meetingKit.meetingAppRuntimeAdapterConfig('google-meet');
 // runtimeConfig 可以交给浏览器 extension content script、Electron WebView preload 或桌面宿主：
 // 它包含 bridge_options、runtime_options、capture_options、extension host 权限和 message_types。
 
+const runtimeAcceptance = meetingKit.meetingAppRuntimeAdapterAcceptance(runtimeConfig);
+// runtimeAcceptance.accepted === true 表示配置的 host 权限、消息协议、runtime preset、capture selectors
+// 和 startup 字段满足 SDK 运行前置条件；生产前仍需用真实会议 DOM 快照通过 launch gate。
+
 const extensionPlan = meetingKit.meetingAppExtensionInstallPlan({
   platforms: ['google-meet', 'microsoft-teams'],
   js: ['meeting-app-content-script.bundle.js'],
