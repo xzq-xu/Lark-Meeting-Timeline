@@ -45,6 +45,8 @@ assert.equal(packedFiles.includes('adapters/platform-provider-connection.mjs'), 
 assert.equal(packedFiles.includes('adapters/platform-provider-connection.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-sample.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-sample.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.d.ts'), true);
 assert.equal(packedFiles.includes('README.md'), true);
@@ -123,6 +125,11 @@ import {
   buildMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract';
+import {
+  buildMeetingPlatformAdapterSamplePlan,
+  runMeetingPlatformAdapterSample,
+  runMeetingPlatformAdapterSampleMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-sample';
 import {
   buildMeetingPlatformFieldCaptureManifest,
   buildMeetingPlatformFieldCollectorConfig,
@@ -268,6 +275,16 @@ assert.equal(buildMeetingPlatformAdapterContractAcceptanceMatrix({
 assert.equal(assertMeetingPlatformAdapterContract('zoom', {
   baseUrl: 'http://localhost:8787',
 }).accepted, true);
+assert.equal(buildMeetingPlatformAdapterSamplePlan('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).platform, 'google_meet');
+assert.equal((await runMeetingPlatformAdapterSample('zoom', {
+  baseUrl: 'http://localhost:8787',
+})).accepted, true);
+assert.equal((await runMeetingPlatformAdapterSampleMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['webex'],
+})).accepted_count, 1);
 
 const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {
   providerRecords: [],

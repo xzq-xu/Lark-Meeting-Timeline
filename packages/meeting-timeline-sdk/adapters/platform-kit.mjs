@@ -108,6 +108,13 @@ import {
   buildMeetingPlatformAdapterContractMatrix,
 } from './platform-adapter-contract.mjs';
 import {
+  assertMeetingPlatformAdapterSample,
+  assertMeetingPlatformAdapterSampleMatrix,
+  buildMeetingPlatformAdapterSamplePlan,
+  runMeetingPlatformAdapterSample,
+  runMeetingPlatformAdapterSampleMatrix,
+} from './platform-adapter-sample.mjs';
+import {
   buildMeetingPlatformFieldCaptureManifest,
   buildMeetingPlatformFieldCaptureManifestMatrix,
   buildMeetingPlatformFieldCollectorConfig,
@@ -522,6 +529,21 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertPlatformAdapterContract(contractOrPlatform, acceptanceOptions = {}) {
       return assertMeetingPlatformAdapterContract(contractOrPlatform, withDefaults(defaults, acceptanceOptions));
+    },
+    platformAdapterSamplePlan(platform, sampleOptions = {}) {
+      return buildMeetingPlatformAdapterSamplePlan(platform, withDefaults(defaults, sampleOptions));
+    },
+    runPlatformAdapterSample(platform, sampleOptions = {}) {
+      return runMeetingPlatformAdapterSample(platform, withDefaults(defaults, sampleOptions));
+    },
+    runPlatformAdapterSampleMatrix(sampleOptions = {}) {
+      return runMeetingPlatformAdapterSampleMatrix(withDefaults(defaults, sampleOptions));
+    },
+    assertPlatformAdapterSample(sampleOrPlatform, sampleOptions = {}) {
+      return assertMeetingPlatformAdapterSample(sampleOrPlatform, withDefaults(defaults, sampleOptions));
+    },
+    assertPlatformAdapterSampleMatrix(sampleOptions = {}) {
+      return assertMeetingPlatformAdapterSampleMatrix(withDefaults(defaults, sampleOptions));
     },
     platformFieldCapturePlan(platform, captureOptions = {}) {
       return buildMeetingPlatformFieldCapturePlan(platform, withDefaults(defaults, captureOptions));

@@ -71,6 +71,12 @@ import type {
   MeetingPlatformAdapterContractOptions,
 } from './platform-adapter-contract.mjs';
 import type {
+  MeetingPlatformAdapterSample,
+  MeetingPlatformAdapterSampleMatrix,
+  MeetingPlatformAdapterSampleOptions,
+  MeetingPlatformAdapterSamplePlan,
+} from './platform-adapter-sample.mjs';
+import type {
   MeetingPlatformFieldCaptureManifest,
   MeetingPlatformFieldCaptureManifestMatrix,
   MeetingPlatformFieldCollectorConfig,
@@ -209,6 +215,14 @@ export interface MeetingPlatformTimelineKit {
     contractOrPlatform: string | MeetingPlatformAdapterContract,
     acceptanceOptions?: MeetingPlatformAdapterContractOptions,
   ): MeetingPlatformAdapterContractAcceptanceReport;
+  platformAdapterSamplePlan(platform: string, sampleOptions?: MeetingPlatformAdapterSampleOptions): MeetingPlatformAdapterSamplePlan;
+  runPlatformAdapterSample(platform: string, sampleOptions?: MeetingPlatformAdapterSampleOptions): Promise<MeetingPlatformAdapterSample>;
+  runPlatformAdapterSampleMatrix(sampleOptions?: MeetingPlatformAdapterSampleOptions): Promise<MeetingPlatformAdapterSampleMatrix>;
+  assertPlatformAdapterSample(
+    sampleOrPlatform: string | MeetingPlatformAdapterSample,
+    sampleOptions?: MeetingPlatformAdapterSampleOptions,
+  ): Promise<MeetingPlatformAdapterSample>;
+  assertPlatformAdapterSampleMatrix(sampleOptions?: MeetingPlatformAdapterSampleOptions): Promise<MeetingPlatformAdapterSampleMatrix>;
   platformFieldCapturePlan(platform: string, captureOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCapturePlan;
   platformFieldCaptureMatrix(captureOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCaptureMatrix;
   platformFieldCaptureManifest(platform: string, manifestOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCaptureManifest;
