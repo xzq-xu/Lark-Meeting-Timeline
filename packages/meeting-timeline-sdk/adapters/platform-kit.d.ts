@@ -33,7 +33,10 @@ import type {
 } from './platform-evidence-session.mjs';
 import type {
   MeetingPlatformLiveAdapter,
+  MeetingPlatformLiveAdapterMatrix,
   MeetingPlatformLiveAdapterOptions,
+  MeetingPlatformLiveAdapterPlan,
+  MeetingPlatformLiveAdapterSuite,
 } from './platform-live-adapter.mjs';
 import type {
   MeetingPlatformAdaptationStrategy,
@@ -133,6 +136,9 @@ export interface MeetingPlatformTimelineKit {
   platformEvidenceCorrelation(platform: string, input?: MeetingPlatformEvidenceCorrelationInput, correlationOptions?: MeetingPlatformEvidenceCorrelationOptions): MeetingPlatformEvidenceCorrelation;
   platformEvidenceSession(platform: string, sessionOptions?: MeetingPlatformEvidenceSessionOptions): MeetingPlatformEvidenceSession;
   platformLiveAdapter(platform: string, adapterOptions?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapter;
+  platformLiveAdapterPlan(platform: string, planOptions?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapterPlan;
+  platformLiveAdapterMatrix(matrixOptions?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapterMatrix;
+  platformLiveAdapterSuite(suiteOptions?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapterSuite;
   meetingAppSnapshotRecorder(recorderOptions?: MeetingAppSnapshotRecordOptions): MeetingAppSnapshotRecorder;
   meetingAppGateInputFromRecords(records?: MeetingAppSnapshotRecord[] | MeetingAppSnapshotRecordSet, recordOptions?: MeetingAppSnapshotRecordOptions): Record<string, unknown>;
   meetingAppIntegrationProfile(platform: string, profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppIntegrationProfile;

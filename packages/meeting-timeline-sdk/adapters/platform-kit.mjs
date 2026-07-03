@@ -70,7 +70,10 @@ import {
   createMeetingPlatformEvidenceSession,
 } from './platform-evidence-session.mjs';
 import {
+  buildMeetingPlatformLiveAdapterMatrix,
+  buildMeetingPlatformLiveAdapterPlan,
   createMeetingPlatformLiveAdapter,
+  createMeetingPlatformLiveAdapterSuite,
 } from './platform-live-adapter.mjs';
 import {
   buildAllMeetingPlatformAdaptationStrategies,
@@ -245,6 +248,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_rollout: buildMeetingPlatformRolloutSummary(options),
     platform_adaptation_runbook: buildMeetingPlatformAdaptationRunbookSummary(options),
     platform_adaptation_strategy: buildMeetingPlatformAdaptationStrategyMatrix(options),
+    platform_live_adapter_matrix: buildMeetingPlatformLiveAdapterMatrix(options),
   };
 }
 
@@ -392,6 +396,15 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformLiveAdapter(platform, adapterOptions = {}) {
       return createMeetingPlatformLiveAdapter(platform, bridge.client, withDefaults(defaults, adapterOptions));
+    },
+    platformLiveAdapterPlan(platform, planOptions = {}) {
+      return buildMeetingPlatformLiveAdapterPlan(platform, withDefaults(defaults, planOptions));
+    },
+    platformLiveAdapterMatrix(matrixOptions = {}) {
+      return buildMeetingPlatformLiveAdapterMatrix(withDefaults(defaults, matrixOptions));
+    },
+    platformLiveAdapterSuite(suiteOptions = {}) {
+      return createMeetingPlatformLiveAdapterSuite(bridge.client, withDefaults(defaults, suiteOptions));
     },
     meetingAppSnapshotRecorder(recorderOptions = {}) {
       return createMeetingAppSnapshotRecorder(withDefaults(defaults, recorderOptions));

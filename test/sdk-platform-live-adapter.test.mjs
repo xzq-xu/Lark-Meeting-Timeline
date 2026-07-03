@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 
 import { buildMeetingAppFixtureSnapshot } from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
 import { buildPlatformFixtureEvent } from '../packages/meeting-timeline-sdk/adapters/platform-fixtures.mjs';
-import { createMeetingPlatformLiveAdapter } from '../packages/meeting-timeline-sdk/adapters/platform-live-adapter.mjs';
+import {
+  buildMeetingPlatformLiveAdapterMatrix,
+  buildMeetingPlatformLiveAdapterPlan,
+  createMeetingPlatformLiveAdapter,
+  createMeetingPlatformLiveAdapterSuite,
+} from '../packages/meeting-timeline-sdk/adapters/platform-live-adapter.mjs';
 import { createMeetingPlatformTimelineKit } from '../packages/meeting-timeline-sdk/adapters/platform-kit.mjs';
 
 const baseUrl = 'https://timeline.example.com';
@@ -44,6 +49,38 @@ const adapter = createMeetingPlatformLiveAdapter('google-meet', client, {
 
 assert.equal(adapter.platform, 'google_meet');
 assert.equal(adapter.summary().can_insert_realtime_marks, false);
+
+const googlePlan = buildMeetingPlatformLiveAdapterPlan('google-meet', {
+  baseUrl,
+  env: googleEnv,
+});
+assert.equal(googlePlan.schema, 'meeting_platform_live_adapter_plan');
+assert.equal(googlePlan.platform, 'google_meet');
+assert.equal(googlePlan.live_adapter.factory, 'createMeetingPlatformLiveAdapter');
+assert.equal(googlePlan.realtime_axis.provider_events_block_realtime, false);
+assert.equal(googlePlan.live_adapter.realtime_methods.includes('insertAnnotation'), true);
+
+const liveMatrix = buildMeetingPlatformLiveAdapterMatrix({
+  baseUrl,
+  env: googleEnv,
+  platforms: ['google-meet', 'zoom', 'teams'],
+});
+assert.equal(liveMatrix.schema, 'meeting_platform_live_adapter_matrix');
+assert.deepEqual(liveMatrix.platforms, ['google_meet', 'zoom', 'microsoft_teams']);
+assert.equal(liveMatrix.rows.every((row) => row.provider_blocks_realtime === false), true);
+assert.equal(liveMatrix.rows.every((row) => row.transcript_blocks_realtime === false), true);
+
+const suite = createMeetingPlatformLiveAdapterSuite(client, {
+  baseUrl,
+  env: googleEnv,
+  platforms: ['google-meet', 'zoom'],
+});
+assert.deepEqual(suite.platforms, ['google_meet', 'zoom']);
+assert.equal(suite.plan('google-meet').platform, 'google_meet');
+assert.equal(suite.matrix().platform_count, 2);
+assert.equal(suite.summary().platform_count, 2);
+assert.equal(suite.adapter('google-meet'), suite.adapter('google-meet'));
+assert.equal(suite.adapters().zoom.platform, 'zoom');
 
 const activeSnapshot = buildMeetingAppFixtureSnapshot('google-meet', {
   state: 'active',
@@ -127,6 +164,9 @@ const zoomAdapter = kit.platformLiveAdapter('zoom', {
 });
 assert.equal(zoomAdapter.platform, 'zoom');
 assert.equal(zoomAdapter.summary().platform, 'zoom');
+assert.equal(kit.platformLiveAdapterPlan('zoom').platform, 'zoom');
+assert.equal(kit.platformLiveAdapterMatrix({ platforms: ['google-meet'] }).rows[0].platform, 'google_meet');
+assert.equal(kit.platformLiveAdapterSuite({ platforms: ['zoom'] }).summary().platform_count, 1);
 
 assert.equal(adapter.reset().evidence.removed.meeting_app_records, 2);
 assert.equal(adapter.summary().package_ready_for_handoff, false);

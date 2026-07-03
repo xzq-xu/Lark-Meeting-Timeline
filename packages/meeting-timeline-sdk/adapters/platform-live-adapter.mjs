@@ -1,13 +1,30 @@
 import { compactObject } from '../index.mjs';
 import { createMeetingSourceAggregator } from './meeting-source.mjs';
 import { createMeetingPlatformEvidenceSession } from './platform-evidence-session.mjs';
-import { normalizeMeetingPlatform } from './platform-setup.mjs';
+import {
+  MEETING_PLATFORM_KEYS,
+  buildPlatformIntegrationPlan,
+  normalizeMeetingPlatform,
+} from './platform-setup.mjs';
+import { buildMeetingPlatformAdaptationStrategy } from './platform-strategy.mjs';
 
 export const MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA = 'meeting_platform_live_adapter';
 export const MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA_VERSION = 1;
+export const MEETING_PLATFORM_LIVE_ADAPTER_PLAN_SCHEMA = 'meeting_platform_live_adapter_plan';
+export const MEETING_PLATFORM_LIVE_ADAPTER_MATRIX_SCHEMA = 'meeting_platform_live_adapter_matrix';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
+}
+
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value !== 'string' && typeof value[Symbol.iterator] === 'function') return Array.from(value);
+  return value == null ? [] : [value];
+}
+
+function uniqueList(values = []) {
+  return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
 }
 
 function isTimelineClient(value) {
@@ -76,6 +93,82 @@ function operationWithEvidence(action, result, evidenceSession, options = {}) {
     live_evidence: evidenceSession.summary(options.evidenceOptions ?? options.evidence_options ?? {}),
     evidence_state: evidenceSession.getState(),
   });
+}
+
+function selectedPlatforms(options = {}) {
+  return asArray(firstNonEmpty(options.platforms, options.platform_keys, MEETING_PLATFORM_KEYS));
+}
+
+export function buildMeetingPlatformLiveAdapterPlan(platform, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  const integration = buildPlatformIntegrationPlan(key, options);
+  const strategy = buildMeetingPlatformAdaptationStrategy(key, options);
+  return compactObject({
+    schema: MEETING_PLATFORM_LIVE_ADAPTER_PLAN_SCHEMA,
+    schema_version: MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA_VERSION,
+    type: 'meeting_platform_live_adapter_plan',
+    platform: key,
+    display_name: strategy.display_name ?? integration.display_name,
+    rollout_status: strategy.rollout_status,
+    production_ready: strategy.production_ready,
+    ready_for_realtime_annotations: strategy.ready_for_realtime_annotations,
+    pilot_ready: strategy.ready_for_realtime_annotations === true,
+    recommended_mode: strategy.recommendation,
+    source_priority: strategy.source_priority,
+    live_adapter: {
+      module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter',
+      factory: 'createMeetingPlatformLiveAdapter',
+      kit_method: 'platformLiveAdapter',
+      realtime_methods: ['observeMeetingApp', 'ingestProvider', 'insertAnnotation'],
+      evidence_methods: ['summary', 'correlation', 'exportPackage', 'verify'],
+      timestamp_field: strategy.realtime_axis?.annotation_time_field ?? 'captured_at_ms',
+    },
+    realtime_axis: strategy.realtime_axis,
+    local_observer: strategy.local_observer,
+    provider_events: strategy.provider_events,
+    speaker_activity: strategy.speaker_activity,
+    post_meeting_transcript: strategy.post_meeting_transcript,
+    handoff: {
+      evidence_session_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-session',
+      evidence_package_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package',
+      package_schema: 'meeting_platform_evidence_package',
+      verifier: 'verifyMeetingPlatformEvidencePackage',
+    },
+    endpoints: {
+      provider_events: integration.provider_events?.endpoint,
+      transcript_import: integration.post_meeting_transcript?.import_endpoint,
+      status: integration.provider_events?.status_endpoint,
+    },
+    next_actions: uniqueList(strategy.next_actions ?? []),
+  });
+}
+
+export function buildMeetingPlatformLiveAdapterMatrix(options = {}) {
+  const plans = selectedPlatforms(options).map((platform) => buildMeetingPlatformLiveAdapterPlan(platform, options));
+  return {
+    type: 'meeting_platform_live_adapter_matrix',
+    schema: MEETING_PLATFORM_LIVE_ADAPTER_MATRIX_SCHEMA,
+    schema_version: MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA_VERSION,
+    platform_count: plans.length,
+    production_ready_count: plans.filter((plan) => plan.production_ready).length,
+    pilot_ready_count: plans.filter((plan) => plan.pilot_ready).length,
+    local_first_count: plans.filter((plan) => plan.realtime_axis?.primary_source === 'local_observer').length,
+    non_blocking_provider_count: plans.filter((plan) => plan.realtime_axis?.provider_events_block_realtime === false).length,
+    platforms: plans.map((plan) => plan.platform),
+    rows: plans.map((plan) => ({
+      platform: plan.platform,
+      display_name: plan.display_name,
+      rollout_status: plan.rollout_status,
+      recommended_mode: plan.recommended_mode,
+      pilot_ready: plan.pilot_ready,
+      production_ready: plan.production_ready,
+      primary_axis_source: plan.realtime_axis?.primary_source,
+      provider_blocks_realtime: plan.realtime_axis?.provider_events_block_realtime,
+      transcript_blocks_realtime: plan.realtime_axis?.transcript_blocks_realtime,
+      next_actions: plan.next_actions,
+    })),
+    plans,
+  };
 }
 
 export function createMeetingPlatformLiveAdapter(platform, clientOrOptions = {}, options = {}) {
@@ -218,6 +311,82 @@ export function createMeetingPlatformLiveAdapter(platform, clientOrOptions = {},
       return {
         source: source.reset(nextState.source ?? nextState.meeting_source ?? {}),
         evidence: evidenceSession.reset(),
+      };
+    },
+  };
+}
+
+export function createMeetingPlatformLiveAdapterSuite(clientOrOptions = {}, options = {}) {
+  const cache = new Map();
+  const platforms = selectedPlatforms(options).map((platform) => normalizeMeetingPlatform(platform));
+
+  function adapter(platform, adapterOptions = {}) {
+    const key = normalizeMeetingPlatform(platform);
+    const cacheKey = `${key}:${adapterOptions.id ?? adapterOptions.sessionId ?? adapterOptions.session_id ?? 'default'}`;
+    if (!cache.has(cacheKey)) {
+      cache.set(cacheKey, createMeetingPlatformLiveAdapter(key, clientOrOptions, {
+        ...options,
+        ...adapterOptions,
+      }));
+    }
+    return cache.get(cacheKey);
+  }
+
+  return {
+    schema: MEETING_PLATFORM_LIVE_ADAPTER_MATRIX_SCHEMA,
+    schema_version: MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA_VERSION,
+    platforms,
+    adapter,
+    liveAdapter: adapter,
+    adapters(adapterOptions = {}) {
+      return Object.fromEntries(platforms.map((platform) => [platform, adapter(platform, adapterOptions)]));
+    },
+    plan(platform, planOptions = {}) {
+      return buildMeetingPlatformLiveAdapterPlan(platform, {
+        ...options,
+        ...planOptions,
+      });
+    },
+    matrix(matrixOptions = {}) {
+      return buildMeetingPlatformLiveAdapterMatrix({
+        ...options,
+        ...matrixOptions,
+        platforms: matrixOptions.platforms ?? matrixOptions.platform_keys ?? platforms,
+      });
+    },
+    summary(summaryOptions = {}) {
+      const matrix = buildMeetingPlatformLiveAdapterMatrix({
+        ...options,
+        ...summaryOptions,
+        platforms: summaryOptions.platforms ?? summaryOptions.platform_keys ?? platforms,
+      });
+      return compactObject({
+        type: 'meeting_platform_live_adapter_suite_summary',
+        schema: MEETING_PLATFORM_LIVE_ADAPTER_MATRIX_SCHEMA,
+        schema_version: MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA_VERSION,
+        platform_count: matrix.platform_count,
+        production_ready_count: matrix.production_ready_count,
+        pilot_ready_count: matrix.pilot_ready_count,
+        platforms: matrix.platforms,
+        rows: matrix.rows,
+      });
+    },
+    getState() {
+      return {
+        type: 'meeting_platform_live_adapter_suite_state',
+        schema: MEETING_PLATFORM_LIVE_ADAPTER_MATRIX_SCHEMA,
+        schema_version: MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA_VERSION,
+        platforms,
+        adapter_count: cache.size,
+        adapters: Object.fromEntries([...cache.entries()].map(([key, item]) => [key, item.getState()])),
+      };
+    },
+    reset(nextState = {}) {
+      const states = Object.fromEntries([...cache.entries()].map(([key, item]) => [key, item.reset(nextState[key] ?? {})]));
+      cache.clear();
+      return {
+        removed_adapters: Object.keys(states).length,
+        adapters: states,
       };
     },
   };

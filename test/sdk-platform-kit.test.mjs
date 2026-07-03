@@ -319,5 +319,7 @@ assert.equal(report.meeting_app_fixture_acceptance.accepted, true);
 assert.equal(report.meeting_app_fixture_acceptance.accepted_count, 5);
 assert.equal(report.meeting_app_launch_gate.ok, false);
 assert.equal(report.meeting_app_launch_gate.gates.length, 5);
+assert.equal(report.platform_live_adapter_matrix.platform_count, 6);
+assert.equal(report.platform_live_adapter_matrix.rows.some((row) => row.platform === 'google_meet'), true);
 
 console.log('ok meeting platform timeline kit');

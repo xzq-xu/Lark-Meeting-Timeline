@@ -86,7 +86,10 @@ import {
   createMeetingPlatformEvidenceSession,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-session';
 import {
+  buildMeetingPlatformLiveAdapterMatrix,
+  buildMeetingPlatformLiveAdapterPlan,
   createMeetingPlatformLiveAdapter,
+  createMeetingPlatformLiveAdapterSuite,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter';
 import {
   buildMeetingPlatformEvidencePackage,
@@ -147,6 +150,17 @@ const liveAdapter = createMeetingPlatformLiveAdapter('google-meet', client, {
   baseUrl: 'http://localhost:8787',
 });
 assert.equal(liveAdapter.summary().platform, 'google_meet');
+assert.equal(buildMeetingPlatformLiveAdapterPlan('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).live_adapter.kit_method, 'platformLiveAdapter');
+assert.equal(buildMeetingPlatformLiveAdapterMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).rows[0].platform, 'zoom');
+assert.equal(createMeetingPlatformLiveAdapterSuite(client, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).summary().platform_count, 1);
 assert.equal(kit.platformLiveAdapter('zoom').platform, 'zoom');
 
 const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {

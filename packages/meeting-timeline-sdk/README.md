@@ -202,6 +202,27 @@ const inserted = await live.insertAnnotation({
 // live.exportPackage() 可在现场采样结束后交给另一个项目复验。
 ```
 
+多平台宿主可以用 suite/matrix 先生成 Google Meet / Teams / Zoom / Webex / Lark 的统一接入面板，再按平台懒加载 live adapter：
+
+```js
+import {
+  buildMeetingPlatformLiveAdapterMatrix,
+  createMeetingPlatformLiveAdapterSuite,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter';
+
+const matrix = buildMeetingPlatformLiveAdapterMatrix({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+const suite = createMeetingPlatformLiveAdapterSuite(timelineClient, {
+  baseUrl: 'https://timeline.example.com',
+  platforms: matrix.platforms,
+});
+
+const zoomLive = suite.adapter('zoom');
+```
+
 会议进行中可以用 `platform-evidence-session` 持续收集本地 DOM 和 provider webhook 证据。它的定位是 live object：每采到一个窗口快照或 webhook，就调用 `summary()` 看当前是否能实时落标注、是否还缺 provider reconcile 证据，以及后续能否导出 handoff 包：
 
 ```js
