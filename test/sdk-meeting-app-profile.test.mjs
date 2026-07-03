@@ -4,13 +4,16 @@ import { buildMeetingAppFixtureSnapshot } from '../packages/meeting-timeline-sdk
 import {
   MEETING_APP_INTEGRATION_PROFILE_PLATFORMS,
   MEETING_APP_INTEGRATION_PROFILE_SCHEMA,
+  MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
   buildAllMeetingAppIntegrationProfiles,
+  buildAllMeetingAppLiveSnapshotCapturePlans,
   buildAllMeetingAppRuntimeAdapterAcceptanceReports,
   buildAllMeetingAppRuntimeAdapterConfigs,
   buildAllMeetingAppRuntimeAdapterValidationReports,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
+  buildMeetingAppLiveSnapshotCapturePlan,
   buildMeetingAppRuntimeAdapterAcceptanceReport,
   buildMeetingAppRuntimeAdapterConfig,
   buildMeetingAppRuntimeAdapterValidationReport,
@@ -27,6 +30,7 @@ assert.deepEqual(MEETING_APP_INTEGRATION_PROFILE_PLATFORMS, [
 ]);
 assert.equal(MEETING_APP_INTEGRATION_PROFILE_SCHEMA, 'meeting_app_integration_profile');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA, 'meeting_app_runtime_adapter_config');
+assert.equal(MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA, 'meeting_app_live_snapshot_capture_plan');
 
 const googleProfile = buildMeetingAppIntegrationProfile('google-meet', {
   baseUrl: 'https://timeline.example.com',
@@ -71,6 +75,18 @@ assert.equal(googleRuntimeConfig.capture_options.participantSelectors.length > 0
 assert.equal(googleRuntimeConfig.startup.attached_message_type, 'meeting_timeline.extension_attached');
 assert.equal(googleRuntimeConfig.supported_client_methods.includes('insertMark'), true);
 assert.equal(googleRuntimeConfig.readiness.runtime_ready, true);
+
+const googleCapturePlan = buildMeetingAppLiveSnapshotCapturePlan('google-meet');
+assert.equal(googleCapturePlan.type, 'meeting_app_live_snapshot_capture_plan');
+assert.equal(googleCapturePlan.platform, 'google_meet');
+assert.equal(googleCapturePlan.runtime_config.platform, 'google_meet');
+assert.equal(googleCapturePlan.validation.method, 'buildMeetingAppRuntimeAdapterValidationReport');
+assert.equal(googleCapturePlan.validation.production_ready_requires, 'captured_dom');
+assert.equal(googleCapturePlan.required_snapshots.some((item) => item.id === 'active_speaker'), true);
+assert.equal(googleCapturePlan.required_snapshots.some((item) => item.id === 'meeting_ended'), true);
+assert.equal(googleCapturePlan.required_snapshots.find((item) => item.id === 'active_speaker').required_coverage.includes('speaker_started'), true);
+assert.equal(googleCapturePlan.minimum_record_count, 2);
+assert.match(googleCapturePlan.handoff.success_condition, /production_ready/);
 const googleRuntimeAcceptance = buildMeetingAppRuntimeAdapterAcceptanceReport(googleRuntimeConfig);
 assert.equal(googleRuntimeAcceptance.type, 'meeting_app_runtime_adapter_acceptance_report');
 assert.equal(googleRuntimeAcceptance.accepted, true);
@@ -150,6 +166,13 @@ const selectedRuntimeConfigs = buildAllMeetingAppRuntimeAdapterConfigs({
 assert.deepEqual(Object.keys(selectedRuntimeConfigs), ['zoom', 'webex']);
 assert.equal(selectedRuntimeConfigs.zoom.bridge_options.browser_runtime_preset, 'zoom');
 assert.equal(selectedRuntimeConfigs.webex.extension.matches.includes('https://*.webex.com/*'), true);
+
+const selectedCapturePlans = buildAllMeetingAppLiveSnapshotCapturePlans({
+  platforms: ['zoom', 'webex'],
+});
+assert.deepEqual(Object.keys(selectedCapturePlans), ['zoom', 'webex']);
+assert.equal(selectedCapturePlans.zoom.required_snapshots.length >= 2, true);
+assert.equal(selectedCapturePlans.webex.runtime_config.platform, 'webex');
 
 const selectedRuntimeAcceptance = buildAllMeetingAppRuntimeAdapterAcceptanceReports({
   platforms: ['zoom', 'webex'],

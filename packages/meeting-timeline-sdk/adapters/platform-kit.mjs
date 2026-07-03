@@ -63,11 +63,13 @@ import {
   assertMeetingAppRuntimeAdapterConfig,
   assertMeetingAppRuntimeAdapterValidation,
   buildAllMeetingAppIntegrationProfiles,
+  buildAllMeetingAppLiveSnapshotCapturePlans,
   buildAllMeetingAppRuntimeAdapterAcceptanceReports,
   buildAllMeetingAppRuntimeAdapterConfigs,
   buildAllMeetingAppRuntimeAdapterValidationReports,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
+  buildMeetingAppLiveSnapshotCapturePlan,
   buildMeetingAppRuntimeAdapterAcceptanceReport,
   buildMeetingAppRuntimeAdapterConfig,
   buildMeetingAppRuntimeAdapterValidationReport,
@@ -194,6 +196,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_integration_matrix: buildMeetingAppIntegrationMatrix(options),
     meeting_app_runtime_adapter_configs: buildAllMeetingAppRuntimeAdapterConfigs(options),
     meeting_app_runtime_adapter_acceptance: buildAllMeetingAppRuntimeAdapterAcceptanceReports(options),
+    meeting_app_live_snapshot_capture_plans: buildAllMeetingAppLiveSnapshotCapturePlans(options),
     meeting_app_runtime_adapter_validation: buildAllMeetingAppRuntimeAdapterValidationReports(options),
     meeting_app_fixture_acceptance: meetingAppFixtureAcceptance,
     meeting_app_launch_gate: meetingAppLaunchGateSummary,
@@ -303,6 +306,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppRuntimeAdapterConfig(platform, configOptions = {}) {
       return buildMeetingAppRuntimeAdapterConfig(platform, withDefaults(defaults, configOptions));
+    },
+    meetingAppLiveSnapshotCapturePlan(platform, planOptions = {}) {
+      return buildMeetingAppLiveSnapshotCapturePlan(platform, withDefaults(defaults, planOptions));
+    },
+    allMeetingAppLiveSnapshotCapturePlans(planOptions = {}) {
+      return buildAllMeetingAppLiveSnapshotCapturePlans(withDefaults(defaults, planOptions));
     },
     allMeetingAppRuntimeAdapterConfigs(configOptions = {}) {
       return buildAllMeetingAppRuntimeAdapterConfigs(withDefaults(defaults, configOptions));

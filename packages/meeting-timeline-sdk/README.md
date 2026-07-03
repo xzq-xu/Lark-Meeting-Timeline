@@ -502,6 +502,9 @@ const runtimeAcceptance = meetingKit.meetingAppRuntimeAdapterAcceptance(runtimeC
 // runtimeAcceptance.accepted === true 表示配置的 host 权限、消息协议、runtime preset、capture selectors
 // 和 startup 字段满足 SDK 运行前置条件；生产前仍需用真实会议 DOM 快照通过 launch gate。
 
+const capturePlan = meetingKit.meetingAppLiveSnapshotCapturePlan('google-meet');
+// capturePlan.required_snapshots 描述现场工具至少要采 active speaker 与 meeting ended 两类快照。
+
 const runtimeValidation = meetingKit.meetingAppRuntimeAdapterValidation(runtimeConfig, {
   snapshots: capturedLiveMeetingSnapshots,
 });

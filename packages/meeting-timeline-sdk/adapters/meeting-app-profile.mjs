@@ -20,6 +20,7 @@ export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA = 'meeting_app_integration_p
 export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION = 1;
 export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS = MEETING_APP_FIXTURE_PLATFORMS;
 export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA = 'meeting_app_runtime_adapter_config';
+export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA = 'meeting_app_live_snapshot_capture_plan';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -515,6 +516,104 @@ function validationOptions(options = {}) {
     require_production_ready: false,
     ...options,
   };
+}
+
+function snapshotCaptureStep(id, phase, label, requiredCoverage = [], options = {}) {
+  return compactObject({
+    id,
+    phase,
+    label,
+    required_coverage: requiredCoverage,
+    min_count: firstNonEmpty(options.minCount, options.min_count, 1),
+    capture_timing: firstNonEmpty(options.captureTiming, options.capture_timing),
+    notes: options.notes,
+  });
+}
+
+export function buildMeetingAppLiveSnapshotCapturePlan(platformOrInput = {}, options = {}) {
+  const config = runtimeConfigFromInput(platformOrInput, options);
+  const platform = normalizeAppPlatform(config.platform);
+  const emptyGate = buildMeetingAppLaunchGate(platform, validationOptions(options));
+  const activeCoverage = [
+    'platform_detected',
+    'meeting_id',
+    'in_meeting',
+    'meeting_started',
+    'active_speaker',
+    'speaker_started',
+  ];
+  const endedCoverage = [
+    'meeting_ended',
+    'ended_in_meeting_false',
+  ].filter((item) => emptyGate.required_coverage?.includes(item));
+  return compactObject({
+    type: 'meeting_app_live_snapshot_capture_plan',
+    schema: MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    platform,
+    display_name: config.display_name,
+    runtime_config: config,
+    recorder: {
+      adapter: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder',
+      capture_method: 'createMeetingAppSnapshotRecorder().capture',
+      export_method: 'createMeetingAppSnapshotRecorder().exportRecords',
+      timestamp_field: 'captured_at_ms',
+    },
+    validation: {
+      adapter: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-profile',
+      method: 'buildMeetingAppRuntimeAdapterValidationReport',
+      production_ready_requires: 'captured_dom',
+      required_coverage: emptyGate.required_coverage,
+      default_options: {
+        allowFixtureEvidence: false,
+        requireMeetingEnd: options.requireMeetingEnd ?? options.require_meeting_end ?? true,
+      },
+    },
+    required_snapshots: [
+      snapshotCaptureStep(
+        'active_speaker',
+        'active',
+        'Capture while the meeting is active, at least one participant is visible, and one speaker is active.',
+        activeCoverage.filter((item) => emptyGate.required_coverage?.includes(item)),
+        { captureTiming: 'after_join_and_audio_activity_is_visible' },
+      ),
+      snapshotCaptureStep(
+        'meeting_ended',
+        'ended',
+        'Capture after leaving or ending the same meeting so the observer can emit meeting_ended.',
+        endedCoverage,
+        { captureTiming: 'after_leave_or_end_meeting' },
+      ),
+    ].filter((step) => step.required_coverage.length > 0),
+    recommended_snapshots: [
+      snapshotCaptureStep(
+        'participants_panel',
+        'active',
+        'Capture with the participants panel or roster visible when the platform exposes richer participant DOM.',
+        ['participant_selectors'],
+        { notes: 'Useful for selector tuning even if launch gate does not require participant_joined.' },
+      ),
+      snapshotCaptureStep(
+        'screen_share_or_presentation',
+        'active',
+        'Capture during screen sharing when this is a common meeting state for the product.',
+        ['platform_detected', 'in_meeting'],
+        { notes: 'Prevents screen-share UI from hiding controls or speaker markers unexpectedly.' },
+      ),
+    ],
+    minimum_record_count: emptyGate.required_coverage?.includes('meeting_ended') ? 2 : 1,
+    handoff: {
+      validation_input: 'Pass recorder.exportRecords() as { records } or pass snapshots directly as { snapshots }.',
+      success_condition: 'meetingAppRuntimeAdapterValidation(...).production_ready === true',
+    },
+  });
+}
+
+export function buildAllMeetingAppLiveSnapshotCapturePlans(options = {}) {
+  return Object.fromEntries(platformList(options).map((platform) => [
+    platform,
+    buildMeetingAppLiveSnapshotCapturePlan(platform, options),
+  ]));
 }
 
 export function buildMeetingAppRuntimeAdapterValidationReport(configOrPlatform = {}, options = {}) {

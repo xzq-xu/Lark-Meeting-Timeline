@@ -5,6 +5,7 @@ export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA: 'meeting_app_integration_pr
 export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION: number;
 export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS: readonly MeetingAppDomCaptureProfilePlatform[];
 export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA: 'meeting_app_runtime_adapter_config';
+export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA: 'meeting_app_live_snapshot_capture_plan';
 
 export interface MeetingAppIntegrationProfileOptions extends MeetingAppLaunchGateOptions {
   platform?: MeetingAppDomCaptureProfilePlatform | string;
@@ -90,6 +91,21 @@ export interface MeetingAppRuntimeAdapterValidationReport {
   issues: Array<Record<string, unknown>>;
 }
 
+export interface MeetingAppLiveSnapshotCapturePlan {
+  type: 'meeting_app_live_snapshot_capture_plan';
+  schema: 'meeting_app_live_snapshot_capture_plan';
+  version: number;
+  platform: MeetingAppDomCaptureProfilePlatform;
+  display_name: string;
+  runtime_config: MeetingAppRuntimeAdapterConfig;
+  recorder: Record<string, unknown>;
+  validation: Record<string, unknown>;
+  required_snapshots: Array<Record<string, unknown>>;
+  recommended_snapshots: Array<Record<string, unknown>>;
+  minimum_record_count: number;
+  handoff: Record<string, unknown>;
+}
+
 export function buildMeetingAppIntegrationProfile(
   platformOrInput?: MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
   options?: MeetingAppIntegrationProfileOptions,
@@ -125,6 +141,15 @@ export function assertMeetingAppRuntimeAdapterConfig(
 export function buildAllMeetingAppRuntimeAdapterAcceptanceReports(
   options?: MeetingAppIntegrationProfileOptions,
 ): Partial<Record<MeetingAppDomCaptureProfilePlatform, MeetingAppRuntimeAdapterAcceptanceReport>>;
+
+export function buildMeetingAppLiveSnapshotCapturePlan(
+  platformOrInput?: MeetingAppRuntimeAdapterConfig | MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppLiveSnapshotCapturePlan;
+
+export function buildAllMeetingAppLiveSnapshotCapturePlans(
+  options?: MeetingAppIntegrationProfileOptions,
+): Partial<Record<MeetingAppDomCaptureProfilePlatform, MeetingAppLiveSnapshotCapturePlan>>;
 
 export function buildMeetingAppRuntimeAdapterValidationReport(
   configOrPlatform?: MeetingAppRuntimeAdapterConfig | MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
