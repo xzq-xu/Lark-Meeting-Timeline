@@ -65,6 +65,14 @@ npm run meeting-platform:rollout-matrix
 
 它会写出 `data/meeting-platform-rollout-matrix.json`，把 provider start/end 事件证据和本地 DOM 证据合成 `production_ready` / `realtime_ready_provider_pending` / `needs_live_dom_and_provider_evidence` 等状态，用来判断某个平台是否能先进入真实 pilot。
 
+SDK 包级交付前再跑一次 package smoke：
+
+```bash
+npm run sdk:package-smoke
+```
+
+它会对 `packages/meeting-timeline-sdk` 执行 `npm pack`，并在临时 consumer 项目里按包名导入 core、`platform-kit`、`platform-rollout`、Google Meet adapter 和 meeting app gate，确认外部项目不是依赖仓库内部相对路径。
+
 ## 启动
 
 ```bash

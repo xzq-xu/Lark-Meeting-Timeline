@@ -43,6 +43,7 @@ assert.equal(packageJson.scripts['meeting-app:extension:build'], 'node scripts/e
 assert.equal(packageJson.scripts['meeting-app:evidence-gate'], 'node scripts/meeting-app-evidence-gate.mjs');
 assert.equal(packageJson.scripts['meeting-app:evidence-matrix'], 'node scripts/meeting-app-evidence-matrix.mjs --dir=data/meeting-app-evidence --report-file=data/meeting-app-evidence-matrix.json');
 assert.equal(packageJson.scripts['meeting-platform:rollout-matrix'], 'node scripts/meeting-platform-rollout-matrix.mjs --provider-dir=data/provider-evidence --dom-dir=data/meeting-app-evidence --report-file=data/meeting-platform-rollout-matrix.json');
+assert.equal(packageJson.scripts['sdk:package-smoke'], 'node test/sdk-package-smoke.test.mjs');
 
 assert.match(readme, /`npm run start` 会设置 `REAL_DEMO_AUTO_ARM=1`/);
 assert.match(readme, /默认不会自动写入验收标注、虚拟墨水屏标注或设备流标注/);
@@ -71,6 +72,7 @@ assert.match(readme, /npm run meeting-app:extension:build/);
 assert.match(readme, /npm run meeting-app:evidence-gate/);
 assert.match(readme, /npm run meeting-app:evidence-matrix/);
 assert.match(readme, /npm run meeting-platform:rollout-matrix/);
+assert.match(readme, /npm run sdk:package-smoke/);
 assert.match(readme, /data\/meeting-app-extension/);
 assert.match(readme, /data\/meeting-app-evidence/);
 assert.match(readme, /data\/meeting-app-evidence-matrix\.json/);

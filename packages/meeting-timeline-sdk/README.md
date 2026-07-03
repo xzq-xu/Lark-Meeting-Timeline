@@ -29,6 +29,14 @@ import { createMeetingTimelineClient } from './packages/meeting-timeline-sdk/ind
 }
 ```
 
+提交给外部项目接入前，建议在仓库根目录跑一次包级 smoke：
+
+```bash
+npm run sdk:package-smoke
+```
+
+这个检查会先 `npm pack`，再创建一个临时 consumer 项目，通过 `@ai-annotation/meeting-timeline-sdk` 和 `@ai-annotation/meeting-timeline-sdk/adapters/*` 导入公开入口，避免 SDK 只在 monorepo 相对路径下可用。
+
 ## 基本用法
 
 ```js
