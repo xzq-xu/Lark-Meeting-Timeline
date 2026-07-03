@@ -178,6 +178,35 @@ const matrix = buildMeetingPlatformAdaptationStrategyMatrix({
 console.log(matrix.rows);
 ```
 
+宿主项目需要真正落地时，推荐再读一层 `platform-runtime-profile`。它把策略转成运行时可执行约束：谁先建轴、结束事件如何兜底、provider 事件是否阻塞实时标注、发言人位置用什么滤波参数。这个 profile 不依赖实时转写；发言人只作为时间轴 marker 写入，正文仍然等会后 transcript import：
+
+```js
+import {
+  buildMeetingPlatformRuntimeProfileMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-profile';
+
+const runtime = buildMeetingPlatformRuntimeProfileMatrix({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+// 每个平台都要求：标注用 captured_at_ms；provider webhook 和 transcript 不阻塞实时落轴。
+console.log(runtime.rows.map((row) => ({
+  platform: row.platform,
+  start: row.start_create_on,
+  end: row.end_create_on,
+  speakerStableMs: row.speaker_min_stable_ms,
+})));
+```
+
+也可以从 `platform-kit` 读取同一份 profile：
+
+```js
+const googleProfile = kit.platformRuntimeProfile('google-meet');
+// googleProfile.axis.end.fallbacks 描述 Workspace Events 晚到时，本地观察器如何先闭合会议轴。
+// googleProfile.speaker_markers.filter 可直接传给 active-speaker observer。
+```
+
 真实采样交接时，`platform-evidence-correlation` 会检查 provider 事件和本地 DOM 记录是否来自同一场会议。它优先用 meeting id / URL 匹配；没有共享 id 时会退到同平台时间窗口匹配。`verifyMeetingPlatformEvidencePackage()` 默认会要求 correlation 通过，避免把不同会议的 provider 样本和 DOM 样本混成一个 production-ready 包。
 
 业务项目如果要直接接入“会议中边写边标注”，优先用 `platform-live-adapter`。它把本地会议 App 观察、provider webhook 回填、实时标注插入和 evidence session 绑成一个对象；`observeMeetingApp()` 会同时尝试建轴并记录本地证据，`ingestProvider()` 会同时回填 provider 事件并记录 provider 证据，`insertAnnotation()` 会返回当前 live readiness：

@@ -58,6 +58,11 @@ import type {
   MeetingPlatformProviderConnectionOptions,
   MeetingPlatformProviderConnectionPack,
 } from './platform-provider-connection.mjs';
+import type {
+  MeetingPlatformRuntimeProfile,
+  MeetingPlatformRuntimeProfileMatrix,
+  MeetingPlatformRuntimeProfileOptions,
+} from './platform-runtime-profile.mjs';
 import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type {
@@ -173,6 +178,8 @@ export interface MeetingPlatformTimelineKit {
   ): MeetingPlatformHostIntegrationScaffoldAcceptanceReport;
   platformProviderConnectionPack(platform: string, providerOptions?: MeetingPlatformProviderConnectionOptions): MeetingPlatformProviderConnectionPack;
   platformProviderConnectionMatrix(providerOptions?: MeetingPlatformProviderConnectionOptions): MeetingPlatformProviderConnectionMatrix;
+  platformRuntimeProfile(platform: string, profileOptions?: MeetingPlatformRuntimeProfileOptions): MeetingPlatformRuntimeProfile;
+  platformRuntimeProfileMatrix(profileOptions?: MeetingPlatformRuntimeProfileOptions): MeetingPlatformRuntimeProfileMatrix;
   meetingAppSnapshotRecorder(recorderOptions?: MeetingAppSnapshotRecordOptions): MeetingAppSnapshotRecorder;
   meetingAppGateInputFromRecords(records?: MeetingAppSnapshotRecord[] | MeetingAppSnapshotRecordSet, recordOptions?: MeetingAppSnapshotRecordOptions): Record<string, unknown>;
   meetingAppIntegrationProfile(platform: string, profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppIntegrationProfile;
