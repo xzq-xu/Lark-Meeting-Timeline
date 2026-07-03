@@ -30,12 +30,16 @@ assert.equal(report.runtime_ready_count, 3);
 assert.equal(report.contract_accepted_count, 3);
 assert.equal(report.provider_required_for_realtime_count, 0);
 assert.equal(report.transcript_blocking_count, 0);
+assert.equal(report.acceptance.accepted, true);
+assert.equal(report.acceptance.blocking_count, 0);
+assert.equal(report.acceptance.manifest, undefined);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').insert_endpoint, `${baseUrl}/api/annotations`);
 assert.equal(report.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 assert.equal(report.manifest.entries.length, 3);
 
 const writtenReport = JSON.parse(await readFile(reportFile, 'utf8'));
 assert.equal(writtenReport.rows.length, 3);
+assert.equal(writtenReport.acceptance.accepted, true);
 assert.equal(writtenReport.manifest.entries.find((entry) => entry.platform === 'microsoft_teams').provider.security_verifier, 'verifyMicrosoftGraphClientState');
 
 const { stdout: compactStdout } = await execFileAsync(process.execPath, [

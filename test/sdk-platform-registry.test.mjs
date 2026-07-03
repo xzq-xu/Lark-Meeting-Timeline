@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 
 import {
+  MEETING_PLATFORM_REGISTRY_ACCEPTANCE_SCHEMA,
   MEETING_PLATFORM_REGISTRY_ENTRY_SCHEMA,
   MEETING_PLATFORM_REGISTRY_MANIFEST_SCHEMA,
+  assertMeetingPlatformRegistryManifest,
+  buildMeetingPlatformRegistryAcceptanceReport,
   buildMeetingPlatformRegistryEntry,
   buildMeetingPlatformRegistryManifest,
   meetingPlatformEventAdapterFor,
@@ -63,6 +66,34 @@ assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').pro
 assert.equal(manifest.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 assert.equal(manifest.next_actions.includes('wire_host_runtime_bundles_endpoint_before_building_extension'), true);
 
+const acceptance = buildMeetingPlatformRegistryAcceptanceReport(manifest);
+assert.equal(acceptance.schema, MEETING_PLATFORM_REGISTRY_ACCEPTANCE_SCHEMA);
+assert.equal(acceptance.accepted, true);
+assert.equal(acceptance.blocking_count, 0);
+assert.equal(assertMeetingPlatformRegistryManifest(manifest).accepted, true);
+
+const brokenManifest = {
+  ...manifest,
+  normalizer_count: 4,
+  entries: manifest.entries.map((entry) => entry.platform === 'zoom'
+    ? {
+      ...entry,
+      annotations: {
+        ...entry.annotations,
+        timestamp_field: 'server_received_at_ms',
+      },
+    }
+    : entry),
+};
+const brokenAcceptance = buildMeetingPlatformRegistryAcceptanceReport(brokenManifest);
+assert.equal(brokenAcceptance.accepted, false);
+assert.equal(brokenAcceptance.issues.some((item) => item.code === 'missing_platform_normalizer'), true);
+assert.equal(brokenAcceptance.issues.some((item) => item.code === 'entry_invalid_timestamp_field'), true);
+assert.throws(
+  () => assertMeetingPlatformRegistryManifest(brokenManifest),
+  /Meeting platform registry manifest failed acceptance/,
+);
+
 const client = {
   async startMeeting(input) { return { ok: true, input }; },
   async endMeeting(input) { return { ok: true, input }; },
@@ -74,6 +105,8 @@ const kit = createMeetingPlatformTimelineKit(client, {
 });
 assert.equal(kit.platformRegistryEntry('zoom').platform, 'zoom');
 assert.equal(kit.platformRegistryManifest().platform_count, 2);
+assert.equal(kit.platformRegistryAcceptance({ platforms: ['zoom'] }).accepted, true);
+assert.equal(kit.assertPlatformRegistryManifest({ platforms: ['zoom'] }).accepted, true);
 assert.equal(kit.report().platform_registry_manifest.provider_required_for_realtime_count, 0);
 
 console.log('ok meeting platform registry manifest');

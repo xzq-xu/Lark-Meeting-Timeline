@@ -1,4 +1,4 @@
-import { compactObject } from '../index.mjs';
+import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
 import { normalizeGoogleMeetEvent } from './google-meet.mjs';
 import { normalizeLarkEvent } from './lark.mjs';
 import { normalizeLocalDetectorEvent } from './local-detector.mjs';
@@ -24,6 +24,7 @@ import { normalizeZoomEvent } from './zoom.mjs';
 
 export const MEETING_PLATFORM_REGISTRY_ENTRY_SCHEMA = 'meeting_platform_registry_entry';
 export const MEETING_PLATFORM_REGISTRY_MANIFEST_SCHEMA = 'meeting_platform_registry_manifest';
+export const MEETING_PLATFORM_REGISTRY_ACCEPTANCE_SCHEMA = 'meeting_platform_registry_acceptance';
 export const MEETING_PLATFORM_REGISTRY_SCHEMA_VERSION = 1;
 
 const normalizers = Object.freeze({
@@ -57,6 +58,10 @@ function asArray(value) {
 
 function unique(values = []) {
   return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
+}
+
+function issue(severity, code, message, details = {}) {
+  return compactObject({ severity, code, message, ...details });
 }
 
 function selectedPlatforms(options = {}) {
@@ -238,4 +243,162 @@ export function buildMeetingPlatformRegistryManifest(options = {}) {
     entries,
     next_actions: unique(entries.flatMap((entry) => entry.next_actions ?? [])),
   };
+}
+
+function registryManifestFrom(input = {}, options = {}) {
+  if (input?.schema === MEETING_PLATFORM_REGISTRY_MANIFEST_SCHEMA) return input;
+  if (input?.schema === MEETING_PLATFORM_REGISTRY_ENTRY_SCHEMA) {
+    return {
+      type: 'meeting_platform_registry_manifest',
+      schema: MEETING_PLATFORM_REGISTRY_MANIFEST_SCHEMA,
+      schema_version: MEETING_PLATFORM_REGISTRY_SCHEMA_VERSION,
+      platform_count: 1,
+      normalizer_count: input.event_adapter?.normalize_available === true ? 1 : 0,
+      runtime_ready_count: input.readiness?.runtime_ready === true ? 1 : 0,
+      contract_accepted_count: input.readiness?.contract_accepted === true ? 1 : 0,
+      provider_required_for_realtime_count: input.readiness?.provider_required_for_realtime === true ? 1 : 0,
+      transcript_blocking_count: input.readiness?.transcript_blocks_realtime === true ? 1 : 0,
+      platforms: [input.platform],
+      rows: [{
+        platform: input.platform,
+        display_name: input.display_name,
+        aliases: input.aliases,
+        normalize_available: input.event_adapter?.normalize_available === true,
+        runtime_ready: input.readiness?.runtime_ready === true,
+        contract_accepted: input.readiness?.contract_accepted === true,
+        browser_match_count: input.runtime?.browser_matches?.length ?? 0,
+        provider_transport: input.provider?.transport,
+        provider_ready: input.provider?.ready === true,
+        provider_required_for_realtime: input.readiness?.provider_required_for_realtime === true,
+        transcript_blocks_realtime: input.readiness?.transcript_blocks_realtime === true,
+        insert_endpoint: input.annotations?.insert_endpoint,
+        timestamp_field: input.annotations?.timestamp_field,
+      }],
+      entries: [input],
+      next_actions: input.next_actions ?? [],
+    };
+  }
+  return buildMeetingPlatformRegistryManifest({ ...input, ...options });
+}
+
+function registryAcceptanceIssues(manifest = {}, options = {}) {
+  const issues = [];
+  const entries = asArray(manifest.entries);
+  const requireProviderReady = options.requireProviderReady === true || options.require_provider_ready === true;
+  if (manifest.schema !== MEETING_PLATFORM_REGISTRY_MANIFEST_SCHEMA) {
+    issues.push(issue('error', 'invalid_registry_schema', 'Registry manifest schema must be meeting_platform_registry_manifest.', {
+      actual_schema: manifest.schema,
+    }));
+  }
+  if ((manifest.platform_count ?? 0) <= 0) {
+    issues.push(issue('error', 'empty_registry_manifest', 'Registry manifest must include at least one platform.'));
+  }
+  if (manifest.normalizer_count !== manifest.platform_count) {
+    issues.push(issue('error', 'missing_platform_normalizer', 'Every selected platform must have a normalizer.', {
+      normalizer_count: manifest.normalizer_count,
+      platform_count: manifest.platform_count,
+    }));
+  }
+  if (manifest.runtime_ready_count !== manifest.platform_count) {
+    issues.push(issue('error', 'runtime_not_ready', 'Every selected platform must have a runtime-ready bundle.', {
+      runtime_ready_count: manifest.runtime_ready_count,
+      platform_count: manifest.platform_count,
+    }));
+  }
+  if (manifest.contract_accepted_count !== manifest.platform_count) {
+    issues.push(issue('error', 'adapter_contract_not_accepted', 'Every selected platform must pass adapter contract acceptance.', {
+      contract_accepted_count: manifest.contract_accepted_count,
+      platform_count: manifest.platform_count,
+    }));
+  }
+  if ((manifest.provider_required_for_realtime_count ?? 0) > 0) {
+    issues.push(issue('error', 'provider_blocks_realtime', 'Provider events must not be required for realtime annotation insertion.', {
+      provider_required_for_realtime_count: manifest.provider_required_for_realtime_count,
+    }));
+  }
+  if ((manifest.transcript_blocking_count ?? 0) > 0) {
+    issues.push(issue('error', 'transcript_blocks_realtime', 'Transcript import must not block realtime annotation insertion.', {
+      transcript_blocking_count: manifest.transcript_blocking_count,
+    }));
+  }
+  for (const entry of entries) {
+    const platform = entry.platform;
+    if (entry.event_adapter?.normalize_available !== true) {
+      issues.push(issue('error', 'entry_missing_normalizer', 'Registry entry must expose a normalizer.', { platform }));
+    }
+    if (entry.readiness?.runtime_ready !== true) {
+      issues.push(issue('error', 'entry_runtime_not_ready', 'Registry entry must have runtime_ready=true.', { platform }));
+    }
+    if (entry.readiness?.contract_accepted !== true) {
+      issues.push(issue('error', 'entry_contract_not_accepted', 'Registry entry must have contract_accepted=true.', { platform }));
+    }
+    if (entry.annotations?.timestamp_field !== 'captured_at_ms') {
+      issues.push(issue('error', 'entry_invalid_timestamp_field', 'Registry entry must use captured_at_ms for realtime annotations.', {
+        platform,
+        timestamp_field: entry.annotations?.timestamp_field,
+      }));
+    }
+    if (!entry.annotations?.insert_endpoint) {
+      issues.push(issue('error', 'entry_missing_insert_endpoint', 'Registry entry must include an annotation insert endpoint.', { platform }));
+    }
+    if (entry.annotations?.provider_events_block_realtime === true) {
+      issues.push(issue('error', 'entry_provider_blocks_realtime', 'Registry entry must keep provider events non-blocking for realtime annotations.', { platform }));
+    }
+    if (entry.annotations?.transcript_blocks_realtime === true || entry.transcript?.blocks_realtime_annotation === true) {
+      issues.push(issue('error', 'entry_transcript_blocks_realtime', 'Registry entry must keep transcript import non-blocking for realtime annotations.', { platform }));
+    }
+    if (entry.supported_surfaces?.browser_observer === true && (entry.runtime?.browser_matches?.length ?? 0) === 0) {
+      issues.push(issue('error', 'entry_missing_browser_matches', 'Browser-observed platforms must include runtime browser match patterns.', { platform }));
+    }
+    if (!entry.host?.endpoints?.runtime_bundles) {
+      issues.push(issue('error', 'entry_missing_runtime_bundle_endpoint', 'Registry entry must include the host runtime bundle endpoint.', { platform }));
+    }
+    if (!entry.sdk?.imports?.runtime_bundle) {
+      issues.push(issue('error', 'entry_missing_runtime_bundle_import', 'Registry entry must include the runtime bundle SDK import path.', { platform }));
+    }
+    if (requireProviderReady && entry.provider?.ready !== true) {
+      issues.push(issue('error', 'entry_provider_not_ready', 'Provider setup must be ready when requireProviderReady=true.', {
+        platform,
+        missing_env: entry.provider?.missing_env ?? [],
+      }));
+    }
+  }
+  return issues;
+}
+
+export function buildMeetingPlatformRegistryAcceptanceReport(manifestOrOptions = {}, options = {}) {
+  const manifest = registryManifestFrom(manifestOrOptions, options);
+  const issues = registryAcceptanceIssues(manifest, options);
+  const blocking = issues.filter((item) => item.severity === 'error');
+  return {
+    type: 'meeting_platform_registry_acceptance',
+    schema: MEETING_PLATFORM_REGISTRY_ACCEPTANCE_SCHEMA,
+    schema_version: MEETING_PLATFORM_REGISTRY_SCHEMA_VERSION,
+    accepted: blocking.length === 0,
+    platform_count: manifest.platform_count ?? 0,
+    normalizer_count: manifest.normalizer_count ?? 0,
+    runtime_ready_count: manifest.runtime_ready_count ?? 0,
+    contract_accepted_count: manifest.contract_accepted_count ?? 0,
+    provider_required_for_realtime_count: manifest.provider_required_for_realtime_count ?? 0,
+    transcript_blocking_count: manifest.transcript_blocking_count ?? 0,
+    blocking_count: blocking.length,
+    warning_count: issues.length - blocking.length,
+    issues,
+    manifest,
+    next_actions: unique([
+      ...blocking.map((item) => item.code),
+      ...(manifest.next_actions ?? []),
+    ]),
+  };
+}
+
+export function assertMeetingPlatformRegistryManifest(manifestOrOptions = {}, options = {}) {
+  const report = buildMeetingPlatformRegistryAcceptanceReport(manifestOrOptions, options);
+  if (!report.accepted) {
+    throw new MeetingTimelineSdkError('Meeting platform registry manifest failed acceptance', {
+      issues: report.issues,
+      report,
+    });
+  }
+  return report;
 }

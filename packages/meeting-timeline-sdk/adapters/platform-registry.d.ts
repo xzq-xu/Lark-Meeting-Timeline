@@ -9,6 +9,7 @@ export interface MeetingPlatformEventAdapter {
 
 export const MEETING_PLATFORM_REGISTRY_ENTRY_SCHEMA: 'meeting_platform_registry_entry';
 export const MEETING_PLATFORM_REGISTRY_MANIFEST_SCHEMA: 'meeting_platform_registry_manifest';
+export const MEETING_PLATFORM_REGISTRY_ACCEPTANCE_SCHEMA: 'meeting_platform_registry_acceptance';
 export const MEETING_PLATFORM_REGISTRY_SCHEMA_VERSION: 1;
 export const MEETING_PLATFORM_EVENT_ADAPTERS: readonly MeetingPlatformEventAdapter[];
 
@@ -61,6 +62,24 @@ export interface MeetingPlatformRegistryManifest {
   next_actions: string[];
 }
 
+export interface MeetingPlatformRegistryAcceptanceReport {
+  type: 'meeting_platform_registry_acceptance';
+  schema: 'meeting_platform_registry_acceptance';
+  schema_version: 1;
+  accepted: boolean;
+  platform_count: number;
+  normalizer_count: number;
+  runtime_ready_count: number;
+  contract_accepted_count: number;
+  provider_required_for_realtime_count: number;
+  transcript_blocking_count: number;
+  blocking_count: number;
+  warning_count: number;
+  issues: Array<Record<string, unknown>>;
+  manifest: MeetingPlatformRegistryManifest;
+  next_actions: string[];
+}
+
 export function buildMeetingPlatformRegistryEntry(
   platform: string,
   options?: MeetingPlatformRegistryOptions,
@@ -69,3 +88,13 @@ export function buildMeetingPlatformRegistryEntry(
 export function buildMeetingPlatformRegistryManifest(
   options?: MeetingPlatformRegistryOptions,
 ): MeetingPlatformRegistryManifest;
+
+export function buildMeetingPlatformRegistryAcceptanceReport(
+  manifestOrOptions?: MeetingPlatformRegistryManifest | MeetingPlatformRegistryEntry | MeetingPlatformRegistryOptions,
+  options?: MeetingPlatformRegistryOptions,
+): MeetingPlatformRegistryAcceptanceReport;
+
+export function assertMeetingPlatformRegistryManifest(
+  manifestOrOptions?: MeetingPlatformRegistryManifest | MeetingPlatformRegistryEntry | MeetingPlatformRegistryOptions,
+  options?: MeetingPlatformRegistryOptions,
+): MeetingPlatformRegistryAcceptanceReport;

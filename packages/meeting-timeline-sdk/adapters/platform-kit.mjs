@@ -27,6 +27,8 @@ import {
   platformCapabilityContract,
 } from './platform-setup.mjs';
 import {
+  assertMeetingPlatformRegistryManifest,
+  buildMeetingPlatformRegistryAcceptanceReport,
   buildMeetingPlatformRegistryEntry,
   buildMeetingPlatformRegistryManifest,
 } from './platform-registry.mjs';
@@ -927,6 +929,18 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformRegistryManifest(registryOptions = {}) {
       return buildMeetingPlatformRegistryManifest(withDefaults(defaults, registryOptions));
+    },
+    platformRegistryAcceptance(manifestOrOptions = {}, registryOptions = {}) {
+      return buildMeetingPlatformRegistryAcceptanceReport(
+        manifestOrOptions,
+        withDefaults(defaults, registryOptions),
+      );
+    },
+    assertPlatformRegistryManifest(manifestOrOptions = {}, registryOptions = {}) {
+      return assertMeetingPlatformRegistryManifest(
+        manifestOrOptions,
+        withDefaults(defaults, registryOptions),
+      );
     },
     capability(platform, platformOptions = {}) {
       return platformCapabilityContract(platform, withDefaults(defaults, platformOptions));

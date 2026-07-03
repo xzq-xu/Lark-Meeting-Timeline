@@ -1136,6 +1136,7 @@ Local detector adapter 支持桌面观察器、浏览器扩展、汉王宿主 Ap
 
 ```js
 import {
+  assertMeetingPlatformRegistryManifest,
   buildMeetingPlatformRegistryManifest,
   meetingPlatformEventAdapterFor,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-registry';
@@ -1150,6 +1151,7 @@ const manifest = buildMeetingPlatformRegistryManifest({
 
 // manifest.rows 是下游项目的选型表：normalizer、runtime、provider、insert endpoint、非阻塞规则。
 // manifest.entries[*] 进一步包含 SDK import、runtime bundle、provider security verifier 和 host endpoints。
+assertMeetingPlatformRegistryManifest(manifest);
 ```
 
 也可以直接导出 registry 报告：

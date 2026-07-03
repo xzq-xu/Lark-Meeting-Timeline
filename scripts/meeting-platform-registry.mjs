@@ -3,6 +3,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import {
+  buildMeetingPlatformRegistryAcceptanceReport,
   buildMeetingPlatformRegistryManifest,
 } from '../packages/meeting-timeline-sdk/adapters/platform-registry.mjs';
 import {
@@ -33,14 +34,10 @@ function buildReport() {
     env: process.env,
     platforms,
   });
+  const acceptance = buildMeetingPlatformRegistryAcceptanceReport(manifest);
   return {
     type: 'meeting_platform_registry_report',
-    ok: manifest.platform_count > 0
-      && manifest.normalizer_count === manifest.platform_count
-      && manifest.runtime_ready_count === manifest.platform_count
-      && manifest.contract_accepted_count === manifest.platform_count
-      && manifest.provider_required_for_realtime_count === 0
-      && manifest.transcript_blocking_count === 0,
+    ok: acceptance.accepted,
     requirement: 'all_selected_platforms_have_nonblocking_registry_entries',
     base_url: baseUrl,
     base_path: basePath,
@@ -51,6 +48,10 @@ function buildReport() {
     provider_required_for_realtime_count: manifest.provider_required_for_realtime_count,
     transcript_blocking_count: manifest.transcript_blocking_count,
     rows: manifest.rows,
+    acceptance: {
+      ...acceptance,
+      manifest: undefined,
+    },
     manifest: includeEntries ? manifest : {
       ...manifest,
       entries: undefined,

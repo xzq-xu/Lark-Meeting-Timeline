@@ -110,6 +110,8 @@ import {
   createMeetingPlatformTimelineKit,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit';
 import {
+  assertMeetingPlatformRegistryManifest,
+  buildMeetingPlatformRegistryAcceptanceReport,
   buildMeetingPlatformRegistryEntry,
   buildMeetingPlatformRegistryManifest,
   meetingPlatformEventAdapterFor,
@@ -272,6 +274,14 @@ assert.equal(buildMeetingPlatformRegistryManifest({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).provider_required_for_realtime_count, 0);
+assert.equal(buildMeetingPlatformRegistryAcceptanceReport({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).accepted, true);
+assert.equal(assertMeetingPlatformRegistryManifest({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).accepted, true);
 assert.equal(kit.platformLiveAdapterHandoff('zoom').sdk.factory, 'createMeetingPlatformLiveAdapter');
 assert.equal(kit.platformLiveAdapterHandoffBundle({
   platforms: ['zoom'],
