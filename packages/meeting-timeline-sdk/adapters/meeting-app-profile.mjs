@@ -498,4 +498,80 @@ export function buildAllMeetingAppRuntimeAdapterAcceptanceReports(options = {}) 
   ]));
 }
 
+function sourcedIssues(source, issues = []) {
+  return asArray(issues).map((item) => ({
+    source,
+    ...item,
+  }));
+}
+
+function validationOptions(options = {}) {
+  return {
+    allowFixtureEvidence: false,
+    allow_fixture_evidence: false,
+    allowFixtureProduction: false,
+    allow_fixture_production: false,
+    requireProductionReady: false,
+    require_production_ready: false,
+    ...options,
+  };
+}
+
+export function buildMeetingAppRuntimeAdapterValidationReport(configOrPlatform = {}, options = {}) {
+  const config = runtimeConfigFromInput(configOrPlatform, options);
+  const configAcceptance = buildMeetingAppRuntimeAdapterAcceptanceReport(config, options);
+  const platform = configAcceptance.platform;
+  let launchGate = null;
+  const issues = [...sourcedIssues('runtime_config', configAcceptance.issues)];
+  if (configAcceptance.accepted && platform) {
+    launchGate = buildMeetingAppLaunchGate(platform, validationOptions(options));
+    issues.push(...sourcedIssues('launch_gate', [
+      ...(launchGate.blocking_issues ?? []),
+      ...(launchGate.warnings ?? []),
+    ]));
+  } else {
+    issues.push(issue(
+      'error',
+      'runtime_config_not_accepted',
+      'Runtime adapter config must pass acceptance before live validation can run.',
+    ));
+  }
+
+  const accepted = configAcceptance.accepted === true && launchGate?.passed === true;
+  const productionReady = configAcceptance.accepted === true && launchGate?.production_ready === true;
+  return compactObject({
+    type: 'meeting_app_runtime_adapter_validation_report',
+    schema: MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    accepted,
+    production_ready: productionReady,
+    platform,
+    evidence_level: launchGate?.evidence_level ?? 'none',
+    evidence_count: launchGate?.evidence_count ?? 0,
+    config_acceptance: configAcceptance,
+    launch_gate: launchGate,
+    next_actions: uniqueList([
+      ...(productionReady ? [] : ['capture_live_dom_snapshots_for_this_platform']),
+      ...(launchGate?.next_actions ?? []),
+      ...issues.map((item) => item.code),
+    ]),
+    issues,
+  });
+}
+
+export function assertMeetingAppRuntimeAdapterValidation(configOrPlatform = {}, options = {}) {
+  const report = buildMeetingAppRuntimeAdapterValidationReport(configOrPlatform, options);
+  if (!report.accepted) {
+    throw new MeetingTimelineSdkError('Meeting app runtime adapter validation failed', report);
+  }
+  return report;
+}
+
+export function buildAllMeetingAppRuntimeAdapterValidationReports(options = {}) {
+  return Object.fromEntries(platformList(options).map((platform) => [
+    platform,
+    buildMeetingAppRuntimeAdapterValidationReport(platform, options),
+  ]));
+}
+
 export default buildMeetingAppIntegrationProfile;

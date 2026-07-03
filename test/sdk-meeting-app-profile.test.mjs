@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 
+import { buildMeetingAppFixtureSnapshot } from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
 import {
   MEETING_APP_INTEGRATION_PROFILE_PLATFORMS,
   MEETING_APP_INTEGRATION_PROFILE_SCHEMA,
@@ -7,11 +8,14 @@ import {
   buildAllMeetingAppIntegrationProfiles,
   buildAllMeetingAppRuntimeAdapterAcceptanceReports,
   buildAllMeetingAppRuntimeAdapterConfigs,
+  buildAllMeetingAppRuntimeAdapterValidationReports,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
   buildMeetingAppRuntimeAdapterAcceptanceReport,
   buildMeetingAppRuntimeAdapterConfig,
+  buildMeetingAppRuntimeAdapterValidationReport,
   assertMeetingAppRuntimeAdapterConfig,
+  assertMeetingAppRuntimeAdapterValidation,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-profile.mjs';
 
 assert.deepEqual(MEETING_APP_INTEGRATION_PROFILE_PLATFORMS, [
@@ -74,6 +78,33 @@ assert.equal(googleRuntimeAcceptance.coverage.bridge_preset, true);
 assert.equal(googleRuntimeAcceptance.coverage.participant_selectors, true);
 assert.equal(assertMeetingAppRuntimeAdapterConfig(googleRuntimeConfig).accepted, true);
 
+const missingLiveValidation = buildMeetingAppRuntimeAdapterValidationReport(googleRuntimeConfig);
+assert.equal(missingLiveValidation.accepted, false);
+assert.equal(missingLiveValidation.production_ready, false);
+assert.equal(missingLiveValidation.evidence_level, 'none');
+assert.equal(missingLiveValidation.issues.some((item) => item.code === 'missing_meeting_app_evidence'), true);
+
+const liveSnapshots = [
+  buildMeetingAppFixtureSnapshot('google-meet', {
+    state: 'active',
+    observedAtMs: 1_783_356_000_000,
+  }),
+  buildMeetingAppFixtureSnapshot('google-meet', {
+    state: 'prejoin',
+    observedAtMs: 1_783_356_600_000,
+  }),
+];
+const liveValidation = buildMeetingAppRuntimeAdapterValidationReport(googleRuntimeConfig, {
+  snapshots: liveSnapshots,
+});
+assert.equal(liveValidation.accepted, true);
+assert.equal(liveValidation.production_ready, true);
+assert.equal(liveValidation.evidence_level, 'captured_dom');
+assert.equal(liveValidation.launch_gate.production_ready, true);
+assert.equal(assertMeetingAppRuntimeAdapterValidation(googleRuntimeConfig, {
+  snapshots: liveSnapshots,
+}).production_ready, true);
+
 const unsafeRuntimeConfig = {
   ...googleRuntimeConfig,
   extension: {
@@ -126,6 +157,13 @@ const selectedRuntimeAcceptance = buildAllMeetingAppRuntimeAdapterAcceptanceRepo
 assert.deepEqual(Object.keys(selectedRuntimeAcceptance), ['zoom', 'webex']);
 assert.equal(selectedRuntimeAcceptance.zoom.accepted, true);
 assert.equal(selectedRuntimeAcceptance.webex.coverage.storage_permission, true);
+
+const selectedRuntimeValidation = buildAllMeetingAppRuntimeAdapterValidationReports({
+  platforms: ['zoom', 'webex'],
+});
+assert.deepEqual(Object.keys(selectedRuntimeValidation), ['zoom', 'webex']);
+assert.equal(selectedRuntimeValidation.zoom.accepted, false);
+assert.equal(selectedRuntimeValidation.webex.evidence_level, 'none');
 
 const matrix = buildMeetingAppIntegrationMatrix({
   baseUrl: 'https://timeline.example.com',

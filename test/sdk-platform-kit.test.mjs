@@ -8,6 +8,7 @@ import {
   buildPlatformFixtureEnv,
   buildPlatformFixtureEvent,
 } from '../packages/meeting-timeline-sdk/adapters/platform-fixtures.mjs';
+import { buildMeetingAppFixtureSnapshot } from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
 import { platformCapabilityContract } from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
 
 const baseUrl = 'https://timeline.example.com';
@@ -134,11 +135,20 @@ assert.equal(runtimeAdapterConfig.bridge_options.browser_runtime_preset, 'google
 assert.equal(runtimeAdapterConfig.capture_options.captureProfile, 'google_meet');
 assert.equal(kit.meetingAppRuntimeAdapterAcceptance(runtimeAdapterConfig).accepted, true);
 assert.equal(kit.assertMeetingAppRuntimeAdapterConfig(runtimeAdapterConfig).accepted, true);
+assert.equal(kit.meetingAppRuntimeAdapterValidation(runtimeAdapterConfig).accepted, false);
+const kitLiveSnapshots = [
+  buildMeetingAppFixtureSnapshot('google-meet', { state: 'active', observedAtMs: 1_783_356_000_000 }),
+  buildMeetingAppFixtureSnapshot('google-meet', { state: 'prejoin', observedAtMs: 1_783_356_600_000 }),
+];
+assert.equal(kit.meetingAppRuntimeAdapterValidation(runtimeAdapterConfig, { snapshots: kitLiveSnapshots }).production_ready, true);
+assert.equal(kit.assertMeetingAppRuntimeAdapterValidation(runtimeAdapterConfig, { snapshots: kitLiveSnapshots }).accepted, true);
 const runtimeAdapterConfigs = kit.allMeetingAppRuntimeAdapterConfigs({ platforms: ['zoom'] });
 assert.deepEqual(Object.keys(runtimeAdapterConfigs), ['zoom']);
 assert.equal(runtimeAdapterConfigs.zoom.runtime_options.runtimePreset, 'zoom');
 const runtimeAdapterAcceptance = kit.allMeetingAppRuntimeAdapterAcceptanceReports({ platforms: ['zoom'] });
 assert.equal(runtimeAdapterAcceptance.zoom.accepted, true);
+const runtimeAdapterValidation = kit.allMeetingAppRuntimeAdapterValidationReports({ platforms: ['zoom'] });
+assert.equal(runtimeAdapterValidation.zoom.accepted, false);
 
 const extensionMatches = kit.meetingAppExtensionMatches({ platforms: ['google-meet'] });
 assert.deepEqual(extensionMatches.matches, ['https://meet.google.com/*']);
@@ -247,6 +257,7 @@ assert.equal(report.meeting_app_integration_matrix.platform_count, 5);
 assert.equal(report.meeting_app_integration_matrix.rows.some((row) => row.platform === 'google_meet'), true);
 assert.equal(report.meeting_app_runtime_adapter_configs.google_meet.bridge_options.browser_runtime_preset, 'google_meet');
 assert.equal(report.meeting_app_runtime_adapter_acceptance.google_meet.accepted, true);
+assert.equal(report.meeting_app_runtime_adapter_validation.google_meet.accepted, false);
 assert.equal(report.meeting_app_fixture_acceptance.accepted, true);
 assert.equal(report.meeting_app_fixture_acceptance.accepted_count, 5);
 assert.equal(report.meeting_app_launch_gate.ok, false);

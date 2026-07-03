@@ -16,6 +16,7 @@ import type {
   MeetingAppIntegrationProfileOptions,
   MeetingAppRuntimeAdapterAcceptanceReport,
   MeetingAppRuntimeAdapterConfig,
+  MeetingAppRuntimeAdapterValidationReport,
 } from './meeting-app-profile.mjs';
 import type {
   MeetingAppExtensionInstallPlan,
@@ -88,6 +89,9 @@ export interface MeetingPlatformTimelineKit {
   meetingAppRuntimeAdapterAcceptance(configOrPlatform?: MeetingAppRuntimeAdapterConfig | string | MeetingAppIntegrationProfileOptions, acceptanceOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterAcceptanceReport;
   allMeetingAppRuntimeAdapterAcceptanceReports(acceptanceOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppRuntimeAdapterAcceptanceReport>>;
   assertMeetingAppRuntimeAdapterConfig(configOrPlatform?: MeetingAppRuntimeAdapterConfig | string | MeetingAppIntegrationProfileOptions, acceptanceOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterAcceptanceReport;
+  meetingAppRuntimeAdapterValidation(configOrPlatform?: MeetingAppRuntimeAdapterConfig | string | MeetingAppIntegrationProfileOptions, validationReportOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterValidationReport;
+  allMeetingAppRuntimeAdapterValidationReports(validationReportOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppRuntimeAdapterValidationReport>>;
+  assertMeetingAppRuntimeAdapterValidation(configOrPlatform?: MeetingAppRuntimeAdapterConfig | string | MeetingAppIntegrationProfileOptions, validationReportOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterValidationReport;
   meetingAppExtensionInstallPlan(extensionOptions?: MeetingAppExtensionOptions): MeetingAppExtensionInstallPlan;
   meetingAppContentScriptManifest(extensionOptions?: MeetingAppExtensionOptions): Record<string, unknown>;
   meetingAppExtensionMatches(extensionOptions?: MeetingAppExtensionOptions): MeetingAppExtensionMatchPatterns;

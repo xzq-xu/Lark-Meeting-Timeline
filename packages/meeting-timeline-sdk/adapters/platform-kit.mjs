@@ -61,13 +61,16 @@ import {
 } from './meeting-app-snapshot-recorder.mjs';
 import {
   assertMeetingAppRuntimeAdapterConfig,
+  assertMeetingAppRuntimeAdapterValidation,
   buildAllMeetingAppIntegrationProfiles,
   buildAllMeetingAppRuntimeAdapterAcceptanceReports,
   buildAllMeetingAppRuntimeAdapterConfigs,
+  buildAllMeetingAppRuntimeAdapterValidationReports,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
   buildMeetingAppRuntimeAdapterAcceptanceReport,
   buildMeetingAppRuntimeAdapterConfig,
+  buildMeetingAppRuntimeAdapterValidationReport,
 } from './meeting-app-profile.mjs';
 import {
   buildMeetingAppExtensionAttachedMessage,
@@ -191,6 +194,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_integration_matrix: buildMeetingAppIntegrationMatrix(options),
     meeting_app_runtime_adapter_configs: buildAllMeetingAppRuntimeAdapterConfigs(options),
     meeting_app_runtime_adapter_acceptance: buildAllMeetingAppRuntimeAdapterAcceptanceReports(options),
+    meeting_app_runtime_adapter_validation: buildAllMeetingAppRuntimeAdapterValidationReports(options),
     meeting_app_fixture_acceptance: meetingAppFixtureAcceptance,
     meeting_app_launch_gate: meetingAppLaunchGateSummary,
   };
@@ -311,6 +315,15 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertMeetingAppRuntimeAdapterConfig(configOrPlatform = {}, acceptanceOptions = {}) {
       return assertMeetingAppRuntimeAdapterConfig(configOrPlatform, withDefaults(defaults, acceptanceOptions));
+    },
+    meetingAppRuntimeAdapterValidation(configOrPlatform = {}, validationReportOptions = {}) {
+      return buildMeetingAppRuntimeAdapterValidationReport(configOrPlatform, withDefaults(defaults, validationReportOptions));
+    },
+    allMeetingAppRuntimeAdapterValidationReports(validationReportOptions = {}) {
+      return buildAllMeetingAppRuntimeAdapterValidationReports(withDefaults(defaults, validationReportOptions));
+    },
+    assertMeetingAppRuntimeAdapterValidation(configOrPlatform = {}, validationReportOptions = {}) {
+      return assertMeetingAppRuntimeAdapterValidation(configOrPlatform, withDefaults(defaults, validationReportOptions));
     },
     meetingAppExtensionInstallPlan(extensionOptions = {}) {
       return buildMeetingAppExtensionInstallPlan(withDefaults(defaults, extensionOptions));

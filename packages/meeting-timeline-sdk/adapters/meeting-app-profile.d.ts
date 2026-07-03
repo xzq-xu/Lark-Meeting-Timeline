@@ -75,6 +75,21 @@ export interface MeetingAppRuntimeAdapterAcceptanceReport {
   issues: Array<Record<string, unknown>>;
 }
 
+export interface MeetingAppRuntimeAdapterValidationReport {
+  type: 'meeting_app_runtime_adapter_validation_report';
+  schema: 'meeting_app_runtime_adapter_config';
+  version: number;
+  accepted: boolean;
+  production_ready: boolean;
+  platform?: MeetingAppDomCaptureProfilePlatform | string;
+  evidence_level: string;
+  evidence_count: number;
+  config_acceptance: MeetingAppRuntimeAdapterAcceptanceReport;
+  launch_gate?: Record<string, unknown> | null;
+  next_actions: string[];
+  issues: Array<Record<string, unknown>>;
+}
+
 export function buildMeetingAppIntegrationProfile(
   platformOrInput?: MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
   options?: MeetingAppIntegrationProfileOptions,
@@ -110,5 +125,19 @@ export function assertMeetingAppRuntimeAdapterConfig(
 export function buildAllMeetingAppRuntimeAdapterAcceptanceReports(
   options?: MeetingAppIntegrationProfileOptions,
 ): Partial<Record<MeetingAppDomCaptureProfilePlatform, MeetingAppRuntimeAdapterAcceptanceReport>>;
+
+export function buildMeetingAppRuntimeAdapterValidationReport(
+  configOrPlatform?: MeetingAppRuntimeAdapterConfig | MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppRuntimeAdapterValidationReport;
+
+export function assertMeetingAppRuntimeAdapterValidation(
+  configOrPlatform?: MeetingAppRuntimeAdapterConfig | MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppRuntimeAdapterValidationReport;
+
+export function buildAllMeetingAppRuntimeAdapterValidationReports(
+  options?: MeetingAppIntegrationProfileOptions,
+): Partial<Record<MeetingAppDomCaptureProfilePlatform, MeetingAppRuntimeAdapterValidationReport>>;
 
 export default buildMeetingAppIntegrationProfile;
