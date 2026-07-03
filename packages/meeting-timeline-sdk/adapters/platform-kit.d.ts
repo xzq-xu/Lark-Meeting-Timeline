@@ -53,6 +53,11 @@ import type {
   MeetingPlatformHostIntegrationScaffold,
   MeetingPlatformHostIntegrationScaffoldAcceptanceReport,
 } from './platform-host-integration.mjs';
+import type {
+  MeetingPlatformProviderConnectionMatrix,
+  MeetingPlatformProviderConnectionOptions,
+  MeetingPlatformProviderConnectionPack,
+} from './platform-provider-connection.mjs';
 import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type {
@@ -166,6 +171,8 @@ export interface MeetingPlatformTimelineKit {
     scaffoldOrOptions?: MeetingPlatformHostIntegrationScaffold | MeetingPlatformHostIntegrationOptions,
     acceptanceOptions?: MeetingPlatformHostIntegrationOptions,
   ): MeetingPlatformHostIntegrationScaffoldAcceptanceReport;
+  platformProviderConnectionPack(platform: string, providerOptions?: MeetingPlatformProviderConnectionOptions): MeetingPlatformProviderConnectionPack;
+  platformProviderConnectionMatrix(providerOptions?: MeetingPlatformProviderConnectionOptions): MeetingPlatformProviderConnectionMatrix;
   meetingAppSnapshotRecorder(recorderOptions?: MeetingAppSnapshotRecordOptions): MeetingAppSnapshotRecorder;
   meetingAppGateInputFromRecords(records?: MeetingAppSnapshotRecord[] | MeetingAppSnapshotRecordSet, recordOptions?: MeetingAppSnapshotRecordOptions): Record<string, unknown>;
   meetingAppIntegrationProfile(platform: string, profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppIntegrationProfile;

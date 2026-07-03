@@ -93,6 +93,10 @@ import {
   buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport,
 } from './platform-host-integration.mjs';
 import {
+  buildMeetingPlatformProviderConnectionMatrix,
+  buildMeetingPlatformProviderConnectionPack,
+} from './platform-provider-connection.mjs';
+import {
   assertAllMeetingAppLaunchGates,
   assertMeetingAppLaunchGate,
   buildMeetingAppLaunchGate,
@@ -265,6 +269,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_live_adapter_handoff_bundle: buildMeetingPlatformLiveAdapterHandoffBundle(options),
     platform_host_integration: buildMeetingPlatformHostIntegrationPlan(options),
     platform_host_integration_acceptance: buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(options),
+    platform_provider_connection_matrix: buildMeetingPlatformProviderConnectionMatrix(options),
   };
 }
 
@@ -463,6 +468,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
         );
       }
       return assertMeetingPlatformHostIntegrationScaffold(withDefaults(defaults, scaffoldOrOptions));
+    },
+    platformProviderConnectionPack(platform, providerOptions = {}) {
+      return buildMeetingPlatformProviderConnectionPack(platform, withDefaults(defaults, providerOptions));
+    },
+    platformProviderConnectionMatrix(providerOptions = {}) {
+      return buildMeetingPlatformProviderConnectionMatrix(withDefaults(defaults, providerOptions));
     },
     meetingAppSnapshotRecorder(recorderOptions = {}) {
       return createMeetingAppSnapshotRecorder(withDefaults(defaults, recorderOptions));

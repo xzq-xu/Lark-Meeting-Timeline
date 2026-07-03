@@ -130,6 +130,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-session`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-host-integration`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan`
@@ -1415,6 +1416,33 @@ const kit = createMeetingPlatformTimelineKit(client, {
 const handoff = kit.platformLiveAdapterHandoff('zoom');
 const bundle = kit.platformLiveAdapterHandoffBundle({
   platforms: ['google-meet', 'zoom'],
+});
+```
+
+官方 provider 侧接入可以先生成 `platform-provider-connection` 包。它会把 Google Meet / Teams / Zoom / Webex / Lark 的事件、scope/permission、安全校验、订阅请求和 SDK 验收命令放到同一份结构里，同时明确 provider 事件只做 reconcile/backfill，不阻塞实时标注：
+
+```js
+import {
+  buildMeetingPlatformProviderConnectionPack,
+  buildMeetingPlatformProviderConnectionMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection';
+
+const googleProvider = buildMeetingPlatformProviderConnectionPack('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+  env: process.env,
+  subscription: {
+    targetResource: '//cloudidentity.googleapis.com/users/me',
+    pubsubTopic: 'projects/demo/topics/meet-events',
+  },
+});
+
+// googleProvider.event_mapping 会列出 Workspace Events 到 meeting_started/artifact_ready 等 SDK signal 的映射。
+// googleProvider.security.verifier === 'verifyGooglePubSubOidcJwt'
+// googleProvider.realtime_annotation_policy.provider_events_block_realtime === false
+
+const providerMatrix = buildMeetingPlatformProviderConnectionMatrix({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'microsoft-teams', 'zoom', 'webex'],
 });
 ```
 

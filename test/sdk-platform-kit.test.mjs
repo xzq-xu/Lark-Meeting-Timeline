@@ -330,5 +330,8 @@ assert.equal(report.platform_live_adapter_handoff_bundle.handoffs.some((handoff)
 assert.equal(report.platform_host_integration.runtime_contract.annotation_timestamp_field, 'captured_at_ms');
 assert.equal(report.platform_host_integration_acceptance.accepted, true);
 assert.equal(report.platform_host_integration_acceptance.scaffold.files.some((file) => file.path === 'src/meeting-platform-host.mjs'), true);
+assert.equal(report.platform_provider_connection_matrix.platform_count, 6);
+assert.equal(report.platform_provider_connection_matrix.rows.some((row) => row.platform === 'google_meet'), true);
+assert.equal(report.platform_provider_connection_matrix.rows.find((row) => row.platform === 'google_meet').docs.some((url) => url.includes('developers.google.com')), true);
 
 console.log('ok meeting platform timeline kit');

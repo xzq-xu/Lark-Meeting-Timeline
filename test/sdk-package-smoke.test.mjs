@@ -41,6 +41,8 @@ assert.equal(packedFiles.includes('adapters/platform-live-adapter.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-live-adapter.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-host-integration.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-host-integration.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-provider-connection.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-provider-connection.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.d.ts'), true);
 assert.equal(packedFiles.includes('README.md'), true);
@@ -109,6 +111,10 @@ import {
   assertMeetingPlatformHostIntegrationScaffold,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-host-integration';
 import {
+  buildMeetingPlatformProviderConnectionMatrix,
+  buildMeetingPlatformProviderConnectionPack,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection';
+import {
   normalizeGoogleMeetEvent,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/google-meet';
 import {
@@ -141,6 +147,10 @@ assert.equal(kit.platformHostIntegrationPlan({
 assert.equal(kit.platformHostIntegrationScaffold({
   platforms: ['zoom'],
 }).files.some((file) => file.path === 'src/meeting-platform-host.mjs'), true);
+assert.equal(kit.platformProviderConnectionPack('zoom').security.verifier, 'verifyZoomWebhookEvent');
+assert.equal(kit.platformProviderConnectionMatrix({
+  platforms: ['zoom'],
+}).platform_count, 1);
 
 const rollout = buildMeetingPlatformRolloutPlan('teams', {
   baseUrl: 'http://localhost:8787',
@@ -220,6 +230,13 @@ assert.equal(assertMeetingPlatformHostIntegrationScaffold(buildMeetingPlatformHo
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 })).accepted, true);
+assert.equal(buildMeetingPlatformProviderConnectionPack('zoom', {
+  baseUrl: 'http://localhost:8787',
+}).realtime_annotation_policy.annotation_timestamp_field, 'captured_at_ms');
+assert.equal(buildMeetingPlatformProviderConnectionMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).packs[0].official_docs.some((doc) => doc.url.includes('zoom.us')), true);
 
 const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {
   providerRecords: [],
