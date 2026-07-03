@@ -17,6 +17,8 @@ import type {
   MeetingAppIntegrationMatrix,
   MeetingAppIntegrationProfile,
   MeetingAppIntegrationProfileOptions,
+  MeetingAppLiveEvidencePackage,
+  MeetingAppLiveEvidencePackageSummary,
   MeetingAppLiveSnapshotCapturePlan,
   MeetingAppRuntimeAdapterAcceptanceReport,
   MeetingAppRuntimeAdapterConfig,
@@ -94,6 +96,8 @@ export interface MeetingPlatformTimelineKit {
   allMeetingAppDeploymentManifestAcceptanceReports(acceptanceOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppDeploymentManifestAcceptanceReport>>;
   meetingAppDeploymentManifestAcceptanceSummary(acceptanceOptions?: MeetingAppIntegrationProfileOptions): MeetingAppDeploymentManifestAcceptanceSummary;
   assertMeetingAppDeploymentManifest(manifestOrPlatform?: MeetingAppDeploymentManifest | MeetingAppRuntimeAdapterConfig | string | MeetingAppIntegrationProfileOptions, acceptanceOptions?: MeetingAppIntegrationProfileOptions): MeetingAppDeploymentManifestAcceptanceReport;
+  meetingAppLiveEvidencePackage(input?: Record<string, unknown> | unknown[], evidenceOptions?: MeetingAppIntegrationProfileOptions): MeetingAppLiveEvidencePackage;
+  meetingAppLiveEvidencePackageSummary(input?: MeetingAppLiveEvidencePackage | Record<string, unknown> | unknown[], evidenceOptions?: MeetingAppIntegrationProfileOptions): MeetingAppLiveEvidencePackageSummary;
   meetingAppRuntimeAdapterConfig(platform: string, configOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterConfig;
   meetingAppLiveSnapshotCapturePlan(platform: string, planOptions?: MeetingAppIntegrationProfileOptions): MeetingAppLiveSnapshotCapturePlan;
   allMeetingAppLiveSnapshotCapturePlans(planOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppLiveSnapshotCapturePlan>>;

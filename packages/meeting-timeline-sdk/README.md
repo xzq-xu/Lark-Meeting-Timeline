@@ -505,6 +505,13 @@ const manifestAcceptance = meetingKit.meetingAppDeploymentManifestAcceptance(dep
 // manifestAcceptance.accepted === true 表示契约结构完整、可以交付外部项目接入；
 // manifestAcceptance.production_ready === true 才表示已经用真实会议 DOM 快照通过生产 gate。
 
+const liveEvidence = meetingKit.meetingAppLiveEvidencePackage({
+  platforms: ['google-meet'],
+  snapshots: capturedLiveMeetingSnapshots,
+});
+// liveEvidence.summary.rows 会列出每个平台的 record_count、missing_required_coverage 和 next_actions。
+// 它适合放进现场采样工具或 CI，把真实 Google Meet / Teams / Zoom 页面快照变成生产 gate 结果。
+
 const runtimeConfig = meetingKit.meetingAppRuntimeAdapterConfig('google-meet');
 // runtimeConfig 可以交给浏览器 extension content script、Electron WebView preload 或桌面宿主：
 // 它包含 bridge_options、runtime_options、capture_options、extension host 权限和 message_types。

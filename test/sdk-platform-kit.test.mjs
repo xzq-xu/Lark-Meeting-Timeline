@@ -165,6 +165,17 @@ const kitLiveSnapshots = [
 ];
 assert.equal(kit.meetingAppRuntimeAdapterValidation(runtimeAdapterConfig, { snapshots: kitLiveSnapshots }).production_ready, true);
 assert.equal(kit.assertMeetingAppRuntimeAdapterValidation(runtimeAdapterConfig, { snapshots: kitLiveSnapshots }).accepted, true);
+const kitEvidencePackage = kit.meetingAppLiveEvidencePackage({
+  packageId: 'kit-google-evidence',
+  platforms: ['google-meet'],
+  snapshots: kitLiveSnapshots,
+});
+assert.equal(kitEvidencePackage.id, 'kit-google-evidence');
+assert.equal(kitEvidencePackage.production_ready, true);
+assert.equal(kitEvidencePackage.manifest_acceptance.google_meet.production_ready, true);
+const kitEvidenceSummary = kit.meetingAppLiveEvidencePackageSummary(kitEvidencePackage);
+assert.equal(kitEvidenceSummary.production_ready_count, 1);
+assert.equal(kitEvidenceSummary.rows[0].record_count, 2);
 const runtimeAdapterConfigs = kit.allMeetingAppRuntimeAdapterConfigs({ platforms: ['zoom'] });
 assert.deepEqual(Object.keys(runtimeAdapterConfigs), ['zoom']);
 assert.equal(runtimeAdapterConfigs.zoom.runtime_options.runtimePreset, 'zoom');

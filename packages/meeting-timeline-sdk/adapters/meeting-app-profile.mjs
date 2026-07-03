@@ -1,8 +1,12 @@
-import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
+import { MeetingTimelineSdkError, compactObject, normalizeAbsoluteMs } from '../index.mjs';
 import { meetingAppBrowserRuntimePreset } from './meeting-app-browser-runtime.mjs';
 import { meetingAppDomCaptureProfile } from './meeting-app-capture.mjs';
 import { MEETING_APP_FIXTURE_PLATFORMS } from './meeting-app-fixtures.mjs';
 import { buildMeetingAppLaunchGate } from './meeting-app-gate.mjs';
+import {
+  buildMeetingAppSnapshotRecordSet,
+  meetingAppSnapshotRecords,
+} from './meeting-app-snapshot-recorder.mjs';
 import {
   MEETING_APP_EXTENSION_MESSAGE_TYPES,
   MEETING_APP_EXTENSION_STATUS_STORAGE_KEY,
@@ -22,6 +26,7 @@ export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS = MEETING_APP_FIXTURE_PLA
 export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA = 'meeting_app_runtime_adapter_config';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA = 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA = 'meeting_app_deployment_manifest';
+export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA = 'meeting_app_live_evidence_package';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -64,6 +69,23 @@ function platformList(options = {}) {
     options.platformKeys,
     options.platform,
     options.provider,
+    MEETING_APP_INTEGRATION_PROFILE_PLATFORMS,
+  );
+  return uniqueList(asArray(raw).map((platform) => normalizeAppPlatform(platform)));
+}
+
+function platformListFromEvidence(recordSet = {}, options = {}) {
+  const evidencePlatforms = uniqueList([
+    ...(recordSet.platforms ?? []),
+    ...meetingAppSnapshotRecords(recordSet).map((record) => record.platform ?? record.provider),
+  ]);
+  const raw = firstNonEmpty(
+    options.platforms,
+    options.platform_keys,
+    options.platformKeys,
+    options.platform,
+    options.provider,
+    evidencePlatforms.length > 0 ? evidencePlatforms : undefined,
     MEETING_APP_INTEGRATION_PROFILE_PLATFORMS,
   );
   return uniqueList(asArray(raw).map((platform) => normalizeAppPlatform(platform)));
@@ -989,6 +1011,197 @@ export function buildMeetingAppDeploymentManifestAcceptanceSummary(options = {})
         ...report.issues.map((item) => item.code),
       ]),
     })),
+  };
+}
+
+function evidenceInputOptions(input = {}, options = {}) {
+  if (Array.isArray(input)) return { ...options, records: input };
+  if (input && typeof input === 'object') return { ...input, ...options };
+  return options;
+}
+
+function evidenceRows(value) {
+  if (value == null) return [];
+  if (Array.isArray(value)) return value;
+  if (value?.records || value?.schema) return meetingAppSnapshotRecords(value);
+  if (typeof value === 'object') {
+    const rows = [];
+    for (const [key, rowsForPlatform] of Object.entries(value)) {
+      let platform;
+      try {
+        platform = normalizeAppPlatform(key);
+      } catch {
+        continue;
+      }
+      rows.push(...asArray(rowsForPlatform).map((row) => (
+        row && typeof row === 'object' && !row.platform && !row.provider
+          ? { ...row, platform }
+          : row
+      )));
+    }
+    if (rows.length > 0) return rows;
+  }
+  return asArray(value);
+}
+
+function buildEvidenceRecordSet(input = {}, options = {}) {
+  const merged = evidenceInputOptions(input, options);
+  const primary = firstNonEmpty(
+    merged.recordSet,
+    merged.record_set,
+    merged.snapshotRecords,
+    merged.snapshot_records,
+    merged.records,
+    Array.isArray(input) ? input : undefined,
+  );
+  const snapshots = firstNonEmpty(
+    merged.snapshots,
+    merged.domSnapshots,
+    merged.dom_snapshots,
+  );
+  const rows = [
+    ...evidenceRows(primary),
+    ...evidenceRows(snapshots),
+  ];
+  return buildMeetingAppSnapshotRecordSet(rows, {
+    id: firstNonEmpty(merged.recordSetId, merged.record_set_id, merged.id),
+    label: firstNonEmpty(merged.label),
+    source: firstNonEmpty(merged.source, 'meeting_app_live_evidence_package'),
+    createdAtMs: firstNonEmpty(merged.createdAtMs, merged.created_at_ms, merged.capturedAtMs, merged.captured_at_ms),
+  });
+}
+
+function recordsByPlatform(recordSet = {}, platforms = []) {
+  const output = Object.fromEntries(platforms.map((platform) => [platform, []]));
+  for (const record of meetingAppSnapshotRecords(recordSet)) {
+    if (!record?.platform && !record?.provider) continue;
+    let platform;
+    try {
+      platform = normalizeAppPlatform(record.platform ?? record.provider);
+    } catch {
+      continue;
+    }
+    if (!output[platform]) output[platform] = [];
+    output[platform].push(record);
+  }
+  return output;
+}
+
+export function buildMeetingAppLiveEvidencePackage(input = {}, options = {}) {
+  const merged = evidenceInputOptions(input, options);
+  const recordSet = buildEvidenceRecordSet(input, options);
+  const platforms = platformListFromEvidence(recordSet, merged);
+  const groupedRecords = recordsByPlatform(recordSet, platforms);
+  const packageIssues = [];
+  const requireEvidence = firstNonEmpty(merged.requireEvidence, merged.require_evidence, true);
+  for (const platform of platforms) {
+    if (requireEvidence && (groupedRecords[platform]?.length ?? 0) === 0) {
+      packageIssues.push(issue('error', 'missing_platform_evidence_records', 'No live evidence records were supplied for platform.', {
+        platform,
+      }));
+    }
+  }
+  const evidenceOptionsForValidation = {
+    ...merged,
+    records: recordSet,
+    snapshotRecords: recordSet,
+    snapshot_records: recordSet,
+    allowFixtureEvidence: false,
+    allow_fixture_evidence: false,
+  };
+  const manifestAcceptance = Object.fromEntries(platforms.map((platform) => [
+    platform,
+    buildMeetingAppDeploymentManifestAcceptanceReport(platform, evidenceOptionsForValidation),
+  ]));
+  const rows = platforms.map((platform) => {
+    const report = manifestAcceptance[platform];
+    const records = groupedRecords[platform] ?? [];
+    return {
+      platform,
+      record_count: records.length,
+      accepted: report.accepted,
+      production_ready: report.production_ready,
+      evidence_level: report.manifest?.validation_report?.evidence_level,
+      evidence_count: report.manifest?.validation_report?.evidence_count ?? records.length,
+      missing_required_coverage: report.manifest?.validation_report?.launch_gate?.missing_required_coverage ?? [],
+      error_count: report.issues.filter((item) => item.severity === 'error').length
+        + packageIssues.filter((item) => item.platform === platform && item.severity === 'error').length,
+      warning_count: report.issues.filter((item) => item.severity === 'warning').length
+        + packageIssues.filter((item) => item.platform === platform && item.severity === 'warning').length,
+      next_actions: uniqueList([
+        ...(report.manifest?.validation_report?.next_actions ?? []),
+        ...report.issues.map((item) => item.code),
+        ...packageIssues.filter((item) => item.platform === platform).map((item) => item.code),
+      ]),
+    };
+  });
+  const accepted = packageIssues.every((item) => item.severity !== 'error')
+    && Object.values(manifestAcceptance).every((report) => report.accepted);
+  const productionReady = accepted && Object.values(manifestAcceptance).every((report) => report.production_ready);
+  const createdAtMs = normalizeAbsoluteMs(firstNonEmpty(
+    merged.createdAtMs,
+    merged.created_at_ms,
+    recordSet.createdAtMs,
+    recordSet.created_at_ms,
+    Date.now(),
+  ), 'meeting_app_live_evidence_package_time');
+  return compactObject({
+    type: 'meeting_app_live_evidence_package',
+    schema: MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    id: firstNonEmpty(merged.packageId, merged.package_id, `meeting-app-live-evidence-${createdAtMs}`),
+    createdAtMs,
+    created_at_ms: createdAtMs,
+    source: firstNonEmpty(merged.source, recordSet.source, 'meeting_app_live_evidence_package'),
+    label: firstNonEmpty(merged.label, recordSet.label),
+    accepted,
+    production_ready: productionReady,
+    platform_count: platforms.length,
+    platforms,
+    record_count: recordSet.record_count,
+    record_set: recordSet,
+    records_by_platform: Object.fromEntries(Object.entries(groupedRecords).map(([platform, records]) => [
+      platform,
+      {
+        record_count: records.length,
+        phases: uniqueList(records.map((record) => record.phase)),
+        latest_record_id: records.at(-1)?.id,
+      },
+    ])),
+    manifest_acceptance: manifestAcceptance,
+    summary: {
+      accepted,
+      production_ready: productionReady,
+      accepted_count: rows.filter((row) => row.accepted).length,
+      production_ready_count: rows.filter((row) => row.production_ready).length,
+      missing_evidence_count: rows.filter((row) => row.record_count === 0).length,
+      rows,
+    },
+    issues: packageIssues,
+    handoff: {
+      validation_input: 'Pass record_set as { records } to meetingAppRuntimeAdapterValidation or meetingAppDeploymentManifestAcceptance.',
+      success_condition: 'summary.production_ready === true',
+    },
+  });
+}
+
+export function buildMeetingAppLiveEvidencePackageSummary(input = {}, options = {}) {
+  const evidencePackage = input?.type === 'meeting_app_live_evidence_package'
+    ? input
+    : buildMeetingAppLiveEvidencePackage(input, options);
+  return {
+    type: 'meeting_app_live_evidence_package_summary',
+    schema: MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    id: evidencePackage.id,
+    accepted: evidencePackage.accepted,
+    production_ready: evidencePackage.production_ready,
+    platform_count: evidencePackage.platform_count,
+    record_count: evidencePackage.record_count,
+    accepted_count: evidencePackage.summary?.accepted_count ?? 0,
+    production_ready_count: evidencePackage.summary?.production_ready_count ?? 0,
+    rows: evidencePackage.summary?.rows ?? [],
+    issues: evidencePackage.issues ?? [],
   };
 }
 

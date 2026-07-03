@@ -7,6 +7,7 @@ export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS: readonly MeetingAppDomCa
 export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA: 'meeting_app_runtime_adapter_config';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA: 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA: 'meeting_app_deployment_manifest';
+export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA: 'meeting_app_live_evidence_package';
 
 export interface MeetingAppIntegrationProfileOptions extends MeetingAppLaunchGateOptions {
   platform?: MeetingAppDomCaptureProfilePlatform | string;
@@ -150,6 +151,43 @@ export interface MeetingAppDeploymentManifestAcceptanceSummary {
   rows: Array<Record<string, unknown>>;
 }
 
+export interface MeetingAppLiveEvidencePackage {
+  type: 'meeting_app_live_evidence_package';
+  schema: 'meeting_app_live_evidence_package';
+  version: number;
+  id: string;
+  createdAtMs: number;
+  created_at_ms: number;
+  source: string;
+  label?: string;
+  accepted: boolean;
+  production_ready: boolean;
+  platform_count: number;
+  platforms: MeetingAppDomCaptureProfilePlatform[];
+  record_count: number;
+  record_set: Record<string, unknown>;
+  records_by_platform: Partial<Record<MeetingAppDomCaptureProfilePlatform, Record<string, unknown>>>;
+  manifest_acceptance: Partial<Record<MeetingAppDomCaptureProfilePlatform, MeetingAppDeploymentManifestAcceptanceReport>>;
+  summary: Record<string, unknown>;
+  issues: Array<Record<string, unknown>>;
+  handoff: Record<string, unknown>;
+}
+
+export interface MeetingAppLiveEvidencePackageSummary {
+  type: 'meeting_app_live_evidence_package_summary';
+  schema: 'meeting_app_live_evidence_package';
+  version: number;
+  id: string;
+  accepted: boolean;
+  production_ready: boolean;
+  platform_count: number;
+  record_count: number;
+  accepted_count: number;
+  production_ready_count: number;
+  rows: Array<Record<string, unknown>>;
+  issues: Array<Record<string, unknown>>;
+}
+
 export function buildMeetingAppIntegrationProfile(
   platformOrInput?: MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,
   options?: MeetingAppIntegrationProfileOptions,
@@ -221,6 +259,16 @@ export function buildAllMeetingAppDeploymentManifestAcceptanceReports(
 export function buildMeetingAppDeploymentManifestAcceptanceSummary(
   options?: MeetingAppIntegrationProfileOptions,
 ): MeetingAppDeploymentManifestAcceptanceSummary;
+
+export function buildMeetingAppLiveEvidencePackage(
+  input?: Record<string, unknown> | unknown[],
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppLiveEvidencePackage;
+
+export function buildMeetingAppLiveEvidencePackageSummary(
+  input?: MeetingAppLiveEvidencePackage | Record<string, unknown> | unknown[],
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppLiveEvidencePackageSummary;
 
 export function buildMeetingAppRuntimeAdapterValidationReport(
   configOrPlatform?: MeetingAppRuntimeAdapterConfig | MeetingAppDomCaptureProfilePlatform | string | MeetingAppIntegrationProfileOptions,

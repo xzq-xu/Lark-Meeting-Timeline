@@ -75,6 +75,8 @@ import {
   buildMeetingAppDeploymentManifest,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
+  buildMeetingAppLiveEvidencePackage,
+  buildMeetingAppLiveEvidencePackageSummary,
   buildMeetingAppLiveSnapshotCapturePlan,
   buildMeetingAppRuntimeAdapterAcceptanceReport,
   buildMeetingAppRuntimeAdapterConfig,
@@ -330,6 +332,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertMeetingAppDeploymentManifest(manifestOrPlatform = {}, acceptanceOptions = {}) {
       return assertMeetingAppDeploymentManifest(manifestOrPlatform, withDefaults(defaults, acceptanceOptions));
+    },
+    meetingAppLiveEvidencePackage(input = {}, evidenceOptions = {}) {
+      return buildMeetingAppLiveEvidencePackage(input, withDefaults(defaults, evidenceOptions));
+    },
+    meetingAppLiveEvidencePackageSummary(input = {}, evidenceOptions = {}) {
+      return buildMeetingAppLiveEvidencePackageSummary(input, withDefaults(defaults, evidenceOptions));
     },
     meetingAppRuntimeAdapterConfig(platform, configOptions = {}) {
       return buildMeetingAppRuntimeAdapterConfig(platform, withDefaults(defaults, configOptions));

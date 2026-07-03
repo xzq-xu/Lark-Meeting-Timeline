@@ -5,6 +5,7 @@ import {
   MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA,
   MEETING_APP_INTEGRATION_PROFILE_PLATFORMS,
   MEETING_APP_INTEGRATION_PROFILE_SCHEMA,
+  MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA,
   MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
   assertMeetingAppDeploymentManifest,
@@ -20,6 +21,8 @@ import {
   buildMeetingAppDeploymentManifestAcceptanceSummary,
   buildMeetingAppIntegrationMatrix,
   buildMeetingAppIntegrationProfile,
+  buildMeetingAppLiveEvidencePackage,
+  buildMeetingAppLiveEvidencePackageSummary,
   buildMeetingAppLiveSnapshotCapturePlan,
   buildMeetingAppRuntimeAdapterAcceptanceReport,
   buildMeetingAppRuntimeAdapterConfig,
@@ -39,6 +42,7 @@ assert.equal(MEETING_APP_INTEGRATION_PROFILE_SCHEMA, 'meeting_app_integration_pr
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA, 'meeting_app_runtime_adapter_config');
 assert.equal(MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA, 'meeting_app_live_snapshot_capture_plan');
 assert.equal(MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA, 'meeting_app_deployment_manifest');
+assert.equal(MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA, 'meeting_app_live_evidence_package');
 
 const googleProfile = buildMeetingAppIntegrationProfile('google-meet', {
   baseUrl: 'https://timeline.example.com',
@@ -176,6 +180,33 @@ assert.equal(liveDeploymentAcceptance.accepted, true);
 assert.equal(liveDeploymentAcceptance.production_ready, true);
 assert.equal(liveDeploymentAcceptance.coverage.live_dom_verified, true);
 assert.equal(liveDeploymentAcceptance.issues.some((item) => item.code === 'live_dom_not_verified'), false);
+const liveEvidencePackage = buildMeetingAppLiveEvidencePackage({
+  packageId: 'evidence-google-001',
+  snapshots: {
+    'google-meet': liveSnapshots,
+  },
+});
+assert.equal(liveEvidencePackage.type, 'meeting_app_live_evidence_package');
+assert.equal(liveEvidencePackage.schema, MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA);
+assert.equal(liveEvidencePackage.id, 'evidence-google-001');
+assert.deepEqual(liveEvidencePackage.platforms, ['google_meet']);
+assert.equal(liveEvidencePackage.record_count, 2);
+assert.equal(liveEvidencePackage.accepted, true);
+assert.equal(liveEvidencePackage.production_ready, true);
+assert.equal(liveEvidencePackage.records_by_platform.google_meet.record_count, 2);
+assert.equal(liveEvidencePackage.manifest_acceptance.google_meet.production_ready, true);
+assert.equal(liveEvidencePackage.summary.production_ready_count, 1);
+assert.equal(liveEvidencePackage.summary.rows[0].missing_required_coverage.length, 0);
+const liveEvidenceSummary = buildMeetingAppLiveEvidencePackageSummary(liveEvidencePackage);
+assert.equal(liveEvidenceSummary.production_ready, true);
+assert.equal(liveEvidenceSummary.record_count, 2);
+const missingEvidencePackage = buildMeetingAppLiveEvidencePackage({
+  platforms: ['google-meet'],
+  snapshots: [],
+});
+assert.equal(missingEvidencePackage.accepted, false);
+assert.equal(missingEvidencePackage.production_ready, false);
+assert.equal(missingEvidencePackage.issues.some((item) => item.code === 'missing_platform_evidence_records'), true);
 
 const unsafeRuntimeConfig = {
   ...googleRuntimeConfig,
