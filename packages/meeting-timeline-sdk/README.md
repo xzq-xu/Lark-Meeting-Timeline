@@ -135,6 +135,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-speaker-track`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-participant-track`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-timeline-view`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-annotation-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-artifact-handoff`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness`
@@ -1549,6 +1550,55 @@ npm run meeting-platform:timeline-view -- \
   --input=data/meeting-platform-timeline-view-input.json \
   --out-dir=data/meeting-platform-timeline-views \
   --report-file=data/meeting-platform-timeline-view-report.json
+```
+
+如果下游项目只需要“把当前手写/标注插到会议时间轴上”，不要复制 demo 服务端里的条件判断，直接用 `platform-annotation-intake`。它不拉 provider、不等转写，只检查标注是否携带可靠 `captured_at_ms`，再根据当前会议轴状态给出动作：直接插入当前轴、先开一个 open session 再插入、进入 pending 等真实会议 start 回填，或者标记为缺时间戳/会后审计。
+
+```js
+import {
+  buildMeetingPlatformAnnotationIntake,
+  buildMeetingPlatformAnnotationIntakeMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-annotation-intake';
+
+const matrix = buildMeetingPlatformAnnotationIntakeMatrix({
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+// matrix.provider_blocking_count === 0
+// matrix.transcript_blocking_count === 0
+
+const decision = buildMeetingPlatformAnnotationIntake('google-meet', {
+  current_meeting: {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    start_time_ms: meetingStartMs,
+  },
+  annotation: {
+    id: 'note-1',
+    label: 'why?',
+    captured_at_ms: inkEndAtMs,
+    text_candidates: ['why?', 'why'],
+    strokes,
+  },
+});
+
+if (decision.status === 'ready_to_insert_current_axis') {
+  await timeline.insertMark(decision.insert_payload);
+}
+if (decision.status === 'start_open_session_then_insert') {
+  await timeline.startMeeting(decision.open_session_payload);
+  await timeline.insertMark(decision.insert_payload);
+}
+```
+
+对应 CLI：
+
+```sh
+npm run meeting-platform:annotation-intake -- \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --input=data/meeting-platform-annotation-input.json \
+  --out-dir=data/meeting-platform-annotation-intake \
+  --report-file=data/meeting-platform-annotation-intake-report.json
 ```
 
 ## 会后转写导入

@@ -86,6 +86,13 @@ import type {
   MeetingPlatformTimelineViewport,
 } from './platform-timeline-view.mjs';
 import type {
+  MeetingPlatformAnnotationIntake,
+  MeetingPlatformAnnotationIntakeInput,
+  MeetingPlatformAnnotationIntakeMatrix,
+  MeetingPlatformAnnotationIntakeOptions,
+  MeetingPlatformAnnotationIntakePlan,
+} from './platform-annotation-intake.mjs';
+import type {
   MeetingPlatformArtifactHandoff,
   MeetingPlatformArtifactHandoffInput,
   MeetingPlatformArtifactHandoffMatrix,
@@ -284,6 +291,13 @@ export interface MeetingPlatformTimelineKit {
     anchorRatio?: number,
     viewOptions?: MeetingPlatformTimelineViewOptions,
   ): MeetingPlatformTimelineViewport;
+  platformAnnotationIntakePlan(platform: string, intakeOptions?: MeetingPlatformAnnotationIntakeOptions): MeetingPlatformAnnotationIntakePlan;
+  platformAnnotationIntakeMatrix(intakeOptions?: MeetingPlatformAnnotationIntakeOptions): MeetingPlatformAnnotationIntakeMatrix;
+  platformAnnotationIntake(
+    platform: string,
+    input?: MeetingPlatformAnnotationIntakeInput,
+    intakeOptions?: MeetingPlatformAnnotationIntakeOptions,
+  ): MeetingPlatformAnnotationIntake;
   platformArtifactHandoffPlan(platform: string, artifactOptions?: MeetingPlatformArtifactHandoffOptions): MeetingPlatformArtifactHandoffPlan;
   platformArtifactHandoffMatrix(artifactOptions?: MeetingPlatformArtifactHandoffOptions): MeetingPlatformArtifactHandoffMatrix;
   platformArtifactHandoff(

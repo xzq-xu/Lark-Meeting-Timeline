@@ -343,6 +343,27 @@ assert.equal(kit.zoomPlatformTimelineViewport({
   duration_ms: 600_000,
   full_duration_ms: 600_000,
 }, 2).duration_ms, 300_000);
+assert.equal(kit.platformAnnotationIntakePlan('google-meet').schema, 'meeting_platform_annotation_intake_plan');
+assert.equal(kit.platformAnnotationIntakeMatrix({ platforms: ['google-meet', 'zoom'] }).platform_count, 2);
+assert.equal(kit.platformAnnotationIntake('google-meet', {
+  current_meeting: {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    start_time_ms: 1_782_614_400_000,
+  },
+  annotation: {
+    id: 'intake-note-1',
+    label: 'why?',
+    captured_at_ms: 1_782_614_402_000,
+  },
+}).status, 'ready_to_insert_current_axis');
+assert.equal(kit.platformAnnotationIntake('lark', {
+  annotation: {
+    id: 'intake-note-2',
+    label: 'follow up',
+    captured_at_ms: 1_782_614_403_000,
+  },
+}).status, 'start_open_session_then_insert');
 
 const kitState = kit.getState();
 assert.equal(kitState.bridge.signal_reconciler.active_meetings.length, 0);
@@ -398,6 +419,9 @@ assert.equal(report.platform_participant_track_matrix.rows.some((row) => row.pla
 assert.equal(report.platform_timeline_view_matrix.platform_count, 6);
 assert.equal(report.platform_timeline_view_matrix.provider_blocking_count, 0);
 assert.equal(report.platform_timeline_view_matrix.rows.some((row) => row.platform === 'google_meet'), true);
+assert.equal(report.platform_annotation_intake_matrix.platform_count, 6);
+assert.equal(report.platform_annotation_intake_matrix.provider_blocking_count, 0);
+assert.equal(report.platform_annotation_intake_matrix.rows.some((row) => row.platform === 'google_meet'), true);
 assert.equal(report.platform_adapter_contract_matrix.platform_count, 6);
 assert.equal(report.platform_adapter_contract_matrix.rows.some((row) => row.platform === 'google_meet'), true);
 assert.equal(report.platform_adapter_contract_matrix.rows.find((row) => row.platform === 'google_meet').browser_observer, true);
