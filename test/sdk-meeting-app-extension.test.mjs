@@ -14,6 +14,7 @@ import {
   buildMeetingAppExtensionClientCallMessage,
   buildMeetingAppExtensionContentScriptSource,
   buildMeetingAppExtensionInstallPlan,
+  buildMeetingAppExtensionLiveCaptureSource,
   buildMeetingAppExtensionMatchPatterns,
   buildMeetingAppExtensionPackageJson,
   buildMeetingAppExtensionScaffold,
@@ -253,6 +254,7 @@ assert.equal(plan.browser_runtime_adapter, '@ai-annotation/meeting-timeline-sdk/
 assert.equal(plan.snapshot_recorder_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder');
 assert.equal(plan.launch_gate_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate');
 assert.equal(plan.runtime_contract.timestamp_field, 'captured_at_ms');
+assert.equal(plan.runtime_contract.live_capture_global, '__meetingTimelineLiveCapture');
 assert.deepEqual(plan.runtime_contract.message_types, MEETING_APP_EXTENSION_MESSAGE_TYPES);
 assert.equal(plan.runtime_contract.status_storage_key, MEETING_APP_EXTENSION_STATUS_STORAGE_KEY);
 assert.deepEqual(plan.runtime_contract.timeline_endpoints, MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS);
@@ -299,6 +301,18 @@ try {
 } finally {
   teamsContentScriptRuntime.restore();
 }
+
+const liveCaptureSource = buildMeetingAppExtensionLiveCaptureSource({
+  platforms: ['google_meet', 'microsoft_teams'],
+});
+assert.match(liveCaptureSource, /captureMeetingAppDomSnapshot/);
+assert.match(liveCaptureSource, /createMeetingAppSnapshotRecorder/);
+assert.match(liveCaptureSource, /buildMeetingAppLiveEvidencePackage/);
+assert.match(liveCaptureSource, /__meetingTimelineLiveCapture/);
+assert.match(liveCaptureSource, /captureActive/);
+assert.match(liveCaptureSource, /captureEnded/);
+assert.match(liveCaptureSource, /meet\.google\.com/);
+assert.match(liveCaptureSource, /teams\.microsoft\.com/);
 
 const backgroundSource = buildMeetingAppExtensionBackgroundSource({
   baseUrl: 'https://timeline.example.com/',
@@ -376,6 +390,8 @@ const buildSource = buildMeetingAppExtensionBuildSource({
 assert.match(buildSource, /from 'esbuild'/);
 assert.match(buildSource, /src\/content-script\.entry\.mjs/);
 assert.match(buildSource, /src\/background\.entry\.mjs/);
+assert.match(buildSource, /src\/live-capture\.entry\.mjs/);
+assert.match(buildSource, /live-capture\.js/);
 assert.match(buildSource, /format: "iife"/);
 assert.match(buildSource, /format: "esm"/);
 
@@ -390,13 +406,18 @@ assert.equal(scaffold.manifest.background.service_worker, 'background.js');
 assert.equal(scaffold.manifest.background.type, 'module');
 assert.equal(scaffold.manifest.permissions.includes('storage'), true);
 assert.equal(scaffold.manifest.host_permissions.includes('https://timeline.example.com/*'), true);
-assert.deepEqual(scaffold.manifest.content_scripts[0].js, ['content-script.js']);
+assert.deepEqual(scaffold.manifest.content_scripts[0].js, ['content-script.js', 'live-capture.js']);
 assert.equal(scaffold.bundle.background_input, 'src/background.entry.mjs');
+assert.equal(scaffold.bundle.live_capture_input, 'src/live-capture.entry.mjs');
+assert.equal(scaffold.bundle.live_capture_output, 'live-capture.js');
 assert.equal(scaffold.files.find((file) => file.path === 'package.json').mime, 'application/json');
 assert.match(scaffold.files.find((file) => file.path === 'package.json').content, /"esbuild"/);
 assert.match(scaffold.files.find((file) => file.path === 'build.mjs').content, /content-script\.js/);
+assert.match(scaffold.files.find((file) => file.path === 'build.mjs').content, /live-capture\.js/);
 assert.equal(scaffold.files.find((file) => file.path === 'manifest.json').mime, 'application/json');
 assert.match(scaffold.files.find((file) => file.path === 'src/content-script.entry.mjs').content, /meeting-app-content-script/);
+assert.match(scaffold.files.find((file) => file.path === 'src/live-capture.entry.mjs').content, /__meetingTimelineLiveCapture/);
+assert.match(scaffold.files.find((file) => file.path === 'src/live-capture.entry.mjs').content, /evidencePackage/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /runtimeApi\(\)\?\.onMessage/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /extension_status/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /npm run build/);

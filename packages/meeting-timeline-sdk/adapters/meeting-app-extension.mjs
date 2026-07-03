@@ -438,12 +438,14 @@ export function buildMeetingAppExtensionInstallPlan(options = {}) {
       message_types: { ...MEETING_APP_EXTENSION_MESSAGE_TYPES },
       status_storage_key: MEETING_APP_EXTENSION_STATUS_STORAGE_KEY,
       timeline_endpoints: { ...MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS },
+      live_capture_global: '__meetingTimelineLiveCapture',
       required_signals: ['meeting_started', 'speaker_started', 'meeting_ended'],
       timestamp_field: 'captured_at_ms',
     },
     next_steps: [
       'Bundle meeting-app-content-script into the js file declared in content_scripts.',
       'Install the generated manifest as a Chrome/Edge compatible MV3 extension or map the same matches into an Electron WebView preload bridge.',
+      'Use window.__meetingTimelineLiveCapture.captureActive() and captureEnded() to collect live DOM evidence for the launch gate.',
       'Record real meeting app snapshots with meeting-app-snapshot-recorder and validate them with meeting-app-gate before production rollout.',
     ],
     constraints: [
@@ -527,6 +529,122 @@ export function buildMeetingAppExtensionContentScriptSource(options = {}) {
     '  captured_at_ms: Date.now(),',
     '  url: globalThis.location?.href,',
     '});',
+  ].join('\n');
+}
+
+export function buildMeetingAppExtensionLiveCaptureSource(options = {}) {
+  const installPlan = buildMeetingAppExtensionInstallPlan(options);
+  const platformMap = Object.fromEntries(installPlan.platforms.map((platform) => {
+    const profile = MEETING_APP_EXTENSION_PROFILES[platform];
+    return [platform, profile.host_permissions.map((pattern) => matchPatternHost(pattern)).filter(Boolean)];
+  }));
+  const globalName = firstNonEmpty(
+    options.liveCaptureGlobal,
+    options.live_capture_global,
+    '__meetingTimelineLiveCapture',
+  );
+  return [
+    "import { captureMeetingAppDomSnapshot } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-capture';",
+    "import { createMeetingAppSnapshotRecorder } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder';",
+    "import { buildMeetingAppLiveEvidencePackage } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-profile';",
+    '',
+    `const PLATFORM_HOSTS = ${json(platformMap)};`,
+    `const LIVE_CAPTURE_GLOBAL = ${JSON.stringify(globalName)};`,
+    '',
+    'function inferPlatform(hostname = globalThis.location?.hostname ?? "") {',
+    '  const host = String(hostname);',
+    '  for (const [platform, hosts] of Object.entries(PLATFORM_HOSTS)) {',
+    '    if (hosts.some((item) => host === item || host.endsWith(`.${item}`))) return platform;',
+    '  }',
+    '  return "unknown";',
+    '}',
+    '',
+    'function nowMs() {',
+    '  return Date.now();',
+    '}',
+    '',
+    'const recorder = createMeetingAppSnapshotRecorder({',
+    '  source: "meeting_app_extension_live_capture",',
+    '});',
+    '',
+    'function capture(labelOrOptions = {}, options = {}) {',
+    '  const objectInput = labelOrOptions && typeof labelOrOptions === "object" && !Array.isArray(labelOrOptions);',
+    '  const merged = objectInput ? { ...labelOrOptions, ...options } : { ...options, label: labelOrOptions };',
+    '  const platform = merged.platform ?? inferPlatform();',
+    '  const capturedAtMs = merged.captured_at_ms ?? merged.capturedAtMs ?? nowMs();',
+    '  const snapshot = captureMeetingAppDomSnapshot({',
+    '    window: globalThis,',
+    '    document: globalThis.document,',
+    '    location: globalThis.location,',
+    '    platform,',
+    '    url: globalThis.location?.href,',
+    '    title: globalThis.document?.title,',
+    '  }, {',
+    '    ...merged,',
+    '    platform,',
+    '    captureProfile: merged.captureProfile ?? merged.capture_profile ?? platform,',
+    '    source: merged.source ?? "meeting_app_extension_live_capture",',
+    '    observedAtMs: capturedAtMs,',
+    '  });',
+    '  return recorder.add({',
+    '    snapshot,',
+    '    platform,',
+    '    phase: merged.phase,',
+    '    label: merged.label,',
+    '    captured_at_ms: capturedAtMs,',
+    '    url: globalThis.location?.href,',
+    '    title: globalThis.document?.title,',
+    '  });',
+    '}',
+    '',
+    'function captureActive(options = {}) {',
+    '  return capture({ label: options.label ?? "active_speaker", phase: "active", ...options });',
+    '}',
+    '',
+    'function captureEnded(options = {}) {',
+    '  return capture({ label: options.label ?? "meeting_ended", phase: "ended", ...options });',
+    '}',
+    '',
+    'function captureRequired(options = {}) {',
+    '  const records = [captureActive(options.active ?? options)];',
+    '  if (options.includeEnded === true || options.include_ended === true) {',
+    '    records.push(captureEnded(options.ended ?? options));',
+    '  }',
+    '  return records;',
+    '}',
+    '',
+    'function exportRecords(options = {}) {',
+    '  return recorder.exportRecords({',
+    '    ...options,',
+    '    label: options.label ?? "meeting_app_live_capture",',
+    '  });',
+    '}',
+    '',
+    'function evidencePackage(options = {}) {',
+    '  const recordSet = exportRecords(options);',
+    '  return buildMeetingAppLiveEvidencePackage({',
+    '    ...options,',
+    '    platforms: options.platforms ?? [inferPlatform()],',
+    '    recordSet,',
+    '  });',
+    '}',
+    '',
+    'const api = {',
+    '  capture,',
+    '  captureActive,',
+    '  captureEnded,',
+    '  captureRequired,',
+    '  exportRecords,',
+    '  evidencePackage,',
+    '  reset: recorder.reset,',
+    '  getState: recorder.getState,',
+    '  records: recorder.records,',
+    '};',
+    '',
+    'globalThis[LIVE_CAPTURE_GLOBAL] = api;',
+    'globalThis.dispatchEvent?.(new CustomEvent("meeting_timeline.live_capture_ready", {',
+    '  detail: { platform: inferPlatform(), global: LIVE_CAPTURE_GLOBAL, captured_at_ms: nowMs() },',
+    '}));',
   ].join('\n');
 }
 
@@ -723,6 +841,29 @@ export function buildMeetingAppExtensionBuildSource(options = {}) {
     options.build_target,
     ['chrome114', 'edge114'],
   ));
+  const includeLiveCapture = options.includeLiveCapture !== false && options.include_live_capture !== false;
+  const liveCaptureEntry = firstNonEmpty(
+    options.liveCaptureEntry,
+    options.live_capture_entry,
+    'src/live-capture.entry.mjs',
+  );
+  const liveCaptureOutput = firstNonEmpty(
+    options.liveCaptureScript,
+    options.live_capture_script,
+    'live-capture.js',
+  );
+  const extraConfig = includeLiveCapture ? [
+    '  {',
+    `    entryPoints: [${JSON.stringify(liveCaptureEntry)}],`,
+    `    outfile: ${JSON.stringify(liveCaptureOutput)},`,
+    '    bundle: true,',
+    '    platform: "browser",',
+    '    format: "iife",',
+    '    target,',
+    '    sourcemap: !production,',
+    '    minify: production,',
+    '  },',
+  ] : [];
   return [
     "import { build, context } from 'esbuild';",
     '',
@@ -751,6 +892,7 @@ export function buildMeetingAppExtensionBuildSource(options = {}) {
     '    sourcemap: !production,',
     '    minify: production,',
     '  },',
+    ...extraConfig,
     '];',
     '',
     'if (watch) {',
@@ -766,6 +908,7 @@ export function buildMeetingAppExtensionBuildSource(options = {}) {
 export function buildMeetingAppExtensionReadme(options = {}) {
   const installPlan = buildMeetingAppExtensionInstallPlan(options);
   const scriptFile = installPlan.content_scripts[0]?.js?.[0] ?? 'content-script.js';
+  const liveCaptureFile = firstNonEmpty(options.liveCaptureScript, options.live_capture_script, 'live-capture.js');
   const backgroundFile = firstNonEmpty(options.backgroundScript, options.background_script, 'background.js');
   return [
     '# Meeting Timeline Browser Extension',
@@ -783,20 +926,25 @@ export function buildMeetingAppExtensionReadme(options = {}) {
     'npm run build',
     '```',
     '',
-    `The build emits \`${scriptFile}\` and \`${backgroundFile}\`, then \`manifest.json\` can be loaded as an unpacked Chrome/Edge extension.`,
+    `The build emits \`${scriptFile}\`, \`${liveCaptureFile}\`, and \`${backgroundFile}\`, then \`manifest.json\` can be loaded as an unpacked Chrome/Edge extension.`,
     '',
     'The generated background worker forwards timeline client calls to the configured timeline service base URL.',
     '',
     'Protocol messages use `meeting_timeline.extension_attached`, `meeting_timeline.extension_status`, and `meeting_timeline.client_call`; build custom callers with the SDK message helpers instead of hardcoded strings.',
     '',
     'Before production rollout, capture real meeting app snapshots with `meeting-app-snapshot-recorder` and validate them with `meeting-app-gate`.',
+    '',
+    'When the extension is loaded, `window.__meetingTimelineLiveCapture` exposes `captureActive()`, `captureEnded()`, `exportRecords()`, and `evidencePackage()` for live DOM validation.',
   ].join('\n');
 }
 
 export function buildMeetingAppExtensionScaffold(options = {}) {
   const scriptFile = firstNonEmpty(options.outputScript, options.output_script, 'content-script.js');
+  const includeLiveCapture = options.includeLiveCapture !== false && options.include_live_capture !== false;
+  const liveCaptureFile = firstNonEmpty(options.liveCaptureScript, options.live_capture_script, 'live-capture.js');
   const backgroundFile = firstNonEmpty(options.backgroundScript, options.background_script, 'background.js');
   const contentScriptEntry = firstNonEmpty(options.contentScriptEntry, options.content_script_entry, 'src/content-script.entry.mjs');
+  const liveCaptureEntry = firstNonEmpty(options.liveCaptureEntry, options.live_capture_entry, 'src/live-capture.entry.mjs');
   const backgroundEntry = firstNonEmpty(options.backgroundEntry, options.background_entry, 'src/background.entry.mjs');
   const baseUrl = firstNonEmpty(options.baseUrl, options.base_url);
   const endpointPermission = endpointOriginPattern(baseUrl);
@@ -810,7 +958,7 @@ export function buildMeetingAppExtensionScaffold(options = {}) {
   });
   const manifest = buildMeetingAppContentScriptManifest({
     ...options,
-    js: scriptFile,
+    js: includeLiveCapture ? [scriptFile, liveCaptureFile] : scriptFile,
     permissions: unique([
       ...asArray(firstNonEmpty(options.permissions, options.extension_permissions, [])),
       'storage',
@@ -830,13 +978,14 @@ export function buildMeetingAppExtensionScaffold(options = {}) {
   });
   const installPlan = buildMeetingAppExtensionInstallPlan({
     ...options,
-    js: scriptFile,
+    js: includeLiveCapture ? [scriptFile, liveCaptureFile] : scriptFile,
     extraHostPermissions: unique([
       ...asArray(firstNonEmpty(options.extraHostPermissions, options.extra_host_permissions)),
       endpointPermission,
     ]),
   });
   const contentScriptSource = buildMeetingAppExtensionContentScriptSource(options);
+  const liveCaptureSource = includeLiveCapture ? buildMeetingAppExtensionLiveCaptureSource(options) : undefined;
   const backgroundSource = buildMeetingAppExtensionBackgroundSource(options);
   const readme = buildMeetingAppExtensionReadme({
     ...options,
@@ -854,12 +1003,17 @@ export function buildMeetingAppExtensionScaffold(options = {}) {
       sourceFile('build.mjs', buildSource, 'build_script', 'text/javascript'),
       sourceFile('manifest.json', `${json(manifest)}\n`, 'manifest', 'application/json'),
       sourceFile(contentScriptEntry, contentScriptSource, 'content_script_entry', 'text/javascript'),
+      ...(includeLiveCapture ? [
+        sourceFile(liveCaptureEntry, liveCaptureSource, 'live_capture_entry', 'text/javascript'),
+      ] : []),
       sourceFile(backgroundEntry, backgroundSource, 'background_service_worker_entry', 'text/javascript'),
       sourceFile('README.md', readme, 'readme', 'text/markdown'),
     ],
     bundle: {
       content_script_input: contentScriptEntry,
       content_script_output: scriptFile,
+      live_capture_input: includeLiveCapture ? liveCaptureEntry : undefined,
+      live_capture_output: includeLiveCapture ? liveCaptureFile : undefined,
       background_input: backgroundEntry,
       background_output: backgroundFile,
     },
@@ -892,6 +1046,7 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
     'build.mjs',
     'manifest.json',
     scaffold.bundle?.content_script_input ?? 'src/content-script.entry.mjs',
+    ...(scaffold.bundle?.live_capture_input ? [scaffold.bundle.live_capture_input] : []),
     scaffold.bundle?.background_input ?? 'src/background.entry.mjs',
     'README.md',
   ];
@@ -905,6 +1060,7 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
   const packageJson = jsonFromFile(scaffold, 'package.json', issues) ?? {};
   const buildFile = fileByPath(scaffold, 'build.mjs');
   const contentEntry = fileByPath(scaffold, scaffold.bundle?.content_script_input ?? 'src/content-script.entry.mjs');
+  const liveCaptureEntry = scaffold.bundle?.live_capture_input ? fileByPath(scaffold, scaffold.bundle.live_capture_input) : null;
   const backgroundEntry = fileByPath(scaffold, scaffold.bundle?.background_input ?? 'src/background.entry.mjs');
   const readme = fileByPath(scaffold, 'README.md');
 
@@ -938,6 +1094,12 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
         actual: contentScript.js,
       }));
     }
+    if (scaffold.bundle?.live_capture_output && !asArray(contentScript.js).includes(scaffold.bundle.live_capture_output)) {
+      issues.push(issue('error', 'live_capture_output_mismatch', 'Manifest content script output does not include the live capture bundle.', {
+        expected: scaffold.bundle.live_capture_output,
+        actual: contentScript.js,
+      }));
+    }
   }
   if (manifest.background?.service_worker !== scaffold.bundle?.background_output) {
     issues.push(issue('error', 'background_output_mismatch', 'Manifest background worker does not match scaffold bundle output.', {
@@ -965,6 +1127,9 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
   if (!buildContent.includes(scaffold.bundle?.background_input ?? 'src/background.entry.mjs')) {
     issues.push(issue('error', 'build_missing_background_entry', 'build.mjs does not include the background entry.'));
   }
+  if (scaffold.bundle?.live_capture_input && !buildContent.includes(scaffold.bundle.live_capture_input)) {
+    issues.push(issue('error', 'build_missing_live_capture_entry', 'build.mjs does not include the live capture entry.'));
+  }
   if (!buildContent.includes('format: "iife"')) {
     issues.push(issue('error', 'build_missing_content_iife', 'build.mjs should bundle the content script as an IIFE.'));
   }
@@ -978,6 +1143,16 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
   }
   if (!contentEntryContent.includes('startRuntime: true')) {
     issues.push(issue('error', 'content_entry_not_starting_runtime', 'Content script entry does not start the browser runtime.'));
+  }
+  const liveCaptureContent = liveCaptureEntry?.content ?? '';
+  if (scaffold.bundle?.live_capture_input && !liveCaptureContent.includes('__meetingTimelineLiveCapture')) {
+    issues.push(issue('error', 'live_capture_missing_global', 'Live capture entry does not expose __meetingTimelineLiveCapture.'));
+  }
+  if (scaffold.bundle?.live_capture_input && !liveCaptureContent.includes('captureMeetingAppDomSnapshot')) {
+    issues.push(issue('error', 'live_capture_missing_dom_capture', 'Live capture entry does not capture meeting app DOM snapshots.'));
+  }
+  if (scaffold.bundle?.live_capture_input && !liveCaptureContent.includes('buildMeetingAppLiveEvidencePackage')) {
+    issues.push(issue('error', 'live_capture_missing_evidence_package', 'Live capture entry does not build live evidence packages.'));
   }
   const backgroundContent = backgroundEntry?.content ?? '';
   if (!backgroundContent.includes('meeting_timeline.extension_attached')) {

@@ -63,10 +63,18 @@ export interface MeetingAppExtensionOptions {
   output_script?: string;
   backgroundScript?: string;
   background_script?: string;
+  liveCaptureScript?: string;
+  live_capture_script?: string;
   contentScriptEntry?: string;
   content_script_entry?: string;
+  liveCaptureEntry?: string;
+  live_capture_entry?: string;
   backgroundEntry?: string;
   background_entry?: string;
+  includeLiveCapture?: boolean;
+  include_live_capture?: boolean;
+  liveCaptureGlobal?: string;
+  live_capture_global?: string;
   buildTarget?: string[] | string;
   build_target?: string[] | string;
   messagePrefix?: string;
@@ -216,6 +224,8 @@ export function buildMeetingAppContentScriptManifest(options?: MeetingAppExtensi
 export function buildMeetingAppExtensionInstallPlan(options?: MeetingAppExtensionOptions): MeetingAppExtensionInstallPlan;
 
 export function buildMeetingAppExtensionContentScriptSource(options?: MeetingAppExtensionOptions): string;
+
+export function buildMeetingAppExtensionLiveCaptureSource(options?: MeetingAppExtensionOptions): string;
 
 export function buildMeetingAppExtensionBackgroundSource(options?: MeetingAppExtensionOptions): string;
 

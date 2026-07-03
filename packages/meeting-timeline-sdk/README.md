@@ -542,6 +542,8 @@ const extensionScaffold = meetingKit.meetingAppExtensionScaffold({
 // extensionScaffold.files 包含 package.json、build.mjs、manifest.json、src/content-script.entry.mjs、src/background.entry.mjs 和 README.md。
 // content script 入口用 SDK bridge 监听会议网页；background worker 把 start/end/mark 调用转发到 timeline 服务。
 // content script 注入后会发送 meeting_timeline.extension_attached；background 可用 meeting_timeline.extension_status 查询最近注入状态。
+// scaffold 默认还会生成 src/live-capture.entry.mjs，在页面上暴露 window.__meetingTimelineLiveCapture。
+// 现场验证时可在真实 Google Meet / Teams / Zoom 页面调用 captureActive()、captureEnded()、evidencePackage()。
 
 const attachedMessage = meetingKit.meetingAppExtensionAttachedMessage({
   platform: 'google-meet',
