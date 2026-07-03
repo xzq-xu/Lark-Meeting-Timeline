@@ -25,7 +25,10 @@ import {
   normalizeMeetingAppExtensionMessageType,
   normalizeMeetingAppExtensionPlatform,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-extension.mjs';
-import { buildMeetingAppLiveEvidencePackage } from '../packages/meeting-timeline-sdk/adapters/meeting-app-profile.mjs';
+import {
+  buildMeetingAppDomAdaptationDiagnosis,
+  buildMeetingAppLiveEvidencePackage,
+} from '../packages/meeting-timeline-sdk/adapters/meeting-app-profile.mjs';
 import { createMeetingAppSnapshotRecorder } from '../packages/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder.mjs';
 
 function installGeneratedBackground(source) {
@@ -159,34 +162,45 @@ function installGeneratedLiveCapture(source, options = {}) {
     dispatched.push(event);
     return true;
   };
-  const captureMeetingAppDomSnapshot = (input = {}, captureOptions = {}) => ({
-    schema: 'meeting_app_dom_capture',
-    schema_version: 1,
-    source: captureOptions.source,
-    observedAtMs: captureOptions.observedAtMs,
-    platform: captureOptions.platform,
-    meeting_id: 'abc-defg-hij',
-    url: input.url,
-    title: input.title,
-    page: {
-      controls: [{ label: 'Leave call' }],
-      buttons: [{ label: 'Leave call' }],
-      participants: [{ id: 'ada', name: 'Ada Lovelace', speaking: true }],
-      tiles: [{ id: 'ada', name: 'Ada Lovelace', speaking: true }],
-    },
-    capture: {
-      profile: captureOptions.captureProfile,
-      participant_count: 1,
-    },
-  });
+  const captureMeetingAppDomSnapshot = (input = {}, captureOptions = {}) => {
+    const ended = captureOptions.phase === 'ended';
+    const controls = ended ? [{ label: 'Join now' }] : [{ label: 'Leave call' }];
+    const participants = ended ? [] : [{ id: 'ada', name: 'Ada Lovelace', speaking: true }];
+    return {
+      schema: 'meeting_app_dom_capture',
+      schema_version: 1,
+      source: captureOptions.source,
+      observedAtMs: captureOptions.observedAtMs,
+      platform: captureOptions.platform,
+      meeting_id: 'abc-defg-hij',
+      url: input.url,
+      title: input.title,
+      page: {
+        controls,
+        buttons: controls,
+        participants,
+        tiles: participants,
+      },
+      capture: {
+        profile: captureOptions.captureProfile,
+        participant_count: participants.length,
+      },
+    };
+  };
   const runnableSource = source.replace(/^(import .+\n)+\n?/, '');
   try {
     Function(
       'captureMeetingAppDomSnapshot',
       'createMeetingAppSnapshotRecorder',
       'buildMeetingAppLiveEvidencePackage',
+      'buildMeetingAppDomAdaptationDiagnosis',
       runnableSource,
-    )(captureMeetingAppDomSnapshot, createMeetingAppSnapshotRecorder, buildMeetingAppLiveEvidencePackage);
+    )(
+      captureMeetingAppDomSnapshot,
+      createMeetingAppSnapshotRecorder,
+      buildMeetingAppLiveEvidencePackage,
+      buildMeetingAppDomAdaptationDiagnosis,
+    );
   } catch (error) {
     globalThis.location = originalLocation;
     globalThis.document = originalDocument;
@@ -333,6 +347,13 @@ assert.equal(plan.snapshot_recorder_adapter, '@ai-annotation/meeting-timeline-sd
 assert.equal(plan.launch_gate_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate');
 assert.equal(plan.runtime_contract.timestamp_field, 'captured_at_ms');
 assert.equal(plan.runtime_contract.live_capture_global, '__meetingTimelineLiveCapture');
+assert.deepEqual(plan.runtime_contract.live_capture_methods, [
+  'captureActive',
+  'captureEnded',
+  'exportRecords',
+  'evidencePackage',
+  'diagnose',
+]);
 assert.deepEqual(plan.runtime_contract.message_types, MEETING_APP_EXTENSION_MESSAGE_TYPES);
 assert.equal(plan.runtime_contract.status_storage_key, MEETING_APP_EXTENSION_STATUS_STORAGE_KEY);
 assert.deepEqual(plan.runtime_contract.timeline_endpoints, MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS);
@@ -386,9 +407,11 @@ const liveCaptureSource = buildMeetingAppExtensionLiveCaptureSource({
 assert.match(liveCaptureSource, /captureMeetingAppDomSnapshot/);
 assert.match(liveCaptureSource, /createMeetingAppSnapshotRecorder/);
 assert.match(liveCaptureSource, /buildMeetingAppLiveEvidencePackage/);
+assert.match(liveCaptureSource, /buildMeetingAppDomAdaptationDiagnosis/);
 assert.match(liveCaptureSource, /__meetingTimelineLiveCapture/);
 assert.match(liveCaptureSource, /captureActive/);
 assert.match(liveCaptureSource, /captureEnded/);
+assert.match(liveCaptureSource, /diagnose/);
 assert.match(liveCaptureSource, /meet\.google\.com/);
 assert.match(liveCaptureSource, /teams\.microsoft\.com/);
 
@@ -421,6 +444,15 @@ try {
   assert.equal(evidence.id, 'live-capture-evidence');
   assert.equal(evidence.record_count, 2);
   assert.equal(evidence.platforms.includes('google_meet'), true);
+
+  const diagnosis = liveCaptureRuntime.api.diagnose();
+  assert.equal(diagnosis.type, 'meeting_app_dom_adaptation_diagnosis');
+  assert.equal(diagnosis.platform, 'google_meet');
+  assert.equal(diagnosis.accepted, true);
+  assert.equal(diagnosis.production_ready, true);
+  assert.equal(diagnosis.selector_probe.matched.controls, true);
+  assert.equal(diagnosis.selector_probe.matched.participants, true);
+  assert.equal(diagnosis.observer_probe.signal_types.includes('meeting_ended'), true);
 } finally {
   liveCaptureRuntime.restore();
 }
@@ -529,9 +561,11 @@ assert.equal(scaffold.files.find((file) => file.path === 'manifest.json').mime, 
 assert.match(scaffold.files.find((file) => file.path === 'src/content-script.entry.mjs').content, /meeting-app-content-script/);
 assert.match(scaffold.files.find((file) => file.path === 'src/live-capture.entry.mjs').content, /__meetingTimelineLiveCapture/);
 assert.match(scaffold.files.find((file) => file.path === 'src/live-capture.entry.mjs').content, /evidencePackage/);
+assert.match(scaffold.files.find((file) => file.path === 'src/live-capture.entry.mjs').content, /diagnose/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /runtimeApi\(\)\?\.onMessage/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /extension_status/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /npm run build/);
+assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /diagnose\(\)/);
 
 const scaffoldReport = buildMeetingAppExtensionScaffoldAcceptanceReport(scaffold);
 assert.equal(scaffoldReport.accepted, true);

@@ -439,13 +439,14 @@ export function buildMeetingAppExtensionInstallPlan(options = {}) {
       status_storage_key: MEETING_APP_EXTENSION_STATUS_STORAGE_KEY,
       timeline_endpoints: { ...MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS },
       live_capture_global: '__meetingTimelineLiveCapture',
+      live_capture_methods: ['captureActive', 'captureEnded', 'exportRecords', 'evidencePackage', 'diagnose'],
       required_signals: ['meeting_started', 'speaker_started', 'meeting_ended'],
       timestamp_field: 'captured_at_ms',
     },
     next_steps: [
       'Bundle meeting-app-content-script into the js file declared in content_scripts.',
       'Install the generated manifest as a Chrome/Edge compatible MV3 extension or map the same matches into an Electron WebView preload bridge.',
-      'Use window.__meetingTimelineLiveCapture.captureActive() and captureEnded() to collect live DOM evidence for the launch gate.',
+      'Use window.__meetingTimelineLiveCapture.captureActive(), captureEnded(), and diagnose() to collect and validate live DOM evidence for the launch gate.',
       'Record real meeting app snapshots with meeting-app-snapshot-recorder and validate them with meeting-app-gate before production rollout.',
     ],
     constraints: [
@@ -546,7 +547,7 @@ export function buildMeetingAppExtensionLiveCaptureSource(options = {}) {
   return [
     "import { captureMeetingAppDomSnapshot } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-capture';",
     "import { createMeetingAppSnapshotRecorder } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder';",
-    "import { buildMeetingAppLiveEvidencePackage } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-profile';",
+    "import { buildMeetingAppDomAdaptationDiagnosis, buildMeetingAppLiveEvidencePackage } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-profile';",
     '',
     `const PLATFORM_HOSTS = ${json(platformMap)};`,
     `const LIVE_CAPTURE_GLOBAL = ${JSON.stringify(globalName)};`,
@@ -629,6 +630,15 @@ export function buildMeetingAppExtensionLiveCaptureSource(options = {}) {
     '  });',
     '}',
     '',
+    'function diagnose(options = {}) {',
+    '  const recordSet = exportRecords(options);',
+    '  return buildMeetingAppDomAdaptationDiagnosis({',
+    '    ...options,',
+    '    platform: options.platform ?? inferPlatform(),',
+    '    recordSet,',
+    '  });',
+    '}',
+    '',
     'const api = {',
     '  capture,',
     '  captureActive,',
@@ -636,6 +646,7 @@ export function buildMeetingAppExtensionLiveCaptureSource(options = {}) {
     '  captureRequired,',
     '  exportRecords,',
     '  evidencePackage,',
+    '  diagnose,',
     '  reset: recorder.reset,',
     '  getState: recorder.getState,',
     '  records: recorder.records,',
@@ -916,7 +927,7 @@ export function buildMeetingAppExtensionReadme(options = {}) {
     : `\`${scriptFile}\` and \`${backgroundFile}\``;
   const liveCaptureDocs = includeLiveCapture ? [
     '',
-    'When the extension is loaded, `window.__meetingTimelineLiveCapture` exposes `captureActive()`, `captureEnded()`, `exportRecords()`, and `evidencePackage()` for live DOM validation.',
+    'When the extension is loaded, `window.__meetingTimelineLiveCapture` exposes `captureActive()`, `captureEnded()`, `exportRecords()`, `evidencePackage()`, and `diagnose()` for live DOM validation.',
   ] : [];
   return [
     '# Meeting Timeline Browser Extension',
@@ -1160,6 +1171,9 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
   }
   if (scaffold.bundle?.live_capture_input && !liveCaptureContent.includes('buildMeetingAppLiveEvidencePackage')) {
     issues.push(issue('error', 'live_capture_missing_evidence_package', 'Live capture entry does not build live evidence packages.'));
+  }
+  if (scaffold.bundle?.live_capture_input && !liveCaptureContent.includes('buildMeetingAppDomAdaptationDiagnosis')) {
+    issues.push(issue('error', 'live_capture_missing_dom_diagnosis', 'Live capture entry does not build DOM adaptation diagnostics.'));
   }
   const backgroundContent = backgroundEntry?.content ?? '';
   if (!backgroundContent.includes('meeting_timeline.extension_attached')) {
