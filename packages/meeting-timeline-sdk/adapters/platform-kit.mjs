@@ -64,6 +64,11 @@ import {
   verifyMeetingPlatformEvidencePackage,
 } from './platform-evidence-package.mjs';
 import {
+  buildAllMeetingPlatformAdaptationStrategies,
+  buildMeetingPlatformAdaptationStrategy,
+  buildMeetingPlatformAdaptationStrategyMatrix,
+} from './platform-strategy.mjs';
+import {
   assertAllMeetingAppLaunchGates,
   assertMeetingAppLaunchGate,
   buildMeetingAppLaunchGate,
@@ -230,6 +235,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_launch_gate: meetingAppLaunchGateSummary,
     platform_rollout: buildMeetingPlatformRolloutSummary(options),
     platform_adaptation_runbook: buildMeetingPlatformAdaptationRunbookSummary(options),
+    platform_adaptation_strategy: buildMeetingPlatformAdaptationStrategyMatrix(options),
   };
 }
 
@@ -336,6 +342,15 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdaptationRunbookSummary(runbookOptions = {}) {
       return buildMeetingPlatformAdaptationRunbookSummary(withDefaults(defaults, runbookOptions));
+    },
+    platformAdaptationStrategy(platform, strategyOptions = {}) {
+      return buildMeetingPlatformAdaptationStrategy(platform, withDefaults(defaults, strategyOptions));
+    },
+    allPlatformAdaptationStrategies(strategyOptions = {}) {
+      return buildAllMeetingPlatformAdaptationStrategies(withDefaults(defaults, strategyOptions));
+    },
+    platformAdaptationStrategyMatrix(strategyOptions = {}) {
+      return buildMeetingPlatformAdaptationStrategyMatrix(withDefaults(defaults, strategyOptions));
     },
     platformEvidencePackage(platformOrInput, input = {}, packageOptions = {}) {
       if (platformOrInput && typeof platformOrInput === 'object' && !Array.isArray(platformOrInput)) {

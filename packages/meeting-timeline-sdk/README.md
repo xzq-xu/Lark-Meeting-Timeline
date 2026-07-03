@@ -125,6 +125,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-capture`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-gate`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-rollout`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-strategy`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan`
@@ -155,6 +156,21 @@ await bridge.importTranscript({
   meeting: { meetingId: 'conference-record-id' },
   raw: googleTranscriptEntries,
 });
+```
+
+多平台正式接入前，可以先用 `platform-strategy` 输出机器可读策略。它把 Google Meet、Teams、Zoom、Webex、Lark 的共性收敛成同一条原则：实时标注轴由本地观察或 host detector 先建，provider webhook 只做 reconcile/backfill，post-meeting transcript 只做会后导入，不阻塞当前标注：
+
+```js
+import {
+  buildMeetingPlatformAdaptationStrategyMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-strategy';
+
+const matrix = buildMeetingPlatformAdaptationStrategyMatrix({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex'],
+});
+
+console.log(matrix.rows);
 ```
 
 如果宿主项目拿到的是桌面窗口、浏览器标签页或 native app 进程快照，先用 `meeting-session-discovery` 把这些低层信号转成统一会议候选，再交给 observer 建轴。这个路径适合 Google Meet 浏览器页，也适合 Zoom / Teams / Lark / Webex native app 没有 webhook 或 webhook 延迟较高的情况：

@@ -31,6 +31,8 @@ assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-strategy.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.d.ts'), true);
 assert.equal(packedFiles.includes('README.md'), true);
@@ -67,6 +69,10 @@ import {
   buildMeetingPlatformAdaptationRunbook,
   buildMeetingPlatformRolloutPlan,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-rollout';
+import {
+  buildMeetingPlatformAdaptationStrategy,
+  buildMeetingPlatformAdaptationStrategyMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-strategy';
 import {
   buildMeetingPlatformEvidencePackage,
   verifyMeetingPlatformEvidencePackage,
@@ -105,6 +111,16 @@ const runbook = buildMeetingPlatformAdaptationRunbook('webex', {
 });
 assert.equal(runbook.type, 'meeting_platform_adaptation_runbook');
 assert.equal(runbook.steps.some((item) => item.id === 'validate_rollout'), true);
+
+const strategy = buildMeetingPlatformAdaptationStrategy('google-meet', {
+  baseUrl: 'http://localhost:8787',
+});
+assert.equal(strategy.platform, 'google_meet');
+assert.equal(strategy.realtime_axis.provider_events_block_realtime, false);
+assert.equal(buildMeetingPlatformAdaptationStrategyMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).rows[0].platform, 'zoom');
 
 const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {
   providerRecords: [],

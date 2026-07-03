@@ -22,6 +22,10 @@ import type {
   MeetingPlatformEvidencePackageSummary,
   MeetingPlatformEvidencePackageVerification,
 } from './platform-evidence-package.mjs';
+import type {
+  MeetingPlatformAdaptationStrategy,
+  MeetingPlatformAdaptationStrategyMatrix,
+} from './platform-strategy.mjs';
 import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type {
@@ -106,6 +110,9 @@ export interface MeetingPlatformTimelineKit {
   platformAdaptationRunbook(platform: string, runbookOptions?: MeetingPlatformRolloutOptions): MeetingPlatformAdaptationRunbook;
   allPlatformAdaptationRunbooks(runbookOptions?: MeetingPlatformRolloutOptions): MeetingPlatformAdaptationRunbook[];
   platformAdaptationRunbookSummary(runbookOptions?: MeetingPlatformRolloutOptions): MeetingPlatformAdaptationRunbookSummary;
+  platformAdaptationStrategy(platform: string, strategyOptions?: MeetingPlatformRolloutOptions): MeetingPlatformAdaptationStrategy;
+  allPlatformAdaptationStrategies(strategyOptions?: MeetingPlatformRolloutOptions): MeetingPlatformAdaptationStrategy[];
+  platformAdaptationStrategyMatrix(strategyOptions?: MeetingPlatformRolloutOptions): MeetingPlatformAdaptationStrategyMatrix;
   platformEvidencePackage(platformOrInput: string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, packageOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackage;
   platformEvidencePackageSummary(packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, summaryOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageSummary;
   platformEvidencePackageBuilder(platform: string, builderOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageBuilder;
