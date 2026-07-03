@@ -72,6 +72,8 @@ import {
 import {
   buildMeetingPlatformLiveAdapterMatrix,
   buildMeetingPlatformLiveAdapterPlan,
+  buildMeetingPlatformLiveAdapterReadiness,
+  buildMeetingPlatformLiveAdapterReadinessMatrix,
   createMeetingPlatformLiveAdapter,
   createMeetingPlatformLiveAdapterSuite,
 } from './platform-live-adapter.mjs';
@@ -249,6 +251,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_adaptation_runbook: buildMeetingPlatformAdaptationRunbookSummary(options),
     platform_adaptation_strategy: buildMeetingPlatformAdaptationStrategyMatrix(options),
     platform_live_adapter_matrix: buildMeetingPlatformLiveAdapterMatrix(options),
+    platform_live_adapter_readiness_matrix: buildMeetingPlatformLiveAdapterReadinessMatrix(options),
   };
 }
 
@@ -400,8 +403,14 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     platformLiveAdapterPlan(platform, planOptions = {}) {
       return buildMeetingPlatformLiveAdapterPlan(platform, withDefaults(defaults, planOptions));
     },
+    platformLiveAdapterReadiness(platform, readinessOptions = {}) {
+      return buildMeetingPlatformLiveAdapterReadiness(platform, withDefaults(defaults, readinessOptions));
+    },
     platformLiveAdapterMatrix(matrixOptions = {}) {
       return buildMeetingPlatformLiveAdapterMatrix(withDefaults(defaults, matrixOptions));
+    },
+    platformLiveAdapterReadinessMatrix(matrixOptions = {}) {
+      return buildMeetingPlatformLiveAdapterReadinessMatrix(withDefaults(defaults, matrixOptions));
     },
     platformLiveAdapterSuite(suiteOptions = {}) {
       return createMeetingPlatformLiveAdapterSuite(bridge.client, withDefaults(defaults, suiteOptions));

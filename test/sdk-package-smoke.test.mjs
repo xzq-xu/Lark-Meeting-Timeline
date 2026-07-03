@@ -88,6 +88,8 @@ import {
 import {
   buildMeetingPlatformLiveAdapterMatrix,
   buildMeetingPlatformLiveAdapterPlan,
+  buildMeetingPlatformLiveAdapterReadiness,
+  buildMeetingPlatformLiveAdapterReadinessMatrix,
   createMeetingPlatformLiveAdapter,
   createMeetingPlatformLiveAdapterSuite,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter';
@@ -157,6 +159,13 @@ assert.equal(buildMeetingPlatformLiveAdapterMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).rows[0].platform, 'zoom');
+assert.equal(buildMeetingPlatformLiveAdapterReadiness('zoom', {
+  baseUrl: 'http://localhost:8787',
+}).schema, 'meeting_platform_live_adapter_readiness');
+assert.equal(buildMeetingPlatformLiveAdapterReadinessMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).platform_count, 1);
 assert.equal(createMeetingPlatformLiveAdapterSuite(client, {
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],

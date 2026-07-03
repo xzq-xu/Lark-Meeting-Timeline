@@ -36,6 +36,9 @@ import type {
   MeetingPlatformLiveAdapterMatrix,
   MeetingPlatformLiveAdapterOptions,
   MeetingPlatformLiveAdapterPlan,
+  MeetingPlatformLiveAdapterReadiness,
+  MeetingPlatformLiveAdapterReadinessMatrix,
+  MeetingPlatformLiveAdapterReadinessOptions,
   MeetingPlatformLiveAdapterSuite,
 } from './platform-live-adapter.mjs';
 import type {
@@ -137,7 +140,9 @@ export interface MeetingPlatformTimelineKit {
   platformEvidenceSession(platform: string, sessionOptions?: MeetingPlatformEvidenceSessionOptions): MeetingPlatformEvidenceSession;
   platformLiveAdapter(platform: string, adapterOptions?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapter;
   platformLiveAdapterPlan(platform: string, planOptions?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapterPlan;
+  platformLiveAdapterReadiness(platform: string, readinessOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterReadiness;
   platformLiveAdapterMatrix(matrixOptions?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapterMatrix;
+  platformLiveAdapterReadinessMatrix(matrixOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterReadinessMatrix;
   platformLiveAdapterSuite(suiteOptions?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapterSuite;
   meetingAppSnapshotRecorder(recorderOptions?: MeetingAppSnapshotRecordOptions): MeetingAppSnapshotRecorder;
   meetingAppGateInputFromRecords(records?: MeetingAppSnapshotRecord[] | MeetingAppSnapshotRecordSet, recordOptions?: MeetingAppSnapshotRecordOptions): Record<string, unknown>;

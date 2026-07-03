@@ -1,5 +1,6 @@
 import { compactObject } from '../index.mjs';
 import { createMeetingSourceAggregator } from './meeting-source.mjs';
+import { verifyMeetingPlatformEvidencePackage } from './platform-evidence-package.mjs';
 import { createMeetingPlatformEvidenceSession } from './platform-evidence-session.mjs';
 import {
   MEETING_PLATFORM_KEYS,
@@ -12,6 +13,16 @@ export const MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA = 'meeting_platform_live_adapt
 export const MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA_VERSION = 1;
 export const MEETING_PLATFORM_LIVE_ADAPTER_PLAN_SCHEMA = 'meeting_platform_live_adapter_plan';
 export const MEETING_PLATFORM_LIVE_ADAPTER_MATRIX_SCHEMA = 'meeting_platform_live_adapter_matrix';
+export const MEETING_PLATFORM_LIVE_ADAPTER_READINESS_SCHEMA = 'meeting_platform_live_adapter_readiness';
+export const MEETING_PLATFORM_LIVE_ADAPTER_READINESS_MATRIX_SCHEMA = 'meeting_platform_live_adapter_readiness_matrix';
+export const MEETING_PLATFORM_LIVE_ADAPTER_REQUIRED_METHODS = Object.freeze([
+  'observeMeetingApp',
+  'ingestProvider',
+  'insertAnnotation',
+  'summary',
+  'exportPackage',
+  'verify',
+]);
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -25,6 +36,15 @@ function asArray(value) {
 
 function uniqueList(values = []) {
   return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
+}
+
+function matchesPlatform(value, platform) {
+  if (!value) return true;
+  try {
+    return normalizeMeetingPlatform(value) === platform;
+  } catch {
+    return false;
+  }
 }
 
 function isTimelineClient(value) {
@@ -99,6 +119,83 @@ function selectedPlatforms(options = {}) {
   return asArray(firstNonEmpty(options.platforms, options.platform_keys, MEETING_PLATFORM_KEYS));
 }
 
+function selectedEvidencePackage(platform, options = {}) {
+  const input = firstNonEmpty(
+    options.evidencePackage,
+    options.evidence_package,
+    options.handoffPackage,
+    options.handoff_package,
+    options.package,
+  );
+  if (!input) return undefined;
+  if (Array.isArray(input)) {
+    return input.find((item) => matchesPlatform(item?.platform ?? item?.rollout_plan?.platform, platform));
+  }
+  if (input.schema || input.rollout_plan || input.provider_records || input.meeting_app_record_set) {
+    return matchesPlatform(input.platform ?? input.rollout_plan?.platform, platform) ? input : undefined;
+  }
+  if (typeof input === 'object') {
+    for (const [key, value] of Object.entries(input)) {
+      if (matchesPlatform(key, platform)) return value;
+    }
+  }
+  return undefined;
+}
+
+function readinessTarget(options = {}) {
+  const target = String(firstNonEmpty(
+    options.target,
+    options.readinessTarget,
+    options.readiness_target,
+    options.requireProductionReady === true || options.require_production_ready === true ? 'production' : 'pilot',
+  ));
+  return target === 'production' ? 'production' : 'pilot';
+}
+
+function check(code, passed, severity, message, details = {}) {
+  return compactObject({
+    code,
+    passed: Boolean(passed),
+    severity: passed ? 'info' : severity,
+    message,
+    ...details,
+  });
+}
+
+function adapterMethodCheck(adapter, requiredMethods = MEETING_PLATFORM_LIVE_ADAPTER_REQUIRED_METHODS) {
+  if (!adapter) return undefined;
+  const missing = requiredMethods.filter((method) => typeof adapter[method] !== 'function');
+  return check(
+    'adapter_methods_available',
+    missing.length === 0,
+    'error',
+    'Live adapter instance must expose the realtime and evidence handoff methods.',
+    { required_methods: requiredMethods, missing_methods: missing },
+  );
+}
+
+function readinessStatus(blocking = [], warnings = []) {
+  if (blocking.length > 0) return 'blocked';
+  if (warnings.length > 0) return 'warning';
+  return 'ready';
+}
+
+function planWithRollout(plan = {}, rollout = {}) {
+  if (!rollout || Object.keys(rollout).length === 0) return plan;
+  return {
+    ...plan,
+    rollout_status: rollout.status ?? plan.rollout_status,
+    production_ready: Boolean(rollout.production_ready),
+    ready_for_realtime_annotations: Boolean(rollout.ready_for_realtime_annotations),
+    pilot_ready: Boolean(rollout.ready_for_realtime_annotations),
+    recommended_mode: rollout.recommended_mode ?? plan.recommended_mode,
+    next_actions: uniqueList([
+      ...(rollout.next_actions ?? []),
+      ...(plan.next_actions ?? []),
+    ]),
+  };
+}
+
 export function buildMeetingPlatformLiveAdapterPlan(platform, options = {}) {
   const key = normalizeMeetingPlatform(platform);
   const integration = buildPlatformIntegrationPlan(key, options);
@@ -168,6 +265,150 @@ export function buildMeetingPlatformLiveAdapterMatrix(options = {}) {
       next_actions: plan.next_actions,
     })),
     plans,
+  };
+}
+
+export function buildMeetingPlatformLiveAdapterReadiness(platform, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  const target = readinessTarget(options);
+  const evidencePackage = selectedEvidencePackage(key, options);
+  const verification = evidencePackage
+    ? verifyMeetingPlatformEvidencePackage(evidencePackage, {
+      ...options,
+      requireProductionReady: target === 'production',
+      require_production_ready: target === 'production',
+      includePackage: true,
+    })
+    : undefined;
+  const strategy = buildMeetingPlatformAdaptationStrategy(key, {
+    ...options,
+    includeRolloutPlan: true,
+  });
+  const rollout = verification?.verified_package?.rollout_plan ?? strategy.rollout_plan ?? {};
+  const plan = planWithRollout(buildMeetingPlatformLiveAdapterPlan(key, options), rollout);
+  const requiredMethods = asArray(firstNonEmpty(options.requiredMethods, options.required_methods, MEETING_PLATFORM_LIVE_ADAPTER_REQUIRED_METHODS));
+  const checks = [
+    check(
+      'adapter_contract_declared',
+      requiredMethods.every((method) => [
+        ...(plan.live_adapter?.realtime_methods ?? []),
+        ...(plan.live_adapter?.evidence_methods ?? []),
+      ].includes(method)),
+      'error',
+      'Live adapter plan must declare the methods needed by a host project.',
+      { required_methods: requiredMethods },
+    ),
+    adapterMethodCheck(firstNonEmpty(options.adapter, options.liveAdapter, options.live_adapter), requiredMethods),
+    check(
+      'timestamp_field_contract',
+      plan.live_adapter?.timestamp_field === 'captured_at_ms',
+      'error',
+      'Realtime marks must use captured_at_ms so annotations land on the current meeting axis.',
+      { timestamp_field: plan.live_adapter?.timestamp_field },
+    ),
+    check(
+      'provider_events_non_blocking',
+      plan.realtime_axis?.provider_events_block_realtime === false,
+      'error',
+      'Provider events must not block realtime annotation insertion.',
+    ),
+    check(
+      'post_meeting_transcript_non_blocking',
+      plan.realtime_axis?.transcript_blocks_realtime === false,
+      'error',
+      'Post-meeting transcript import must not block realtime annotation insertion.',
+    ),
+    check(
+      'pilot_realtime_axis_ready',
+      plan.ready_for_realtime_annotations === true,
+      'error',
+      'At least one low-latency axis source must be verified before realtime annotations can be enabled.',
+      { rollout_status: plan.rollout_status },
+    ),
+    check(
+      'production_evidence_ready',
+      plan.production_ready === true,
+      target === 'production' ? 'error' : 'warning',
+      'Production rollout requires both local observer evidence and provider reconcile evidence.',
+      { rollout_status: plan.rollout_status },
+    ),
+    evidencePackage ? check(
+      'evidence_package_verified',
+      verification?.passed === true,
+      'error',
+      'Evidence package must verify against the current SDK gates.',
+      {
+        requirement: verification?.requirement,
+        correlation_passed: verification?.correlation_passed,
+        embedded_plan_matches: verification?.embedded_plan_matches,
+      },
+    ) : check(
+      'evidence_package_available',
+      false,
+      target === 'production' ? 'error' : 'warning',
+      'No evidence package was provided; SDK wiring can be inspected but handoff cannot be audited.',
+    ),
+  ].filter(Boolean);
+  const blockingChecks = checks.filter((item) => item.passed !== true && item.severity === 'error');
+  const warnings = checks.filter((item) => item.passed !== true && item.severity !== 'error');
+  const status = readinessStatus(blockingChecks, warnings);
+  return compactObject({
+    type: 'meeting_platform_live_adapter_readiness',
+    schema: MEETING_PLATFORM_LIVE_ADAPTER_READINESS_SCHEMA,
+    schema_version: MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA_VERSION,
+    platform: key,
+    display_name: plan.display_name,
+    target,
+    status,
+    passed: blockingChecks.length === 0,
+    ready_for_realtime_annotations: plan.ready_for_realtime_annotations,
+    production_ready: plan.production_ready,
+    rollout_status: plan.rollout_status,
+    recommended_mode: plan.recommended_mode,
+    blocking_count: blockingChecks.length,
+    warning_count: warnings.length,
+    checks,
+    blocking_checks: blockingChecks,
+    warnings,
+    verification,
+    plan,
+    next_actions: uniqueList([
+      ...blockingChecks.map((item) => item.code),
+      ...warnings.map((item) => item.code),
+      ...(verification?.next_actions ?? []),
+      ...(plan.next_actions ?? []),
+    ]),
+  });
+}
+
+export function buildMeetingPlatformLiveAdapterReadinessMatrix(options = {}) {
+  const rows = selectedPlatforms(options).map((platform) => buildMeetingPlatformLiveAdapterReadiness(platform, options));
+  return {
+    type: 'meeting_platform_live_adapter_readiness_matrix',
+    schema: MEETING_PLATFORM_LIVE_ADAPTER_READINESS_MATRIX_SCHEMA,
+    schema_version: MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA_VERSION,
+    platform_count: rows.length,
+    passed_count: rows.filter((row) => row.passed).length,
+    ready_count: rows.filter((row) => row.status === 'ready').length,
+    warning_count: rows.filter((row) => row.status === 'warning').length,
+    blocked_count: rows.filter((row) => row.status === 'blocked').length,
+    realtime_ready_count: rows.filter((row) => row.ready_for_realtime_annotations).length,
+    production_ready_count: rows.filter((row) => row.production_ready).length,
+    platforms: rows.map((row) => row.platform),
+    rows: rows.map((row) => ({
+      platform: row.platform,
+      display_name: row.display_name,
+      target: row.target,
+      status: row.status,
+      passed: row.passed,
+      rollout_status: row.rollout_status,
+      ready_for_realtime_annotations: row.ready_for_realtime_annotations,
+      production_ready: row.production_ready,
+      blocking_count: row.blocking_count,
+      warning_count: row.warning_count,
+      next_actions: row.next_actions,
+    })),
+    reports: rows,
   };
 }
 
@@ -347,11 +588,30 @@ export function createMeetingPlatformLiveAdapterSuite(clientOrOptions = {}, opti
         ...planOptions,
       });
     },
+    readiness(platform, readinessOptions = {}) {
+      return buildMeetingPlatformLiveAdapterReadiness(platform, {
+        ...options,
+        ...readinessOptions,
+        adapter: firstNonEmpty(
+          readinessOptions.adapter,
+          readinessOptions.liveAdapter,
+          readinessOptions.live_adapter,
+          adapter(platform, readinessOptions.adapterOptions ?? readinessOptions.adapter_options ?? {}),
+        ),
+      });
+    },
     matrix(matrixOptions = {}) {
       return buildMeetingPlatformLiveAdapterMatrix({
         ...options,
         ...matrixOptions,
         platforms: matrixOptions.platforms ?? matrixOptions.platform_keys ?? platforms,
+      });
+    },
+    readinessMatrix(readinessOptions = {}) {
+      return buildMeetingPlatformLiveAdapterReadinessMatrix({
+        ...options,
+        ...readinessOptions,
+        platforms: readinessOptions.platforms ?? readinessOptions.platform_keys ?? platforms,
       });
     },
     summary(summaryOptions = {}) {
