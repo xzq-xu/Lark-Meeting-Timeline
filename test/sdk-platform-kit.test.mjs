@@ -323,5 +323,9 @@ assert.equal(report.platform_live_adapter_matrix.platform_count, 6);
 assert.equal(report.platform_live_adapter_matrix.rows.some((row) => row.platform === 'google_meet'), true);
 assert.equal(report.platform_live_adapter_readiness_matrix.platform_count, 6);
 assert.equal(report.platform_live_adapter_readiness_matrix.rows.some((row) => row.platform === 'google_meet'), true);
+assert.equal(report.platform_live_adapter_handoff_bundle.platform_count, 6);
+assert.equal(report.platform_live_adapter_handoff_bundle.sdk.factory, 'createMeetingPlatformLiveAdapter');
+assert.equal(report.platform_live_adapter_handoff_bundle.host_contract.annotation_timestamp_field, 'captured_at_ms');
+assert.equal(report.platform_live_adapter_handoff_bundle.handoffs.some((handoff) => handoff.platform === 'google_meet'), true);
 
 console.log('ok meeting platform timeline kit');

@@ -1378,6 +1378,45 @@ evidence.addMeetingAppRecord(endedSnapshotRecord);
 const handoff = evidence.exportPackage();
 ```
 
+如果要把会议时间轴能力交给另一个项目接入，优先生成 `platform-live-adapter` 的 handoff bundle。它不是一份纯文档，而是机器可读的接入契约：包含 SDK import、宿主必须提供的输入、实时标注时间字段、证据路径、CI 命令、单平台 readiness 和多平台矩阵。
+
+```js
+import {
+  buildMeetingPlatformLiveAdapterHandoff,
+  buildMeetingPlatformLiveAdapterHandoffBundle,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter';
+
+const googleHandoff = buildMeetingPlatformLiveAdapterHandoff('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+  evidencePackage,
+});
+
+// googleHandoff.host_contract.annotation_timestamp_field === 'captured_at_ms'
+// googleHandoff.commands.validate_live_readiness === 'npm run meeting-platform:live-readiness'
+// googleHandoff.evidence_paths.evidence_package 指向可复验的 provider + DOM 证据包。
+
+const bundle = buildMeetingPlatformLiveAdapterHandoffBundle({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'microsoft-teams', 'zoom', 'webex', 'lark'],
+});
+
+// bundle.handoffs 可以直接交给外部项目生成接入 checklist。
+// bundle.readiness_matrix 可以作为 CI gate，保证实时标注不依赖会后转写或 provider 事件。
+```
+
+如果已经使用 `platform-kit`，同样可以从高层入口拿到这份交付物：
+
+```js
+const kit = createMeetingPlatformTimelineKit(client, {
+  baseUrl: 'https://timeline.example.com',
+});
+
+const handoff = kit.platformLiveAdapterHandoff('zoom');
+const bundle = kit.platformLiveAdapterHandoffBundle({
+  platforms: ['google-meet', 'zoom'],
+});
+```
+
 ## Webhook 验证工具
 
 真实接 Zoom / Microsoft Graph / Google Pub/Sub push 时，建议先在 webhook 层完成平台验证，再把 payload 交给 normalizer：

@@ -33,6 +33,8 @@ import type {
 } from './platform-evidence-session.mjs';
 import type {
   MeetingPlatformLiveAdapter,
+  MeetingPlatformLiveAdapterHandoff,
+  MeetingPlatformLiveAdapterHandoffBundle,
   MeetingPlatformLiveAdapterMatrix,
   MeetingPlatformLiveAdapterOptions,
   MeetingPlatformLiveAdapterPlan,
@@ -145,6 +147,8 @@ export interface MeetingPlatformTimelineKit {
   platformLiveAdapterMatrix(matrixOptions?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapterMatrix;
   platformLiveAdapterReadinessMatrix(matrixOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterReadinessMatrix;
   assertPlatformLiveAdapterReadinessMatrix(matrixOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterReadinessMatrix;
+  platformLiveAdapterHandoff(platform: string, handoffOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterHandoff;
+  platformLiveAdapterHandoffBundle(handoffOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterHandoffBundle;
   platformLiveAdapterSuite(suiteOptions?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapterSuite;
   meetingAppSnapshotRecorder(recorderOptions?: MeetingAppSnapshotRecordOptions): MeetingAppSnapshotRecorder;
   meetingAppGateInputFromRecords(records?: MeetingAppSnapshotRecord[] | MeetingAppSnapshotRecordSet, recordOptions?: MeetingAppSnapshotRecordOptions): Record<string, unknown>;

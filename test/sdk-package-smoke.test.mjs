@@ -88,6 +88,8 @@ import {
 import {
   assertMeetingPlatformLiveAdapterReadiness,
   assertMeetingPlatformLiveAdapterReadinessMatrix,
+  buildMeetingPlatformLiveAdapterHandoff,
+  buildMeetingPlatformLiveAdapterHandoffBundle,
   buildMeetingPlatformLiveAdapterMatrix,
   buildMeetingPlatformLiveAdapterPlan,
   buildMeetingPlatformLiveAdapterReadiness,
@@ -122,6 +124,10 @@ const kit = createMeetingPlatformTimelineKit(client, {
 assert.equal(kit.platformRolloutPlan('google-meet').platform, 'google_meet');
 assert.equal(kit.platformAdaptationRunbook('zoom').platform, 'zoom');
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_rollout.type, 'meeting_platform_rollout_summary');
+assert.equal(kit.platformLiveAdapterHandoff('zoom').sdk.factory, 'createMeetingPlatformLiveAdapter');
+assert.equal(kit.platformLiveAdapterHandoffBundle({
+  platforms: ['zoom'],
+}).platform_count, 1);
 
 const rollout = buildMeetingPlatformRolloutPlan('teams', {
   baseUrl: 'http://localhost:8787',
@@ -168,6 +174,13 @@ assert.equal(buildMeetingPlatformLiveAdapterReadinessMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).platform_count, 1);
+assert.equal(buildMeetingPlatformLiveAdapterHandoff('zoom', {
+  baseUrl: 'http://localhost:8787',
+}).host_contract.annotation_timestamp_field, 'captured_at_ms');
+assert.equal(buildMeetingPlatformLiveAdapterHandoffBundle({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).commands.validate_live_readiness, 'npm run meeting-platform:live-readiness');
 assert.throws(
   () => assertMeetingPlatformLiveAdapterReadiness('zoom', {
     baseUrl: 'http://localhost:8787',

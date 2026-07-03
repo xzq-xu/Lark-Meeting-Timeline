@@ -16,6 +16,7 @@ import type {
 } from './platform-evidence-package.mjs';
 import type { MeetingPlatformEvidenceCorrelation } from './platform-evidence-correlation.mjs';
 import type { MeetingPlatformAdaptationStrategy } from './platform-strategy.mjs';
+import type { MeetingPlatformAdaptationRunbook } from './platform-rollout.mjs';
 
 export const MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA: string;
 export const MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA_VERSION: number;
@@ -23,6 +24,8 @@ export const MEETING_PLATFORM_LIVE_ADAPTER_PLAN_SCHEMA: string;
 export const MEETING_PLATFORM_LIVE_ADAPTER_MATRIX_SCHEMA: string;
 export const MEETING_PLATFORM_LIVE_ADAPTER_READINESS_SCHEMA: string;
 export const MEETING_PLATFORM_LIVE_ADAPTER_READINESS_MATRIX_SCHEMA: string;
+export const MEETING_PLATFORM_LIVE_ADAPTER_HANDOFF_SCHEMA: string;
+export const MEETING_PLATFORM_LIVE_ADAPTER_HANDOFF_BUNDLE_SCHEMA: string;
 export const MEETING_PLATFORM_LIVE_ADAPTER_REQUIRED_METHODS: readonly string[];
 
 export interface MeetingPlatformLiveAdapterOptions extends MeetingSourceAggregatorOptions, MeetingPlatformEvidenceSessionOptions, MeetingPlatformEvidencePackageOptions {
@@ -173,6 +176,55 @@ export interface MeetingPlatformLiveAdapterReadinessMatrix {
   reports: MeetingPlatformLiveAdapterReadiness[];
 }
 
+export interface MeetingPlatformLiveAdapterHandoff {
+  type: 'meeting_platform_live_adapter_handoff';
+  schema: string;
+  schema_version: number;
+  platform: string;
+  display_name?: string;
+  status: 'ready' | 'warning' | 'blocked';
+  passed: boolean;
+  target: 'pilot' | 'production';
+  rollout_status?: string;
+  recommended_mode?: string;
+  production_ready: boolean;
+  ready_for_realtime_annotations: boolean;
+  sdk: Record<string, unknown>;
+  host_contract: Record<string, unknown>;
+  commands: Record<string, string>;
+  evidence_paths: Record<string, string>;
+  required_host_inputs: string[];
+  realtime_flow: string[];
+  outputs: string[];
+  plan: MeetingPlatformLiveAdapterPlan;
+  readiness: MeetingPlatformLiveAdapterReadiness;
+  integration_plan: Record<string, unknown>;
+  runbook: MeetingPlatformAdaptationRunbook;
+  next_actions: string[];
+}
+
+export interface MeetingPlatformLiveAdapterHandoffBundle {
+  type: 'meeting_platform_live_adapter_handoff_bundle';
+  schema: string;
+  schema_version: number;
+  platform_count: number;
+  passed_count: number;
+  ready_count: number;
+  blocked_count: number;
+  realtime_ready_count: number;
+  production_ready_count: number;
+  platforms: string[];
+  sdk: Record<string, unknown>;
+  commands: Record<string, string>;
+  evidence_paths: Record<string, string>;
+  host_contract: Record<string, unknown>;
+  rows: Record<string, unknown>[];
+  handoffs: MeetingPlatformLiveAdapterHandoff[];
+  live_adapter_matrix: MeetingPlatformLiveAdapterMatrix;
+  readiness_matrix: MeetingPlatformLiveAdapterReadinessMatrix;
+  next_actions: string[];
+}
+
 export interface MeetingPlatformLiveAdapterSuite {
   schema: string;
   schema_version: number;
@@ -186,6 +238,8 @@ export interface MeetingPlatformLiveAdapterSuite {
   matrix(matrixOptions?: MeetingPlatformLiveAdapterOptions): MeetingPlatformLiveAdapterMatrix;
   readinessMatrix(readinessOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterReadinessMatrix;
   assertReadinessMatrix(readinessOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterReadinessMatrix;
+  handoff(platform: string, handoffOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterHandoff;
+  handoffBundle(handoffOptions?: MeetingPlatformLiveAdapterReadinessOptions): MeetingPlatformLiveAdapterHandoffBundle;
   summary(summaryOptions?: MeetingPlatformLiveAdapterOptions): Record<string, unknown>;
   getState(): Record<string, unknown>;
   reset(nextState?: Record<string, unknown>): Record<string, unknown>;
@@ -217,6 +271,15 @@ export function assertMeetingPlatformLiveAdapterReadiness(
 export function assertMeetingPlatformLiveAdapterReadinessMatrix(
   options?: MeetingPlatformLiveAdapterReadinessOptions,
 ): MeetingPlatformLiveAdapterReadinessMatrix;
+
+export function buildMeetingPlatformLiveAdapterHandoff(
+  platform: string,
+  options?: MeetingPlatformLiveAdapterReadinessOptions,
+): MeetingPlatformLiveAdapterHandoff;
+
+export function buildMeetingPlatformLiveAdapterHandoffBundle(
+  options?: MeetingPlatformLiveAdapterReadinessOptions,
+): MeetingPlatformLiveAdapterHandoffBundle;
 
 export function createMeetingPlatformLiveAdapter(
   platform: string,

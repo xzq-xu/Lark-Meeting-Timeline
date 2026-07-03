@@ -7,6 +7,7 @@ import {
   buildPlatformIntegrationPlan,
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
+import { buildMeetingPlatformAdaptationRunbook } from './platform-rollout.mjs';
 import { buildMeetingPlatformAdaptationStrategy } from './platform-strategy.mjs';
 
 export const MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA = 'meeting_platform_live_adapter';
@@ -15,6 +16,8 @@ export const MEETING_PLATFORM_LIVE_ADAPTER_PLAN_SCHEMA = 'meeting_platform_live_
 export const MEETING_PLATFORM_LIVE_ADAPTER_MATRIX_SCHEMA = 'meeting_platform_live_adapter_matrix';
 export const MEETING_PLATFORM_LIVE_ADAPTER_READINESS_SCHEMA = 'meeting_platform_live_adapter_readiness';
 export const MEETING_PLATFORM_LIVE_ADAPTER_READINESS_MATRIX_SCHEMA = 'meeting_platform_live_adapter_readiness_matrix';
+export const MEETING_PLATFORM_LIVE_ADAPTER_HANDOFF_SCHEMA = 'meeting_platform_live_adapter_handoff';
+export const MEETING_PLATFORM_LIVE_ADAPTER_HANDOFF_BUNDLE_SCHEMA = 'meeting_platform_live_adapter_handoff_bundle';
 export const MEETING_PLATFORM_LIVE_ADAPTER_REQUIRED_METHODS = Object.freeze([
   'observeMeetingApp',
   'ingestProvider',
@@ -117,6 +120,65 @@ function operationWithEvidence(action, result, evidenceSession, options = {}) {
 
 function selectedPlatforms(options = {}) {
   return asArray(firstNonEmpty(options.platforms, options.platform_keys, MEETING_PLATFORM_KEYS));
+}
+
+function liveAdapterSdkContract() {
+  return {
+    package: '@ai-annotation/meeting-timeline-sdk',
+    module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter',
+    kit_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
+    factory: 'createMeetingPlatformLiveAdapter',
+    suite_factory: 'createMeetingPlatformLiveAdapterSuite',
+    readiness_methods: [
+      'buildMeetingPlatformLiveAdapterReadiness',
+      'buildMeetingPlatformLiveAdapterReadinessMatrix',
+      'assertMeetingPlatformLiveAdapterReadiness',
+      'assertMeetingPlatformLiveAdapterReadinessMatrix',
+    ],
+    kit_methods: [
+      'platformLiveAdapter',
+      'platformLiveAdapterSuite',
+      'platformLiveAdapterHandoff',
+      'platformLiveAdapterHandoffBundle',
+    ],
+  };
+}
+
+function liveAdapterCommands(platform) {
+  const key = normalizeMeetingPlatform(platform);
+  return {
+    build_capture_runtime: 'npm run meeting-app:extension:build',
+    validate_dom_evidence: `npm run meeting-app:evidence-gate -- --input=data/meeting-app-evidence/${key}.json --report-file=data/meeting-app-live-gate-report.json`,
+    validate_dom_matrix: 'npm run meeting-app:evidence-matrix',
+    validate_provider_events: 'buildPlatformLaunchGate(platform, { records: providerRecords, env, baseUrl })',
+    validate_rollout: 'npm run meeting-platform:rollout-matrix',
+    verify_evidence_package: `npm run meeting-platform:evidence-package -- --input=data/meeting-platform-evidence-packages/${key}.json`,
+    validate_live_readiness: 'npm run meeting-platform:live-readiness',
+    package_smoke: 'npm run sdk:package-smoke',
+  };
+}
+
+function liveAdapterEvidencePaths(platform) {
+  const key = normalizeMeetingPlatform(platform);
+  return {
+    meeting_app_evidence: `data/meeting-app-evidence/${key}.json`,
+    provider_evidence: `data/provider-evidence/${key}.json`,
+    evidence_package: `data/meeting-platform-evidence-packages/${key}.json`,
+    live_readiness_report: 'data/meeting-platform-live-readiness-report.json',
+  };
+}
+
+function hostContract(plan = {}) {
+  return {
+    annotation_timestamp_field: plan.live_adapter?.timestamp_field ?? 'captured_at_ms',
+    realtime_source_order: plan.source_priority ?? [],
+    meeting_axis_primary_source: plan.realtime_axis?.primary_source,
+    provider_events_block_realtime: plan.realtime_axis?.provider_events_block_realtime === true,
+    transcript_blocks_realtime: plan.realtime_axis?.transcript_blocks_realtime === true,
+    must_keep_annotations_per_meeting: true,
+    must_use_absolute_capture_time_ms: true,
+    can_insert_before_provider_event: plan.realtime_axis?.provider_events_block_realtime === false,
+  };
 }
 
 function selectedEvidencePackage(platform, options = {}) {
@@ -451,6 +513,126 @@ export function assertMeetingPlatformLiveAdapterReadinessMatrix(options = {}) {
   return matrix;
 }
 
+export function buildMeetingPlatformLiveAdapterHandoff(platform, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  const plan = buildMeetingPlatformLiveAdapterPlan(key, options);
+  const readiness = buildMeetingPlatformLiveAdapterReadiness(key, options);
+  const integration = buildPlatformIntegrationPlan(key, options);
+  const runbook = buildMeetingPlatformAdaptationRunbook(key, options);
+  return compactObject({
+    type: 'meeting_platform_live_adapter_handoff',
+    schema: MEETING_PLATFORM_LIVE_ADAPTER_HANDOFF_SCHEMA,
+    schema_version: MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA_VERSION,
+    platform: key,
+    display_name: plan.display_name,
+    status: readiness.status,
+    passed: readiness.passed,
+    target: readiness.target,
+    rollout_status: readiness.rollout_status,
+    recommended_mode: plan.recommended_mode,
+    production_ready: readiness.production_ready,
+    ready_for_realtime_annotations: readiness.ready_for_realtime_annotations,
+    sdk: liveAdapterSdkContract(),
+    host_contract: hostContract(plan),
+    commands: liveAdapterCommands(key),
+    evidence_paths: liveAdapterEvidencePaths(key),
+    required_host_inputs: [
+      'timeline client implementing startMeeting/endMeeting/insertMark/insertMarks/importTranscript',
+      'local meeting app observer snapshots with captured_at_ms',
+      'annotation packets with captured_at_ms from the writing device or host app',
+      'provider webhook records for later reconcile when the platform exposes them',
+      'post-meeting transcript or artifact import only after the meeting if available',
+    ],
+    realtime_flow: [
+      'observe local meeting app state',
+      'create or update the current meeting axis immediately',
+      'insert annotation marks with captured_at_ms onto the active axis',
+      'ingest provider events asynchronously for reconciliation',
+      'import transcript/artifacts after the meeting without blocking realtime marks',
+    ],
+    outputs: [
+      'meeting axis start/end events',
+      'annotation marks aligned by captured_at_ms',
+      'speaker activity markers when local observer can emit them',
+      'meeting_platform_evidence_package for handoff and audit',
+      'meeting_platform_live_adapter_readiness report for CI gating',
+    ],
+    plan,
+    readiness,
+    integration_plan: integration,
+    runbook,
+    next_actions: uniqueList([
+      ...(readiness.next_actions ?? []),
+      ...(plan.next_actions ?? []),
+      ...(runbook.next_actions ?? []),
+    ]),
+  });
+}
+
+export function buildMeetingPlatformLiveAdapterHandoffBundle(options = {}) {
+  const platforms = selectedPlatforms(options).map((platform) => normalizeMeetingPlatform(platform));
+  const handoffs = platforms.map((platform) => buildMeetingPlatformLiveAdapterHandoff(platform, {
+    ...options,
+    platforms,
+  }));
+  const liveAdapterMatrix = buildMeetingPlatformLiveAdapterMatrix({
+    ...options,
+    platforms,
+  });
+  const readinessMatrix = buildMeetingPlatformLiveAdapterReadinessMatrix({
+    ...options,
+    platforms,
+  });
+  return {
+    type: 'meeting_platform_live_adapter_handoff_bundle',
+    schema: MEETING_PLATFORM_LIVE_ADAPTER_HANDOFF_BUNDLE_SCHEMA,
+    schema_version: MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA_VERSION,
+    platform_count: platforms.length,
+    passed_count: readinessMatrix.passed_count,
+    ready_count: readinessMatrix.ready_count,
+    blocked_count: readinessMatrix.blocked_count,
+    realtime_ready_count: readinessMatrix.realtime_ready_count,
+    production_ready_count: readinessMatrix.production_ready_count,
+    platforms,
+    sdk: liveAdapterSdkContract(),
+    commands: {
+      build_capture_runtime: 'npm run meeting-app:extension:build',
+      validate_dom_matrix: 'npm run meeting-app:evidence-matrix',
+      validate_rollout: 'npm run meeting-platform:rollout-matrix',
+      validate_live_readiness: 'npm run meeting-platform:live-readiness',
+      package_smoke: 'npm run sdk:package-smoke',
+    },
+    evidence_paths: {
+      meeting_app_evidence_dir: 'data/meeting-app-evidence',
+      provider_evidence_dir: 'data/provider-evidence',
+      evidence_package_dir: 'data/meeting-platform-evidence-packages',
+      live_readiness_report: 'data/meeting-platform-live-readiness-report.json',
+    },
+    host_contract: {
+      annotation_timestamp_field: 'captured_at_ms',
+      provider_events_block_realtime: false,
+      transcript_blocks_realtime: false,
+      per_meeting_annotation_isolation_required: true,
+      realtime_marks_do_not_wait_for_transcript: true,
+    },
+    rows: handoffs.map((handoff) => ({
+      platform: handoff.platform,
+      display_name: handoff.display_name,
+      status: handoff.status,
+      passed: handoff.passed,
+      rollout_status: handoff.rollout_status,
+      recommended_mode: handoff.recommended_mode,
+      ready_for_realtime_annotations: handoff.ready_for_realtime_annotations,
+      production_ready: handoff.production_ready,
+      next_actions: handoff.next_actions,
+    })),
+    handoffs,
+    live_adapter_matrix: liveAdapterMatrix,
+    readiness_matrix: readinessMatrix,
+    next_actions: uniqueList(handoffs.flatMap((handoff) => handoff.next_actions ?? [])),
+  };
+}
+
 export function createMeetingPlatformLiveAdapter(platform, clientOrOptions = {}, options = {}) {
   const key = normalizeMeetingPlatform(platform);
   const sourceInput = isTimelineClient(clientOrOptions)
@@ -670,6 +852,19 @@ export function createMeetingPlatformLiveAdapterSuite(clientOrOptions = {}, opti
         ...options,
         ...readinessOptions,
         platforms: readinessOptions.platforms ?? readinessOptions.platform_keys ?? platforms,
+      });
+    },
+    handoff(platform, handoffOptions = {}) {
+      return buildMeetingPlatformLiveAdapterHandoff(platform, {
+        ...options,
+        ...handoffOptions,
+      });
+    },
+    handoffBundle(handoffOptions = {}) {
+      return buildMeetingPlatformLiveAdapterHandoffBundle({
+        ...options,
+        ...handoffOptions,
+        platforms: handoffOptions.platforms ?? handoffOptions.platform_keys ?? platforms,
       });
     },
     summary(summaryOptions = {}) {

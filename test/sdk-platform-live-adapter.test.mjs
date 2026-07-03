@@ -5,6 +5,8 @@ import { buildPlatformFixtureEvent } from '../packages/meeting-timeline-sdk/adap
 import {
   assertMeetingPlatformLiveAdapterReadiness,
   assertMeetingPlatformLiveAdapterReadinessMatrix,
+  buildMeetingPlatformLiveAdapterHandoff,
+  buildMeetingPlatformLiveAdapterHandoffBundle,
   buildMeetingPlatformLiveAdapterMatrix,
   buildMeetingPlatformLiveAdapterPlan,
   buildMeetingPlatformLiveAdapterReadiness,
@@ -239,6 +241,53 @@ assert.equal(suite.assertReadinessMatrix({
   evidencePackage: { google_meet: adapter.exportPackage() },
 }).passed_count, 1);
 
+const googleHandoff = buildMeetingPlatformLiveAdapterHandoff('google-meet', {
+  baseUrl,
+  env: googleEnv,
+  target: 'production',
+  adapter,
+  evidencePackage: adapter.exportPackage(),
+});
+assert.equal(googleHandoff.schema, 'meeting_platform_live_adapter_handoff');
+assert.equal(googleHandoff.platform, 'google_meet');
+assert.equal(googleHandoff.passed, true);
+assert.equal(googleHandoff.host_contract.annotation_timestamp_field, 'captured_at_ms');
+assert.equal(googleHandoff.host_contract.can_insert_before_provider_event, true);
+assert.equal(googleHandoff.sdk.factory, 'createMeetingPlatformLiveAdapter');
+assert.equal(googleHandoff.sdk.kit_methods.includes('platformLiveAdapterHandoffBundle'), true);
+assert.equal(googleHandoff.commands.validate_live_readiness, 'npm run meeting-platform:live-readiness');
+assert.equal(googleHandoff.evidence_paths.evidence_package, 'data/meeting-platform-evidence-packages/google_meet.json');
+assert.equal(googleHandoff.runbook.steps.some((step) => step.id === 'validate_rollout'), true);
+assert.equal(googleHandoff.realtime_flow.includes('insert annotation marks with captured_at_ms onto the active axis'), true);
+
+const handoffBundle = buildMeetingPlatformLiveAdapterHandoffBundle({
+  baseUrl,
+  env: googleEnv,
+  target: 'production',
+  platforms: ['google-meet', 'zoom'],
+  evidencePackage: { google_meet: adapter.exportPackage() },
+});
+assert.equal(handoffBundle.schema, 'meeting_platform_live_adapter_handoff_bundle');
+assert.deepEqual(handoffBundle.platforms, ['google_meet', 'zoom']);
+assert.equal(handoffBundle.platform_count, 2);
+assert.equal(handoffBundle.ready_count, 1);
+assert.equal(handoffBundle.blocked_count, 1);
+assert.equal(handoffBundle.host_contract.provider_events_block_realtime, false);
+assert.equal(handoffBundle.handoffs[0].schema, 'meeting_platform_live_adapter_handoff');
+assert.equal(handoffBundle.readiness_matrix.platform_count, 2);
+assert.equal(handoffBundle.live_adapter_matrix.platform_count, 2);
+assert.equal(handoffBundle.commands.package_smoke, 'npm run sdk:package-smoke');
+
+assert.equal(suite.handoff('google-meet', {
+  target: 'production',
+  evidencePackage: adapter.exportPackage(),
+}).passed, true);
+assert.equal(suite.handoffBundle({
+  target: 'production',
+  platforms: ['google-meet'],
+  evidencePackage: { google_meet: adapter.exportPackage() },
+}).ready_count, 1);
+
 const state = adapter.getState();
 assert.equal(state.platform, 'google_meet');
 assert.equal(state.evidence.provider_record_count, 2);
@@ -269,6 +318,13 @@ assert.equal(kit.assertPlatformLiveAdapterReadinessMatrix({
   platforms: ['google-meet'],
   evidencePackage: { google_meet: adapter.exportPackage() },
 }).passed_count, 1);
+assert.equal(kit.platformLiveAdapterHandoff('google-meet', {
+  evidencePackage: adapter.exportPackage(),
+}).host_contract.annotation_timestamp_field, 'captured_at_ms');
+assert.equal(kit.platformLiveAdapterHandoffBundle({
+  platforms: ['google-meet'],
+  evidencePackage: { google_meet: adapter.exportPackage() },
+}).handoffs[0].sdk.kit_module, '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit');
 assert.equal(kit.platformLiveAdapterSuite({ platforms: ['zoom'] }).summary().platform_count, 1);
 
 assert.equal(adapter.reset().evidence.removed.meeting_app_records, 2);

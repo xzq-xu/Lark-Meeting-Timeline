@@ -72,6 +72,8 @@ import {
 import {
   assertMeetingPlatformLiveAdapterReadiness,
   assertMeetingPlatformLiveAdapterReadinessMatrix,
+  buildMeetingPlatformLiveAdapterHandoff,
+  buildMeetingPlatformLiveAdapterHandoffBundle,
   buildMeetingPlatformLiveAdapterMatrix,
   buildMeetingPlatformLiveAdapterPlan,
   buildMeetingPlatformLiveAdapterReadiness,
@@ -254,6 +256,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_adaptation_strategy: buildMeetingPlatformAdaptationStrategyMatrix(options),
     platform_live_adapter_matrix: buildMeetingPlatformLiveAdapterMatrix(options),
     platform_live_adapter_readiness_matrix: buildMeetingPlatformLiveAdapterReadinessMatrix(options),
+    platform_live_adapter_handoff_bundle: buildMeetingPlatformLiveAdapterHandoffBundle(options),
   };
 }
 
@@ -419,6 +422,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertPlatformLiveAdapterReadinessMatrix(matrixOptions = {}) {
       return assertMeetingPlatformLiveAdapterReadinessMatrix(withDefaults(defaults, matrixOptions));
+    },
+    platformLiveAdapterHandoff(platform, handoffOptions = {}) {
+      return buildMeetingPlatformLiveAdapterHandoff(platform, withDefaults(defaults, handoffOptions));
+    },
+    platformLiveAdapterHandoffBundle(handoffOptions = {}) {
+      return buildMeetingPlatformLiveAdapterHandoffBundle(withDefaults(defaults, handoffOptions));
     },
     platformLiveAdapterSuite(suiteOptions = {}) {
       return createMeetingPlatformLiveAdapterSuite(bridge.client, withDefaults(defaults, suiteOptions));
