@@ -202,6 +202,16 @@ assert.equal(runtimeAdapterAcceptance.zoom.accepted, true);
 const runtimeAdapterValidation = kit.allMeetingAppRuntimeAdapterValidationReports({ platforms: ['zoom'] });
 assert.equal(runtimeAdapterValidation.zoom.accepted, false);
 
+const googleContract = kit.platformAdapterContract('google-meet');
+assert.equal(googleContract.platform, 'google_meet');
+assert.equal(googleContract.realtime_axis.rules.includes('use_provider_events_only_for_reconcile_and_backfill'), true);
+assert.equal(googleContract.provider_observer.required_for_realtime, false);
+assert.equal(googleContract.annotations.endpoints.insertMark, `${baseUrl}/api/annotations`);
+const contractMatrix = kit.platformAdapterContractMatrix({ platforms: ['google-meet', 'teams'] });
+assert.equal(contractMatrix.platform_count, 2);
+assert.equal(contractMatrix.browser_observer_count, 2);
+assert.equal(contractMatrix.rows.find((row) => row.platform === 'microsoft_teams').provider_start_event_count, 1);
+
 const extensionMatches = kit.meetingAppExtensionMatches({ platforms: ['google-meet'] });
 assert.deepEqual(extensionMatches.matches, ['https://meet.google.com/*']);
 const extensionManifest = kit.meetingAppContentScriptManifest({
@@ -333,5 +343,8 @@ assert.equal(report.platform_host_integration_acceptance.scaffold.files.some((fi
 assert.equal(report.platform_provider_connection_matrix.platform_count, 6);
 assert.equal(report.platform_provider_connection_matrix.rows.some((row) => row.platform === 'google_meet'), true);
 assert.equal(report.platform_provider_connection_matrix.rows.find((row) => row.platform === 'google_meet').docs.some((url) => url.includes('developers.google.com')), true);
+assert.equal(report.platform_adapter_contract_matrix.platform_count, 6);
+assert.equal(report.platform_adapter_contract_matrix.rows.some((row) => row.platform === 'google_meet'), true);
+assert.equal(report.platform_adapter_contract_matrix.rows.find((row) => row.platform === 'google_meet').browser_observer, true);
 
 console.log('ok meeting platform timeline kit');

@@ -43,6 +43,8 @@ assert.equal(packedFiles.includes('adapters/platform-host-integration.mjs'), tru
 assert.equal(packedFiles.includes('adapters/platform-host-integration.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-provider-connection.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-provider-connection.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-contract.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-contract.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.d.ts'), true);
 assert.equal(packedFiles.includes('README.md'), true);
@@ -114,6 +116,10 @@ import {
   buildMeetingPlatformProviderConnectionMatrix,
   buildMeetingPlatformProviderConnectionPack,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection';
+import {
+  buildMeetingPlatformAdapterContract,
+  buildMeetingPlatformAdapterContractMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract';
 import {
   buildMeetingPlatformFieldCaptureManifest,
   buildMeetingPlatformFieldCollectorConfig,
@@ -242,6 +248,13 @@ assert.equal(buildMeetingPlatformProviderConnectionMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).packs[0].official_docs.some((doc) => doc.url.includes('zoom.us')), true);
+assert.equal(buildMeetingPlatformAdapterContract('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).supported_surfaces.browser_observer, true);
+assert.equal(buildMeetingPlatformAdapterContractMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).contracts[0].platform, 'zoom');
 
 const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {
   providerRecords: [],
@@ -270,6 +283,8 @@ assert.equal(buildMeetingPlatformFieldCollectorConfig('google-meet', {
 assert.equal(kit.platformFieldCaptureManifest('google-meet', {
   evidencePackage,
 }).file_contract.files.evidence_package.endsWith('/google_meet.json'), true);
+assert.equal(kit.platformAdapterContract('google-meet').schema, 'meeting_platform_adapter_contract');
+assert.equal(kit.platformAdapterContractMatrix({ platforms: ['zoom'] }).platform_count, 1);
 assert.equal(kit.platformFieldCollectorConfig('google-meet').schema, 'meeting_platform_field_collector_config');
 assert.equal(kit.platformFieldEvidenceBundle('google-meet', evidencePackage, {
   requireProductionReady: false,

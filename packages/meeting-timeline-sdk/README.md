@@ -131,6 +131,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-host-integration`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan`
@@ -274,6 +275,34 @@ const collector = buildMeetingPlatformFieldCollectorConfig('google-meet', {
 // collector.timeline_ingest.endpoints.insertMark 是实时标注写入 endpoint。
 // collector.storage.files.field_evidence_input 是采样端应写入的 raw JSON 路径。
 ```
+
+如果下游项目只想拿“一个平台如何接入会议时间轴”的最终契约，直接用 `platform-adapter-contract`。它会把 runtime profile、provider connection、collector config、证据验收条件收敛成一个对象：
+
+```js
+import {
+  buildMeetingPlatformAdapterContract,
+  buildMeetingPlatformAdapterContractMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract';
+
+const google = buildMeetingPlatformAdapterContract('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+});
+
+// google.realtime_axis.rules 明确：本地观察先建轴，provider 事件只做 reconcile。
+// google.annotations.endpoints.insertMark 是实时标注写入 endpoint。
+// google.provider_observer.events 列出 Google Workspace Events 需要监听的 started/ended/participant/artifact 事件。
+// google.local_observer.matches 可交给浏览器扩展或 WebView preload 白名单。
+// google.evidence.missing_items 表示当前离 production-ready 还缺哪些真实会议样本。
+
+const matrix = buildMeetingPlatformAdapterContractMatrix({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+console.log(matrix.rows);
+```
+
+`platform-kit` 也暴露同一能力：`kit.platformAdapterContract('teams')` 和 `kit.platformAdapterContractMatrix()`。外部项目如果要做多会议软件适配面板，优先读这个 contract；只有实际采样、验收、导出 evidence package 时才下钻到 `platform-field-capture`。
 
 也可以直接导出每个平台一份 manifest 文件，给 Chrome 扩展、本地 host 或 provider recorder 读取：
 

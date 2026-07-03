@@ -64,6 +64,11 @@ import type {
   MeetingPlatformRuntimeProfileOptions,
 } from './platform-runtime-profile.mjs';
 import type {
+  MeetingPlatformAdapterContract,
+  MeetingPlatformAdapterContractMatrix,
+  MeetingPlatformAdapterContractOptions,
+} from './platform-adapter-contract.mjs';
+import type {
   MeetingPlatformFieldCaptureManifest,
   MeetingPlatformFieldCaptureManifestMatrix,
   MeetingPlatformFieldCollectorConfig,
@@ -191,6 +196,8 @@ export interface MeetingPlatformTimelineKit {
   platformProviderConnectionMatrix(providerOptions?: MeetingPlatformProviderConnectionOptions): MeetingPlatformProviderConnectionMatrix;
   platformRuntimeProfile(platform: string, profileOptions?: MeetingPlatformRuntimeProfileOptions): MeetingPlatformRuntimeProfile;
   platformRuntimeProfileMatrix(profileOptions?: MeetingPlatformRuntimeProfileOptions): MeetingPlatformRuntimeProfileMatrix;
+  platformAdapterContract(platform: string, contractOptions?: MeetingPlatformAdapterContractOptions): MeetingPlatformAdapterContract;
+  platformAdapterContractMatrix(contractOptions?: MeetingPlatformAdapterContractOptions): MeetingPlatformAdapterContractMatrix;
   platformFieldCapturePlan(platform: string, captureOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCapturePlan;
   platformFieldCaptureMatrix(captureOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCaptureMatrix;
   platformFieldCaptureManifest(platform: string, manifestOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCaptureManifest;

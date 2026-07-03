@@ -101,6 +101,10 @@ import {
   buildMeetingPlatformRuntimeProfileMatrix,
 } from './platform-runtime-profile.mjs';
 import {
+  buildMeetingPlatformAdapterContract,
+  buildMeetingPlatformAdapterContractMatrix,
+} from './platform-adapter-contract.mjs';
+import {
   buildMeetingPlatformFieldCaptureManifest,
   buildMeetingPlatformFieldCaptureManifestMatrix,
   buildMeetingPlatformFieldCollectorConfig,
@@ -285,6 +289,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_host_integration_acceptance: buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(options),
     platform_provider_connection_matrix: buildMeetingPlatformProviderConnectionMatrix(options),
     platform_runtime_profile_matrix: buildMeetingPlatformRuntimeProfileMatrix(options),
+    platform_adapter_contract_matrix: buildMeetingPlatformAdapterContractMatrix(options),
     platform_field_capture_matrix: buildMeetingPlatformFieldCaptureMatrix(options),
     platform_field_capture_manifest_matrix: buildMeetingPlatformFieldCaptureManifestMatrix(options),
     platform_field_collector_config_matrix: buildMeetingPlatformFieldCollectorConfigMatrix(options),
@@ -498,6 +503,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformRuntimeProfileMatrix(profileOptions = {}) {
       return buildMeetingPlatformRuntimeProfileMatrix(withDefaults(defaults, profileOptions));
+    },
+    platformAdapterContract(platform, contractOptions = {}) {
+      return buildMeetingPlatformAdapterContract(platform, withDefaults(defaults, contractOptions));
+    },
+    platformAdapterContractMatrix(contractOptions = {}) {
+      return buildMeetingPlatformAdapterContractMatrix(withDefaults(defaults, contractOptions));
     },
     platformFieldCapturePlan(platform, captureOptions = {}) {
       return buildMeetingPlatformFieldCapturePlan(platform, withDefaults(defaults, captureOptions));
