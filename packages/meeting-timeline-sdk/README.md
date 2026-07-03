@@ -141,6 +141,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-realtime-annotation`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-artifact-handoff`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-adaptation-package`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract`
@@ -402,6 +403,42 @@ npm run meeting-platform:adaptation-package -- \
 ```
 
 这份 package 的定位是“交给另一个项目开始接入”的 SDK 汇总，不替代真实会议采样；`readiness.sdk_wiring_ready=true` 只说明协议和 SDK 调用面可接，是否能 production 仍要看 evidence package / handoff readiness。
+
+如果下游项目要直接启动浏览器扩展、WebView preload 或 native host runtime，用 `platform-runtime-bundle`。它在 `platform-adaptation-package` 基础上再补一层可执行运行时配置：content script manifest、浏览器 URL matches、`meeting-app-browser-runtime` preset、`meeting-app-content-script` start options、mutation observer / speaker filter 参数、extension message 示例、host ingest endpoints，以及 `captured_at_ms` 写入契约：
+
+```js
+import {
+  buildMeetingPlatformRuntimeBundle,
+  buildMeetingPlatformRuntimeBundleMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle';
+
+const googleRuntime = buildMeetingPlatformRuntimeBundle('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+});
+
+// googleRuntime.browser.manifest 可交给扩展构建器。
+// googleRuntime.runtime.start_options 可直接传给 content-script bridge。
+// googleRuntime.host.endpoints.insertMark 是实时标注写入地址。
+// googleRuntime.readiness.provider_required_for_realtime === false。
+// googleRuntime.readiness.transcript_blocks_realtime === false。
+
+const runtimeMatrix = buildMeetingPlatformRuntimeBundleMatrix({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+```
+
+`platform-kit` 同样暴露 `kit.platformRuntimeBundle('google-meet')` 和 `kit.platformRuntimeBundleMatrix()`。CLI 可批量导出每个平台的 runtime bundle：
+
+```sh
+npm run meeting-platform:runtime-bundle -- \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --out-dir=data/meeting-platform-runtime-bundles \
+  --report-file=data/meeting-platform-runtime-bundle-report.json
+```
+
+这层适合交给另一个工程直接落地运行时 glue code；它仍然不代表 production-ready，真实会议 DOM / provider 样本仍以后续 evidence package 和 handoff readiness 为准。
 
 也可以直接导出每个平台一份 manifest 文件，给 Chrome 扩展、本地 host 或 provider recorder 读取：
 

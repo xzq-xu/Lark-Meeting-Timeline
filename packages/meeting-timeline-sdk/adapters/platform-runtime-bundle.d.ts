@@ -1,0 +1,98 @@
+import type { MeetingPlatformAdaptationPackage, MeetingPlatformAdaptationPackageOptions } from './platform-adaptation-package.mjs';
+
+export const MEETING_PLATFORM_RUNTIME_BUNDLE_SCHEMA: 'meeting_platform_runtime_bundle';
+export const MEETING_PLATFORM_RUNTIME_BUNDLE_MATRIX_SCHEMA: 'meeting_platform_runtime_bundle_matrix';
+export const MEETING_PLATFORM_RUNTIME_BUNDLE_SCHEMA_VERSION: 1;
+
+export interface MeetingPlatformRuntimeBundleOptions extends MeetingPlatformAdaptationPackageOptions {
+  bundleId?: string;
+  bundle_id?: string;
+  contentScriptJs?: string | string[];
+  content_script_js?: string | string[];
+  js?: string | string[];
+  sampleIntervalMs?: number;
+  sample_interval_ms?: number;
+  mutationDebounceMs?: number;
+  mutation_debounce_ms?: number;
+  speakerStableFollowupMs?: number;
+  speaker_stable_followup_ms?: number;
+  observeMutations?: boolean;
+  observe_mutations?: boolean;
+  url?: string;
+  href?: string;
+  meeting_url?: string;
+  meetingUrl?: string;
+  capturedAtMs?: number;
+  captured_at_ms?: number;
+}
+
+export interface MeetingPlatformRuntimeBundle {
+  type: 'meeting_platform_runtime_bundle';
+  schema: 'meeting_platform_runtime_bundle';
+  schema_version: 1;
+  id: string;
+  platform: string;
+  display_name?: string;
+  objective: string;
+  runtime_contract: Record<string, unknown>;
+  modules: Record<string, string>;
+  browser: {
+    matches: string[];
+    host_permissions: string[];
+    content_scripts: Record<string, unknown>[];
+    manifest: Record<string, unknown>;
+  };
+  runtime: {
+    preset: string;
+    start_options: Record<string, unknown>;
+    mutation_observer: Record<string, unknown>;
+    capture_profile?: string;
+    required_snapshots: unknown[];
+    speaker_filter?: Record<string, unknown>;
+  };
+  messaging: {
+    message_types: Record<string, string>;
+    accepted_methods: string[];
+    examples: Record<string, unknown>;
+  };
+  host: {
+    endpoints: Record<string, string>;
+    annotation_timestamp_field: string;
+    insert_policy?: Record<string, unknown>;
+  };
+  provider_reconcile?: Record<string, unknown>;
+  transcript: Record<string, unknown>;
+  readiness: {
+    sdk_wiring_ready: boolean;
+    runtime_ready: boolean;
+    provider_required_for_realtime: boolean;
+    transcript_blocks_realtime: boolean;
+    missing_items: string[];
+  };
+  adaptation_package: MeetingPlatformAdaptationPackage;
+  next_actions: string[];
+}
+
+export interface MeetingPlatformRuntimeBundleMatrix {
+  type: 'meeting_platform_runtime_bundle_matrix';
+  schema: 'meeting_platform_runtime_bundle_matrix';
+  schema_version: 1;
+  platform_count: number;
+  runtime_ready_count: number;
+  sdk_wiring_ready_count: number;
+  provider_required_for_realtime_count: number;
+  transcript_blocking_count: number;
+  platforms: string[];
+  rows: Record<string, unknown>[];
+  bundles: MeetingPlatformRuntimeBundle[];
+  next_actions: string[];
+}
+
+export function buildMeetingPlatformRuntimeBundle(
+  platform: string,
+  options?: MeetingPlatformRuntimeBundleOptions,
+): MeetingPlatformRuntimeBundle;
+
+export function buildMeetingPlatformRuntimeBundleMatrix(
+  options?: MeetingPlatformRuntimeBundleOptions,
+): MeetingPlatformRuntimeBundleMatrix;

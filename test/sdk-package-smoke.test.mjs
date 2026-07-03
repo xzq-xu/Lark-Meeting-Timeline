@@ -63,6 +63,8 @@ assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.mjs'), tru
 assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adaptation-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adaptation-package.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-runtime-bundle.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-runtime-bundle.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-sample.mjs'), true);
@@ -193,6 +195,10 @@ import {
   buildMeetingPlatformAdaptationPackage,
   buildMeetingPlatformAdaptationPackageMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adaptation-package';
+import {
+  buildMeetingPlatformRuntimeBundle,
+  buildMeetingPlatformRuntimeBundleMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle';
 import {
   assertMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
@@ -405,6 +411,17 @@ assert.equal(buildMeetingPlatformAdaptationPackageMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).rows[0].sdk_wiring_ready, true);
+assert.equal(kit.platformRuntimeBundle('google-meet').schema, 'meeting_platform_runtime_bundle');
+assert.equal(kit.platformRuntimeBundleMatrix({
+  platforms: ['google-meet'],
+}).platform_count, 1);
+assert.equal(buildMeetingPlatformRuntimeBundle('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).browser.matches.includes('https://meet.google.com/*'), true);
+assert.equal(buildMeetingPlatformRuntimeBundleMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).rows[0].provider_required_for_realtime, false);
 
 const rollout = buildMeetingPlatformRolloutPlan('teams', {
   baseUrl: 'http://localhost:8787',
