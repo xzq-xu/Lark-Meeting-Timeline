@@ -115,6 +115,13 @@ import {
   runMeetingPlatformAdapterSampleMatrix,
 } from './platform-adapter-sample.mjs';
 import {
+  assertMeetingPlatformRealEvidenceIntake,
+  assertMeetingPlatformRealEvidenceIntakeMatrix,
+  buildMeetingPlatformRealEvidenceIntakeMatrix,
+  buildMeetingPlatformRealEvidenceIntakePlan,
+  buildMeetingPlatformRealEvidenceIntakeReport,
+} from './platform-real-intake.mjs';
+import {
   buildMeetingPlatformFieldCaptureManifest,
   buildMeetingPlatformFieldCaptureManifestMatrix,
   buildMeetingPlatformFieldCollectorConfig,
@@ -544,6 +551,21 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertPlatformAdapterSampleMatrix(sampleOptions = {}) {
       return assertMeetingPlatformAdapterSampleMatrix(withDefaults(defaults, sampleOptions));
+    },
+    platformRealEvidenceIntakePlan(platform, intakeOptions = {}) {
+      return buildMeetingPlatformRealEvidenceIntakePlan(platform, withDefaults(defaults, intakeOptions));
+    },
+    platformRealEvidenceIntake(platform, input = {}, intakeOptions = {}) {
+      return buildMeetingPlatformRealEvidenceIntakeReport(platform, input, withDefaults(defaults, intakeOptions));
+    },
+    platformRealEvidenceIntakeMatrix(input = {}, intakeOptions = {}) {
+      return buildMeetingPlatformRealEvidenceIntakeMatrix(input, withDefaults(defaults, intakeOptions));
+    },
+    assertPlatformRealEvidenceIntake(platform, input = {}, intakeOptions = {}) {
+      return assertMeetingPlatformRealEvidenceIntake(platform, input, withDefaults(defaults, intakeOptions));
+    },
+    assertPlatformRealEvidenceIntakeMatrix(input = {}, intakeOptions = {}) {
+      return assertMeetingPlatformRealEvidenceIntakeMatrix(input, withDefaults(defaults, intakeOptions));
     },
     platformFieldCapturePlan(platform, captureOptions = {}) {
       return buildMeetingPlatformFieldCapturePlan(platform, withDefaults(defaults, captureOptions));

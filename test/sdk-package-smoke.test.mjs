@@ -47,6 +47,8 @@ assert.equal(packedFiles.includes('adapters/platform-adapter-contract.mjs'), tru
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-sample.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-sample.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-real-intake.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-real-intake.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.d.ts'), true);
 assert.equal(packedFiles.includes('README.md'), true);
@@ -130,6 +132,10 @@ import {
   runMeetingPlatformAdapterSample,
   runMeetingPlatformAdapterSampleMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-sample';
+import {
+  buildMeetingPlatformRealEvidenceIntakePlan,
+  buildMeetingPlatformRealEvidenceIntakeReport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-real-intake';
 import {
   buildMeetingPlatformFieldCaptureManifest,
   buildMeetingPlatformFieldCollectorConfig,
@@ -285,6 +291,13 @@ assert.equal((await runMeetingPlatformAdapterSampleMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['webex'],
 })).accepted_count, 1);
+assert.equal(buildMeetingPlatformRealEvidenceIntakePlan('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).provider_endpoint, 'http://localhost:8787/api/platform-events/google-meet');
+assert.equal(buildMeetingPlatformRealEvidenceIntakeReport('google-meet', {}, {
+  baseUrl: 'http://localhost:8787',
+  requireProductionReady: false,
+}).accepted, false);
 
 const evidencePackage = buildMeetingPlatformEvidencePackage('google-meet', {
   providerRecords: [],
@@ -317,6 +330,10 @@ assert.equal(kit.platformAdapterContract('google-meet').schema, 'meeting_platfor
 assert.equal(kit.platformAdapterContractMatrix({ platforms: ['zoom'] }).platform_count, 1);
 assert.equal(kit.platformAdapterContractAcceptance('google-meet').accepted, true);
 assert.equal(kit.platformAdapterContractAcceptanceMatrix({ platforms: ['zoom'] }).accepted_count, 1);
+assert.equal(kit.platformRealEvidenceIntakePlan('google-meet').schema, 'meeting_platform_real_evidence_intake_plan');
+assert.equal(kit.platformRealEvidenceIntake('google-meet', {}, {
+  requireProductionReady: false,
+}).accepted, false);
 assert.equal(kit.platformFieldCollectorConfig('google-meet').schema, 'meeting_platform_field_collector_config');
 assert.equal(kit.platformFieldEvidenceBundle('google-meet', evidencePackage, {
   requireProductionReady: false,

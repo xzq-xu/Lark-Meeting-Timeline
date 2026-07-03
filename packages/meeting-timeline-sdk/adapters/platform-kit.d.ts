@@ -77,6 +77,12 @@ import type {
   MeetingPlatformAdapterSamplePlan,
 } from './platform-adapter-sample.mjs';
 import type {
+  MeetingPlatformRealEvidenceIntakeMatrix,
+  MeetingPlatformRealEvidenceIntakeOptions,
+  MeetingPlatformRealEvidenceIntakePlan,
+  MeetingPlatformRealEvidenceIntakeReport,
+} from './platform-real-intake.mjs';
+import type {
   MeetingPlatformFieldCaptureManifest,
   MeetingPlatformFieldCaptureManifestMatrix,
   MeetingPlatformFieldCollectorConfig,
@@ -223,6 +229,25 @@ export interface MeetingPlatformTimelineKit {
     sampleOptions?: MeetingPlatformAdapterSampleOptions,
   ): Promise<MeetingPlatformAdapterSample>;
   assertPlatformAdapterSampleMatrix(sampleOptions?: MeetingPlatformAdapterSampleOptions): Promise<MeetingPlatformAdapterSampleMatrix>;
+  platformRealEvidenceIntakePlan(platform: string, intakeOptions?: MeetingPlatformRealEvidenceIntakeOptions): MeetingPlatformRealEvidenceIntakePlan;
+  platformRealEvidenceIntake(
+    platform: string,
+    input?: Record<string, unknown>,
+    intakeOptions?: MeetingPlatformRealEvidenceIntakeOptions,
+  ): MeetingPlatformRealEvidenceIntakeReport;
+  platformRealEvidenceIntakeMatrix(
+    input?: Record<string, unknown>,
+    intakeOptions?: MeetingPlatformRealEvidenceIntakeOptions,
+  ): MeetingPlatformRealEvidenceIntakeMatrix;
+  assertPlatformRealEvidenceIntake(
+    platform: string,
+    input?: Record<string, unknown>,
+    intakeOptions?: MeetingPlatformRealEvidenceIntakeOptions,
+  ): MeetingPlatformRealEvidenceIntakeReport;
+  assertPlatformRealEvidenceIntakeMatrix(
+    input?: Record<string, unknown>,
+    intakeOptions?: MeetingPlatformRealEvidenceIntakeOptions,
+  ): MeetingPlatformRealEvidenceIntakeMatrix;
   platformFieldCapturePlan(platform: string, captureOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCapturePlan;
   platformFieldCaptureMatrix(captureOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCaptureMatrix;
   platformFieldCaptureManifest(platform: string, manifestOptions?: MeetingPlatformFieldCaptureOptions): MeetingPlatformFieldCaptureManifest;
