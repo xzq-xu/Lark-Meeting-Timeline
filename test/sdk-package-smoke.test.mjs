@@ -47,6 +47,8 @@ assert.equal(packedFiles.includes('adapters/platform-subscription-handoff.mjs'),
 assert.equal(packedFiles.includes('adapters/platform-subscription-handoff.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-speaker-track.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-speaker-track.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-artifact-handoff.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-contract.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-sample.mjs'), true);
@@ -137,6 +139,11 @@ import {
   buildMeetingPlatformSpeakerTrackMatrix,
   buildMeetingPlatformSpeakerTrackPlan,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-speaker-track';
+import {
+  buildMeetingPlatformArtifactHandoff,
+  buildMeetingPlatformArtifactHandoffMatrix,
+  buildMeetingPlatformArtifactHandoffPlan,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-artifact-handoff';
 import {
   assertMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
@@ -230,6 +237,21 @@ assert.equal(kit.platformSpeakerTrack('zoom', {
     },
   ],
 }).mark_count, 1);
+assert.equal(kit.platformArtifactHandoffPlan('zoom').schema, 'meeting_platform_artifact_handoff_plan');
+assert.equal(kit.platformArtifactHandoffMatrix({
+  platforms: ['zoom'],
+}).platform_count, 1);
+assert.equal(kit.platformArtifactHandoff('zoom', {
+  signals: [
+    {
+      type: 'artifact_ready',
+      meeting: { platform: 'zoom', meeting_id: '987654321' },
+      occurred_at_ms: 1_782_614_400_000,
+      artifact_kind: 'transcript',
+      artifact_url: 'https://zoom.us/transcript.vtt',
+    },
+  ],
+}).fetch_request_count, 1);
 
 const rollout = buildMeetingPlatformRolloutPlan('teams', {
   baseUrl: 'http://localhost:8787',
@@ -343,6 +365,21 @@ assert.equal(buildMeetingPlatformSpeakerTrack('google-meet', {
     },
   ],
 }).marks[0].intent, 'speaker_track');
+assert.equal(buildMeetingPlatformArtifactHandoffPlan('google-meet').transcript_blocks_realtime, false);
+assert.equal(buildMeetingPlatformArtifactHandoffMatrix({
+  platforms: ['google-meet'],
+}).realtime_blocking_count, 0);
+assert.equal(buildMeetingPlatformArtifactHandoff('google-meet', {
+  signals: [
+    {
+      type: 'artifact_ready',
+      meeting: { platform: 'google_meet', meeting_id: 'abc-defg-hij' },
+      occurred_at_ms: 1_782_614_400_000,
+      artifact_kind: 'transcript',
+      artifact_id: 'transcript-1',
+    },
+  ],
+}).transcript_import_count, 1);
 assert.equal(buildMeetingPlatformAdapterContract('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).supported_surfaces.browser_observer, true);

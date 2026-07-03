@@ -133,6 +133,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-subscription-handoff`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-speaker-track`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-artifact-handoff`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-field-intake`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract`
@@ -1463,6 +1464,51 @@ npm run meeting-platform:speaker-track -- \
 ## 会后转写导入
 
 事件 adapter 只负责告诉你 transcript/recording 已生成；正文内容建议会后拉取后再导入。`artifact-plan` 可以把 `artifact_ready` signal 转成平台相关的补拉/导入计划，告诉宿主应该用哪个 provider API、哪个 transcript normalizer，以及是否只是录制 metadata：
+
+如果要把 Google Meet / Teams / Zoom / Webex / Lark 的会后产物能力交给另一个项目，优先用 `platform-artifact-handoff`。它会把 transcript、recording、smart notes 的事件来源、fetch strategy、normalizer、token env、导入 endpoint 和“绝不阻塞实时标注”的约束收成统一对象：
+
+```js
+import {
+  buildMeetingPlatformArtifactHandoff,
+  buildMeetingPlatformArtifactHandoffMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-artifact-handoff';
+
+const matrix = buildMeetingPlatformArtifactHandoffMatrix({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+// matrix.realtime_blocking_count === 0
+// matrix.rows[*].post_meeting_only === true
+
+const handoff = buildMeetingPlatformArtifactHandoff('google-meet', {
+  signals: [
+    {
+      type: 'artifact_ready',
+      meeting: { platform: 'google_meet', meeting_id: 'abc-defg-hij' },
+      occurred_at_ms: Date.now(),
+      artifact_kind: 'transcript',
+      artifact_id: 'transcript-1',
+    },
+  ],
+}, {
+  baseUrl: 'https://timeline.example.com',
+});
+
+// handoff.fetch_requests 是会后补拉请求骨架；Authorization 会被 redacted。
+// handoff.transcript_import_count > 0 时，补拉后用 transcript adapter 导入。
+```
+
+命令行版本适合接入项目或 CI 生成会后产物交接报告：
+
+```sh
+npm run meeting-platform:artifact-handoff -- \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --signals-file=data/meeting-platform-artifact-signals.json \
+  --out-dir=data/meeting-platform-artifact-handoffs \
+  --report-file=data/meeting-platform-artifact-handoff-report.json
+```
 
 ```js
 import { buildArtifactImportPlans } from '@ai-annotation/meeting-timeline-sdk/adapters/artifact-plan';

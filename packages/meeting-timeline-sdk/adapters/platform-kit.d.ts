@@ -71,6 +71,13 @@ import type {
   MeetingPlatformSpeakerTrackPlan,
 } from './platform-speaker-track.mjs';
 import type {
+  MeetingPlatformArtifactHandoff,
+  MeetingPlatformArtifactHandoffInput,
+  MeetingPlatformArtifactHandoffMatrix,
+  MeetingPlatformArtifactHandoffOptions,
+  MeetingPlatformArtifactHandoffPlan,
+} from './platform-artifact-handoff.mjs';
+import type {
   MeetingPlatformRuntimeProfile,
   MeetingPlatformRuntimeProfileMatrix,
   MeetingPlatformRuntimeProfileOptions,
@@ -242,6 +249,13 @@ export interface MeetingPlatformTimelineKit {
     input?: MeetingPlatformSpeakerTrackInput | Record<string, unknown>[],
     trackOptions?: MeetingPlatformSpeakerTrackOptions,
   ): MeetingPlatformSpeakerTrack;
+  platformArtifactHandoffPlan(platform: string, artifactOptions?: MeetingPlatformArtifactHandoffOptions): MeetingPlatformArtifactHandoffPlan;
+  platformArtifactHandoffMatrix(artifactOptions?: MeetingPlatformArtifactHandoffOptions): MeetingPlatformArtifactHandoffMatrix;
+  platformArtifactHandoff(
+    platform: string,
+    input?: MeetingPlatformArtifactHandoffInput | Record<string, unknown>[],
+    artifactOptions?: MeetingPlatformArtifactHandoffOptions,
+  ): MeetingPlatformArtifactHandoff;
   platformRuntimeProfile(platform: string, profileOptions?: MeetingPlatformRuntimeProfileOptions): MeetingPlatformRuntimeProfile;
   platformRuntimeProfileMatrix(profileOptions?: MeetingPlatformRuntimeProfileOptions): MeetingPlatformRuntimeProfileMatrix;
   platformAdapterContract(platform: string, contractOptions?: MeetingPlatformAdapterContractOptions): MeetingPlatformAdapterContract;

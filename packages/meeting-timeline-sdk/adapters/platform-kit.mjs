@@ -108,6 +108,11 @@ import {
   buildMeetingPlatformSpeakerTrackPlan,
 } from './platform-speaker-track.mjs';
 import {
+  buildMeetingPlatformArtifactHandoff,
+  buildMeetingPlatformArtifactHandoffMatrix,
+  buildMeetingPlatformArtifactHandoffPlan,
+} from './platform-artifact-handoff.mjs';
+import {
   buildMeetingPlatformRuntimeProfile,
   buildMeetingPlatformRuntimeProfileMatrix,
 } from './platform-runtime-profile.mjs';
@@ -330,6 +335,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_provider_connection_matrix: buildMeetingPlatformProviderConnectionMatrix(options),
     platform_subscription_handoff_matrix: buildMeetingPlatformSubscriptionHandoffMatrix(options),
     platform_speaker_track_matrix: buildMeetingPlatformSpeakerTrackMatrix(options),
+    platform_artifact_handoff_matrix: buildMeetingPlatformArtifactHandoffMatrix(options),
     platform_runtime_profile_matrix: buildMeetingPlatformRuntimeProfileMatrix(options),
     platform_adapter_contract_matrix: buildMeetingPlatformAdapterContractMatrix(options),
     platform_adapter_contract_acceptance_matrix: buildMeetingPlatformAdapterContractAcceptanceMatrix(options),
@@ -563,6 +569,15 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformSpeakerTrack(platform, input = {}, trackOptions = {}) {
       return buildMeetingPlatformSpeakerTrack(platform, input, withDefaults(defaults, trackOptions));
+    },
+    platformArtifactHandoffPlan(platform, artifactOptions = {}) {
+      return buildMeetingPlatformArtifactHandoffPlan(platform, withDefaults(defaults, artifactOptions));
+    },
+    platformArtifactHandoffMatrix(artifactOptions = {}) {
+      return buildMeetingPlatformArtifactHandoffMatrix(withDefaults(defaults, artifactOptions));
+    },
+    platformArtifactHandoff(platform, input = {}, artifactOptions = {}) {
+      return buildMeetingPlatformArtifactHandoff(platform, input, withDefaults(defaults, artifactOptions));
     },
     platformRuntimeProfile(platform, profileOptions = {}) {
       return buildMeetingPlatformRuntimeProfile(platform, withDefaults(defaults, profileOptions));
