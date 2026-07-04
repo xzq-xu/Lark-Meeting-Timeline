@@ -75,10 +75,17 @@ assert.equal(googlePackage.provider_records.length, 2);
 assert.equal(googlePackage.meeting_app_record_set.record_count, 2);
 assert.equal(googlePackage.rollout_plan.status, 'production_ready');
 assert.equal(googlePackage.rollout_plan.production_ready, true);
+assert.equal(googlePackage.adapter_route.schema, 'meeting_platform_adapter_route');
+assert.equal(googlePackage.adapter_route.recommended_mode, 'local_observer_first_provider_reconcile');
+assert.equal(googlePackage.adapter_route.routes[0].route, 'local_observer_axis');
+assert.equal(googlePackage.adapter_route.realtime_invariants.provider_events_block_realtime, false);
+assert.equal(googlePackage.adapter_route.realtime_invariants.transcript_blocks_realtime, false);
 assert.equal(googlePackage.evidence_correlation.passed, true);
 assert.equal(googlePackage.evidence_correlation.confidence, 'high');
 assert.equal(googlePackage.evidence_summary.provider.evidence_level, 'captured_events');
 assert.equal(googlePackage.evidence_summary.local_dom.evidence_level, 'captured_dom');
+assert.equal(googlePackage.evidence_summary.adapter_route.first_route, 'local_observer_axis');
+assert.equal(googlePackage.evidence_summary.adapter_route.provider_events_block_realtime, false);
 assert.equal(googlePackage.evidence_summary.correlation.passed, true);
 assert.deepEqual(googlePackage.env_summary.configured_keys, [
   'GOOGLE_PUBSUB_OIDC_AUDIENCE',
@@ -86,6 +93,8 @@ assert.deepEqual(googlePackage.env_summary.configured_keys, [
 ]);
 assert.equal(googlePackage.env_summary.values, undefined);
 assert.equal(googlePackage.handoff.final_gate, 'buildMeetingPlatformRolloutPlan');
+assert.equal(googlePackage.handoff.adapter_route_gate, 'buildMeetingPlatformAdapterRoute');
+assert.equal(googlePackage.handoff.adapter_first_route, 'local_observer_axis');
 assert.equal(googlePackage.runbook.steps.some((item) => item.id === 'validate_rollout'), true);
 
 const googleSummary = buildMeetingPlatformEvidencePackageSummary(googlePackage);
@@ -96,6 +105,11 @@ assert.equal(googleSummary.provider_record_count, 2);
 assert.equal(googleSummary.meeting_app_record_count, 2);
 assert.equal(googleSummary.correlation_passed, true);
 assert.equal(googleSummary.correlation_confidence, 'high');
+assert.equal(googleSummary.adapter_route_ready, true);
+assert.equal(googleSummary.adapter_recommended_mode, 'local_observer_first_provider_reconcile');
+assert.equal(googleSummary.adapter_first_route, 'local_observer_axis');
+assert.equal(googleSummary.provider_events_block_realtime, false);
+assert.equal(googleSummary.transcript_blocks_realtime, false);
 
 const googleVerification = verifyMeetingPlatformEvidencePackage(googlePackage, {
   baseUrl,
@@ -107,6 +121,10 @@ assert.equal(googleVerification.embedded_plan_matches, true);
 assert.equal(googleVerification.requirement, 'production_ready');
 assert.equal(googleVerification.correlation_required, true);
 assert.equal(googleVerification.correlation_passed, true);
+assert.equal(googleVerification.adapter_route_ready, true);
+assert.equal(googleVerification.adapter_first_route, 'local_observer_axis');
+assert.equal(googleVerification.provider_events_block_realtime, false);
+assert.equal(googleVerification.transcript_blocks_realtime, false);
 
 const zoomDomOnly = buildMeetingPlatformEvidencePackage({
   platform: 'zoom',

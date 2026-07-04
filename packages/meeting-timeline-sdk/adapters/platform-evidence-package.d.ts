@@ -1,5 +1,6 @@
 import type { MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type { PlatformCaptureOptions, PlatformCaptureRecord } from './platform-capture.mjs';
+import type { MeetingPlatformAdapterRoute } from './platform-adapter-route.mjs';
 import type { MeetingPlatformEvidenceCorrelation } from './platform-evidence-correlation.mjs';
 import type { MeetingPlatformAdaptationRunbook, MeetingPlatformRolloutOptions, MeetingPlatformRolloutPlan } from './platform-rollout.mjs';
 
@@ -59,6 +60,7 @@ export interface MeetingPlatformEvidencePackage {
   meeting_app_record_set?: MeetingAppSnapshotRecordSet | Record<string, unknown>;
   evidence_correlation?: MeetingPlatformEvidenceCorrelation;
   rollout_plan: MeetingPlatformRolloutPlan;
+  adapter_route: MeetingPlatformAdapterRoute;
   runbook?: MeetingPlatformAdaptationRunbook;
   handoff: Record<string, unknown>;
   env_summary?: {
@@ -85,6 +87,11 @@ export interface MeetingPlatformEvidencePackageSummary {
   correlation_status?: string;
   correlation_passed?: boolean;
   correlation_confidence?: string;
+  adapter_route_ready: boolean;
+  adapter_recommended_mode?: string;
+  adapter_first_route?: string;
+  provider_events_block_realtime?: boolean;
+  transcript_blocks_realtime?: boolean;
   provider_missing_required_coverage: string[];
   local_dom_missing_required_coverage: string[];
   next_actions: string[];
@@ -110,6 +117,11 @@ export interface MeetingPlatformEvidencePackageVerification {
   correlation_status?: string;
   correlation_confidence?: string;
   evidence_correlation?: MeetingPlatformEvidenceCorrelation;
+  adapter_route_ready: boolean;
+  adapter_recommended_mode?: string;
+  adapter_first_route?: string;
+  provider_events_block_realtime?: boolean;
+  transcript_blocks_realtime?: boolean;
   provider_missing_required_coverage: string[];
   local_dom_missing_required_coverage: string[];
   next_actions: string[];

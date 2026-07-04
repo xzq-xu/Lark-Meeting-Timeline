@@ -14,6 +14,9 @@ import {
   buildMeetingPlatformAdaptationRunbook,
   buildMeetingPlatformRolloutPlan,
 } from './platform-rollout.mjs';
+import {
+  buildMeetingPlatformAdapterRoute,
+} from './platform-adapter-route.mjs';
 import { normalizeMeetingPlatform } from './platform-setup.mjs';
 
 export const MEETING_PLATFORM_EVIDENCE_PACKAGE_SCHEMA = 'meeting_platform_evidence_package';
@@ -202,7 +205,37 @@ function providerSamplesOption(platform, samples = []) {
   return samples.length > 0 ? { [platform]: samples } : undefined;
 }
 
-function buildEvidenceSummary(rolloutPlan = {}, providerRecords = [], providerSamples = [], meetingAppRecordSet = undefined, evidenceCorrelation = undefined) {
+function adapterRouteSummary(adapterRoute = {}) {
+  if (!adapterRoute || typeof adapterRoute !== 'object') return undefined;
+  const invariants = adapterRoute.realtime_invariants ?? {};
+  return compactObject({
+    recommended_mode: adapterRoute.recommended_mode,
+    first_route: adapterRoute.routes?.[0]?.route,
+    route_count: adapterRoute.route_count,
+    provider_events_block_realtime: invariants.provider_events_block_realtime,
+    transcript_blocks_realtime: invariants.transcript_blocks_realtime,
+    annotations_use_absolute_captured_at_ms: invariants.annotations_use_absolute_captured_at_ms,
+    per_meeting_annotation_isolation_required: invariants.per_meeting_annotation_isolation_required,
+  });
+}
+
+function hasRequiredRoute(adapterRoute = {}, routeName) {
+  return asArray(adapterRoute.routes).some((route) => route.route === routeName && route.blocks_realtime_if_missing === true);
+}
+
+function adapterRouteReady(adapterRoute = {}) {
+  const invariants = adapterRoute.realtime_invariants ?? {};
+  return adapterRoute.schema === 'meeting_platform_adapter_route'
+    && adapterRoute.route_count > 0
+    && hasRequiredRoute(adapterRoute, adapterRoute.platform === 'local_detector' ? 'host_detector_axis' : 'local_observer_axis')
+    && hasRequiredRoute(adapterRoute, 'annotation_insert')
+    && invariants.annotations_use_absolute_captured_at_ms === true
+    && invariants.provider_events_block_realtime === false
+    && invariants.transcript_blocks_realtime === false
+    && invariants.per_meeting_annotation_isolation_required === true;
+}
+
+function buildEvidenceSummary(rolloutPlan = {}, providerRecords = [], providerSamples = [], meetingAppRecordSet = undefined, evidenceCorrelation = undefined, adapterRoute = undefined) {
   return compactObject({
     status: rolloutPlan.status,
     production_ready: rolloutPlan.production_ready,
@@ -225,6 +258,7 @@ function buildEvidenceSummary(rolloutPlan = {}, providerRecords = [], providerSa
       production_ready: rolloutPlan.local_observer.production_ready,
       missing_required_coverage: rolloutPlan.local_observer.missing_required_coverage,
     } : undefined,
+    adapter_route: adapterRouteSummary(adapterRoute),
     next_actions: rolloutPlan.next_actions,
   });
 }
@@ -274,7 +308,15 @@ export function buildMeetingPlatformEvidencePackage(platformOrInput, inputOrOpti
     providerRecords,
     meetingAppRecordSet,
   }, options);
-  const evidenceSummary = buildEvidenceSummary(rolloutPlan, providerRecords, providerSamples, meetingAppRecordSet, evidenceCorrelation);
+  const adapterRoute = buildMeetingPlatformAdapterRoute(key, rolloutOptions);
+  const evidenceSummary = buildEvidenceSummary(
+    rolloutPlan,
+    providerRecords,
+    providerSamples,
+    meetingAppRecordSet,
+    evidenceCorrelation,
+    adapterRoute,
+  );
   return compactObject({
     schema: MEETING_PLATFORM_EVIDENCE_PACKAGE_SCHEMA,
     schema_version: MEETING_PLATFORM_EVIDENCE_PACKAGE_SCHEMA_VERSION,
@@ -296,15 +338,20 @@ export function buildMeetingPlatformEvidencePackage(platformOrInput, inputOrOpti
     meeting_app_record_set: meetingAppRecordSet,
     evidence_correlation: evidenceCorrelation,
     rollout_plan: rolloutPlan,
+    adapter_route: adapterRoute,
     runbook,
     handoff: {
       provider_evidence_input: 'providerRecords',
       meeting_app_evidence_input: 'meetingAppRecordSet',
+      adapter_route_input: 'adapter_route',
+      adapter_route_gate: 'buildMeetingPlatformAdapterRoute',
       final_gate: 'buildMeetingPlatformRolloutPlan',
       pilot_condition: 'ready_for_realtime_annotations === true',
       production_condition: 'production_ready === true',
       status: rolloutPlan.status,
       recommended_mode: rolloutPlan.recommended_mode,
+      adapter_recommended_mode: adapterRoute.recommended_mode,
+      adapter_first_route: adapterRoute.routes?.[0]?.route,
       next_actions: rolloutPlan.next_actions,
     },
     env_summary: safeEnvSummary(env, { ...input, ...options }),
@@ -333,6 +380,11 @@ export function buildMeetingPlatformEvidencePackageSummary(packageOrInput, optio
     correlation_status: pkg.evidence_correlation?.status,
     correlation_passed: pkg.evidence_correlation?.passed,
     correlation_confidence: pkg.evidence_correlation?.confidence,
+    adapter_route_ready: adapterRouteReady(pkg.adapter_route),
+    adapter_recommended_mode: pkg.adapter_route?.recommended_mode,
+    adapter_first_route: pkg.adapter_route?.routes?.[0]?.route,
+    provider_events_block_realtime: pkg.adapter_route?.realtime_invariants?.provider_events_block_realtime,
+    transcript_blocks_realtime: pkg.adapter_route?.realtime_invariants?.transcript_blocks_realtime,
     provider_missing_required_coverage: plan.provider_events?.missing_required_coverage ?? [],
     local_dom_missing_required_coverage: plan.local_observer?.missing_required_coverage ?? [],
     next_actions: plan.next_actions ?? [],
@@ -374,7 +426,8 @@ export function verifyMeetingPlatformEvidencePackage(packageOrInput, options = {
     ? verifiedPlan.production_ready === true
     : verifiedPlan.ready_for_realtime_annotations === true;
   const correlationPassed = verifiedPackage.evidence_correlation?.passed !== false;
-  const finalPassed = passed && (!requireCorrelation || correlationPassed);
+  const routeReady = adapterRouteReady(verifiedPackage.adapter_route);
+  const finalPassed = passed && (!requireCorrelation || correlationPassed) && routeReady;
   const embeddedPlanMatches = embeddedPlan ? statusMatches(embeddedPlan, verifiedPlan) : undefined;
   return compactObject({
     type: 'meeting_platform_evidence_package_verification',
@@ -396,6 +449,11 @@ export function verifyMeetingPlatformEvidencePackage(packageOrInput, options = {
     correlation_status: verifiedPackage.evidence_correlation?.status,
     correlation_confidence: verifiedPackage.evidence_correlation?.confidence,
     evidence_correlation: verifiedPackage.evidence_correlation,
+    adapter_route_ready: routeReady,
+    adapter_recommended_mode: verifiedPackage.adapter_route?.recommended_mode,
+    adapter_first_route: verifiedPackage.adapter_route?.routes?.[0]?.route,
+    provider_events_block_realtime: verifiedPackage.adapter_route?.realtime_invariants?.provider_events_block_realtime,
+    transcript_blocks_realtime: verifiedPackage.adapter_route?.realtime_invariants?.transcript_blocks_realtime,
     provider_missing_required_coverage: verifiedPlan.provider_events?.missing_required_coverage ?? [],
     local_dom_missing_required_coverage: verifiedPlan.local_observer?.missing_required_coverage ?? [],
     next_actions: verifiedPlan.next_actions ?? [],
