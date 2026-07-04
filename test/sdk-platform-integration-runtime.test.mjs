@@ -201,14 +201,31 @@ assert.equal(manifest.blocking_count, 0);
 assert.equal(manifest.warning_count, 1);
 assert.equal(manifest.registry_acceptance.accepted, true);
 assert.equal(manifest.runtime_bundle_matrix.runtime_ready_count, 2);
+assert.equal(manifest.runtime_bundle_matrix.candidate_observer_count, 2);
 assert.equal(manifest.runtime_bundle_matrix.provider_required_for_realtime_count, 0);
 assert.equal(manifest.adaptation_strategy_matrix.strategy_count, 2);
 assert.equal(manifest.adaptation_package_matrix.sdk_wiring_ready_count, 2);
+assert.equal(manifest.adaptation_package_matrix.candidate_observer_count, 2);
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').browser_match_count, 1);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').candidate_observation_ready, true);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').candidate_observer_message_type, 'meeting_timeline.observe_candidates');
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').candidate_observer_permission, 'tabs');
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').primary_axis_source, 'local_observer');
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').provider_blocks_realtime, false);
 assert.equal(manifest.rows.find((row) => row.platform === 'zoom').sdk_wiring_ready, true);
 assert.equal(assertMeetingPlatformIntegrationRuntimeManifest(manifest).host_integration_ready, true);
+
+const missingCandidateObserverManifest = {
+  ...manifest,
+  runtime_bundle_matrix: {
+    ...manifest.runtime_bundle_matrix,
+    candidate_observer_count: 1,
+  },
+};
+assert.throws(
+  () => assertMeetingPlatformIntegrationRuntimeManifest(missingCandidateObserverManifest),
+  /Meeting platform integration runtime is not ready/,
+);
 
 const calls = [];
 const client = {

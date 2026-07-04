@@ -126,6 +126,13 @@ function runtimeIssues(manifest = {}) {
       message: 'Every selected platform runtime bundle must expose SDK wiring.',
     });
   }
+  if (manifest.runtime_bundle_matrix?.candidate_observer_count !== manifest.platform_count) {
+    issues.push({
+      severity: 'error',
+      code: 'runtime_candidate_observer_not_ready',
+      message: 'Every selected platform runtime bundle must expose candidate observation for host-level axis binding.',
+    });
+  }
   if ((manifest.runtime_bundle_matrix?.provider_required_for_realtime_count ?? 0) > 0) {
     issues.push({
       severity: 'error',
@@ -145,6 +152,13 @@ function runtimeIssues(manifest = {}) {
       severity: 'error',
       code: 'adaptation_package_sdk_wiring_not_ready',
       message: 'Every selected platform must have an adaptation package with SDK wiring.',
+    });
+  }
+  if (manifest.adaptation_package_matrix?.candidate_observer_count !== manifest.platform_count) {
+    issues.push({
+      severity: 'error',
+      code: 'adaptation_package_candidate_observer_not_ready',
+      message: 'Every selected platform adaptation package must expose candidate observation.',
     });
   }
   if (manifest.adaptation_strategy_matrix?.strategy_count !== manifest.platform_count) {
@@ -484,6 +498,10 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     runtime_ready: runtimeRows[platform]?.runtime_ready === true,
     sdk_wiring_ready: runtimeRows[platform]?.sdk_wiring_ready === true && adaptationRows[platform]?.sdk_wiring_ready === true,
     browser_match_count: runtimeRows[platform]?.browser_match_count,
+    candidate_observation_ready: runtimeRows[platform]?.candidate_observation_ready === true
+      && adaptationRows[platform]?.candidate_observation_ready === true,
+    candidate_observer_message_type: runtimeRows[platform]?.candidate_observer_message_type ?? adaptationRows[platform]?.candidate_observer_message_type,
+    candidate_observer_permission: runtimeRows[platform]?.candidate_observer_permission ?? adaptationRows[platform]?.candidate_observer_permission,
     recommended_mode: liveRows[platform]?.recommended_mode ?? adaptationRows[platform]?.recommended_mode,
     primary_axis_source: strategyRows[platform]?.primary_axis_source,
     strategy_recommendation: strategyRows[platform]?.recommendation,
@@ -527,12 +545,24 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
 }
 
 export function assertMeetingPlatformIntegrationRuntimeManifest(manifestOrOptions = {}, options = {}) {
-  const manifest = manifestOrOptions?.schema === MEETING_PLATFORM_INTEGRATION_RUNTIME_MANIFEST_SCHEMA
+  const rawManifest = manifestOrOptions?.schema === MEETING_PLATFORM_INTEGRATION_RUNTIME_MANIFEST_SCHEMA
     ? manifestOrOptions
     : buildMeetingPlatformIntegrationRuntimeManifest({
       ...manifestOrOptions,
       ...options,
     });
+  const issues = runtimeIssues(rawManifest);
+  const manifest = {
+    ...rawManifest,
+    host_integration_ready: runtimeAccepted(issues),
+    blocking_count: issues.filter((item) => item.severity === 'error').length,
+    warning_count: issues.filter((item) => item.severity === 'warning').length,
+    issues,
+    next_actions: unique([
+      ...issues.map((item) => item.code),
+      ...asArray(rawManifest.handoff_readiness_matrix?.rows).flatMap((row) => row.next_actions ?? []),
+    ]),
+  };
   if (manifest.host_integration_ready !== true) {
     throw new MeetingTimelineSdkError('Meeting platform integration runtime is not ready for host handoff', {
       issues: manifest.issues,
