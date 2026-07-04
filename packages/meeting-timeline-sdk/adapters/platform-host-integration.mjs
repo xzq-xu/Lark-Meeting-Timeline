@@ -29,6 +29,9 @@ import {
   buildMeetingPlatformAdaptationStrategyMatrix,
 } from './platform-strategy.mjs';
 import {
+  buildMeetingPlatformAdapterRouteMatrix,
+} from './platform-adapter-route.mjs';
+import {
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
   buildMeetingPlatformAdapterContractMatrix,
 } from './platform-adapter-contract.mjs';
@@ -168,6 +171,12 @@ export function createMeetingPlatformHost(options = {}) {
       return kit.platformRuntimeEventPlanMatrix({
         ...planOptions,
         platforms: planOptions.platforms ?? planOptions.platform_keys ?? platforms,
+      });
+    },
+    adapterRoutes(routeOptions = {}) {
+      return kit.platformAdapterRouteMatrix({
+        ...routeOptions,
+        platforms: routeOptions.platforms ?? routeOptions.platform_keys ?? platforms,
       });
     },
     adaptationStrategyMatrix(strategyOptions = {}) {
@@ -310,6 +319,9 @@ function routesSource(options = {}) {
   if (url.pathname === '/api/meeting-platform/runtime-event-plans') {
     return Response.json(host.runtimeEventPlans(options));
   }
+  if (url.pathname === '/api/meeting-platform/adapter-routes') {
+    return Response.json(host.adapterRoutes(options));
+  }
   if (url.pathname === '/api/meeting-platform/strategy') {
     return Response.json(host.adaptationStrategyMatrix(options));
   }
@@ -376,6 +388,7 @@ Runtime rule:
 - Each meeting keeps an isolated annotation set.
 - Candidate observation is a required host-axis binding contract: browser extensions or native hosts send active meeting windows through meeting_timeline.observe_candidates or /api/meeting-platform/observe-candidates before realtime marks are inserted.
 - Observer plans standardize the local DOM/AX observation loop, throttling, speaker follow-up, and meeting-end grace windows for each meeting app surface.
+- Adapter routes describe each platform's implementation path: local observer realtime axis first, provider reconciliation second, transcript/artifact import last.
 - Speaker and participant position tracks are required realtime contracts. They use local samples/snapshots first and must not wait for provider events or transcript export.
 
 Supported platforms in this scaffold:
@@ -441,6 +454,7 @@ const candidateObservation = await host.observePlatformCandidates({
 const runtimeBundles = host.runtimeBundles();
 const observerPlans = host.observerPlans();
 const runtimeEventPlans = host.runtimeEventPlans();
+const adapterRoutes = host.adapterRoutes();
 const extensionPlan = host.extensionInstallPlan();
 const integrationRuntime = host.integrationRuntimeSummary();
 const runtimeHandoffGate = await host.runIntegrationRuntimeManifest({
@@ -621,6 +635,12 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     platforms,
     baseUrl,
   });
+  const adapterRouteMatrix = buildMeetingPlatformAdapterRouteMatrix({
+    ...options,
+    platforms,
+    baseUrl,
+    basePath,
+  });
   const adaptationStrategyMatrix = buildMeetingPlatformAdaptationStrategyMatrix({
     ...options,
     platforms,
@@ -668,6 +688,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       runtime_bundles: '/api/meeting-platform/runtime-bundles',
       observer_plans: '/api/meeting-platform/observer-plans',
       runtime_event_plans: '/api/meeting-platform/runtime-event-plans',
+      adapter_routes: '/api/meeting-platform/adapter-routes',
       strategy: '/api/meeting-platform/strategy',
       platform_resolution: '/api/meeting-platform/resolve',
       platform_candidate_resolution: '/api/meeting-platform/resolve-candidates',
@@ -690,6 +711,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       buildPlatformIntegrationPlan(platform, { ...options, baseUrl, basePath }),
     ])),
     extension_install_plan: extensionInstallPlan,
+    adapter_route_matrix: adapterRouteMatrix,
     adaptation_strategy_matrix: adaptationStrategyMatrix,
     runtime_event_plan_matrix: runtimeEventPlanMatrix,
     runtime_bundle_matrix: runtimeBundleMatrix,
@@ -732,6 +754,7 @@ export function buildMeetingPlatformHostIntegrationScaffold(options = {}) {
       'meeting-platform:runtime-bundles': 'node ./scripts/print-runtime-bundles.mjs',
       'meeting-platform:observer-plans': 'node ./scripts/print-observer-plans.mjs',
       'meeting-platform:runtime-event-plans': 'node ./scripts/print-runtime-event-plans.mjs',
+      'meeting-platform:adapter-routes': 'node ./scripts/print-adapter-routes.mjs',
       'meeting-platform:extension-plan': 'node ./scripts/print-extension-plan.mjs',
       'meeting-platform:resolve': 'node ./scripts/resolve-platform.mjs',
       'meeting-platform:resolve-candidates': 'node ./scripts/resolve-platform-candidates.mjs',
@@ -869,6 +892,14 @@ const host = createMeetingPlatformHost({
 
 console.log(JSON.stringify(host.runtimeEventPlans(), null, 2));
 `;
+  const adapterRoutesScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+console.log(JSON.stringify(host.adapterRoutes(), null, 2));
+`;
   const extensionPlanScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
 
 const host = createMeetingPlatformHost({
@@ -956,6 +987,7 @@ if (
       sourceFile('scripts/print-runtime-bundles.mjs', runtimeBundlesScript, 'runtime_bundle_script', 'text/javascript'),
       sourceFile('scripts/print-observer-plans.mjs', observerPlansScript, 'observer_plan_script', 'text/javascript'),
       sourceFile('scripts/print-runtime-event-plans.mjs', runtimeEventPlansScript, 'runtime_event_plan_script', 'text/javascript'),
+      sourceFile('scripts/print-adapter-routes.mjs', adapterRoutesScript, 'adapter_route_script', 'text/javascript'),
       sourceFile('scripts/print-extension-plan.mjs', extensionPlanScript, 'extension_plan_script', 'text/javascript'),
       sourceFile('scripts/resolve-platform.mjs', platformResolutionScript, 'platform_resolution_script', 'text/javascript'),
       sourceFile('scripts/resolve-platform-candidates.mjs', platformCandidateResolutionScript, 'platform_candidate_resolution_script', 'text/javascript'),
@@ -987,6 +1019,7 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     'scripts/print-runtime-bundles.mjs',
     'scripts/print-observer-plans.mjs',
     'scripts/print-runtime-event-plans.mjs',
+    'scripts/print-adapter-routes.mjs',
     'scripts/resolve-platform.mjs',
     'scripts/resolve-platform-candidates.mjs',
     'scripts/observe-platform-candidates.mjs',
@@ -1038,6 +1071,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!host.includes('platformRuntimeEventPlanMatrix')) {
     issues.push(issue('error', 'missing_runtime_event_plan_matrix', 'Host source must expose the runtime event plan matrix.'));
   }
+  if (!host.includes('platformAdapterRouteMatrix')) {
+    issues.push(issue('error', 'missing_adapter_route_matrix', 'Host source must expose the platform adapter route matrix.'));
+  }
   if (!host.includes('platformAdaptationStrategyMatrix')) {
     issues.push(issue('error', 'missing_adaptation_strategy_matrix', 'Host source must expose the adaptation strategy matrix.'));
   }
@@ -1076,6 +1112,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!routes.includes('/api/meeting-platform/runtime-event-plans')) {
     issues.push(issue('error', 'missing_runtime_event_plan_route', 'Route source must expose the runtime event plan matrix endpoint.'));
+  }
+  if (!routes.includes('/api/meeting-platform/adapter-routes')) {
+    issues.push(issue('error', 'missing_adapter_route_route', 'Route source must expose the platform adapter route matrix endpoint.'));
   }
   if (!routes.includes('/api/meeting-platform/strategy')) {
     issues.push(issue('error', 'missing_adaptation_strategy_route', 'Route source must expose the adaptation strategy matrix endpoint.'));
