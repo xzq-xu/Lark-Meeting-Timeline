@@ -26,6 +26,7 @@ export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION = 1;
 export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS = MEETING_APP_FIXTURE_PLATFORMS;
 export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA = 'meeting_app_runtime_adapter_config';
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA = 'meeting_app_runtime_adapter_profile_resolution';
+export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA = 'meeting_app_runtime_adapter_profile_matrix';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA = 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA = 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA = 'meeting_app_live_evidence_package';
@@ -284,6 +285,21 @@ function trackRuntimeDefaults(platform, options = {}) {
   });
 }
 
+function matrixInputForPlatform(platform, options = {}) {
+  const source = options.inputs
+    ?? options.inputByPlatform
+    ?? options.input_by_platform
+    ?? options.profileInputs
+    ?? options.profile_inputs
+    ?? {};
+  const dashed = platform.replaceAll('_', '-');
+  const value = source[platform] ?? source[dashed];
+  if (value == null) return { platform };
+  if (typeof value === 'string') return { platform, url: value };
+  if (value && typeof value === 'object') return { platform, ...value };
+  return { platform };
+}
+
 function readinessFor(gate = {}, runtimePreset = {}, captureProfile = {}) {
   const nextActions = [];
   if (gate.production_ready !== true) nextActions.push('capture_live_dom_snapshots_for_this_platform');
@@ -416,6 +432,47 @@ export function resolveMeetingAppRuntimeAdapterProfile(input = {}, options = {})
       ],
     };
   }
+}
+
+export function buildMeetingAppRuntimeAdapterProfileMatrix(options = {}) {
+  const profiles = platformList(options).map((platform) => resolveMeetingAppRuntimeAdapterProfile(
+    matrixInputForPlatform(platform, options),
+    {
+      ...options,
+      platforms: undefined,
+      platform_keys: undefined,
+      platformKeys: undefined,
+    },
+  ));
+  return {
+    type: 'meeting_app_runtime_adapter_profile_matrix',
+    schema: MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    platform_count: profiles.length,
+    detected_count: profiles.filter((profile) => profile.detected).length,
+    runtime_ready_count: profiles.filter((profile) => profile.readiness?.runtime_ready).length,
+    track_profile_count: profiles.filter((profile) => profile.tracks?.output_intents?.includes?.('speaker_track')).length,
+    platforms: profiles.map((profile) => profile.platform).filter(Boolean),
+    rows: profiles.map((profile) => compactObject({
+      platform: profile.platform,
+      display_name: profile.display_name,
+      detected: profile.detected,
+      reason: profile.reason,
+      url: profile.url,
+      extension_match_count: profile.extension?.matches?.length ?? 0,
+      capture_profile: profile.capture?.profile?.platform,
+      runtime_preset: profile.runtime?.options?.runtimePreset,
+      mutation_track_selector_count: profile.runtime?.options?.mutationTrackSelectors?.length ?? 0,
+      speaker_min_stable_ms: profile.tracks?.runtime_options?.speakerTrackOptions?.minStableMs,
+      participant_leave_stable_ms: profile.tracks?.runtime_options?.participantTrackOptions?.leaveStableMs,
+      track_output_intents: profile.tracks?.output_intents,
+      runtime_ready: profile.readiness?.runtime_ready === true,
+      production_requires_live_snapshot: profile.readiness?.production_requires_live_snapshot === true,
+      issue_count: profile.issues?.length ?? 0,
+    })),
+    profiles,
+    next_actions: uniqueList(profiles.flatMap((profile) => profile.next_actions ?? [])),
+  };
 }
 
 export function buildMeetingAppIntegrationProfile(platformOrInput = {}, options = {}) {

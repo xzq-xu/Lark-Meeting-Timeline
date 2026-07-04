@@ -6,6 +6,7 @@ export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION: number;
 export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS: readonly MeetingAppDomCaptureProfilePlatform[];
 export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA: 'meeting_app_runtime_adapter_config';
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA: 'meeting_app_runtime_adapter_profile_resolution';
+export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA: 'meeting_app_runtime_adapter_profile_matrix';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA: 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA: 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA: 'meeting_app_live_evidence_package';
@@ -88,6 +89,20 @@ export interface MeetingAppRuntimeAdapterProfileResolution {
   host?: Record<string, unknown>;
   readiness: Record<string, unknown>;
   issues?: Array<Record<string, unknown>>;
+  next_actions: string[];
+}
+
+export interface MeetingAppRuntimeAdapterProfileMatrix {
+  type: 'meeting_app_runtime_adapter_profile_matrix';
+  schema: 'meeting_app_runtime_adapter_profile_matrix';
+  version: number;
+  platform_count: number;
+  detected_count: number;
+  runtime_ready_count: number;
+  track_profile_count: number;
+  platforms: MeetingAppDomCaptureProfilePlatform[];
+  rows: Array<Record<string, unknown>>;
+  profiles: MeetingAppRuntimeAdapterProfileResolution[];
   next_actions: string[];
 }
 
@@ -270,6 +285,10 @@ export function resolveMeetingAppRuntimeAdapterProfile(
   input?: string | Record<string, unknown>,
   options?: MeetingAppIntegrationProfileOptions,
 ): MeetingAppRuntimeAdapterProfileResolution;
+
+export function buildMeetingAppRuntimeAdapterProfileMatrix(
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppRuntimeAdapterProfileMatrix;
 
 export function buildAllMeetingAppRuntimeAdapterConfigs(
   options?: MeetingAppIntegrationProfileOptions,

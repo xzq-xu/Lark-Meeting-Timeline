@@ -932,7 +932,7 @@ await runtime.insertMark({
 await runtime.ingestProvider('google-meet', googleWorkspaceEventBody);
 ```
 
-如果宿主已经统一使用 `platform-kit`，同一个 profile 可以从 `kit.meetingAppRuntimeAdapterProfile(input)` 获取，避免下游项目同时依赖多个底层模块。
+如果宿主已经统一使用 `platform-kit`，同一个 profile 可以从 `kit.meetingAppRuntimeAdapterProfile(input)` 获取，避免下游项目同时依赖多个底层模块。多平台接入面板可以用 `kit.meetingAppRuntimeAdapterProfileMatrix({ platforms: ['google-meet', 'teams', 'zoom'] })` 一次拿到每个平台的 extension matches、capture profile、runtime preset 和 speaker/participant track 默认阈值。
 
 如果是在浏览器扩展 content script、内嵌浏览器或 Electron WebView 里运行，可以用 `meeting-app-content-script` 直接安装浏览器侧 bridge。它会创建 `meeting-app-browser-runtime`，自动读取当前 `document/location/window`，安装扩展消息监听，并把 background script 或宿主转发来的标注消息写入时间轴：
 

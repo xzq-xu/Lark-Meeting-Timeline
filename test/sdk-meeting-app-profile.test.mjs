@@ -10,6 +10,7 @@ import {
   MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA,
   MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
+  MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA,
   assertMeetingAppDeploymentManifest,
   buildAllMeetingAppDeploymentManifests,
@@ -32,6 +33,7 @@ import {
   buildMeetingAppLiveSnapshotCapturePlan,
   buildMeetingAppRuntimeAdapterAcceptanceReport,
   buildMeetingAppRuntimeAdapterConfig,
+  buildMeetingAppRuntimeAdapterProfileMatrix,
   buildMeetingAppRuntimeAdapterValidationReport,
   resolveMeetingAppRuntimeAdapterProfile,
   assertMeetingAppRuntimeAdapterConfig,
@@ -48,6 +50,7 @@ assert.deepEqual(MEETING_APP_INTEGRATION_PROFILE_PLATFORMS, [
 assert.equal(MEETING_APP_INTEGRATION_PROFILE_SCHEMA, 'meeting_app_integration_profile');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA, 'meeting_app_runtime_adapter_config');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA, 'meeting_app_runtime_adapter_profile_resolution');
+assert.equal(MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA, 'meeting_app_runtime_adapter_profile_matrix');
 assert.equal(MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA, 'meeting_app_live_snapshot_capture_plan');
 assert.equal(MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA, 'meeting_app_deployment_manifest');
 assert.equal(MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA, 'meeting_app_live_evidence_package');
@@ -132,6 +135,25 @@ const unknownResolved = resolveMeetingAppRuntimeAdapterProfile({
 assert.equal(unknownResolved.detected, false);
 assert.equal(unknownResolved.platform, null);
 assert.equal(unknownResolved.issues.some((item) => item.code === 'platform_not_detected'), true);
+
+const profileMatrix = buildMeetingAppRuntimeAdapterProfileMatrix({
+  platforms: ['google-meet', 'teams', 'zoom'],
+  inputs: {
+    google_meet: 'https://meet.google.com/abc-defg-hij',
+    microsoft_teams: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting',
+  },
+});
+assert.equal(profileMatrix.type, 'meeting_app_runtime_adapter_profile_matrix');
+assert.equal(profileMatrix.schema, MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA);
+assert.deepEqual(profileMatrix.platforms, ['google_meet', 'microsoft_teams', 'zoom']);
+assert.equal(profileMatrix.platform_count, 3);
+assert.equal(profileMatrix.detected_count, 3);
+assert.equal(profileMatrix.runtime_ready_count, 3);
+assert.equal(profileMatrix.track_profile_count, 3);
+assert.equal(profileMatrix.rows.find((row) => row.platform === 'google_meet').extension_match_count, 1);
+assert.equal(profileMatrix.rows.find((row) => row.platform === 'microsoft_teams').runtime_preset, 'microsoft_teams');
+assert.equal(profileMatrix.rows.find((row) => row.platform === 'zoom').capture_profile, 'zoom');
+assert.equal(profileMatrix.next_actions.includes('enable_observeTracks_or_trackMutations_when_speaker_position_marks_are_needed'), true);
 
 const googleCapturePlan = buildMeetingAppLiveSnapshotCapturePlan('google-meet');
 assert.equal(googleCapturePlan.type, 'meeting_app_live_snapshot_capture_plan');

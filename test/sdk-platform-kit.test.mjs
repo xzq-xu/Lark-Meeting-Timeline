@@ -164,6 +164,13 @@ assert.equal(runtimeAdapterProfile.platform, 'google_meet');
 assert.equal(runtimeAdapterProfile.runtime_config.capture_options.captureProfile, 'google_meet');
 assert.equal(runtimeAdapterProfile.tracks.output_intents.includes('speaker_track'), true);
 assert.equal(kit.meetingAppRuntimeAdapterProfile('https://example.com/not-a-meeting').detected, false);
+const runtimeAdapterProfileMatrix = kit.meetingAppRuntimeAdapterProfileMatrix({
+  platforms: ['google-meet', 'teams'],
+});
+assert.equal(runtimeAdapterProfileMatrix.platform_count, 2);
+assert.equal(runtimeAdapterProfileMatrix.detected_count, 2);
+assert.deepEqual(runtimeAdapterProfileMatrix.platforms, ['google_meet', 'microsoft_teams']);
+assert.equal(runtimeAdapterProfileMatrix.rows.every((row) => row.track_output_intents.includes('speaker_track')), true);
 const capturePlan = kit.meetingAppLiveSnapshotCapturePlan('google-meet');
 assert.equal(capturePlan.platform, 'google_meet');
 assert.equal(capturePlan.required_snapshots.some((item) => item.id === 'active_speaker'), true);
