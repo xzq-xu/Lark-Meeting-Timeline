@@ -5,6 +5,10 @@ import {
   runMeetingPlatformRuntimeHostReplay,
 } from './meeting-platform-runtime-host-verifier.mjs';
 import {
+  buildMeetingPlatformAdapterRoute,
+  verifyMeetingPlatformAdapterRouteReadiness,
+} from './platform-adapter-route.mjs';
+import {
   buildMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceReport,
 } from './platform-adapter-contract.mjs';
@@ -228,6 +232,7 @@ function statusFor({
   contractAccepted,
   providerReady,
   providerMissingEnv,
+  adapterRouteReady,
   candidateObservationReady,
   domAccepted,
   realAccepted,
@@ -238,6 +243,7 @@ function statusFor({
   if (runtimeHostReplayRequired && !runtimeHostReplayAccepted && realAccepted) return 'needs_runtime_host_replay';
   if (pilotReady && providerReady) return 'pilot_ready_provider_reconcile_pending';
   if (pilotReady) return 'pilot_ready_provider_setup_pending';
+  if (!adapterRouteReady) return 'adapter_route_blocked';
   if (!candidateObservationReady) return 'needs_candidate_observation_contract';
   if (!contractAccepted) return 'adapter_contract_blocked';
   if (!domAccepted) return 'needs_local_observer_evidence';
@@ -269,12 +275,14 @@ function nextActions({
   realIntake,
   liveReadiness,
   candidateObservation,
+  adapterRouteReadiness,
   runtimeHostReplay,
 } = {}) {
   const statusAction = {
     production_ready: 'handoff_to_host_project_with_monitoring',
     pilot_ready_provider_reconcile_pending: 'start_local_observer_pilot_and_capture_provider_reconcile_evidence',
     pilot_ready_provider_setup_pending: 'start_local_observer_pilot_and_complete_provider_setup',
+    adapter_route_blocked: 'fix_platform_adapter_route_before_host_handoff',
     adapter_contract_blocked: 'fix_adapter_contract_acceptance',
     needs_candidate_observation_contract: 'verify_candidate_observation_before_host_handoff',
     needs_local_observer_evidence: 'capture_real_meeting_app_snapshots',
@@ -294,6 +302,7 @@ function nextActions({
     ...(runtimeHostReplay?.next_actions ?? []),
     ...(candidateObservation?.ready === false ? ['verify_candidate_observation_before_host_handoff'] : []),
     ...((candidateObservation?.issues ?? []).map((code) => `candidate_observation:${code}`)),
+    ...((adapterRouteReadiness?.issues ?? []).map((item) => `adapter_route:${item.code}`)),
   ]);
 }
 
@@ -319,6 +328,14 @@ export function buildMeetingPlatformHandoffReadiness(platformOrInput = {}, input
     target: firstNonEmpty(baseOptions.contractTarget, baseOptions.contract_target, 'contract'),
   });
   const provider = buildMeetingPlatformProviderConnectionPack(platform, baseOptions);
+  const adapterRoute = evidence.evidencePackage?.adapter_route?.schema === 'meeting_platform_adapter_route'
+    ? evidence.evidencePackage.adapter_route
+    : buildMeetingPlatformAdapterRoute(platform, baseOptions);
+  const adapterRouteSource = evidence.evidencePackage?.adapter_route?.schema === 'meeting_platform_adapter_route'
+    ? 'evidence_package'
+    : 'computed';
+  const adapterRouteReadiness = verifyMeetingPlatformAdapterRouteReadiness(adapterRoute);
+  const adapterRouteReady = adapterRouteReadiness.ready === true;
   const fieldPlan = buildMeetingPlatformFieldIntakePlan(platform, baseOptions);
   const domDiagnosis = buildMeetingAppDomAdaptationDiagnosis({
     platform,
@@ -350,15 +367,16 @@ export function buildMeetingPlatformHandoffReadiness(platformOrInput = {}, input
   const runtimeReplayGatePassed = !requireRuntimeReplay || runtimeReplayAccepted;
   const candidateObservation = liveReadiness.candidate_observation ?? liveHandoff.candidate_observation_contract ?? {};
   const candidateObservationReady = candidateObservation.ready === true;
-  const pilotReady = contractAccepted && candidateObservationReady && domAccepted;
+  const pilotReady = adapterRouteReady && contractAccepted && candidateObservationReady && domAccepted;
   const productionReady = pilotReady && realAccepted && liveReadiness.production_ready === true && runtimeReplayGatePassed;
-  const handoffReady = contractAccepted && candidateObservationReady && (pilotReady || liveReadiness.passed === true) && runtimeReplayGatePassed;
+  const handoffReady = adapterRouteReady && contractAccepted && candidateObservationReady && (pilotReady || liveReadiness.passed === true) && runtimeReplayGatePassed;
   const status = statusFor({
     productionReady,
     pilotReady,
     contractAccepted,
     providerReady,
     providerMissingEnv,
+    adapterRouteReady,
     candidateObservationReady,
     domAccepted,
     realAccepted,
@@ -377,6 +395,12 @@ export function buildMeetingPlatformHandoffReadiness(platformOrInput = {}, input
     pilot_ready: pilotReady,
     production_ready: productionReady,
     provider_reconcile_ready: providerReady && realIntake.provider_record_count > 0,
+    adapter_route_ready: adapterRouteReady,
+    adapter_recommended_mode: adapterRoute.recommended_mode,
+    adapter_first_route: adapterRoute.routes?.[0]?.route,
+    adapter_route_source: adapterRouteSource,
+    provider_events_block_realtime: adapterRoute.realtime_invariants?.provider_events_block_realtime,
+    transcript_blocks_realtime: adapterRoute.realtime_invariants?.transcript_blocks_realtime,
     local_observer_ready: domAccepted,
     candidate_observation_ready: candidateObservationReady,
     candidate_observer_message_type: candidateObservation.message_type,
@@ -398,12 +422,15 @@ export function buildMeetingPlatformHandoffReadiness(platformOrInput = {}, input
       real_intake_blocking_codes: blockingCodes(realIntake.blocking_checks),
       live_readiness_blocking_codes: blockingCodes(liveReadiness.blocking_checks),
       contract_issue_codes: blockingCodes(contractReport.issues),
+      adapter_route_issue_codes: adapterRouteReadiness.missing ?? [],
       candidate_observation_issue_codes: candidateObservation.issues ?? [],
       runtime_host_replay_missing: runtimeHostReplay?.missing ?? [],
     },
     commands: handoffCommands(platform, fieldPlan),
     required_host_contract: {
       annotation_timestamp_field: 'captured_at_ms',
+      adapter_route_required: true,
+      adapter_route_first_route: adapterRoute.routes?.[0]?.route,
       provider_events_block_realtime: false,
       transcript_blocks_realtime: false,
       meeting_axis_source_order: contract.realtime_axis?.rules,
@@ -430,6 +457,8 @@ export function buildMeetingPlatformHandoffReadiness(platformOrInput = {}, input
     reports: {
       contract_acceptance: contractReport,
       provider_connection: provider,
+      adapter_route: adapterRoute,
+      adapter_route_readiness: adapterRouteReadiness,
       candidate_observation: candidateObservation,
       dom_diagnosis: domDiagnosis,
       field_intake: fieldPlan,
@@ -447,6 +476,7 @@ export function buildMeetingPlatformHandoffReadiness(platformOrInput = {}, input
       realIntake,
       liveReadiness,
       candidateObservation,
+      adapterRouteReadiness,
       runtimeHostReplay,
     }),
   });
@@ -461,6 +491,7 @@ function matrixFromReports(reports = [], platforms = reports.map((report) => rep
     handoff_ready_count: reports.filter((report) => report.handoff_ready).length,
     pilot_ready_count: reports.filter((report) => report.pilot_ready).length,
     production_ready_count: reports.filter((report) => report.production_ready).length,
+    adapter_route_ready_count: reports.filter((report) => report.adapter_route_ready).length,
     local_observer_ready_count: reports.filter((report) => report.local_observer_ready).length,
     candidate_observer_count: reports.filter((report) => report.candidate_observation_ready).length,
     runtime_host_replay_ready_count: reports.filter((report) => report.runtime_host_replay_accepted === true).length,
@@ -475,6 +506,13 @@ function matrixFromReports(reports = [], platforms = reports.map((report) => rep
       handoff_ready: report.handoff_ready,
       pilot_ready: report.pilot_ready,
       production_ready: report.production_ready,
+      adapter_route_ready: report.adapter_route_ready,
+      adapter_recommended_mode: report.adapter_recommended_mode,
+      adapter_first_route: report.adapter_first_route,
+      adapter_route_source: report.adapter_route_source,
+      provider_events_block_realtime: report.provider_events_block_realtime,
+      transcript_blocks_realtime: report.transcript_blocks_realtime,
+      adapter_route_issue_codes: report.missing?.adapter_route_issue_codes ?? [],
       local_observer_ready: report.local_observer_ready,
       candidate_observation_ready: report.candidate_observation_ready,
       candidate_observer_message_type: report.candidate_observer_message_type,

@@ -4,6 +4,8 @@ import {
   MEETING_PLATFORM_ADAPTER_ROUTE_SCHEMA,
   buildMeetingPlatformAdapterRoute,
   buildMeetingPlatformAdapterRouteMatrix,
+  summarizeMeetingPlatformAdapterRoute,
+  verifyMeetingPlatformAdapterRouteReadiness,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-route.mjs';
 import { createMeetingPlatformTimelineKit } from '../packages/meeting-timeline-sdk/adapters/platform-kit.mjs';
 
@@ -27,6 +29,23 @@ assert.equal(google.realtime_invariants.annotations_use_absolute_captured_at_ms,
 assert.equal(google.realtime_invariants.provider_events_block_realtime, false);
 assert.equal(google.realtime_invariants.transcript_blocks_realtime, false);
 assert.equal(google.gates.production, 'meetingAppRecordSet_plus_providerRecords');
+const googleRouteSummary = summarizeMeetingPlatformAdapterRoute(google);
+assert.equal(googleRouteSummary.first_route, 'local_observer_axis');
+assert.equal(googleRouteSummary.provider_events_block_realtime, false);
+const googleRouteReadiness = verifyMeetingPlatformAdapterRouteReadiness(google);
+assert.equal(googleRouteReadiness.type, 'meeting_platform_adapter_route_readiness');
+assert.equal(googleRouteReadiness.ready, true);
+assert.equal(googleRouteReadiness.required_axis_route, 'local_observer_axis');
+assert.equal(googleRouteReadiness.missing.length, 0);
+const blockingRouteReadiness = verifyMeetingPlatformAdapterRouteReadiness({
+  ...google,
+  realtime_invariants: {
+    ...google.realtime_invariants,
+    provider_events_block_realtime: true,
+  },
+});
+assert.equal(blockingRouteReadiness.ready, false);
+assert.equal(blockingRouteReadiness.missing.includes('provider_events_block_realtime'), true);
 
 const teams = buildMeetingPlatformAdapterRoute('teams', { baseUrl });
 assert.equal(teams.platform, 'microsoft_teams');
@@ -52,11 +71,13 @@ const matrix = buildMeetingPlatformAdapterRouteMatrix({
 });
 assert.equal(matrix.type, 'meeting_platform_adapter_route_matrix');
 assert.equal(matrix.platform_count, 5);
+assert.equal(matrix.route_ready_count, 5);
 assert.equal(matrix.local_observer_first_count, 5);
 assert.equal(matrix.provider_non_blocking_count, 5);
 assert.equal(matrix.transcript_non_blocking_count, 5);
 assert.deepEqual(matrix.platforms, ['google_meet', 'microsoft_teams', 'zoom', 'webex', 'lark']);
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').first_route, 'local_observer_axis');
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').route_ready, true);
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').provider_blocks_realtime, false);
 
 const kit = createMeetingPlatformTimelineKit({ baseUrl });

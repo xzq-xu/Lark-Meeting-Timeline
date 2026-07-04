@@ -63,6 +63,12 @@ export interface MeetingPlatformHandoffReadiness {
   pilot_ready: boolean;
   production_ready: boolean;
   provider_reconcile_ready: boolean;
+  adapter_route_ready: boolean;
+  adapter_recommended_mode?: string;
+  adapter_first_route?: string;
+  adapter_route_source?: 'evidence_package' | 'computed' | string;
+  provider_events_block_realtime?: boolean;
+  transcript_blocks_realtime?: boolean;
   local_observer_ready: boolean;
   candidate_observation_ready: boolean;
   candidate_observer_message_type?: string;
@@ -89,6 +95,7 @@ export interface MeetingPlatformHandoffReadinessMatrix {
   handoff_ready_count: number;
   pilot_ready_count: number;
   production_ready_count: number;
+  adapter_route_ready_count: number;
   local_observer_ready_count: number;
   candidate_observer_count: number;
   runtime_host_replay_ready_count?: number;

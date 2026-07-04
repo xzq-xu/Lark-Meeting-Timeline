@@ -119,9 +119,15 @@ assert.equal(productionGoogle.pilot_ready, true);
 assert.equal(productionGoogle.production_ready, true);
 assert.equal(productionGoogle.local_observer_ready, true);
 assert.equal(productionGoogle.provider_reconcile_ready, true);
+assert.equal(productionGoogle.adapter_route_ready, true);
+assert.equal(productionGoogle.adapter_first_route, 'local_observer_axis');
+assert.equal(productionGoogle.adapter_route_source, 'evidence_package');
+assert.equal(productionGoogle.provider_events_block_realtime, false);
+assert.equal(productionGoogle.transcript_blocks_realtime, false);
 assert.equal(productionGoogle.evidence_counts.provider_records, 5);
 assert.equal(productionGoogle.evidence_counts.dom_records, 2);
 assert.equal(productionGoogle.required_host_contract.annotation_timestamp_field, 'captured_at_ms');
+assert.equal(productionGoogle.required_host_contract.adapter_route_first_route, 'local_observer_axis');
 assert.equal(productionGoogle.candidate_observation_ready, true);
 assert.equal(productionGoogle.candidate_observer_message_type, 'meeting_timeline.observe_candidates');
 assert.equal(productionGoogle.candidate_observer_permission, 'tabs');
@@ -168,6 +174,29 @@ assert.equal(runtimeReplayBlocked.status, 'needs_runtime_host_replay');
 assert.equal(runtimeReplayBlocked.handoff_ready, false);
 assert.equal(runtimeReplayBlocked.runtime_host_replay_accepted, false);
 assert.equal(runtimeReplayBlocked.next_actions.includes('fix_runtime_host_replay_before_sdk_handoff'), true);
+
+const routeBlockedPackage = {
+  ...googlePackage,
+  adapter_route: {
+    ...googlePackage.adapter_route,
+    realtime_invariants: {
+      ...googlePackage.adapter_route.realtime_invariants,
+      provider_events_block_realtime: true,
+    },
+  },
+};
+const routeBlocked = buildMeetingPlatformHandoffReadiness('google-meet', {
+  evidencePackage: routeBlockedPackage,
+}, {
+  baseUrl,
+  env: productionEnv,
+  target: 'production',
+});
+assert.equal(routeBlocked.status, 'adapter_route_blocked');
+assert.equal(routeBlocked.handoff_ready, false);
+assert.equal(routeBlocked.adapter_route_ready, false);
+assert.equal(routeBlocked.missing.adapter_route_issue_codes.includes('provider_events_block_realtime'), true);
+assert.equal(routeBlocked.next_actions.includes('fix_platform_adapter_route_before_host_handoff'), true);
 
 const brokenCandidateObservation = buildMeetingPlatformHandoffReadiness('google-meet', {
   evidencePackage: googlePackage,
@@ -220,9 +249,12 @@ assert.equal(matrix.schema, 'meeting_platform_handoff_readiness_matrix');
 assert.equal(matrix.platform_count, 2);
 assert.equal(matrix.handoff_ready_count, 2);
 assert.equal(matrix.production_ready_count, 2);
+assert.equal(matrix.adapter_route_ready_count, 2);
 assert.equal(matrix.candidate_observer_count, 2);
 assert.equal(matrix.provider_setup_needed_count, 0);
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').production_ready, true);
+assert.equal(matrix.rows.find((row) => row.platform === 'zoom').adapter_route_ready, true);
+assert.equal(matrix.rows.find((row) => row.platform === 'zoom').adapter_first_route, 'local_observer_axis');
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').candidate_observation_ready, true);
 const runtimeMatrix = await runMeetingPlatformHandoffReadinessMatrix({
   platforms: ['google-meet', 'zoom'],

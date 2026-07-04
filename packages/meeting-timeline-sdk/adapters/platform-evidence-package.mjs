@@ -16,6 +16,8 @@ import {
 } from './platform-rollout.mjs';
 import {
   buildMeetingPlatformAdapterRoute,
+  summarizeMeetingPlatformAdapterRoute,
+  verifyMeetingPlatformAdapterRouteReadiness,
 } from './platform-adapter-route.mjs';
 import { normalizeMeetingPlatform } from './platform-setup.mjs';
 
@@ -205,34 +207,8 @@ function providerSamplesOption(platform, samples = []) {
   return samples.length > 0 ? { [platform]: samples } : undefined;
 }
 
-function adapterRouteSummary(adapterRoute = {}) {
-  if (!adapterRoute || typeof adapterRoute !== 'object') return undefined;
-  const invariants = adapterRoute.realtime_invariants ?? {};
-  return compactObject({
-    recommended_mode: adapterRoute.recommended_mode,
-    first_route: adapterRoute.routes?.[0]?.route,
-    route_count: adapterRoute.route_count,
-    provider_events_block_realtime: invariants.provider_events_block_realtime,
-    transcript_blocks_realtime: invariants.transcript_blocks_realtime,
-    annotations_use_absolute_captured_at_ms: invariants.annotations_use_absolute_captured_at_ms,
-    per_meeting_annotation_isolation_required: invariants.per_meeting_annotation_isolation_required,
-  });
-}
-
-function hasRequiredRoute(adapterRoute = {}, routeName) {
-  return asArray(adapterRoute.routes).some((route) => route.route === routeName && route.blocks_realtime_if_missing === true);
-}
-
 function adapterRouteReady(adapterRoute = {}) {
-  const invariants = adapterRoute.realtime_invariants ?? {};
-  return adapterRoute.schema === 'meeting_platform_adapter_route'
-    && adapterRoute.route_count > 0
-    && hasRequiredRoute(adapterRoute, adapterRoute.platform === 'local_detector' ? 'host_detector_axis' : 'local_observer_axis')
-    && hasRequiredRoute(adapterRoute, 'annotation_insert')
-    && invariants.annotations_use_absolute_captured_at_ms === true
-    && invariants.provider_events_block_realtime === false
-    && invariants.transcript_blocks_realtime === false
-    && invariants.per_meeting_annotation_isolation_required === true;
+  return verifyMeetingPlatformAdapterRouteReadiness(adapterRoute).ready === true;
 }
 
 function buildEvidenceSummary(rolloutPlan = {}, providerRecords = [], providerSamples = [], meetingAppRecordSet = undefined, evidenceCorrelation = undefined, adapterRoute = undefined) {
@@ -258,7 +234,7 @@ function buildEvidenceSummary(rolloutPlan = {}, providerRecords = [], providerSa
       production_ready: rolloutPlan.local_observer.production_ready,
       missing_required_coverage: rolloutPlan.local_observer.missing_required_coverage,
     } : undefined,
-    adapter_route: adapterRouteSummary(adapterRoute),
+    adapter_route: summarizeMeetingPlatformAdapterRoute(adapterRoute),
     next_actions: rolloutPlan.next_actions,
   });
 }

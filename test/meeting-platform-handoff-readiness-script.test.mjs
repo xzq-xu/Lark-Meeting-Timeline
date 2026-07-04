@@ -105,8 +105,13 @@ assert.equal(report.ok, true);
 assert.equal(report.platform_count, 1);
 assert.equal(report.handoff_ready_count, 1);
 assert.equal(report.production_ready_count, 1);
+assert.equal(report.adapter_route_ready_count, 1);
 assert.equal(report.runtime_host_replay_ready_count, 1);
 assert.equal(report.rows[0].status, 'production_ready');
+assert.equal(report.rows[0].adapter_route_ready, true);
+assert.equal(report.rows[0].adapter_first_route, 'local_observer_axis');
+assert.equal(report.rows[0].provider_events_block_realtime, false);
+assert.equal(report.rows[0].transcript_blocks_realtime, false);
 assert.equal(report.rows[0].runtime_host_replay_accepted, true);
 assert.equal(report.rows[0].evidence_package_file.endsWith('google_meet.json'), true);
 

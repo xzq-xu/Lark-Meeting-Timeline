@@ -651,7 +651,7 @@ npm run meeting-platform:field-intake -- \
 
 这一步输出的是“采样前执行单”，不是生产验收；最终仍要跑 `meeting-platform:real-intake` 或 `platform-live-adapter` readiness。
 
-给其他项目交付时，建议在 evidence package 生成后再跑一层 `platform-handoff-readiness`。evidence package 自身已经带 `adapter_route`、summary 和 verification 字段，用于说明“本地观察建轴、标注写入、发言人位置、provider 回填、会后 artifact”这几条路线是否满足实时非阻塞原则；handoff readiness 则进一步把 adapter contract、provider connection、candidate observation、DOM 诊断、field intake、real-intake gate 和 live adapter readiness 合成一个状态：`needs_candidate_observation_contract`、`needs_local_observer_evidence`、`pilot_ready_provider_setup_pending`、`pilot_ready_provider_reconcile_pending` 或 `production_ready`。这个对象适合给宿主项目做接入面板：它不要求读完整 runbook，但能直接回答“Google Meet / Teams / Zoom / Webex / Lark 现在能不能接入，缺什么，下一条命令是什么”。其中 `candidate_observation_ready` 是硬门槛：必须能通过 `meeting_timeline.observe_candidates` / `observe_platform_candidates` / `/api/meeting-platform/observe-candidates` 把当前会议窗口候选送进 host，才能声明 handoff ready；provider event 和 transcript 仍然只做回填或会后处理。
+给其他项目交付时，建议在 evidence package 生成后再跑一层 `platform-handoff-readiness`。evidence package 自身已经带 `adapter_route`、summary 和 verification 字段，用于说明“本地观察建轴、标注写入、发言人位置、provider 回填、会后 artifact”这几条路线是否满足实时非阻塞原则；handoff readiness 会复验同一条 adapter route，并把 adapter contract、provider connection、candidate observation、DOM 诊断、field intake、real-intake gate 和 live adapter readiness 合成一个状态：`adapter_route_blocked`、`needs_candidate_observation_contract`、`needs_local_observer_evidence`、`pilot_ready_provider_setup_pending`、`pilot_ready_provider_reconcile_pending` 或 `production_ready`。这个对象适合给宿主项目做接入面板：它不要求读完整 runbook，但能直接回答“Google Meet / Teams / Zoom / Webex / Lark 现在能不能接入，缺什么，下一条命令是什么”。其中 `adapter_route_ready` 和 `candidate_observation_ready` 都是硬门槛：前者保证本地轴优先、`captured_at_ms` 写入、provider/transcript 非阻塞，后者保证能通过 `meeting_timeline.observe_candidates` / `observe_platform_candidates` / `/api/meeting-platform/observe-candidates` 把当前会议窗口候选送进 host；provider event 和 transcript 仍然只做回填或会后处理。
 
 ```js
 import {
@@ -670,8 +670,8 @@ const matrix = await runMeetingPlatformHandoffReadinessMatrix({
 });
 
 // matrix.rows 每行都有 handoff_ready / pilot_ready / production_ready，
-// 以及 candidate_observation_ready、runtime_host_replay_accepted、
-// provider_missing_env、dom_record_count、next_actions。
+// 以及 adapter_route_ready、adapter_first_route、candidate_observation_ready、
+// runtime_host_replay_accepted、provider_missing_env、dom_record_count、next_actions。
 ```
 
 CLI 入口：

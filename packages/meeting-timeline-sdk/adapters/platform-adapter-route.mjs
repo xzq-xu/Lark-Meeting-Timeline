@@ -107,6 +107,18 @@ function unique(values = []) {
   return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
 }
 
+function routeHasRequiredRealtimeStep(adapterRoute = {}, routeName) {
+  return asArray(adapterRoute.routes).some((route) => route.route === routeName && route.blocks_realtime_if_missing === true);
+}
+
+function issue(code, message, details = {}) {
+  return compactObject({
+    code,
+    message,
+    ...details,
+  });
+}
+
 function selectedPlatforms(options = {}) {
   return unique(asArray(firstNonEmpty(options.platforms, options.platform_keys, DEFAULT_ROUTE_PLATFORMS))
     .map((platform) => normalizeMeetingPlatform(platform)));
@@ -310,17 +322,74 @@ export function buildMeetingPlatformAdapterRoute(platform, options = {}) {
   });
 }
 
+export function summarizeMeetingPlatformAdapterRoute(adapterRoute = {}) {
+  if (!adapterRoute || typeof adapterRoute !== 'object') return undefined;
+  const invariants = adapterRoute.realtime_invariants ?? {};
+  return compactObject({
+    platform: adapterRoute.platform,
+    recommended_mode: adapterRoute.recommended_mode,
+    first_route: adapterRoute.routes?.[0]?.route,
+    route_count: adapterRoute.route_count,
+    provider_events_block_realtime: invariants.provider_events_block_realtime,
+    transcript_blocks_realtime: invariants.transcript_blocks_realtime,
+    annotations_use_absolute_captured_at_ms: invariants.annotations_use_absolute_captured_at_ms,
+    per_meeting_annotation_isolation_required: invariants.per_meeting_annotation_isolation_required,
+  });
+}
+
+export function verifyMeetingPlatformAdapterRouteReadiness(adapterRoute = {}) {
+  const invariants = adapterRoute.realtime_invariants ?? {};
+  const axisRoute = adapterRoute.platform === 'local_detector' ? 'host_detector_axis' : 'local_observer_axis';
+  const issues = [
+    adapterRoute.schema === MEETING_PLATFORM_ADAPTER_ROUTE_SCHEMA
+      ? undefined
+      : issue('invalid_adapter_route_schema', 'Adapter route must use meeting_platform_adapter_route schema.'),
+    adapterRoute.route_count > 0
+      ? undefined
+      : issue('missing_adapter_routes', 'Adapter route must contain at least one route.'),
+    routeHasRequiredRealtimeStep(adapterRoute, axisRoute)
+      ? undefined
+      : issue('missing_primary_axis_route', 'Adapter route must include the realtime axis route.', { required_route: axisRoute }),
+    routeHasRequiredRealtimeStep(adapterRoute, 'annotation_insert')
+      ? undefined
+      : issue('missing_annotation_insert_route', 'Adapter route must include the realtime annotation insert route.'),
+    invariants.annotations_use_absolute_captured_at_ms === true
+      ? undefined
+      : issue('annotations_must_use_captured_at_ms', 'Annotations must use absolute captured_at_ms timestamps.'),
+    invariants.provider_events_block_realtime === false
+      ? undefined
+      : issue('provider_events_block_realtime', 'Provider events must not block realtime annotations.'),
+    invariants.transcript_blocks_realtime === false
+      ? undefined
+      : issue('transcript_blocks_realtime', 'Transcript import must not block realtime annotations.'),
+    invariants.per_meeting_annotation_isolation_required === true
+      ? undefined
+      : issue('missing_per_meeting_annotation_isolation', 'Adapter route must require per-meeting annotation isolation.'),
+  ].filter(Boolean);
+  return compactObject({
+    type: 'meeting_platform_adapter_route_readiness',
+    platform: adapterRoute.platform,
+    ready: issues.length === 0,
+    required_axis_route: axisRoute,
+    missing: issues.map((item) => item.code),
+    issues,
+    summary: summarizeMeetingPlatformAdapterRoute(adapterRoute),
+  });
+}
+
 export function buildMeetingPlatformAdapterRouteMatrix(options = {}) {
   const routes = selectedPlatforms(options).map((platform) => buildMeetingPlatformAdapterRoute(platform, {
     ...options,
     platforms: undefined,
     platform_keys: undefined,
   }));
+  const routeReadiness = routes.map((route) => verifyMeetingPlatformAdapterRouteReadiness(route));
   return {
     type: 'meeting_platform_adapter_route_matrix',
     schema: MEETING_PLATFORM_ADAPTER_ROUTE_MATRIX_SCHEMA,
     schema_version: MEETING_PLATFORM_ADAPTER_ROUTE_SCHEMA_VERSION,
     platform_count: routes.length,
+    route_ready_count: routeReadiness.filter((readiness) => readiness.ready).length,
     local_observer_first_count: routes.filter((route) => route.recommended_mode === 'local_observer_first_provider_reconcile').length,
     provider_non_blocking_count: routes.filter((route) => route.realtime_invariants.provider_events_block_realtime === false).length,
     transcript_non_blocking_count: routes.filter((route) => route.realtime_invariants.transcript_blocks_realtime === false).length,
@@ -330,6 +399,8 @@ export function buildMeetingPlatformAdapterRouteMatrix(options = {}) {
       display_name: route.display_name,
       recommended_mode: route.recommended_mode,
       first_route: route.routes[0]?.route,
+      route_ready: routeReadiness.find((readiness) => readiness.platform === route.platform)?.ready,
+      route_missing: routeReadiness.find((readiness) => readiness.platform === route.platform)?.missing ?? [],
       browser_match_count: route.entrypoints.browser_extension?.matches?.length ?? 0,
       provider_transport: route.entrypoints.provider_webhook?.transport,
       provider_blocks_realtime: route.realtime_invariants.provider_events_block_realtime,
