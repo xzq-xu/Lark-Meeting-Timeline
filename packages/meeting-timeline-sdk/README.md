@@ -301,6 +301,8 @@ await runtimeEvents.insertAnnotation('google-meet', {
 });
 ```
 
+如果使用 SDK 生成的浏览器扩展脚手架，background worker 已内置同一条链路：向扩展发送 `meeting_timeline.observe_candidates`，它会查询当前浏览器 tabs，构造成 `observe_platform_candidates` runtime event 投递给 host。这样 Google Meet、Teams、Zoom、Webex、Lark/飞书都可以先用同一种“候选会议窗口观察”方式建轴，content script 只负责更细粒度的页面内观察。
+
 如果要给另一个项目批量交付动作契约，可以直接导出 runtime event plan：
 
 ```bash
@@ -1188,6 +1190,7 @@ const extensionScaffold = meetingKit.meetingAppExtensionScaffold({
 // extensionScaffold.files 包含 package.json、build.mjs、manifest.json、src/content-script.entry.mjs、src/background.entry.mjs 和 README.md。
 // content script 入口用平台级 SDK bridge 监听会议网页；background worker 把 start/end/mark 调用转发到 timeline 服务。
 // content script 注入后会发送 meeting_timeline.extension_attached；background 可用 meeting_timeline.extension_status 查询最近注入状态。
+// popup/native host 也可以发 meeting_timeline.observe_candidates，让 background 查询 tabs 并投递 observe_platform_candidates runtime event。
 // scaffold 默认还会生成 src/live-capture.entry.mjs，在页面上暴露 window.__meetingTimelineLiveCapture。
 // 现场验证时可在真实 Google Meet / Teams / Zoom 页面调用 captureActive()、captureEnded()、evidencePackage()、diagnose()。
 

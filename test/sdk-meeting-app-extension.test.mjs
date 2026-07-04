@@ -16,6 +16,7 @@ import {
   buildMeetingAppExtensionInstallPlan,
   buildMeetingAppExtensionLiveCaptureSource,
   buildMeetingAppExtensionMatchPatterns,
+  buildMeetingAppExtensionObserveCandidatesMessage,
   buildMeetingAppExtensionPackageJson,
   buildMeetingAppExtensionScaffold,
   buildMeetingAppExtensionScaffoldAcceptanceReport,
@@ -58,6 +59,21 @@ function installGeneratedBackground(source) {
         },
       },
     },
+    tabs: {
+      query(_query, callback) {
+        callback?.([{
+          id: 7,
+          windowId: 1,
+          active: true,
+          audible: false,
+          pinned: false,
+          discarded: false,
+          status: 'complete',
+          title: 'Google Meet',
+          url: 'https://meet.google.com/abc-defg-hij',
+        }]);
+      },
+    },
   };
   globalThis.fetch = async (url, init) => {
     fetchCalls.push({ url, init });
@@ -67,7 +83,31 @@ function installGeneratedBackground(source) {
     });
   };
   try {
-    Function(source)();
+    const executableSource = source.replace(
+      "import { createMeetingPlatformRuntimeEventClient } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event';",
+      `function createMeetingPlatformRuntimeEventClient(options = {}) {
+        return {
+          async observePlatformCandidates(input = {}) {
+            const response = await fetch(new URL('/api/meeting-platform/runtime-events', options.baseUrl).toString(), {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                type: 'meeting_platform_runtime_event',
+                schema: 'meeting_platform_runtime_event',
+                schema_version: 1,
+                action: 'observe_platform_candidates',
+                source: options.source,
+                sent_at_ms: input.captured_at_ms ?? Date.now(),
+                ...input,
+              }),
+            });
+            const body = await response.json();
+            return { ok: response.ok, status: response.status, body };
+          },
+        };
+      }`,
+    );
+    Function(executableSource)();
   } catch (error) {
     globalThis.chrome = originalChrome;
     globalThis.fetch = originalFetch;
@@ -242,11 +282,13 @@ assert.equal(normalizeMeetingAppExtensionPlatform('feishu'), 'lark');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call, 'meeting_timeline.client_call');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached, 'meeting_timeline.extension_attached');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status, 'meeting_timeline.extension_status');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates, 'meeting_timeline.observe_candidates');
 assert.equal(MEETING_APP_EXTENSION_STATUS_STORAGE_KEY, 'meeting_timeline_extension_status');
 assert.equal(MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS.insertMarks, '/api/annotations/batch');
 assert.equal(normalizeMeetingAppExtensionMessageType('client_call'), MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call);
 assert.equal(normalizeMeetingAppExtensionMessageType('attached'), MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached);
 assert.equal(normalizeMeetingAppExtensionMessageType('extension-status'), MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status);
+assert.equal(normalizeMeetingAppExtensionMessageType('observe-platform-candidates'), MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates);
 assert.equal(meetingAppExtensionTimelineEndpoint('insertMarks'), '/api/annotations/batch');
 assert.throws(
   () => meetingAppExtensionTimelineEndpoint('deleteEverything'),
@@ -277,6 +319,18 @@ assert.deepEqual(statusMessage, {
   type: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status,
   request_id: 'status-001',
   captured_at_ms: 124,
+});
+
+const observeCandidatesMessage = buildMeetingAppExtensionObserveCandidatesMessage({
+  requestId: 'observe-001',
+  capturedAtMs: 1245,
+  tabs: [{ url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet', active: true }],
+});
+assert.deepEqual(observeCandidatesMessage, {
+  type: MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+  request_id: 'observe-001',
+  captured_at_ms: 1245,
+  tabs: [{ url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet', active: true }],
 });
 
 const clientCallMessage = buildMeetingAppExtensionClientCallMessage('startMeeting', {
@@ -476,6 +530,9 @@ const backgroundSource = buildMeetingAppExtensionBackgroundSource({
 assert.match(backgroundSource, /const BASE_URL = "https:\/\/timeline\.example\.com";/);
 assert.match(backgroundSource, /meeting_timeline\.extension_attached/);
 assert.match(backgroundSource, /meeting_timeline\.extension_status/);
+assert.match(backgroundSource, /meeting_timeline\.observe_candidates/);
+assert.match(backgroundSource, /createMeetingPlatformRuntimeEventClient/);
+assert.match(backgroundSource, /observePlatformCandidates/);
 assert.match(backgroundSource, /STATUS_STORAGE_KEY/);
 assert.match(backgroundSource, /setStorageValue/);
 assert.match(backgroundSource, /\/api\/meeting-session\/start/);
@@ -526,6 +583,24 @@ try {
   assert.equal(postedPayload.meeting_id, 'meet-001');
   assert.equal(postedPayload.detector_source, 'meeting_app_extension');
   assert.equal(postedPayload.extension_sender.tab_id, 7);
+
+  const observeResponse = await backgroundRuntime.send({
+    type: MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+    captured_at_ms: 1_782_442_812_000,
+  }, {
+    tab: { id: 7 },
+    frameId: 0,
+    url: 'https://meet.google.com/abc-defg-hij',
+  });
+  assert.equal(observeResponse.ok, true);
+  assert.equal(observeResponse.body.ok, true);
+  assert.equal(backgroundRuntime.fetchCalls.length, 2);
+  assert.equal(backgroundRuntime.fetchCalls[1].url, 'https://timeline.example.com/api/meeting-platform/runtime-events');
+  const postedRuntimeEvent = JSON.parse(backgroundRuntime.fetchCalls[1].init.body);
+  assert.equal(postedRuntimeEvent.action, 'observe_platform_candidates');
+  assert.equal(postedRuntimeEvent.source, 'meeting_app_extension_background');
+  assert.equal(postedRuntimeEvent.tabs[0].url, 'https://meet.google.com/abc-defg-hij');
+  assert.equal(postedRuntimeEvent.extension_sender.tab_id, 7);
 } finally {
   backgroundRuntime.restore();
 }
@@ -561,6 +636,7 @@ assert.equal(scaffold.validation.uses_all_urls, false);
 assert.equal(scaffold.manifest.background.service_worker, 'background.js');
 assert.equal(scaffold.manifest.background.type, 'module');
 assert.equal(scaffold.manifest.permissions.includes('storage'), true);
+assert.equal(scaffold.manifest.permissions.includes('tabs'), true);
 assert.equal(scaffold.manifest.host_permissions.includes('https://timeline.example.com/*'), true);
 assert.deepEqual(scaffold.manifest.content_scripts[0].js, ['content-script.js', 'live-capture.js']);
 assert.equal(scaffold.bundle.background_input, 'src/background.entry.mjs');
@@ -578,7 +654,11 @@ assert.match(scaffold.files.find((file) => file.path === 'src/live-capture.entry
 assert.match(scaffold.files.find((file) => file.path === 'src/live-capture.entry.mjs').content, /diagnose/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /runtimeApi\(\)\?\.onMessage/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /extension_status/);
+assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /createMeetingPlatformRuntimeEventClient/);
+assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /observePlatformCandidates/);
+assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /meeting_timeline\.observe_candidates/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /npm run build/);
+assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /observe_candidates/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /diagnose\(\)/);
 
 const scaffoldReport = buildMeetingAppExtensionScaffoldAcceptanceReport(scaffold);
@@ -587,6 +667,7 @@ assert.deepEqual(scaffoldReport.platforms, ['google_meet']);
 assert.equal(scaffoldReport.accepted_platform_count, 1);
 assert.equal(scaffoldReport.manifest.uses_all_urls, false);
 assert.equal(scaffoldReport.manifest.permissions.includes('storage'), true);
+assert.equal(scaffoldReport.manifest.permissions.includes('tabs'), true);
 assert.deepEqual(scaffoldReport.issues, []);
 assert.equal(assertMeetingAppExtensionScaffold(scaffold).accepted, true);
 

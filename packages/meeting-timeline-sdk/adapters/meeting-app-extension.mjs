@@ -14,6 +14,7 @@ export const MEETING_APP_EXTENSION_MESSAGE_TYPES = Object.freeze({
   client_call: 'meeting_timeline.client_call',
   extension_attached: 'meeting_timeline.extension_attached',
   extension_status: 'meeting_timeline.extension_status',
+  observe_candidates: 'meeting_timeline.observe_candidates',
 });
 
 export const MEETING_APP_EXTENSION_STATUS_STORAGE_KEY = 'meeting_timeline_extension_status';
@@ -55,6 +56,12 @@ const MESSAGE_TYPE_ALIASES = Object.freeze({
   extension_status: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status,
   extensionstatus: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status,
   'extension-status': MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status,
+  observe_candidates: MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+  observecandidates: MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+  'observe-candidates': MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+  observe_platform_candidates: MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+  observeplatformcandidates: MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+  'observe-platform-candidates': MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
 });
 
 export const MEETING_APP_EXTENSION_PROFILES = Object.freeze({
@@ -308,6 +315,27 @@ export function buildMeetingAppExtensionStatusMessage(input = {}, options = {}) 
     platform: optionalPlatform(firstNonEmpty(merged.platform, merged.platform_key, merged.platformKey)),
     url: firstNonEmpty(merged.url, merged.href, merged.meeting_url, merged.meetingUrl),
     captured_at_ms: firstNonEmpty(merged.captured_at_ms, merged.capturedAtMs),
+  });
+}
+
+export function buildMeetingAppExtensionObserveCandidatesMessage(input = {}, options = {}) {
+  const merged = plainObject(input) ? { ...input, ...options } : options;
+  return compactObject({
+    type: normalizeMeetingAppExtensionMessageType(firstNonEmpty(
+      merged.type,
+      merged.messageType,
+      merged.message_type,
+      'observe_candidates',
+    )),
+    request_id: firstNonEmpty(merged.request_id, merged.requestId),
+    captured_at_ms: firstNonEmpty(merged.captured_at_ms, merged.capturedAtMs, Date.now()),
+    query: firstNonEmpty(merged.query, merged.tabs_query, merged.tabsQuery),
+    tabs: firstNonEmpty(merged.tabs, merged.browser_tabs, merged.browserTabs),
+    windows: firstNonEmpty(merged.windows, merged.browser_windows, merged.browserWindows),
+    applications: firstNonEmpty(merged.applications, merged.apps),
+    candidates: merged.candidates,
+    environment: firstNonEmpty(merged.environment, merged.meeting_environment, merged.meetingEnvironment),
+    input: plainObject(merged.input) ? merged.input : undefined,
   });
 }
 
@@ -675,12 +703,19 @@ export function buildMeetingAppExtensionBackgroundSource(options = {}) {
   );
   const endpoints = { ...MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS };
   return [
+    "import { createMeetingPlatformRuntimeEventClient } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event';",
+    '',
     `const BASE_URL = ${JSON.stringify(baseUrl)};`,
     `const CLIENT_CALL_TYPE = ${JSON.stringify(messagePrefix)};`,
     `const ATTACHED_TYPE = ${JSON.stringify(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached)};`,
     `const STATUS_TYPE = ${JSON.stringify(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status)};`,
+    `const OBSERVE_CANDIDATES_TYPE = ${JSON.stringify(MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates)};`,
     `const STATUS_STORAGE_KEY = ${JSON.stringify(MEETING_APP_EXTENSION_STATUS_STORAGE_KEY)};`,
     `const ENDPOINTS = ${json(endpoints)};`,
+    'const runtimeEvents = createMeetingPlatformRuntimeEventClient({',
+    '  baseUrl: BASE_URL,',
+    '  source: "meeting_app_extension_background",',
+    '});',
     'let lastAttached = null;',
     '',
     'function runtimeApi() {',
@@ -689,6 +724,79 @@ export function buildMeetingAppExtensionBackgroundSource(options = {}) {
     '',
     'function storageArea() {',
     '  return globalThis.chrome?.storage?.local ?? globalThis.browser?.storage?.local;',
+    '}',
+    '',
+    'function tabsApi() {',
+    '  return globalThis.chrome?.tabs ?? globalThis.browser?.tabs;',
+    '}',
+    '',
+    'function normalizeTab(tab = {}) {',
+    '  return {',
+    '    id: tab.id,',
+    '    tab_id: tab.id,',
+    '    window_id: tab.windowId,',
+    '    active: Boolean(tab.active),',
+    '    audible: tab.audible,',
+    '    pinned: tab.pinned,',
+    '    discarded: tab.discarded,',
+    '    muted: tab.mutedInfo?.muted,',
+    '    status: tab.status,',
+    '    title: tab.title,',
+    '    url: tab.url ?? tab.pendingUrl,',
+    '    fav_icon_url: tab.favIconUrl,',
+    '    observed_at_ms: Date.now(),',
+    '  };',
+    '}',
+    '',
+    'function queryTabs(query = {}) {',
+    '  const tabs = tabsApi();',
+    '  if (!tabs?.query) return Promise.resolve([]);',
+    '  return new Promise((resolve) => {',
+    '    let settled = false;',
+    '    const finish = (value) => {',
+    '      if (settled) return;',
+    '      settled = true;',
+    '      resolve(Array.isArray(value) ? value : []);',
+    '    };',
+    '    try {',
+    '      const maybePromise = tabs.query(query, finish);',
+    '      if (maybePromise?.then) maybePromise.then(finish).catch(() => finish([]));',
+    '    } catch {',
+    '      finish([]);',
+    '    }',
+    '  });',
+    '}',
+    '',
+    'async function observedTabsFor(message = {}) {',
+    '  if (Array.isArray(message.tabs)) return message.tabs;',
+    '  if (Array.isArray(message.input?.tabs)) return message.input.tabs;',
+    '  const query = message.query ?? message.input?.query ?? {};',
+    '  return (await queryTabs(query)).map(normalizeTab);',
+    '}',
+    '',
+    'function candidateObservationInput(message = {}, sender = {}, tabs = []) {',
+    '  const capturedAtMs = message.input?.captured_at_ms ?? message.captured_at_ms ?? Date.now();',
+    '  return {',
+    '    ...(message.input ?? {}),',
+    '    source: message.input?.source ?? message.source ?? "meeting_app_extension_background",',
+    '    captured_at_ms: capturedAtMs,',
+    '    tabs,',
+    '    windows: message.input?.windows ?? message.windows,',
+    '    applications: message.input?.applications ?? message.input?.apps ?? message.applications ?? message.apps,',
+    '    candidates: message.input?.candidates ?? message.candidates,',
+    '    environment: {',
+    '      ...(message.input?.environment ?? message.environment ?? {}),',
+    '      source: "meeting_app_extension_background",',
+    '      observed_at_ms: capturedAtMs,',
+    '      sender_tab_id: sender?.tab?.id,',
+    '      sender_url: sender?.url,',
+    '    },',
+    '    extension_sender: {',
+    '      tab_id: sender?.tab?.id,',
+    '      frame_id: sender?.frameId,',
+    '      url: sender?.url,',
+    '    },',
+    '  };',
     '}',
     '',
     'function setStorageValue(key, value) {',
@@ -767,6 +875,22 @@ export function buildMeetingAppExtensionBackgroundSource(options = {}) {
     '  if (message?.type === STATUS_TYPE) {',
     '    getStorageValue(STATUS_STORAGE_KEY).then((stored) => {',
     '      sendResponse({ ok: true, type: STATUS_TYPE, attached: stored ?? lastAttached });',
+    '    });',
+    '    return true;',
+    '  }',
+    '  if (message?.type === OBSERVE_CANDIDATES_TYPE) {',
+    '    observedTabsFor(message).then((tabs) => {',
+    '      const input = candidateObservationInput(message, sender, tabs);',
+    '      return runtimeEvents.observePlatformCandidates(input, message.send_options ?? message.sendOptions ?? {});',
+    '    }).then((body) => {',
+    '      sendResponse({ ok: true, type: OBSERVE_CANDIDATES_TYPE, body });',
+    '    }).catch((error) => {',
+    '      sendResponse({',
+    '        ok: false,',
+    '        type: OBSERVE_CANDIDATES_TYPE,',
+    '        reason: "observe_candidates_failed",',
+    '        error: String(error?.message ?? error),',
+    '      });',
     '    });',
     '    return true;',
     '  }',
@@ -956,7 +1080,9 @@ export function buildMeetingAppExtensionReadme(options = {}) {
     '',
     'The generated background worker forwards timeline client calls to the configured timeline service base URL.',
     '',
-    'Protocol messages use `meeting_timeline.extension_attached`, `meeting_timeline.extension_status`, and `meeting_timeline.client_call`; build custom callers with the SDK message helpers instead of hardcoded strings.',
+    'Protocol messages use `meeting_timeline.extension_attached`, `meeting_timeline.extension_status`, `meeting_timeline.observe_candidates`, and `meeting_timeline.client_call`; build custom callers with the SDK message helpers instead of hardcoded strings.',
+    '',
+    'Send `meeting_timeline.observe_candidates` from a popup, native host, or diagnostic page to let the background worker query browser tabs and forward an `observe_platform_candidates` runtime event to `/api/meeting-platform/runtime-events`.',
     '',
     'Before production rollout, capture real meeting app snapshots with `meeting-app-snapshot-recorder` and validate them with `meeting-app-gate`.',
     ...liveCaptureDocs,
@@ -987,6 +1113,7 @@ export function buildMeetingAppExtensionScaffold(options = {}) {
     permissions: unique([
       ...asArray(firstNonEmpty(options.permissions, options.extension_permissions, [])),
       'storage',
+      'tabs',
     ]),
     extraHostPermissions: unique([
       ...asArray(firstNonEmpty(options.extraHostPermissions, options.extra_host_permissions)),
@@ -1100,6 +1227,9 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
   if (!asArray(manifest.permissions).includes('storage')) {
     issues.push(issue('error', 'missing_storage_permission', 'Manifest must request storage permission for extension diagnostics.'));
   }
+  if (!asArray(manifest.permissions).includes('tabs')) {
+    issues.push(issue('error', 'missing_tabs_permission', 'Manifest must request tabs permission for background platform candidate observation.'));
+  }
   if (!manifest.background?.service_worker) {
     issues.push(issue('error', 'missing_background_worker', 'Manifest is missing a background service worker.'));
   }
@@ -1188,6 +1318,12 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
   }
   if (!backgroundContent.includes('meeting_timeline.extension_status')) {
     issues.push(issue('error', 'background_missing_status_diagnostic', 'Background entry does not handle extension_status diagnostics.'));
+  }
+  if (!backgroundContent.includes('meeting_timeline.observe_candidates')) {
+    issues.push(issue('error', 'background_missing_candidate_observer', 'Background entry does not handle observe_candidates runtime events.'));
+  }
+  if (!backgroundContent.includes('createMeetingPlatformRuntimeEventClient')) {
+    issues.push(issue('error', 'background_missing_runtime_event_client', 'Background entry does not use the platform runtime event client.'));
   }
   if (!backgroundContent.includes('setStorageValue')) {
     issues.push(issue('error', 'background_missing_diagnostic_storage', 'Background entry does not persist extension diagnostics.'));

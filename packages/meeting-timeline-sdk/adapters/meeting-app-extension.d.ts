@@ -8,7 +8,8 @@ export type MeetingAppExtensionPlatform =
 export type MeetingAppExtensionMessageType =
   | 'meeting_timeline.client_call'
   | 'meeting_timeline.extension_attached'
-  | 'meeting_timeline.extension_status';
+  | 'meeting_timeline.extension_status'
+  | 'meeting_timeline.observe_candidates';
 
 export type MeetingAppExtensionClientCallMethod =
   | 'startMeeting'
@@ -185,6 +186,7 @@ export const MEETING_APP_EXTENSION_MESSAGE_TYPES: Readonly<{
   client_call: 'meeting_timeline.client_call';
   extension_attached: 'meeting_timeline.extension_attached';
   extension_status: 'meeting_timeline.extension_status';
+  observe_candidates: 'meeting_timeline.observe_candidates';
 }>;
 export const MEETING_APP_EXTENSION_STATUS_STORAGE_KEY: 'meeting_timeline_extension_status';
 export const MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS: Readonly<Record<MeetingAppExtensionClientCallMethod, string>>;
@@ -201,6 +203,11 @@ export function buildMeetingAppExtensionAttachedMessage(
 ): Record<string, unknown>;
 
 export function buildMeetingAppExtensionStatusMessage(
+  input?: MeetingAppExtensionMessageOptions,
+  options?: MeetingAppExtensionMessageOptions,
+): Record<string, unknown>;
+
+export function buildMeetingAppExtensionObserveCandidatesMessage(
   input?: MeetingAppExtensionMessageOptions,
   options?: MeetingAppExtensionMessageOptions,
 ): Record<string, unknown>;

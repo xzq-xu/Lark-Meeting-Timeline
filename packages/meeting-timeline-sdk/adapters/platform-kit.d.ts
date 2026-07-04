@@ -472,6 +472,7 @@ export interface MeetingPlatformTimelineKit {
   assertMeetingAppExtensionScaffold(extensionOptions?: MeetingAppExtensionOptions): MeetingAppExtensionScaffoldAcceptanceReport;
   meetingAppExtensionAttachedMessage(input?: MeetingAppExtensionMessageOptions | string, messageOptions?: MeetingAppExtensionMessageOptions): Record<string, unknown>;
   meetingAppExtensionStatusMessage(input?: MeetingAppExtensionMessageOptions, messageOptions?: MeetingAppExtensionMessageOptions): Record<string, unknown>;
+  meetingAppExtensionObserveCandidatesMessage(input?: MeetingAppExtensionMessageOptions, messageOptions?: MeetingAppExtensionMessageOptions): Record<string, unknown>;
   meetingAppExtensionClientCallMessage(
     methodOrInput: MeetingAppExtensionClientCallMethod | string | MeetingAppExtensionClientCallMessageInput,
     input?: Record<string, unknown>,

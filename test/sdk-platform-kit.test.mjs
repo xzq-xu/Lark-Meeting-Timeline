@@ -247,7 +247,9 @@ assert.equal(extensionPlan.meeting_app_content_script_adapter, '@ai-annotation/m
 assert.equal(extensionPlan.platform_integration_runtime_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime');
 assert.equal(extensionPlan.platforms.length, 5);
 assert.equal(extensionPlan.runtime_contract.message_types.client_call, 'meeting_timeline.client_call');
+assert.equal(extensionPlan.runtime_contract.message_types.observe_candidates, 'meeting_timeline.observe_candidates');
 assert.equal(kit.normalizeMeetingAppExtensionMessageType('attached'), 'meeting_timeline.extension_attached');
+assert.equal(kit.normalizeMeetingAppExtensionMessageType('observe-platform-candidates'), 'meeting_timeline.observe_candidates');
 assert.equal(kit.meetingAppExtensionTimelineEndpoint('endMeeting'), '/api/meeting-session/end');
 assert.deepEqual(kit.meetingAppExtensionAttachedMessage({
   platform: 'google-meet',
@@ -258,6 +260,14 @@ assert.deepEqual(kit.meetingAppExtensionAttachedMessage({
   platform: 'google_meet',
   captured_at_ms: 234,
   url: 'https://meet.google.com/abc-defg-hij',
+});
+assert.deepEqual(kit.meetingAppExtensionObserveCandidatesMessage({
+  capturedAtMs: 236,
+  tabs: [{ url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet', active: true }],
+}), {
+  type: 'meeting_timeline.observe_candidates',
+  captured_at_ms: 236,
+  tabs: [{ url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet', active: true }],
 });
 assert.deepEqual(kit.meetingAppExtensionClientCallMessage('insertMark', {
   label: 'why?',

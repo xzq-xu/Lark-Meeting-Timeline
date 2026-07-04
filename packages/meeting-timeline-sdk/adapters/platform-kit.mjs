@@ -248,6 +248,7 @@ import {
   buildMeetingAppExtensionClientCallMessage,
   buildMeetingAppExtensionInstallPlan,
   buildMeetingAppExtensionMatchPatterns,
+  buildMeetingAppExtensionObserveCandidatesMessage,
   buildMeetingAppExtensionScaffold,
   buildMeetingAppExtensionScaffoldAcceptanceReport,
   buildMeetingAppExtensionStatusMessage,
@@ -907,6 +908,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppExtensionStatusMessage(input = {}, messageOptions = {}) {
       return buildMeetingAppExtensionStatusMessage(input, withDefaults(defaults, messageOptions));
+    },
+    meetingAppExtensionObserveCandidatesMessage(input = {}, messageOptions = {}) {
+      return buildMeetingAppExtensionObserveCandidatesMessage(input, withDefaults(defaults, messageOptions));
     },
     meetingAppExtensionClientCallMessage(methodOrInput, input = {}, messageOptions = {}) {
       const objectInput = Boolean(methodOrInput) && typeof methodOrInput === 'object' && !Array.isArray(methodOrInput);
