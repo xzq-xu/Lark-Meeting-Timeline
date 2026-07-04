@@ -11,6 +11,9 @@ import {
   buildMeetingAppExtensionInstallPlan,
 } from './meeting-app-extension.mjs';
 import {
+  buildMeetingAppRuntimeObserverPlanMatrix,
+} from './meeting-app-profile.mjs';
+import {
   buildMeetingPlatformRuntimeBundleMatrix,
 } from './platform-runtime-bundle.mjs';
 import {
@@ -155,6 +158,12 @@ export function createMeetingPlatformHost(options = {}) {
         platforms: bundleOptions.platforms ?? bundleOptions.platform_keys ?? platforms,
       });
     },
+    observerPlans(planOptions = {}) {
+      return kit.meetingAppRuntimeObserverPlanMatrix({
+        ...planOptions,
+        platforms: planOptions.platforms ?? planOptions.platform_keys ?? extensionPlatforms(platforms),
+      });
+    },
     runtimeEventPlans(planOptions = {}) {
       return kit.platformRuntimeEventPlanMatrix({
         ...planOptions,
@@ -271,6 +280,9 @@ function routesSource(options = {}) {
   if (url.pathname === '/api/meeting-platform/runtime-bundles') {
     return Response.json(host.runtimeBundles(options));
   }
+  if (url.pathname === '/api/meeting-platform/observer-plans') {
+    return Response.json(host.observerPlans(options));
+  }
   if (url.pathname === '/api/meeting-platform/runtime-event-plans') {
     return Response.json(host.runtimeEventPlans(options));
   }
@@ -329,6 +341,7 @@ Runtime rule:
 - Transcript and artifact import are post-meeting work.
 - Each meeting keeps an isolated annotation set.
 - Candidate observation is a required host-axis binding contract: browser extensions or native hosts send active meeting windows through meeting_timeline.observe_candidates or /api/meeting-platform/observe-candidates before realtime marks are inserted.
+- Observer plans standardize the local DOM/AX observation loop, throttling, speaker follow-up, and meeting-end grace windows for each meeting app surface.
 - Speaker and participant position tracks are required realtime contracts. They use local samples/snapshots first and must not wait for provider events or transcript export.
 
 Supported platforms in this scaffold:
@@ -343,6 +356,14 @@ Candidate observation contract:
 - all ready: ${plan.candidate_observation_contract?.all_ready === true ? 'true' : 'false'}
 
 ${candidateRows.map((row) => `- ${row.platform}: ${row.ready ? 'ready' : 'missing'} via ${row.message_type ?? 'meeting_timeline.observe_candidates'} (${row.required_permission ?? 'tabs'})`).join('\n')}
+
+Observer plan contract:
+
+- endpoint: ${plan.endpoints?.observer_plans ?? '/api/meeting-platform/observer-plans'}
+- platform count: ${plan.observer_plan_matrix?.platform_count ?? 0}
+- sdk ready count: ${plan.observer_plan_matrix?.sdk_ready_count ?? 0}
+- preflight accepted count: ${plan.observer_plan_matrix?.preflight_accepted_count ?? 0}
+- timestamp field: captured_at_ms
 
 Meeting track contract:
 
@@ -384,6 +405,7 @@ const candidateObservation = await host.observePlatformCandidates({
   }],
 });
 const runtimeBundles = host.runtimeBundles();
+const observerPlans = host.observerPlans();
 const runtimeEventPlans = host.runtimeEventPlans();
 const extensionPlan = host.extensionInstallPlan();
 const integrationRuntime = host.integrationRuntimeSummary();
@@ -406,6 +428,7 @@ npm run meeting-platform:live-readiness
 npm run meeting-platform:contracts
 npm run meeting-platform:contract-acceptance
 npm run meeting-platform:runtime-bundles
+npm run meeting-platform:observer-plans
 npm run meeting-platform:runtime-event-plans
 npm run meeting-platform:resolve
 npm run meeting-platform:resolve-candidates
@@ -538,6 +561,10 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     platforms,
     baseUrl,
   });
+  const observerPlanMatrix = buildMeetingAppRuntimeObserverPlanMatrix({
+    ...options,
+    platforms: platforms.filter((platform) => platform !== 'local_detector'),
+  });
   const candidateObservationContract = buildCandidateObservationContract(platforms, runtimeBundleMatrix);
   const speakerTrackMatrix = buildMeetingPlatformSpeakerTrackMatrix({
     ...options,
@@ -600,6 +627,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       adapter_contracts: '/api/meeting-platform/contracts',
       adapter_contract_acceptance: '/api/meeting-platform/contract-acceptance',
       runtime_bundles: '/api/meeting-platform/runtime-bundles',
+      observer_plans: '/api/meeting-platform/observer-plans',
       runtime_event_plans: '/api/meeting-platform/runtime-event-plans',
       strategy: '/api/meeting-platform/strategy',
       platform_resolution: '/api/meeting-platform/resolve',
@@ -620,6 +648,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     adaptation_strategy_matrix: adaptationStrategyMatrix,
     runtime_event_plan_matrix: runtimeEventPlanMatrix,
     runtime_bundle_matrix: runtimeBundleMatrix,
+    observer_plan_matrix: observerPlanMatrix,
     candidate_observation_contract: candidateObservationContract,
     speaker_track_matrix: speakerTrackMatrix,
     participant_track_matrix: participantTrackMatrix,
@@ -632,6 +661,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       'run_meeting_platform_contract_acceptance_before_enabling_new_platform',
       'wire_host_routes_to_handleMeetingPlatformRequest',
       'capture_real_meeting_app_snapshots_for_each_target_platform',
+      'wire_observer_plans_to_host_scheduler',
       'verify_candidate_observation_contract_for_each_target_platform',
       'verify_meeting_track_contract_for_each_target_platform',
       'capture_real_provider_events_where_available',
@@ -653,6 +683,7 @@ export function buildMeetingPlatformHostIntegrationScaffold(options = {}) {
       'meeting-platform:contracts': 'node ./scripts/print-contracts.mjs',
       'meeting-platform:contract-acceptance': 'node ./scripts/verify-contracts.mjs',
       'meeting-platform:runtime-bundles': 'node ./scripts/print-runtime-bundles.mjs',
+      'meeting-platform:observer-plans': 'node ./scripts/print-observer-plans.mjs',
       'meeting-platform:runtime-event-plans': 'node ./scripts/print-runtime-event-plans.mjs',
       'meeting-platform:extension-plan': 'node ./scripts/print-extension-plan.mjs',
       'meeting-platform:resolve': 'node ./scripts/resolve-platform.mjs',
@@ -773,6 +804,14 @@ const host = createMeetingPlatformHost({
 
 console.log(JSON.stringify(host.runtimeBundles(), null, 2));
 `;
+  const observerPlansScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+console.log(JSON.stringify(host.observerPlans(), null, 2));
+`;
   const runtimeEventPlansScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
 
 const host = createMeetingPlatformHost({
@@ -822,6 +861,7 @@ console.log(JSON.stringify(host.integrationRuntimeManifest(), null, 2));
       sourceFile('scripts/print-contracts.mjs', contractsScript, 'adapter_contract_script', 'text/javascript'),
       sourceFile('scripts/verify-contracts.mjs', contractAcceptanceScript, 'adapter_contract_acceptance_script', 'text/javascript'),
       sourceFile('scripts/print-runtime-bundles.mjs', runtimeBundlesScript, 'runtime_bundle_script', 'text/javascript'),
+      sourceFile('scripts/print-observer-plans.mjs', observerPlansScript, 'observer_plan_script', 'text/javascript'),
       sourceFile('scripts/print-runtime-event-plans.mjs', runtimeEventPlansScript, 'runtime_event_plan_script', 'text/javascript'),
       sourceFile('scripts/print-extension-plan.mjs', extensionPlanScript, 'extension_plan_script', 'text/javascript'),
       sourceFile('scripts/resolve-platform.mjs', platformResolutionScript, 'platform_resolution_script', 'text/javascript'),
@@ -850,6 +890,7 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     'scripts/print-contracts.mjs',
     'scripts/verify-contracts.mjs',
     'scripts/print-runtime-bundles.mjs',
+    'scripts/print-observer-plans.mjs',
     'scripts/print-runtime-event-plans.mjs',
     'scripts/resolve-platform.mjs',
     'scripts/resolve-platform-candidates.mjs',
@@ -888,6 +929,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!host.includes('platformRuntimeBundleMatrix')) {
     issues.push(issue('error', 'missing_runtime_bundle_matrix', 'Host source must expose the runtime bundle matrix.'));
   }
+  if (!host.includes('meetingAppRuntimeObserverPlanMatrix')) {
+    issues.push(issue('error', 'missing_observer_plan_matrix', 'Host source must expose meeting app runtime observer plans.'));
+  }
   if (!host.includes('platformRuntimeEventPlanMatrix')) {
     issues.push(issue('error', 'missing_runtime_event_plan_matrix', 'Host source must expose the runtime event plan matrix.'));
   }
@@ -924,6 +968,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!routes.includes('/api/meeting-platform/runtime-bundles')) {
     issues.push(issue('error', 'missing_runtime_bundle_route', 'Route source must expose the runtime bundle matrix endpoint.'));
   }
+  if (!routes.includes('/api/meeting-platform/observer-plans')) {
+    issues.push(issue('error', 'missing_observer_plan_route', 'Route source must expose the observer plan matrix endpoint.'));
+  }
   if (!routes.includes('/api/meeting-platform/runtime-event-plans')) {
     issues.push(issue('error', 'missing_runtime_event_plan_route', 'Route source must expose the runtime event plan matrix endpoint.'));
   }
@@ -957,6 +1004,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!readme.includes('Meeting track contract')) {
     issues.push(issue('warning', 'readme_missing_meeting_track_contract', 'README should state the speaker/participant track contract.'));
   }
+  if (!readme.includes('Observer plan contract')) {
+    issues.push(issue('warning', 'readme_missing_observer_plan_contract', 'README should state the observer plan contract.'));
+  }
   const candidateObservationContract = scaffold.plan?.candidate_observation_contract;
   if (!candidateObservationContract) {
     issues.push(issue('error', 'missing_candidate_observation_contract', 'Scaffold plan must include the candidate observation contract.'));
@@ -970,6 +1020,15 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     issues.push(issue('error', 'runtime_bundle_candidate_observer_not_ready', 'Runtime bundle matrix must expose candidate observation for every selected platform.', {
       candidate_observer_count: runtimeCandidateObserverCount,
       platform_count: scaffold.platforms?.length ?? 0,
+    }));
+  }
+  const observerPlanMatrix = scaffold.plan?.observer_plan_matrix;
+  if (!observerPlanMatrix) {
+    issues.push(issue('error', 'missing_observer_plan_matrix', 'Scaffold plan must include the observer plan matrix.'));
+  } else if (observerPlanMatrix.sdk_ready_count !== observerPlanMatrix.platform_count) {
+    issues.push(issue('error', 'observer_plan_matrix_not_ready', 'Every selected meeting app platform must expose a runtime observer plan.', {
+      platform_count: observerPlanMatrix.platform_count,
+      sdk_ready_count: observerPlanMatrix.sdk_ready_count,
     }));
   }
   const meetingTrackContract = scaffold.plan?.meeting_track_contract;
@@ -1009,6 +1068,12 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     candidate_observer_count: candidateObservationContract?.ready_count ?? runtimeCandidateObserverCount ?? 0,
     candidate_observer_missing_count: candidateObservationContract?.missing_count,
     candidate_observation_contract: candidateObservationContract,
+    observer_plan_ready: observerPlanMatrix
+      ? observerPlanMatrix.sdk_ready_count === observerPlanMatrix.platform_count
+      : false,
+    observer_plan_ready_count: observerPlanMatrix?.sdk_ready_count ?? 0,
+    observer_plan_preflight_accepted_count: observerPlanMatrix?.preflight_accepted_count ?? 0,
+    observer_plan_matrix: observerPlanMatrix,
     meeting_track_ready: meetingTrackContract?.all_ready === true,
     speaker_track_ready_count: meetingTrackContract?.speaker_ready_count ?? 0,
     participant_track_ready_count: meetingTrackContract?.participant_ready_count ?? 0,
