@@ -593,7 +593,7 @@ npm run meeting-platform:adaptation-package -- \
 
 这份 package 的定位是“交给另一个项目开始接入”的 SDK 汇总，不替代真实会议采样；`readiness.sdk_wiring_ready=true` 只说明协议和 SDK 调用面可接，是否能 production 仍要看 evidence package / handoff readiness。
 
-如果下游项目要直接启动浏览器扩展、WebView preload 或 native host runtime，用 `platform-runtime-bundle`。它在 `platform-adaptation-package` 基础上再补一层可执行运行时配置：content script manifest、浏览器 URL matches、`meeting-app-browser-runtime` preset、`platform-integration-runtime` content-script bridge 安装参数、mutation observer / speaker filter 参数、extension message 示例、host ingest endpoints，以及 `captured_at_ms` 写入契约：
+如果下游项目要直接启动浏览器扩展、WebView preload 或 native host runtime，用 `platform-runtime-bundle`。它在 `platform-adaptation-package` 基础上再补一层可执行运行时配置：content script manifest、浏览器 URL matches、adapter route、`meeting-app-browser-runtime` preset、`platform-integration-runtime` content-script bridge 安装参数、mutation observer / speaker filter 参数、extension message 示例、host ingest endpoints，以及 `captured_at_ms` 写入契约：
 
 ```js
 import {
@@ -606,6 +606,7 @@ const googleRuntime = buildMeetingPlatformRuntimeBundle('google-meet', {
 });
 
 // googleRuntime.browser.manifest 可交给扩展构建器。
+// googleRuntime.adapter_route.routes[0].route === 'local_observer_axis'。
 // googleRuntime.browser.permissions 和 googleRuntime.messaging.background_message_types 包含候选会议观察所需的 tabs + meeting_timeline.observe_candidates。
 // googleRuntime.runtime.content_script_bridge.options 可直接传给平台级 content-script bridge。
 // googleRuntime.messaging.examples.content_script_insert_annotation 是外部插入标注的消息格式。
@@ -613,7 +614,7 @@ const googleRuntime = buildMeetingPlatformRuntimeBundle('google-meet', {
 // googleRuntime.host.endpoints.insertMark 是实时标注写入地址。
 // googleRuntime.host.endpoints.runtimeEvents 是统一 runtime event envelope 写入地址。
 // googleRuntime.messaging.runtime_event.client_factory 指向 createMeetingPlatformRuntimeEventClient。
-// googleRuntime.messaging.runtime_event.plan 是外部宿主接入 observe/provider/annotation/speaker/participant/view 的动作表。
+// googleRuntime.messaging.runtime_event.plan 是外部宿主接入 observe/provider/annotation/speaker/participant/view/adapter-route 的动作表。
 // googleRuntime.readiness.provider_required_for_realtime === false。
 // googleRuntime.readiness.transcript_blocks_realtime === false。
 

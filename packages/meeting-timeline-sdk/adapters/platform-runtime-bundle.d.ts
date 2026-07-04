@@ -1,4 +1,5 @@
 import type { MeetingPlatformAdaptationPackage, MeetingPlatformAdaptationPackageOptions } from './platform-adaptation-package.mjs';
+import type { MeetingPlatformAdapterRoute } from './platform-adapter-route.mjs';
 import type { MeetingAppRuntimeObserverPlan } from './meeting-app-profile.mjs';
 import type { MeetingAppObserverSchedulerConfig } from './meeting-app-observer-scheduler.mjs';
 import type { MeetingPlatformRuntimeEventPlan } from './platform-runtime-event.mjs';
@@ -39,6 +40,7 @@ export interface MeetingPlatformRuntimeBundle {
   objective: string;
   runtime_contract: Record<string, unknown>;
   modules: Record<string, string>;
+  adapter_route: MeetingPlatformAdapterRoute;
   browser: {
     matches: string[];
     host_permissions: string[];
@@ -118,6 +120,10 @@ export interface MeetingPlatformRuntimeBundleMatrix {
   sdk_wiring_ready_count: number;
   observer_plan_ready_count?: number;
   runtime_host_ready_count?: number;
+  adapter_route_ready_count?: number;
+  local_observer_first_count?: number;
+  provider_non_blocking_route_count?: number;
+  transcript_non_blocking_route_count?: number;
   candidate_observer_count: number;
   provider_required_for_realtime_count: number;
   transcript_blocking_count: number;

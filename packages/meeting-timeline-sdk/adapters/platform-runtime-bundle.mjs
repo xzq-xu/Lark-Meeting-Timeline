@@ -7,6 +7,9 @@ import {
   buildMeetingPlatformAdaptationPackage,
 } from './platform-adaptation-package.mjs';
 import {
+  buildMeetingPlatformAdapterRoute,
+} from './platform-adapter-route.mjs';
+import {
   MEETING_APP_BROWSER_RUNTIME_PRESETS,
   meetingAppBrowserRuntimePreset,
 } from './meeting-app-browser-runtime.mjs';
@@ -233,6 +236,7 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
   const start = startOptions(key, adaptationPackage, preset ?? {}, options);
   const endpoints = hostEndpoints(adaptationPackage, options);
   const runtimeEventPlan = buildMeetingPlatformRuntimeEventPlan(key, options);
+  const adapterRoute = buildMeetingPlatformAdapterRoute(key, options);
   const observerPlan = runtimeObserverPlan(key, options);
   const observerSchedulerConfig = observerPlan
     ? buildMeetingAppObserverSchedulerConfig(observerPlan, options)
@@ -264,6 +268,7 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
       observer_scheduler: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-observer-scheduler',
       runtime_host: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-runtime-host',
     },
+    adapter_route: adapterRoute,
     browser: {
       matches: extension.matches ?? [],
       host_permissions: extension.host_permissions ?? [],
@@ -379,6 +384,10 @@ export function buildMeetingPlatformRuntimeBundleMatrix(options = {}) {
     sdk_wiring_ready_count: bundles.filter((bundle) => bundle.readiness.sdk_wiring_ready).length,
     observer_plan_ready_count: bundles.filter((bundle) => bundle.readiness.observer_plan_ready).length,
     runtime_host_ready_count: bundles.filter((bundle) => bundle.readiness.runtime_host_ready).length,
+    adapter_route_ready_count: bundles.filter((bundle) => bundle.adapter_route?.route_count > 0).length,
+    local_observer_first_count: bundles.filter((bundle) => bundle.adapter_route?.recommended_mode === 'local_observer_first_provider_reconcile').length,
+    provider_non_blocking_route_count: bundles.filter((bundle) => bundle.adapter_route?.realtime_invariants?.provider_events_block_realtime === false).length,
+    transcript_non_blocking_route_count: bundles.filter((bundle) => bundle.adapter_route?.realtime_invariants?.transcript_blocks_realtime === false).length,
     candidate_observer_count: bundles.filter((bundle) => bundle.messaging?.candidate_observation?.runtime_event_action === 'observe_platform_candidates').length,
     provider_required_for_realtime_count: bundles.filter((bundle) => bundle.readiness.provider_required_for_realtime).length,
     transcript_blocking_count: bundles.filter((bundle) => bundle.readiness.transcript_blocks_realtime).length,
@@ -390,6 +399,9 @@ export function buildMeetingPlatformRuntimeBundleMatrix(options = {}) {
       sdk_wiring_ready: bundle.readiness.sdk_wiring_ready,
       browser_match_count: bundle.browser?.matches?.length ?? 0,
       browser_permission_count: bundle.browser?.permissions?.length ?? 0,
+      adapter_recommended_mode: bundle.adapter_route?.recommended_mode,
+      adapter_first_route: bundle.adapter_route?.routes?.[0]?.route,
+      adapter_route_count: bundle.adapter_route?.route_count,
       candidate_observation_ready: bundle.messaging?.candidate_observation?.runtime_event_action === 'observe_platform_candidates',
       candidate_observer_message_type: bundle.messaging?.candidate_observation?.message_type,
       candidate_observer_permission: bundle.messaging?.candidate_observation?.required_permission,
