@@ -19,6 +19,7 @@ import {
 } from './platform-adaptation-package.mjs';
 import {
   buildMeetingPlatformHandoffReadinessMatrix,
+  runMeetingPlatformHandoffReadinessMatrix,
 } from './platform-handoff-readiness.mjs';
 import {
   buildMeetingPlatformParticipantTrackMatrix,
@@ -111,6 +112,7 @@ function meetingKey(value = {}) {
 
 function runtimeIssues(manifest = {}) {
   const issues = [];
+  const requireHandoffReady = manifest.require_handoff_ready === true;
   if (manifest.registry_acceptance?.accepted !== true) {
     issues.push({
       severity: 'error',
@@ -228,6 +230,24 @@ function runtimeIssues(manifest = {}) {
       severity: 'warning',
       code: 'real_evidence_not_ready',
       message: 'One or more platforms still need real DOM/provider evidence before pilot or production rollout.',
+    });
+  }
+  if (requireHandoffReady && manifest.handoff_readiness_matrix?.handoff_ready_count !== manifest.platform_count) {
+    issues.push({
+      severity: 'error',
+      code: 'handoff_readiness_not_ready',
+      message: 'Formal SDK handoff requires every selected platform to pass handoff readiness.',
+    });
+  }
+  if (
+    requireHandoffReady
+    && manifest.handoff_readiness_matrix?.runtime_host_replay_ready_count !== undefined
+    && manifest.handoff_readiness_matrix.runtime_host_replay_ready_count !== manifest.platform_count
+  ) {
+    issues.push({
+      severity: 'error',
+      code: 'runtime_host_replay_not_ready',
+      message: 'Formal SDK handoff requires every selected platform evidence package to replay through runtime host into the timeline.',
     });
   }
   return issues;
@@ -359,6 +379,31 @@ function emptyObservationResult(reason, details = {}) {
 
 function flattenedObservationRows(platformResults = [], field) {
   return platformResults.flatMap((row) => asArray(row.result?.[field]));
+}
+
+function requireHandoffReady(options = {}) {
+  return firstNonEmpty(options.requireHandoffReady, options.require_handoff_ready, false) === true;
+}
+
+function summaryFromManifest(manifest = {}) {
+  return compactObject({
+    type: 'meeting_platform_integration_runtime_summary',
+    schema: MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA,
+    schema_version: MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA_VERSION,
+    platform_count: manifest.platform_count,
+    platforms: manifest.platforms,
+    host_integration_ready: manifest.host_integration_ready,
+    require_handoff_ready: manifest.require_handoff_ready,
+    blocking_count: manifest.blocking_count,
+    warning_count: manifest.warning_count,
+    handoff_ready_count: manifest.handoff_readiness_matrix?.handoff_ready_count,
+    pilot_ready_count: manifest.handoff_readiness_matrix?.pilot_ready_count,
+    production_ready_count: manifest.handoff_readiness_matrix?.production_ready_count,
+    runtime_host_replay_ready_count: manifest.handoff_readiness_matrix?.runtime_host_replay_ready_count,
+    speaker_track_ready_count: manifest.speaker_track_matrix?.realtime_ready_when_samples_available_count,
+    participant_track_ready_count: manifest.participant_track_matrix?.realtime_ready_when_snapshots_available_count,
+    next_actions: manifest.next_actions,
+  });
 }
 
 export function detectMeetingPlatformForBrowser(input = {}, options = {}) {
@@ -539,7 +584,10 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     ...merged,
     platforms,
   });
-  const handoffReadinessMatrix = buildMeetingPlatformHandoffReadinessMatrix({
+  const handoffReadinessMatrix = firstNonEmpty(
+    options.handoffReadinessMatrix,
+    options.handoff_readiness_matrix,
+  ) ?? buildMeetingPlatformHandoffReadinessMatrix({
     ...merged,
     platforms,
   });
@@ -566,6 +614,9 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     provider_required_for_realtime: runtimeRows[platform]?.provider_required_for_realtime === true,
     provider_blocks_realtime: strategyRows[platform]?.provider_blocks_realtime === true,
     transcript_blocks_realtime: runtimeRows[platform]?.transcript_blocks_realtime === true,
+    runtime_host_replay_required: handoffRows[platform]?.runtime_host_replay_required,
+    runtime_host_replay_accepted: handoffRows[platform]?.runtime_host_replay_accepted,
+    runtime_host_replay_missing: handoffRows[platform]?.runtime_host_replay_missing ?? [],
     speaker_track_ready: speakerRows[platform] != null
       && speakerRows[platform]?.provider_events_block_realtime !== true
       && speakerRows[platform]?.transcript_blocks_realtime !== true,
@@ -592,6 +643,7 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     schema_version: MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA_VERSION,
     base_url: merged.baseUrl,
     base_path: merged.basePath,
+    require_handoff_ready: requireHandoffReady(merged),
     platform_count: platforms.length,
     platforms,
     registry_acceptance: registryAcceptance,
@@ -618,6 +670,32 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
       ...handoffReadinessMatrix.rows.flatMap((row) => row.next_actions ?? []),
     ]),
   };
+}
+
+export async function runMeetingPlatformIntegrationRuntimeManifest(options = {}) {
+  const merged = runtimeBaseOptions(options);
+  const platforms = selectedPlatforms(merged);
+  const handoffReadinessMatrix = await runMeetingPlatformHandoffReadinessMatrix({
+    ...merged,
+    platforms,
+  }, {
+    ...merged,
+    platforms,
+    target: firstNonEmpty(merged.target, merged.readinessTarget, merged.readiness_target, 'production'),
+  });
+  const staticManifestOptions = {
+    ...merged,
+    target: undefined,
+    readinessTarget: undefined,
+    readiness_target: undefined,
+    requireProductionReady: undefined,
+    require_production_ready: undefined,
+  };
+  return buildMeetingPlatformIntegrationRuntimeManifest({
+    ...staticManifestOptions,
+    handoffReadinessMatrix,
+    handoff_readiness_matrix: handoffReadinessMatrix,
+  });
 }
 
 export function assertMeetingPlatformIntegrationRuntimeManifest(manifestOrOptions = {}, options = {}) {
@@ -677,8 +755,14 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
     manifest(manifestOptions = {}) {
       return buildMeetingPlatformIntegrationRuntimeManifest(withDefaults(defaults, manifestOptions));
     },
+    async runManifest(manifestOptions = {}) {
+      return runMeetingPlatformIntegrationRuntimeManifest(withDefaults(defaults, manifestOptions));
+    },
     assertManifest(manifestOptions = {}) {
       return assertMeetingPlatformIntegrationRuntimeManifest(withDefaults(defaults, manifestOptions));
+    },
+    async runAndAssertManifest(manifestOptions = {}) {
+      return assertMeetingPlatformIntegrationRuntimeManifest(await runtime.runManifest(manifestOptions));
     },
     registry(registryOptions = {}) {
       const manifest = kit.platformRegistryManifest({
@@ -786,6 +870,12 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
         platforms: readinessOptions.platforms ?? readinessOptions.platform_keys ?? platforms,
       });
     },
+    runHandoffReadiness(readinessOptions = {}) {
+      return kit.runPlatformHandoffReadinessMatrix({
+        ...readinessOptions,
+        platforms: readinessOptions.platforms ?? readinessOptions.platform_keys ?? platforms,
+      });
+    },
     observeMeetingApp(platform, snapshot = {}, observeOptions = {}) {
       return adapter(platform, observeOptions.adapterOptions ?? observeOptions.adapter_options ?? {})
         .observeMeetingApp(snapshot, observeOptions);
@@ -821,6 +911,7 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
       const action = actionName(eventInput, eventOptions);
       if (['registry', 'platform_registry'].includes(action)) return runtime.registry(eventOptions);
       if (['manifest', 'runtime_manifest', 'integration_manifest'].includes(action)) return runtime.manifest(eventOptions);
+      if (['run_manifest', 'runtime_manifest_run', 'integration_manifest_run'].includes(action)) return runtime.runManifest(eventOptions);
       if (['runtime_bundles', 'runtime_bundle_matrix'].includes(action)) return runtime.runtimeBundles(eventOptions);
       if (['strategy', 'adaptation_strategy', 'adaptation_strategy_matrix'].includes(action)) return runtime.adaptationStrategyMatrix(eventOptions);
       if (['resolve', 'resolve_platform', 'platform_resolution'].includes(action)) return runtime.resolvePlatform(eventInput, eventOptions);
@@ -828,6 +919,7 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
       if (['observe_candidates', 'observe_platform_candidates', 'observe_meeting_environment', 'meeting_environment_snapshot'].includes(action)) return runtime.observePlatformCandidates(eventInput, eventOptions);
       if (['readiness', 'live_readiness'].includes(action)) return runtime.readiness(eventOptions);
       if (['handoff_readiness'].includes(action)) return runtime.handoffReadiness(eventOptions);
+      if (['run_handoff_readiness', 'handoff_readiness_run'].includes(action)) return runtime.runHandoffReadiness(eventOptions);
       const platform = platformFrom(eventInput, eventOptions);
       if (['observe', 'observe_app', 'observe_meeting_app', 'meeting_app_snapshot', 'snapshot'].includes(action)) {
         return runtime.observeMeetingApp(platform, snapshotFrom(eventInput), eventOptions);
@@ -863,29 +955,19 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
           'observe_platform_candidates',
           'registry',
           'manifest',
+          'run_manifest',
           'readiness',
           'handoff_readiness',
+          'run_handoff_readiness',
         ],
       });
     },
     summary(summaryOptions = {}) {
       const manifest = runtime.manifest(summaryOptions);
-      return compactObject({
-        type: 'meeting_platform_integration_runtime_summary',
-        schema: MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA,
-        schema_version: MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA_VERSION,
-        platform_count: manifest.platform_count,
-        platforms: manifest.platforms,
-        host_integration_ready: manifest.host_integration_ready,
-        blocking_count: manifest.blocking_count,
-        warning_count: manifest.warning_count,
-        handoff_ready_count: manifest.handoff_readiness_matrix?.handoff_ready_count,
-        pilot_ready_count: manifest.handoff_readiness_matrix?.pilot_ready_count,
-        production_ready_count: manifest.handoff_readiness_matrix?.production_ready_count,
-        speaker_track_ready_count: manifest.speaker_track_matrix?.realtime_ready_when_samples_available_count,
-        participant_track_ready_count: manifest.participant_track_matrix?.realtime_ready_when_snapshots_available_count,
-        next_actions: manifest.next_actions,
-      });
+      return summaryFromManifest(manifest);
+    },
+    async runSummary(summaryOptions = {}) {
+      return summaryFromManifest(await runtime.runManifest(summaryOptions));
     },
     getState() {
       return {

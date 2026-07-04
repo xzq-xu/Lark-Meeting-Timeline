@@ -107,6 +107,8 @@ npm run meeting-platform:handoff-readiness
 
 报告里的 `runtime_host_replay_ready_count` 必须等于 `platform_count`，每行的 `runtime_host_replay_accepted=true` 才代表该平台可以作为可复用 SDK 接入单元交付。
 
+如果接入方直接使用 `platform-integration-runtime`，等价的 SDK 总入口是 `runMeetingPlatformIntegrationRuntimeManifest({ requireHandoffReady: true, ...evidenceByPlatform })` 或 runtime 实例的 `runManifest()`。它会把静态 runtime wiring、speaker/participant 位置轨、handoff readiness 和 runtime replay 合成一个 `host_integration_ready` 结论。
+
 SDK 包级交付前再跑一次 package smoke：
 
 ```bash

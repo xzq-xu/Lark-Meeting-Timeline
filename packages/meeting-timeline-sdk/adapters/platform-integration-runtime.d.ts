@@ -28,6 +28,10 @@ export interface MeetingPlatformIntegrationRuntimeOptions {
   env?: Record<string, unknown>;
   clientOptions?: Record<string, unknown>;
   client_options?: Record<string, unknown>;
+  requireHandoffReady?: boolean;
+  require_handoff_ready?: boolean;
+  handoffReadinessMatrix?: Record<string, unknown>;
+  handoff_readiness_matrix?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -50,6 +54,9 @@ export interface MeetingPlatformIntegrationRuntimeRow {
   provider_required_for_realtime: boolean;
   provider_blocks_realtime: boolean;
   transcript_blocks_realtime: boolean;
+  runtime_host_replay_required?: boolean;
+  runtime_host_replay_accepted?: boolean;
+  runtime_host_replay_missing?: string[];
   speaker_track_ready?: boolean;
   speaker_min_stable_ms?: number;
   speaker_switch_stable_ms?: number;
@@ -73,6 +80,7 @@ export interface MeetingPlatformIntegrationRuntimeManifest {
   schema_version: typeof MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA_VERSION;
   base_url: string;
   base_path: string;
+  require_handoff_ready?: boolean;
   platform_count: number;
   platforms: string[];
   host_integration_ready: boolean;
@@ -208,7 +216,9 @@ export interface MeetingPlatformIntegrationRuntime {
   adapter(platform: string, adapterOptions?: Record<string, unknown>): Record<string, unknown>;
   platformAdapter(platform: string, adapterOptions?: Record<string, unknown>): Record<string, unknown>;
   manifest(manifestOptions?: MeetingPlatformIntegrationRuntimeOptions): MeetingPlatformIntegrationRuntimeManifest;
+  runManifest(manifestOptions?: MeetingPlatformIntegrationRuntimeOptions): Promise<MeetingPlatformIntegrationRuntimeManifest>;
   assertManifest(manifestOptions?: MeetingPlatformIntegrationRuntimeOptions): MeetingPlatformIntegrationRuntimeManifest;
+  runAndAssertManifest(manifestOptions?: MeetingPlatformIntegrationRuntimeOptions): Promise<MeetingPlatformIntegrationRuntimeManifest>;
   registry(registryOptions?: Record<string, unknown>): {
     manifest: Record<string, unknown>;
     acceptance: Record<string, unknown>;
@@ -228,6 +238,7 @@ export interface MeetingPlatformIntegrationRuntime {
   ): Promise<MeetingPlatformCandidateObservation>;
   readiness(readinessOptions?: Record<string, unknown>): Record<string, unknown>;
   handoffReadiness(readinessOptions?: Record<string, unknown>): Record<string, unknown>;
+  runHandoffReadiness(readinessOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
   observeMeetingApp(platform: string, snapshot?: Record<string, unknown>, observeOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
   observeApp(platform: string, snapshot?: Record<string, unknown>, observeOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
   ingestProvider(platform: string, requestOrPayload?: Record<string, unknown>, payload?: unknown, ingestOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -238,6 +249,7 @@ export interface MeetingPlatformIntegrationRuntime {
   timelineView(platform: string, input?: Record<string, unknown>, viewOptions?: Record<string, unknown>): Record<string, unknown>;
   handleEvent(input?: Record<string, unknown>, payload?: unknown, eventOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
   summary(summaryOptions?: MeetingPlatformIntegrationRuntimeOptions): Record<string, unknown>;
+  runSummary(summaryOptions?: MeetingPlatformIntegrationRuntimeOptions): Promise<Record<string, unknown>>;
   getState(): Record<string, unknown>;
   reset(nextState?: Record<string, unknown>): Record<string, unknown>;
 }
@@ -313,6 +325,10 @@ export function resolveMeetingPlatformCandidates(
 export function buildMeetingPlatformIntegrationRuntimeManifest(
   options?: MeetingPlatformIntegrationRuntimeOptions,
 ): MeetingPlatformIntegrationRuntimeManifest;
+
+export function runMeetingPlatformIntegrationRuntimeManifest(
+  options?: MeetingPlatformIntegrationRuntimeOptions,
+): Promise<MeetingPlatformIntegrationRuntimeManifest>;
 
 export function assertMeetingPlatformIntegrationRuntimeManifest(
   manifestOrOptions?: MeetingPlatformIntegrationRuntimeManifest | MeetingPlatformIntegrationRuntimeOptions,

@@ -13,11 +13,23 @@ import {
   installMeetingPlatformIntegrationContentScriptBridge,
   resolveMeetingPlatformCandidates,
   resolveMeetingPlatformForInput,
+  runMeetingPlatformIntegrationRuntimeManifest,
 } from '../packages/meeting-timeline-sdk/adapters/platform-integration-runtime.mjs';
+import { capturePlatformWebhookEvent } from '../packages/meeting-timeline-sdk/adapters/platform-capture.mjs';
+import {
+  buildMeetingPlatformEvidencePackage,
+} from '../packages/meeting-timeline-sdk/adapters/platform-evidence-package.mjs';
 import { buildPlatformFixtureEvent } from '../packages/meeting-timeline-sdk/adapters/platform-fixtures.mjs';
 
 const baseUrl = 'https://timeline.example.com';
 const browserStartMs = 1_782_614_400_000;
+const evidenceStartMs = 1_784_010_000_000;
+const evidenceDurationMs = 120_000;
+const productionEnv = {
+  GOOGLE_PUBSUB_OIDC_AUDIENCE: `${baseUrl}/api/platform-events/google-meet`,
+  GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL: 'meet-events@example.iam.gserviceaccount.com',
+  ZOOM_WEBHOOK_SECRET_TOKEN: 'real-zoom-secret-token',
+};
 
 function node(tagName, attrs = {}, text = '') {
   return {
@@ -113,6 +125,68 @@ function fakeExtensionRuntime() {
       });
     },
   };
+}
+
+function realSnapshot(platform, state, observedAtMs) {
+  return {
+    ...buildMeetingAppFixtureSnapshot(platform, {
+      state,
+      observedAtMs,
+      title: state === 'active' ? 'Integration runtime meeting' : 'Ready to join',
+      speakerId: 'real-speaker-001',
+      speakerName: 'Ada Real',
+      mutedId: 'real-muted-001',
+      mutedName: 'Grace Real',
+    }),
+    id: `integration-runtime-${platform}-${state}-${observedAtMs}`,
+    source: 'chrome_extension_capture',
+    fixture_state: undefined,
+  };
+}
+
+function realProviderRecord(platform, signalType, capturedAtMs) {
+  const body = buildPlatformFixtureEvent(platform, signalType, {
+    startMs: evidenceStartMs,
+    durationMs: evidenceDurationMs,
+    title: 'Integration runtime meeting',
+    participantId: 'real-user-001',
+    participantName: 'Ada Real',
+    speakerId: 'real-speaker-001',
+    speakerName: 'Ada Real',
+    googleRecordId: 'real-google-record-001',
+    zoomUuid: 'real-zoom-uuid-001',
+    transcriptId: 'real-transcript-001',
+    recordingId: 'real-recording-001',
+  });
+  return capturePlatformWebhookEvent({
+    platform,
+    method: 'POST',
+    url: `${baseUrl}/api/platform-events/${platform}`,
+    body,
+    id: `integration-runtime-${platform}-${signalType}`,
+  }, undefined, {
+    capturedAtMs,
+  });
+}
+
+function realEvidencePackage(platform) {
+  return buildMeetingPlatformEvidencePackage(platform, {
+    providerRecords: [
+      realProviderRecord(platform, 'meeting_start', evidenceStartMs),
+      realProviderRecord(platform, 'participant_join', evidenceStartMs + 30_000),
+      realProviderRecord(platform, 'participant_left', evidenceStartMs + 90_000),
+      realProviderRecord(platform, 'meeting_end', evidenceStartMs + evidenceDurationMs),
+      realProviderRecord(platform, 'transcript_ready', evidenceStartMs + evidenceDurationMs + 120_000),
+    ],
+    meetingAppRecords: [
+      realSnapshot(platform, 'active', evidenceStartMs),
+      realSnapshot(platform, 'prejoin', evidenceStartMs + evidenceDurationMs),
+    ],
+  }, {
+    baseUrl,
+    env: productionEnv,
+    includeRunbook: false,
+  });
 }
 
 const browserDetection = detectMeetingPlatformForBrowser({
@@ -229,6 +303,37 @@ assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').partici
 assert.equal(manifest.rows.find((row) => row.platform === 'zoom').sdk_wiring_ready, true);
 assert.equal(assertMeetingPlatformIntegrationRuntimeManifest(manifest).host_integration_ready, true);
 
+const googleEvidencePackage = realEvidencePackage('google-meet');
+const zoomEvidencePackage = realEvidencePackage('zoom');
+const runtimeManifest = await runMeetingPlatformIntegrationRuntimeManifest({
+  baseUrl,
+  platforms: ['google-meet', 'zoom'],
+  env: productionEnv,
+  target: 'production',
+  requireHandoffReady: true,
+  google_meet: {
+    evidencePackage: googleEvidencePackage,
+  },
+  zoom: {
+    evidencePackage: zoomEvidencePackage,
+  },
+});
+assert.equal(runtimeManifest.host_integration_ready, true);
+assert.equal(runtimeManifest.require_handoff_ready, true);
+assert.equal(runtimeManifest.handoff_readiness_matrix.handoff_ready_count, 2);
+assert.equal(runtimeManifest.handoff_readiness_matrix.runtime_host_replay_ready_count, 2);
+assert.equal(runtimeManifest.rows.every((row) => row.runtime_host_replay_accepted === true), true);
+assert.equal(assertMeetingPlatformIntegrationRuntimeManifest(runtimeManifest).host_integration_ready, true);
+
+const blockedRuntimeManifest = await runMeetingPlatformIntegrationRuntimeManifest({
+  baseUrl,
+  platforms: ['google-meet'],
+  requireHandoffReady: true,
+});
+assert.equal(blockedRuntimeManifest.host_integration_ready, false);
+assert.equal(blockedRuntimeManifest.issues.some((issue) => issue.code === 'handoff_readiness_not_ready'), true);
+assert.equal(blockedRuntimeManifest.issues.some((issue) => issue.code === 'runtime_host_replay_not_ready'), true);
+
 const missingCandidateObserverManifest = {
   ...manifest,
   runtime_bundle_matrix: {
@@ -300,6 +405,41 @@ assert.equal(runtime.manifest().host_integration_ready, true);
 assert.equal(runtime.summary().host_integration_ready, true);
 assert.equal(runtime.summary().speaker_track_ready_count, 2);
 assert.equal(runtime.summary().participant_track_ready_count, 2);
+const runtimeRunManifest = await runtime.runManifest({
+  env: productionEnv,
+  target: 'production',
+  requireHandoffReady: true,
+  google_meet: {
+    evidencePackage: googleEvidencePackage,
+  },
+  zoom: {
+    evidencePackage: zoomEvidencePackage,
+  },
+});
+assert.equal(runtimeRunManifest.host_integration_ready, true);
+assert.equal(runtimeRunManifest.handoff_readiness_matrix.runtime_host_replay_ready_count, 2);
+assert.equal((await runtime.runSummary({
+  env: productionEnv,
+  target: 'production',
+  requireHandoffReady: true,
+  google_meet: {
+    evidencePackage: googleEvidencePackage,
+  },
+  zoom: {
+    evidencePackage: zoomEvidencePackage,
+  },
+})).runtime_host_replay_ready_count, 2);
+assert.equal((await runtime.runAndAssertManifest({
+  env: productionEnv,
+  target: 'production',
+  requireHandoffReady: true,
+  google_meet: {
+    evidencePackage: googleEvidencePackage,
+  },
+  zoom: {
+    evidencePackage: zoomEvidencePackage,
+  },
+})).host_integration_ready, true);
 assert.equal(runtime.registry().acceptance.accepted, true);
 assert.equal(runtime.runtimeBundle('google-meet').browser.matches.includes('https://meet.google.com/*'), true);
 assert.equal(runtime.runtimeBundles().platform_count, 2);
@@ -462,6 +602,19 @@ assert.equal((await runtime.handleEvent({
   }],
 }, undefined, { observedAtMs: 1_782_614_399_750 })).platform, 'google_meet');
 assert.equal((await runtime.handleEvent({ action: 'manifest' })).host_integration_ready, true);
+assert.equal((await runtime.handleEvent({
+  action: 'run_manifest',
+}, undefined, {
+  env: productionEnv,
+  target: 'production',
+  requireHandoffReady: true,
+  google_meet: {
+    evidencePackage: googleEvidencePackage,
+  },
+  zoom: {
+    evidencePackage: zoomEvidencePackage,
+  },
+})).handoff_readiness_matrix.runtime_host_replay_ready_count, 2);
 await assert.rejects(
   () => runtime.handleEvent({ action: 'insert_annotation' }),
   /platform is required/,

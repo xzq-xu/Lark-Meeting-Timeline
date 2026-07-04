@@ -139,7 +139,8 @@ import {
 	  installMeetingPlatformIntegrationContentScriptBridge,
 	  resolveMeetingPlatformCandidates,
 	  resolveMeetingPlatformForInput,
-	} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';
+	  runMeetingPlatformIntegrationRuntimeManifest,
+		} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';
 import {
   MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
   buildMeetingPlatformAnnotationRuntimeEvent,
@@ -380,11 +381,18 @@ const integrationRuntimeManifest = buildMeetingPlatformIntegrationRuntimeManifes
 });
 assert.equal(integrationRuntimeManifest.host_integration_ready, true);
 assert.equal(assertMeetingPlatformIntegrationRuntimeManifest(integrationRuntimeManifest).platform_count, 2);
+const integrationRuntimeRunManifest = await runMeetingPlatformIntegrationRuntimeManifest({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+});
+assert.equal(integrationRuntimeRunManifest.host_integration_ready, true);
+assert.equal(integrationRuntimeRunManifest.handoff_readiness_matrix.runtime_host_replay_ready_count, 0);
 const integrationRuntime = createMeetingPlatformIntegrationRuntime(client, {
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],
 });
 assert.equal(integrationRuntime.manifest().host_integration_ready, true);
+assert.equal((await integrationRuntime.runManifest()).host_integration_ready, true);
 assert.equal(integrationRuntime.runtimeBundles().platform_count, 1);
 assert.equal(integrationRuntime.adaptationStrategyMatrix().strategy_count, 1);
 assert.equal(integrationRuntime.resolvePlatform({
