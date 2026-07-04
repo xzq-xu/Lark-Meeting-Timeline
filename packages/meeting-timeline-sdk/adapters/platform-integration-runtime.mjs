@@ -21,6 +21,9 @@ import {
   buildMeetingPlatformHandoffReadinessMatrix,
 } from './platform-handoff-readiness.mjs';
 import {
+  buildMeetingPlatformParticipantTrackMatrix,
+} from './platform-participant-track.mjs';
+import {
   buildMeetingPlatformLiveAdapterMatrix,
 } from './platform-live-adapter.mjs';
 import {
@@ -30,6 +33,9 @@ import {
 import {
   buildMeetingPlatformRuntimeBundleMatrix,
 } from './platform-runtime-bundle.mjs';
+import {
+  buildMeetingPlatformSpeakerTrackMatrix,
+} from './platform-speaker-track.mjs';
 import {
   buildMeetingPlatformAdaptationStrategyMatrix,
 } from './platform-strategy.mjs';
@@ -173,6 +179,48 @@ function runtimeIssues(manifest = {}) {
       severity: 'error',
       code: 'adaptation_strategy_blocks_realtime',
       message: 'Adaptation strategy must keep provider events and transcript import non-blocking for realtime annotations.',
+    });
+  }
+  if (manifest.speaker_track_matrix?.realtime_ready_when_samples_available_count !== manifest.platform_count) {
+    issues.push({
+      severity: 'error',
+      code: 'speaker_track_not_ready',
+      message: 'Every selected platform must support realtime speaker-position marks once local speaker samples are available.',
+    });
+  }
+  if ((manifest.speaker_track_matrix?.provider_blocking_count ?? 0) > 0) {
+    issues.push({
+      severity: 'error',
+      code: 'speaker_track_provider_blocks_realtime',
+      message: 'Speaker-position tracks must not require provider events for realtime insertion.',
+    });
+  }
+  if ((manifest.speaker_track_matrix?.transcript_blocking_count ?? 0) > 0) {
+    issues.push({
+      severity: 'error',
+      code: 'speaker_track_transcript_blocks_realtime',
+      message: 'Speaker-position tracks must not require realtime transcript content.',
+    });
+  }
+  if (manifest.participant_track_matrix?.realtime_ready_when_snapshots_available_count !== manifest.platform_count) {
+    issues.push({
+      severity: 'error',
+      code: 'participant_track_not_ready',
+      message: 'Every selected platform must support realtime participant-position marks once local roster snapshots are available.',
+    });
+  }
+  if ((manifest.participant_track_matrix?.provider_blocking_count ?? 0) > 0) {
+    issues.push({
+      severity: 'error',
+      code: 'participant_track_provider_blocks_realtime',
+      message: 'Participant-position tracks must not require provider events for realtime insertion.',
+    });
+  }
+  if ((manifest.participant_track_matrix?.transcript_blocking_count ?? 0) > 0) {
+    issues.push({
+      severity: 'error',
+      code: 'participant_track_transcript_blocks_realtime',
+      message: 'Participant-position tracks must not require realtime transcript content.',
     });
   }
   if ((manifest.handoff_readiness_matrix?.pilot_ready_count ?? 0) < manifest.platform_count) {
@@ -483,6 +531,14 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     ...merged,
     platforms,
   });
+  const speakerTrackMatrix = buildMeetingPlatformSpeakerTrackMatrix({
+    ...merged,
+    platforms,
+  });
+  const participantTrackMatrix = buildMeetingPlatformParticipantTrackMatrix({
+    ...merged,
+    platforms,
+  });
   const handoffReadinessMatrix = buildMeetingPlatformHandoffReadinessMatrix({
     ...merged,
     platforms,
@@ -491,6 +547,8 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
   const adaptationRows = byPlatform(adaptationPackageMatrix.rows);
   const liveRows = byPlatform(liveAdapterMatrix.rows);
   const strategyRows = byPlatform(adaptationStrategyMatrix.rows);
+  const speakerRows = byPlatform(speakerTrackMatrix.rows);
+  const participantRows = byPlatform(participantTrackMatrix.rows);
   const handoffRows = byPlatform(handoffReadinessMatrix.rows);
   const rows = platforms.map((platform) => compactObject({
     platform,
@@ -508,7 +566,21 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     provider_required_for_realtime: runtimeRows[platform]?.provider_required_for_realtime === true,
     provider_blocks_realtime: strategyRows[platform]?.provider_blocks_realtime === true,
     transcript_blocks_realtime: runtimeRows[platform]?.transcript_blocks_realtime === true,
-    speaker_min_stable_ms: runtimeRows[platform]?.speaker_min_stable_ms,
+    speaker_track_ready: speakerRows[platform] != null
+      && speakerRows[platform]?.provider_events_block_realtime !== true
+      && speakerRows[platform]?.transcript_blocks_realtime !== true,
+    speaker_min_stable_ms: speakerRows[platform]?.min_stable_ms ?? runtimeRows[platform]?.speaker_min_stable_ms,
+    speaker_switch_stable_ms: speakerRows[platform]?.switch_stable_ms,
+    speaker_end_idle_ms: speakerRows[platform]?.end_idle_ms,
+    speaker_provider_blocks_realtime: speakerRows[platform]?.provider_events_block_realtime === true,
+    speaker_transcript_blocks_realtime: speakerRows[platform]?.transcript_blocks_realtime === true,
+    participant_track_ready: participantRows[platform] != null
+      && participantRows[platform]?.provider_events_block_realtime !== true
+      && participantRows[platform]?.transcript_blocks_realtime !== true,
+    participant_duplicate_window_ms: participantRows[platform]?.duplicate_window_ms,
+    participant_leave_stable_ms: participantRows[platform]?.leave_stable_ms,
+    participant_provider_blocks_realtime: participantRows[platform]?.provider_events_block_realtime === true,
+    participant_transcript_blocks_realtime: participantRows[platform]?.transcript_blocks_realtime === true,
     handoff_ready: handoffRows[platform]?.handoff_ready === true,
     pilot_ready: handoffRows[platform]?.pilot_ready === true,
     production_ready: handoffRows[platform]?.production_ready === true,
@@ -525,6 +597,8 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     registry_acceptance: registryAcceptance,
     runtime_bundle_matrix: runtimeBundleMatrix,
     adaptation_strategy_matrix: adaptationStrategyMatrix,
+    speaker_track_matrix: speakerTrackMatrix,
+    participant_track_matrix: participantTrackMatrix,
     adaptation_package_matrix: adaptationPackageMatrix,
     live_adapter_matrix: liveAdapterMatrix,
     handoff_readiness_matrix: handoffReadinessMatrix,
@@ -539,6 +613,8 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     issues,
     next_actions: unique([
       ...issues.map((item) => item.code),
+      ...(speakerTrackMatrix.next_actions ?? []),
+      ...(participantTrackMatrix.next_actions ?? []),
       ...handoffReadinessMatrix.rows.flatMap((row) => row.next_actions ?? []),
     ]),
   };
@@ -560,6 +636,8 @@ export function assertMeetingPlatformIntegrationRuntimeManifest(manifestOrOption
     issues,
     next_actions: unique([
       ...issues.map((item) => item.code),
+      ...(rawManifest.speaker_track_matrix?.next_actions ?? []),
+      ...(rawManifest.participant_track_matrix?.next_actions ?? []),
       ...asArray(rawManifest.handoff_readiness_matrix?.rows).flatMap((row) => row.next_actions ?? []),
     ]),
   };
@@ -804,6 +882,8 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
         handoff_ready_count: manifest.handoff_readiness_matrix?.handoff_ready_count,
         pilot_ready_count: manifest.handoff_readiness_matrix?.pilot_ready_count,
         production_ready_count: manifest.handoff_readiness_matrix?.production_ready_count,
+        speaker_track_ready_count: manifest.speaker_track_matrix?.realtime_ready_when_samples_available_count,
+        participant_track_ready_count: manifest.participant_track_matrix?.realtime_ready_when_snapshots_available_count,
         next_actions: manifest.next_actions,
       });
     },

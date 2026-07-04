@@ -206,12 +206,26 @@ assert.equal(manifest.runtime_bundle_matrix.provider_required_for_realtime_count
 assert.equal(manifest.adaptation_strategy_matrix.strategy_count, 2);
 assert.equal(manifest.adaptation_package_matrix.sdk_wiring_ready_count, 2);
 assert.equal(manifest.adaptation_package_matrix.candidate_observer_count, 2);
+assert.equal(manifest.speaker_track_matrix.platform_count, 2);
+assert.equal(manifest.speaker_track_matrix.realtime_ready_when_samples_available_count, 2);
+assert.equal(manifest.speaker_track_matrix.provider_blocking_count, 0);
+assert.equal(manifest.speaker_track_matrix.transcript_blocking_count, 0);
+assert.equal(manifest.participant_track_matrix.platform_count, 2);
+assert.equal(manifest.participant_track_matrix.realtime_ready_when_snapshots_available_count, 2);
+assert.equal(manifest.participant_track_matrix.provider_blocking_count, 0);
+assert.equal(manifest.participant_track_matrix.transcript_blocking_count, 0);
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').browser_match_count, 1);
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').candidate_observation_ready, true);
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').candidate_observer_message_type, 'meeting_timeline.observe_candidates');
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').candidate_observer_permission, 'tabs');
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').primary_axis_source, 'local_observer');
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').provider_blocks_realtime, false);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').speaker_track_ready, true);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').speaker_provider_blocks_realtime, false);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').speaker_transcript_blocks_realtime, false);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').participant_track_ready, true);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').participant_provider_blocks_realtime, false);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').participant_transcript_blocks_realtime, false);
 assert.equal(manifest.rows.find((row) => row.platform === 'zoom').sdk_wiring_ready, true);
 assert.equal(assertMeetingPlatformIntegrationRuntimeManifest(manifest).host_integration_ready, true);
 
@@ -224,6 +238,30 @@ const missingCandidateObserverManifest = {
 };
 assert.throws(
   () => assertMeetingPlatformIntegrationRuntimeManifest(missingCandidateObserverManifest),
+  /Meeting platform integration runtime is not ready/,
+);
+
+const missingSpeakerTrackManifest = {
+  ...manifest,
+  speaker_track_matrix: {
+    ...manifest.speaker_track_matrix,
+    realtime_ready_when_samples_available_count: 1,
+  },
+};
+assert.throws(
+  () => assertMeetingPlatformIntegrationRuntimeManifest(missingSpeakerTrackManifest),
+  /Meeting platform integration runtime is not ready/,
+);
+
+const participantProviderBlockingManifest = {
+  ...manifest,
+  participant_track_matrix: {
+    ...manifest.participant_track_matrix,
+    provider_blocking_count: 1,
+  },
+};
+assert.throws(
+  () => assertMeetingPlatformIntegrationRuntimeManifest(participantProviderBlockingManifest),
   /Meeting platform integration runtime is not ready/,
 );
 
@@ -260,6 +298,8 @@ assert.equal(runtime.schema, MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA);
 assert.deepEqual(runtime.platforms, ['google_meet', 'zoom']);
 assert.equal(runtime.manifest().host_integration_ready, true);
 assert.equal(runtime.summary().host_integration_ready, true);
+assert.equal(runtime.summary().speaker_track_ready_count, 2);
+assert.equal(runtime.summary().participant_track_ready_count, 2);
 assert.equal(runtime.registry().acceptance.accepted, true);
 assert.equal(runtime.runtimeBundle('google-meet').browser.matches.includes('https://meet.google.com/*'), true);
 assert.equal(runtime.runtimeBundles().platform_count, 2);

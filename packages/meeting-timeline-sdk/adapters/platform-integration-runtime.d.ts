@@ -5,6 +5,8 @@ import type {
   MeetingPlatformRuntimeBundleMatrix,
 } from './platform-runtime-bundle.mjs';
 import type { MeetingPlatformAdaptationStrategyMatrix } from './platform-strategy.mjs';
+import type { MeetingPlatformParticipantTrackMatrix } from './platform-participant-track.mjs';
+import type { MeetingPlatformSpeakerTrackMatrix } from './platform-speaker-track.mjs';
 import type {
   MeetingSessionEnvironmentSnapshot,
   MeetingSessionDiscoverySnapshot,
@@ -48,7 +50,17 @@ export interface MeetingPlatformIntegrationRuntimeRow {
   provider_required_for_realtime: boolean;
   provider_blocks_realtime: boolean;
   transcript_blocks_realtime: boolean;
+  speaker_track_ready?: boolean;
   speaker_min_stable_ms?: number;
+  speaker_switch_stable_ms?: number;
+  speaker_end_idle_ms?: number;
+  speaker_provider_blocks_realtime?: boolean;
+  speaker_transcript_blocks_realtime?: boolean;
+  participant_track_ready?: boolean;
+  participant_duplicate_window_ms?: number;
+  participant_leave_stable_ms?: number;
+  participant_provider_blocks_realtime?: boolean;
+  participant_transcript_blocks_realtime?: boolean;
   handoff_ready: boolean;
   pilot_ready: boolean;
   production_ready: boolean;
@@ -72,6 +84,8 @@ export interface MeetingPlatformIntegrationRuntimeManifest {
   registry_acceptance: Record<string, unknown>;
   runtime_bundle_matrix: MeetingPlatformRuntimeBundleMatrix;
   adaptation_strategy_matrix: MeetingPlatformAdaptationStrategyMatrix;
+  speaker_track_matrix: MeetingPlatformSpeakerTrackMatrix;
+  participant_track_matrix: MeetingPlatformParticipantTrackMatrix;
   adaptation_package_matrix: Record<string, unknown>;
   live_adapter_matrix: Record<string, unknown>;
   handoff_readiness_matrix: Record<string, unknown>;

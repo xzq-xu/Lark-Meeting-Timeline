@@ -265,7 +265,7 @@ installMeetingPlatformIntegrationContentScriptBridge({
 });
 ```
 
-`runtime.manifest()` 只证明 SDK 接线、runtime bundle、候选会议观察、`captured_at_ms`、provider/transcript 非阻塞策略已经满足 host handoff；真实会议页 DOM 和官方事件证据仍然要用 `platform-real-intake` / `platform-handoff-readiness` 验收，不能用 runtime manifest 冒充 production ready。
+`runtime.manifest()` 只证明 SDK 接线、runtime bundle、候选会议观察、speaker/participant 位置轨、`captured_at_ms`、provider/transcript 非阻塞策略已经满足 host handoff；真实会议页 DOM 和官方事件证据仍然要用 `platform-real-intake` / `platform-handoff-readiness` 验收，不能用 runtime manifest 冒充 production ready。manifest 会带上 `speaker_track_matrix` 和 `participant_track_matrix`，并在任一平台的发言人轨或参会人轨需要 provider/transcript 才能实时写入时直接报错。
 
 跨项目投递到 host 的统一 HTTP envelope 用 `platform-runtime-event`。Google Meet 扩展、Teams WebView preload、Zoom native helper 都可以只构造同一类事件包，再发到 `/api/meeting-platform/runtime-events`；host 侧 `handleRuntimeEvent()` 会分发到 observe、candidate observation、provider ingest、insert annotation、speaker/participant track 或 timeline view：
 
