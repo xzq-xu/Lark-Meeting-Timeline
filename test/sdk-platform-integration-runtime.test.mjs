@@ -402,6 +402,8 @@ const runtime = createMeetingPlatformIntegrationRuntime(client, {
 assert.equal(runtime.schema, MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA);
 assert.deepEqual(runtime.platforms, ['google_meet', 'zoom']);
 assert.equal(runtime.manifest().host_integration_ready, true);
+assert.equal(runtime.manifest().adapter_route_matrix.platform_count, 2);
+assert.equal(runtime.manifest().rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');
 assert.equal(runtime.summary().host_integration_ready, true);
 assert.equal(runtime.summary().speaker_track_ready_count, 2);
 assert.equal(runtime.summary().participant_track_ready_count, 2);
@@ -443,6 +445,8 @@ assert.equal((await runtime.runAndAssertManifest({
 assert.equal(runtime.registry().acceptance.accepted, true);
 assert.equal(runtime.runtimeBundle('google-meet').browser.matches.includes('https://meet.google.com/*'), true);
 assert.equal(runtime.runtimeBundles().platform_count, 2);
+assert.equal(runtime.adapterRoute('google-meet').routes[0].route, 'local_observer_axis');
+assert.equal(runtime.adapterRoutes().provider_non_blocking_count, 2);
 assert.equal(runtime.adaptationStrategyMatrix().strategy_count, 2);
 const runtimeResolution = runtime.resolvePlatform({ url: 'https://meet.google.com/abc-defg-hij' });
 assert.equal(runtimeResolution.supported, true);
@@ -584,6 +588,8 @@ const view = runtime.timelineView('zoom', {
 assert.equal(view.diagnostics.marker_count, 2);
 assert.equal(view.markers.some((marker) => marker.rail === 'speaker'), true);
 assert.equal((await runtime.handleEvent({ action: 'runtime_bundles' })).platform_count, 2);
+assert.equal((await runtime.handleEvent({ action: 'adapter_routes' })).platform_count, 2);
+assert.equal((await runtime.handleEvent({ action: 'adapter_route', platform: 'zoom' })).routes[0].route, 'local_observer_axis');
 assert.equal((await runtime.handleEvent({ action: 'adaptation_strategy_matrix' })).strategy_count, 2);
 assert.equal((await runtime.handleEvent({
   action: 'resolve_platform',

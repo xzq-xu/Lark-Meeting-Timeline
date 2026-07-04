@@ -1,3 +1,5 @@
+import type { MeetingPlatformAdapterRouteMatrix } from './platform-adapter-route.mjs';
+
 export const MEETING_PLATFORM_HOST_INTEGRATION_SCHEMA: string;
 export const MEETING_PLATFORM_HOST_INTEGRATION_SCHEMA_VERSION: number;
 export const MEETING_PLATFORM_HOST_INTEGRATION_SCAFFOLD_SCHEMA: string;
@@ -31,6 +33,7 @@ export interface MeetingPlatformHostIntegrationPlan {
   evidence_paths: Record<string, string>;
   integration_plans: Record<string, Record<string, unknown>>;
   extension_install_plan: Record<string, unknown>;
+  adapter_route_matrix: MeetingPlatformAdapterRouteMatrix;
   adaptation_strategy_matrix: Record<string, unknown>;
   runtime_event_plan_matrix: Record<string, unknown>;
   runtime_bundle_matrix: Record<string, unknown>;

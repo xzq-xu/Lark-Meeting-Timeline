@@ -400,8 +400,10 @@ const integrationRuntime = createMeetingPlatformIntegrationRuntime(client, {
   platforms: ['google-meet'],
 });
 assert.equal(integrationRuntime.manifest().host_integration_ready, true);
+assert.equal(integrationRuntime.manifest().adapter_route_matrix.platform_count, 1);
 assert.equal((await integrationRuntime.runManifest()).host_integration_ready, true);
 assert.equal(integrationRuntime.runtimeBundles().platform_count, 1);
+assert.equal(integrationRuntime.adapterRoutes().rows[0].first_route, 'local_observer_axis');
 assert.equal(integrationRuntime.adaptationStrategyMatrix().strategy_count, 1);
 assert.equal(integrationRuntime.resolvePlatform({
   url: 'https://meet.google.com/abc-defg-hij',
@@ -1024,6 +1026,10 @@ assert.equal(buildMeetingPlatformHostIntegrationPlan({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).platforms[0], 'zoom');
+assert.equal(buildMeetingPlatformHostIntegrationPlan({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).adapter_route_matrix.rows[0].first_route, 'local_observer_axis');
 assert.equal(buildMeetingPlatformHostIntegrationPlan({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],

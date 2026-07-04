@@ -40,6 +40,9 @@ import {
 import {
   buildMeetingPlatformAdaptationStrategyMatrix,
 } from './platform-strategy.mjs';
+import {
+  buildMeetingPlatformAdapterRouteMatrix,
+} from './platform-adapter-route.mjs';
 
 export const MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA = 'meeting_platform_integration_runtime';
 export const MEETING_PLATFORM_INTEGRATION_RUNTIME_MANIFEST_SCHEMA = 'meeting_platform_integration_runtime_manifest';
@@ -181,6 +184,27 @@ function runtimeIssues(manifest = {}) {
       severity: 'error',
       code: 'adaptation_strategy_blocks_realtime',
       message: 'Adaptation strategy must keep provider events and transcript import non-blocking for realtime annotations.',
+    });
+  }
+  if (manifest.adapter_route_matrix?.platform_count !== manifest.platform_count) {
+    issues.push({
+      severity: 'error',
+      code: 'adapter_route_not_complete',
+      message: 'Every selected platform must have an adapter route for host/runtime handoff.',
+    });
+  }
+  if ((manifest.adapter_route_matrix?.provider_non_blocking_count ?? 0) !== manifest.platform_count) {
+    issues.push({
+      severity: 'error',
+      code: 'adapter_route_provider_blocks_realtime',
+      message: 'Adapter routes must keep provider events non-blocking for realtime annotations.',
+    });
+  }
+  if ((manifest.adapter_route_matrix?.transcript_non_blocking_count ?? 0) !== manifest.platform_count) {
+    issues.push({
+      severity: 'error',
+      code: 'adapter_route_transcript_blocks_realtime',
+      message: 'Adapter routes must keep transcript import non-blocking for realtime annotations.',
     });
   }
   if (manifest.speaker_track_matrix?.realtime_ready_when_samples_available_count !== manifest.platform_count) {
@@ -576,6 +600,10 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     ...merged,
     platforms,
   });
+  const adapterRouteMatrix = buildMeetingPlatformAdapterRouteMatrix({
+    ...merged,
+    platforms,
+  });
   const speakerTrackMatrix = buildMeetingPlatformSpeakerTrackMatrix({
     ...merged,
     platforms,
@@ -595,6 +623,7 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
   const adaptationRows = byPlatform(adaptationPackageMatrix.rows);
   const liveRows = byPlatform(liveAdapterMatrix.rows);
   const strategyRows = byPlatform(adaptationStrategyMatrix.rows);
+  const adapterRouteRows = byPlatform(adapterRouteMatrix.rows);
   const speakerRows = byPlatform(speakerTrackMatrix.rows);
   const participantRows = byPlatform(participantTrackMatrix.rows);
   const handoffRows = byPlatform(handoffReadinessMatrix.rows);
@@ -611,6 +640,8 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     recommended_mode: liveRows[platform]?.recommended_mode ?? adaptationRows[platform]?.recommended_mode,
     primary_axis_source: strategyRows[platform]?.primary_axis_source,
     strategy_recommendation: strategyRows[platform]?.recommendation,
+    adapter_recommended_mode: adapterRouteRows[platform]?.recommended_mode,
+    adapter_first_route: adapterRouteRows[platform]?.first_route,
     provider_required_for_realtime: runtimeRows[platform]?.provider_required_for_realtime === true,
     provider_blocks_realtime: strategyRows[platform]?.provider_blocks_realtime === true,
     transcript_blocks_realtime: runtimeRows[platform]?.transcript_blocks_realtime === true,
@@ -649,6 +680,7 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     registry_acceptance: registryAcceptance,
     runtime_bundle_matrix: runtimeBundleMatrix,
     adaptation_strategy_matrix: adaptationStrategyMatrix,
+    adapter_route_matrix: adapterRouteMatrix,
     speaker_track_matrix: speakerTrackMatrix,
     participant_track_matrix: participantTrackMatrix,
     adaptation_package_matrix: adaptationPackageMatrix,
@@ -781,6 +813,15 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
       return kit.platformRuntimeBundleMatrix({
         ...bundleOptions,
         platforms: bundleOptions.platforms ?? bundleOptions.platform_keys ?? platforms,
+      });
+    },
+    adapterRoute(platform, routeOptions = {}) {
+      return kit.platformAdapterRoute(platform, routeOptions);
+    },
+    adapterRoutes(routeOptions = {}) {
+      return kit.platformAdapterRouteMatrix({
+        ...routeOptions,
+        platforms: routeOptions.platforms ?? routeOptions.platform_keys ?? platforms,
       });
     },
     adaptationPackages(packageOptions = {}) {
@@ -925,6 +966,7 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
       if (['manifest', 'runtime_manifest', 'integration_manifest'].includes(action)) return runtime.manifest(eventRuntimeOptions);
       if (['run_manifest', 'runtime_manifest_run', 'integration_manifest_run'].includes(action)) return runtime.runManifest(eventRuntimeOptions);
       if (['runtime_bundles', 'runtime_bundle_matrix'].includes(action)) return runtime.runtimeBundles(eventRuntimeOptions);
+      if (['adapter_routes', 'adapter_route_matrix'].includes(action)) return runtime.adapterRoutes(eventRuntimeOptions);
       if (['strategy', 'adaptation_strategy', 'adaptation_strategy_matrix'].includes(action)) return runtime.adaptationStrategyMatrix(eventRuntimeOptions);
       if (['resolve', 'resolve_platform', 'platform_resolution'].includes(action)) return runtime.resolvePlatform(eventInput, eventRuntimeOptions);
       if (['resolve_candidates', 'resolve_platform_candidates', 'platform_candidate_resolution'].includes(action)) return runtime.resolvePlatformCandidates(eventInput, eventRuntimeOptions);
@@ -951,6 +993,9 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
       if (['timeline_view', 'view'].includes(action)) {
         return runtime.timelineView(platform, eventInput, eventOptions);
       }
+      if (['adapter_route'].includes(action)) {
+        return runtime.adapterRoute(platform, eventRuntimeOptions);
+      }
       throw new MeetingTimelineSdkError('unsupported meeting platform runtime event action', {
         action,
         supported_actions: [
@@ -960,6 +1005,8 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
           'speaker_track',
           'participant_track',
           'timeline_view',
+          'adapter_route',
+          'adapter_routes',
           'runtime_bundles',
           'adaptation_strategy_matrix',
           'resolve_platform',

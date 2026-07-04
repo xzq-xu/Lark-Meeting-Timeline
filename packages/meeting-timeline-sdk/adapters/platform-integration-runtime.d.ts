@@ -5,6 +5,10 @@ import type {
   MeetingPlatformRuntimeBundleMatrix,
 } from './platform-runtime-bundle.mjs';
 import type { MeetingPlatformAdaptationStrategyMatrix } from './platform-strategy.mjs';
+import type {
+  MeetingPlatformAdapterRoute,
+  MeetingPlatformAdapterRouteMatrix,
+} from './platform-adapter-route.mjs';
 import type { MeetingPlatformParticipantTrackMatrix } from './platform-participant-track.mjs';
 import type { MeetingPlatformSpeakerTrackMatrix } from './platform-speaker-track.mjs';
 import type {
@@ -51,6 +55,8 @@ export interface MeetingPlatformIntegrationRuntimeRow {
   recommended_mode?: string;
   primary_axis_source?: string;
   strategy_recommendation?: string;
+  adapter_recommended_mode?: string;
+  adapter_first_route?: string;
   provider_required_for_realtime: boolean;
   provider_blocks_realtime: boolean;
   transcript_blocks_realtime: boolean;
@@ -92,6 +98,7 @@ export interface MeetingPlatformIntegrationRuntimeManifest {
   registry_acceptance: Record<string, unknown>;
   runtime_bundle_matrix: MeetingPlatformRuntimeBundleMatrix;
   adaptation_strategy_matrix: MeetingPlatformAdaptationStrategyMatrix;
+  adapter_route_matrix: MeetingPlatformAdapterRouteMatrix;
   speaker_track_matrix: MeetingPlatformSpeakerTrackMatrix;
   participant_track_matrix: MeetingPlatformParticipantTrackMatrix;
   adaptation_package_matrix: Record<string, unknown>;
@@ -225,6 +232,8 @@ export interface MeetingPlatformIntegrationRuntime {
   };
   runtimeBundle(platform: string, bundleOptions?: Record<string, unknown>): MeetingPlatformRuntimeBundle;
   runtimeBundles(bundleOptions?: Record<string, unknown>): MeetingPlatformRuntimeBundleMatrix;
+  adapterRoute(platform: string, routeOptions?: Record<string, unknown>): MeetingPlatformAdapterRoute;
+  adapterRoutes(routeOptions?: Record<string, unknown>): MeetingPlatformAdapterRouteMatrix;
   adaptationPackages(packageOptions?: Record<string, unknown>): Record<string, unknown>;
   adaptationStrategyMatrix(strategyOptions?: Record<string, unknown>): MeetingPlatformAdaptationStrategyMatrix;
   resolvePlatform(input?: Record<string, unknown>, resolveOptions?: Record<string, unknown>): MeetingPlatformResolution;
