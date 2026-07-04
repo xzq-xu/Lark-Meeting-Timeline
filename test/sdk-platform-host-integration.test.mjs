@@ -95,7 +95,7 @@ const scaffold = buildMeetingPlatformHostIntegrationScaffold({
 });
 
 assert.equal(scaffold.schema, MEETING_PLATFORM_HOST_INTEGRATION_SCAFFOLD_SCHEMA);
-assert.equal(scaffold.files.length, 19);
+assert.equal(scaffold.files.length, 21);
 assert.equal(file(scaffold, 'package.json').mime, 'application/json');
 const manifest = JSON.parse(file(scaffold, 'package.json').content);
 assert.equal(manifest.name, 'timeline-host-consumer');
@@ -111,9 +111,14 @@ assert.equal(manifest.scripts['meeting-platform:observe-candidates'], 'node ./sc
 assert.equal(manifest.scripts['meeting-platform:extension-plan'], 'node ./scripts/print-extension-plan.mjs');
 assert.equal(manifest.scripts['meeting-platform:integration-runtime'], 'node ./scripts/print-integration-runtime.mjs');
 assert.equal(manifest.scripts['meeting-platform:integration-runtime-manifest'], 'node ./scripts/print-integration-runtime-manifest.mjs');
+assert.equal(manifest.scripts['meeting-platform:integration-runtime-run-manifest'], 'node ./scripts/run-integration-runtime-manifest.mjs');
+assert.equal(manifest.scripts['meeting-platform:handoff-readiness'], 'node ./scripts/run-handoff-readiness.mjs');
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('createMeetingPlatformIntegrationRuntime'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('integrationRuntimeManifest'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('runIntegrationRuntimeManifest'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('assertRunIntegrationRuntimeManifest'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('integrationRuntimeSummary'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('runHandoffReadiness'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('handleRuntimeEvent'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('liveAdapters'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformAdapterContractMatrix'), true);
@@ -141,6 +146,8 @@ assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meetin
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/extension-plan'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/integration-runtime'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/integration-runtime/manifest'), true);
+assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/integration-runtime/run-manifest'), true);
+assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/handoff-readiness'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/runtime-events'), true);
 assert.equal(file(scaffold, 'scripts/print-handoff.mjs').content.includes('host.handoffBundle()'), true);
 assert.equal(file(scaffold, 'scripts/print-contracts.mjs').content.includes('host.adapterContracts()'), true);
@@ -158,6 +165,10 @@ assert.equal(file(scaffold, 'scripts/observe-platform-candidates.mjs').content.i
 assert.equal(file(scaffold, 'scripts/print-extension-plan.mjs').content.includes('host.extensionInstallPlan()'), true);
 assert.equal(file(scaffold, 'scripts/print-integration-runtime.mjs').content.includes('host.integrationRuntimeSummary()'), true);
 assert.equal(file(scaffold, 'scripts/print-integration-runtime-manifest.mjs').content.includes('host.integrationRuntimeManifest()'), true);
+assert.equal(file(scaffold, 'scripts/run-integration-runtime-manifest.mjs').content.includes('host.runIntegrationRuntimeManifest'), true);
+assert.equal(file(scaffold, 'scripts/run-integration-runtime-manifest.mjs').content.includes('MEETING_PLATFORM_REQUIRE_HANDOFF_READY'), true);
+assert.equal(file(scaffold, 'scripts/run-handoff-readiness.mjs').content.includes('host.runHandoffReadiness'), true);
+assert.equal(file(scaffold, 'scripts/run-handoff-readiness.mjs').content.includes('handoff_ready_count'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('captured_at_ms'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('adaptationStrategyMatrix'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('runtimeEventPlans'), true);
@@ -172,6 +183,7 @@ assert.equal(file(scaffold, 'README.md').content.includes('Meeting track contrac
 assert.equal(file(scaffold, 'README.md').content.includes('speaker_track_ready'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('extensionInstallPlan'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('integrationRuntimeSummary'), true);
+assert.equal(file(scaffold, 'README.md').content.includes('runIntegrationRuntimeManifest'), true);
 
 const acceptance = buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaffold);
 assert.equal(acceptance.schema, MEETING_PLATFORM_HOST_INTEGRATION_ACCEPTANCE_SCHEMA);
@@ -201,6 +213,8 @@ assert.equal(acceptance.required_files.includes('scripts/observe-platform-candid
 assert.equal(acceptance.required_files.includes('scripts/print-extension-plan.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-integration-runtime.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-integration-runtime-manifest.mjs'), true);
+assert.equal(acceptance.required_files.includes('scripts/run-integration-runtime-manifest.mjs'), true);
+assert.equal(acceptance.required_files.includes('scripts/run-handoff-readiness.mjs'), true);
 assert.equal(assertMeetingPlatformHostIntegrationScaffold(scaffold).accepted, true);
 
 const broken = {

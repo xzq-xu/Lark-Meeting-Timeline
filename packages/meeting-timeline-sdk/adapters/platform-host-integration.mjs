@@ -210,10 +210,34 @@ export function createMeetingPlatformHost(options = {}) {
         platforms: manifestOptions.platforms ?? manifestOptions.platform_keys ?? platforms,
       });
     },
+    runIntegrationRuntimeManifest(manifestOptions = {}) {
+      return integrationRuntime.runManifest({
+        ...manifestOptions,
+        platforms: manifestOptions.platforms ?? manifestOptions.platform_keys ?? platforms,
+      });
+    },
+    assertRunIntegrationRuntimeManifest(manifestOptions = {}) {
+      return integrationRuntime.runAndAssertManifest({
+        ...manifestOptions,
+        platforms: manifestOptions.platforms ?? manifestOptions.platform_keys ?? platforms,
+      });
+    },
     integrationRuntimeSummary(summaryOptions = {}) {
       return integrationRuntime.summary({
         ...summaryOptions,
         platforms: summaryOptions.platforms ?? summaryOptions.platform_keys ?? platforms,
+      });
+    },
+    handoffReadiness(readinessOptions = {}) {
+      return integrationRuntime.handoffReadiness({
+        ...readinessOptions,
+        platforms: readinessOptions.platforms ?? readinessOptions.platform_keys ?? platforms,
+      });
+    },
+    runHandoffReadiness(readinessOptions = {}) {
+      return integrationRuntime.runHandoffReadiness({
+        ...readinessOptions,
+        platforms: readinessOptions.platforms ?? readinessOptions.platform_keys ?? platforms,
       });
     },
     handleRuntimeEvent(input = {}, payload, eventOptions = {}) {
@@ -315,6 +339,16 @@ function routesSource(options = {}) {
   if (url.pathname === '/api/meeting-platform/integration-runtime/manifest') {
     return Response.json(host.integrationRuntimeManifest(options));
   }
+  if (url.pathname === '/api/meeting-platform/integration-runtime/run-manifest') {
+    const payload = request.method === 'POST' ? await request.json() : {};
+    const result = await host.runIntegrationRuntimeManifest({ ...options, ...payload });
+    return Response.json(result);
+  }
+  if (url.pathname === '/api/meeting-platform/handoff-readiness') {
+    const payload = request.method === 'POST' ? await request.json() : {};
+    const result = await host.runHandoffReadiness({ ...options, ...payload });
+    return Response.json(result);
+  }
   if (url.pathname === '/api/meeting-platform/runtime-events' && request.method === 'POST') {
     const payload = await request.json();
     const result = await host.handleRuntimeEvent(payload, payload.payload ?? payload.raw, options);
@@ -409,6 +443,9 @@ const observerPlans = host.observerPlans();
 const runtimeEventPlans = host.runtimeEventPlans();
 const extensionPlan = host.extensionInstallPlan();
 const integrationRuntime = host.integrationRuntimeSummary();
+const runtimeHandoffGate = await host.runIntegrationRuntimeManifest({
+  requireHandoffReady: process.env.MEETING_PLATFORM_REQUIRE_HANDOFF_READY === '1',
+});
 const candidateContract = host.integrationRuntimeManifest().rows.map((row) => ({
   platform: row.platform,
   candidate_observation_ready: row.candidate_observation_ready,
@@ -436,6 +473,8 @@ npm run meeting-platform:observe-candidates
 npm run meeting-platform:extension-plan
 npm run meeting-platform:integration-runtime
 npm run meeting-platform:integration-runtime-manifest
+npm run meeting-platform:integration-runtime-run-manifest
+npm run meeting-platform:handoff-readiness
 npm run sdk:package-smoke
 \`\`\`
 `;
@@ -691,6 +730,8 @@ export function buildMeetingPlatformHostIntegrationScaffold(options = {}) {
       'meeting-platform:observe-candidates': 'node ./scripts/observe-platform-candidates.mjs',
       'meeting-platform:integration-runtime': 'node ./scripts/print-integration-runtime.mjs',
       'meeting-platform:integration-runtime-manifest': 'node ./scripts/print-integration-runtime-manifest.mjs',
+      'meeting-platform:integration-runtime-run-manifest': 'node ./scripts/run-integration-runtime-manifest.mjs',
+      'meeting-platform:handoff-readiness': 'node ./scripts/run-handoff-readiness.mjs',
     },
     dependencies: {
       '@ai-annotation/meeting-timeline-sdk': '^0.1.0',
@@ -844,6 +885,50 @@ const host = createMeetingPlatformHost({
 
 console.log(JSON.stringify(host.integrationRuntimeManifest(), null, 2));
 `;
+  const integrationRuntimeRunManifestScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+const options = process.env.MEETING_PLATFORM_MANIFEST_OPTIONS_JSON
+  ? JSON.parse(process.env.MEETING_PLATFORM_MANIFEST_OPTIONS_JSON)
+  : {
+    requireHandoffReady: process.env.MEETING_PLATFORM_REQUIRE_HANDOFF_READY === '1',
+    target: process.env.MEETING_PLATFORM_HANDOFF_TARGET ?? 'production',
+  };
+
+const report = await host.runIntegrationRuntimeManifest(options);
+
+console.log(JSON.stringify(report, null, 2));
+
+if (report.host_integration_ready !== true) {
+  process.exitCode = 1;
+}
+`;
+  const handoffReadinessScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+const options = process.env.MEETING_PLATFORM_HANDOFF_OPTIONS_JSON
+  ? JSON.parse(process.env.MEETING_PLATFORM_HANDOFF_OPTIONS_JSON)
+  : {
+    target: process.env.MEETING_PLATFORM_HANDOFF_TARGET ?? 'production',
+  };
+
+const report = await host.runHandoffReadiness(options);
+
+console.log(JSON.stringify(report, null, 2));
+
+if (
+  process.env.MEETING_PLATFORM_REQUIRE_HANDOFF_READY === '1'
+  && report.handoff_ready_count !== report.platform_count
+) {
+  process.exitCode = 1;
+}
+`;
   return {
     type: 'meeting_platform_host_integration_scaffold',
     schema: MEETING_PLATFORM_HOST_INTEGRATION_SCAFFOLD_SCHEMA,
@@ -869,6 +954,8 @@ console.log(JSON.stringify(host.integrationRuntimeManifest(), null, 2));
       sourceFile('scripts/observe-platform-candidates.mjs', platformCandidateObservationScript, 'platform_candidate_observation_script', 'text/javascript'),
       sourceFile('scripts/print-integration-runtime.mjs', integrationRuntimeScript, 'integration_runtime_script', 'text/javascript'),
       sourceFile('scripts/print-integration-runtime-manifest.mjs', integrationRuntimeManifestScript, 'integration_runtime_manifest_script', 'text/javascript'),
+      sourceFile('scripts/run-integration-runtime-manifest.mjs', integrationRuntimeRunManifestScript, 'integration_runtime_run_manifest_script', 'text/javascript'),
+      sourceFile('scripts/run-handoff-readiness.mjs', handoffReadinessScript, 'handoff_readiness_script', 'text/javascript'),
       sourceFile('README.md', readmeSource(plan), 'readme', 'text/markdown'),
     ],
   };
@@ -898,6 +985,8 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     'scripts/print-extension-plan.mjs',
     'scripts/print-integration-runtime.mjs',
     'scripts/print-integration-runtime-manifest.mjs',
+    'scripts/run-integration-runtime-manifest.mjs',
+    'scripts/run-handoff-readiness.mjs',
     'README.md',
   ];
   for (const path of requiredFiles) {
@@ -913,6 +1002,12 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!host.includes('integrationRuntimeManifest')) {
     issues.push(issue('error', 'missing_integration_runtime_manifest', 'Host source must expose the integration runtime manifest.'));
+  }
+  if (!host.includes('runIntegrationRuntimeManifest')) {
+    issues.push(issue('error', 'missing_integration_runtime_run_manifest', 'Host source must expose the executable integration runtime manifest gate.'));
+  }
+  if (!host.includes('runHandoffReadiness')) {
+    issues.push(issue('error', 'missing_handoff_readiness_runner', 'Host source must expose the runtime handoff readiness runner.'));
   }
   if (!host.includes('integrationRuntimeSummary')) {
     issues.push(issue('error', 'missing_integration_runtime_summary', 'Host source must expose the integration runtime summary.'));
@@ -991,6 +1086,12 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!routes.includes('/api/meeting-platform/integration-runtime')) {
     issues.push(issue('error', 'missing_integration_runtime_route', 'Route source must expose the integration runtime summary endpoint.'));
+  }
+  if (!routes.includes('/api/meeting-platform/integration-runtime/run-manifest')) {
+    issues.push(issue('error', 'missing_integration_runtime_run_manifest_route', 'Route source must expose the executable integration runtime manifest endpoint.'));
+  }
+  if (!routes.includes('/api/meeting-platform/handoff-readiness')) {
+    issues.push(issue('error', 'missing_handoff_readiness_route', 'Route source must expose the handoff readiness endpoint.'));
   }
   if (!routes.includes('/api/meeting-platform/runtime-events')) {
     issues.push(issue('error', 'missing_runtime_events_route', 'Route source must expose the runtime event endpoint.'));

@@ -2686,7 +2686,9 @@ assertMeetingPlatformHostIntegrationScaffold(scaffold);
 // host.resolvePlatformCandidates(input) 和 /api/meeting-platform/resolve-candidates 可从多窗口/多标签页快照中选择当前会议。
 // host.observePlatformCandidates(input) 和 /api/meeting-platform/observe-candidates 可把当前会议出现/消失写成实时轴事件。
 // host.integrationRuntimeSummary() 和 /api/meeting-platform/integration-runtime 可给宿主接入面板读取。
-// host.integrationRuntimeManifest() 和 /api/meeting-platform/integration-runtime/manifest 可给 CI/handoff gate 读取。
+// host.integrationRuntimeManifest() 和 /api/meeting-platform/integration-runtime/manifest 可给 CI/handoff gate 读取静态 SDK 接线状态。
+// host.runIntegrationRuntimeManifest() 和 /api/meeting-platform/integration-runtime/run-manifest 会实际运行 handoff readiness/runtime replay gate。
+// host.runHandoffReadiness() 和 /api/meeting-platform/handoff-readiness 可单独复验真实证据包是否能交给宿主上线。
 // /api/meeting-platform/runtime-events 可让扩展/WebView/native host 统一投递 observe/insert/provider 事件。
 // host.runtimeBundles() 和 /api/meeting-platform/runtime-bundles 可直接给扩展/WebView/native host 读取。
 // host.extensionInstallPlan() 和 /api/meeting-platform/extension-plan 可直接给扩展构建器读取。
