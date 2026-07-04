@@ -959,6 +959,14 @@ const handoff = kit.platformRuntimeHostHandoff('google-meet');
 // handoff.acceptance.checks 是接入前的最小验收条件。
 ```
 
+也可以直接导出给外部项目：
+
+```bash
+npm run meeting-platform:runtime-host-handoff
+```
+
+默认会为 Google Meet / Teams / Zoom / Webex / Lark 生成总报告和每个平台的 handoff JSON。
+
 浏览器扩展或 WebView 里可以再往前接一层 `meeting-app-capture`。它只读取 DOM 文本、按钮、`aria-label`、participant tile、常见 `data-participant-*` / `data-user-*` / `data-person-*` 属性和音量/发言状态，输出 `meeting-apps` 可识别的快照；不截图、不 OCR、不读取转写正文：
 
 ```js
