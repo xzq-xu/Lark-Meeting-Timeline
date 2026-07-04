@@ -290,6 +290,64 @@ mutationRuntime.stop();
 assert.equal(FakeMutationObserver.instances[0].connected, false);
 
 FakeMutationObserver.instances = [];
+const trackMutationCalls = [];
+const trackMutationClient = {
+  async startMeeting(inputValue) {
+    trackMutationCalls.push({ method: 'startMeeting', input: inputValue });
+    return { ok: true, input: inputValue };
+  },
+  async endMeeting(inputValue) {
+    trackMutationCalls.push({ method: 'endMeeting', input: inputValue });
+    return { ok: true, input: inputValue };
+  },
+  async insertMark(inputValue, optionsValue) {
+    trackMutationCalls.push({ method: 'insertMark', input: inputValue, options: optionsValue });
+    return { ok: true, input: inputValue };
+  },
+  async insertMarks(inputsValue, optionsValue) {
+    trackMutationCalls.push({ method: 'insertMarks', inputs: inputsValue, options: optionsValue });
+    return { ok: true, inputs: inputsValue };
+  },
+};
+const trackMutationWindow = fakeWindow(fakeDocument(), { MutationObserver: FakeMutationObserver });
+const trackMutationRuntime = createMeetingAppBrowserRuntime(trackMutationClient, {
+  window: trackMutationWindow,
+  now: () => clock,
+  observeTracks: true,
+  applyOptions: { speakerAsAnnotation: true },
+  speakerOptions: { minStableMs: 0 },
+  trackRuntimeOptions: {
+    speakerTrackOptions: {
+      minStableMs: 0,
+      minSegmentMs: 0,
+      closeOpenSegmentsAtMs: clock + 1_000,
+    },
+  },
+});
+trackMutationRuntime.installMutationObserver({ mutationDebounceMs: 0 });
+FakeMutationObserver.instances[0].trigger([
+  { type: 'attributes', target: node('div', { 'data-participant-id': 'ada' }) },
+]);
+const trackMutationFlush = await trackMutationRuntime.flushMutationObserver();
+assert.equal(trackMutationFlush.flushed, true);
+assert.equal(trackMutationFlush.track_result.emitted, true);
+assert.equal(trackMutationFlush.track_result.result.new_mark_count, 1);
+assert.equal(trackMutationCalls.at(-1).method, 'insertMarks');
+assert.equal(trackMutationCalls.at(-1).inputs[0].intent, 'speaker_track');
+assert.equal(trackMutationRuntime.getState().tracks.seen_mark_count, 1);
+const sampleTracksMessage = await trackMutationRuntime.handleMessage({ type: 'meeting_timeline.sample_tracks' }, {
+  force: true,
+  speakerTrackOptions: {
+    minStableMs: 0,
+    minSegmentMs: 0,
+    closeOpenSegmentsAtMs: clock + 1_500,
+  },
+});
+assert.equal(sampleTracksMessage.handled, true);
+assert.equal(sampleTracksMessage.action, 'sampleTracks');
+trackMutationRuntime.dispose();
+
+FakeMutationObserver.instances = [];
 const filteredWindow = fakeWindow(fakeDocument(), { MutationObserver: FakeMutationObserver });
 const filteredRuntime = createMeetingAppBrowserRuntime(mutationClient, {
   window: filteredWindow,

@@ -348,6 +348,34 @@ function speakerStableFollowupEnabled(options = {}) {
     && options.mutation_speaker_followup !== false;
 }
 
+function trackObservationEnabled(options = {}) {
+  const explicit = firstNonEmpty(
+    options.observeTracks,
+    options.observe_tracks,
+    options.trackMutations,
+    options.track_mutations,
+  );
+  if (explicit != null) return explicit !== false && explicit !== 'false';
+  return Boolean(
+    options.trackRuntimeOptions
+    || options.track_runtime_options
+    || options.speakerTrackOptions
+    || options.speaker_track_options
+    || options.participantTrackOptions
+    || options.participant_track_options
+  );
+}
+
+function trackSampleOptions(options = {}, sampleOptions = {}) {
+  return {
+    ...(options.trackSampleOptions ?? {}),
+    ...(options.track_sample_options ?? {}),
+    ...(sampleOptions.trackSampleOptions ?? {}),
+    ...(sampleOptions.track_sample_options ?? {}),
+    ...sampleOptions,
+  };
+}
+
 function speakerStableFollowupMs(options = {}) {
   const speakerOptions = {
     ...(options.speakerOptions ?? {}),
@@ -571,8 +599,19 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
     try {
       mutationLastObservedAtMs = Date.now();
       const result = await runtime.sample(inputProvider(), sampleOptions);
+      let trackResult = null;
+      if (trackObservationEnabled({
+        ...mergedOptions,
+        ...mutationLastOptions,
+        ...sampleOptions,
+      })) {
+        trackResult = await runtime.sampleTracks(inputProvider(), trackSampleOptions({
+          ...mergedOptions,
+          ...mutationLastOptions,
+        }, sampleOptions));
+      }
       mutationSampleCount += 1;
-      mutationLastResult = result;
+      mutationLastResult = trackResult ? { axis: result, tracks: trackResult } : result;
       mutationLastError = null;
       if (flushOptions.stabilityFollowup !== true && flushOptions.stability_followup !== true) {
         scheduleSpeakerStableFollowup(result, {
@@ -583,6 +622,7 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
       return {
         flushed: true,
         result,
+        track_result: trackResult,
         state: mutationState(),
       };
     } catch (error) {
@@ -706,6 +746,42 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
     ].includes(type)) {
       return { handled: true, action: 'flushMutationObserver', result: await flushMutationObserver(messageOptions) };
     }
+    if ([
+      'meeting_timeline.sample_tracks',
+      'meeting_timeline_sample_tracks',
+      'sample_tracks',
+      'track_sample',
+    ].includes(type)) {
+      return { handled: true, action: 'sampleTracks', result: await sampleTracks(messageOptions) };
+    }
+    if ([
+      'meeting_timeline.start_tracks',
+      'meeting_timeline_start_tracks',
+      'start_tracks',
+    ].includes(type)) {
+      return { handled: true, action: 'startTracks', result: startTracks(messageOptions) };
+    }
+    if ([
+      'meeting_timeline.stop_tracks',
+      'meeting_timeline_stop_tracks',
+      'stop_tracks',
+    ].includes(type)) {
+      return { handled: true, action: 'stopTracks', result: runtime.stopTracks() };
+    }
+    if ([
+      'meeting_timeline.observe_tracks',
+      'meeting_timeline_observe_tracks',
+      'observe_tracks',
+    ].includes(type)) {
+      return { handled: true, action: 'observeMeetingAppTracks', result: await runtime.observeMeetingAppTracks(payload, messageOptions) };
+    }
+    if ([
+      'meeting_timeline.preview_tracks',
+      'meeting_timeline_preview_tracks',
+      'preview_tracks',
+    ].includes(type)) {
+      return { handled: true, action: 'previewMeetingAppTracks', result: runtime.previewMeetingAppTracks(payload, messageOptions) };
+    }
     return { handled: false, reason: 'unsupported_message_type', type };
   }
 
@@ -719,21 +795,40 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
     })) {
       installMutationObserver(startOptions);
     }
-    return runtime.start(() => inputProvider(), startOptions);
+    const state = runtime.start(() => inputProvider(), startOptions);
+    if (trackObservationEnabled({ ...mergedOptions, ...startOptions })
+      && (startOptions.startTracksInterval === true || startOptions.start_tracks_interval === true)) {
+      runtime.startTracks(() => inputProvider(), startOptions);
+    }
+    return state;
   }
 
   function stop() {
     if (mergedOptions.keepMutationObserverOnStop !== true && mergedOptions.keep_mutation_observer_on_stop !== true) {
       removeMutationObserver();
     }
+    runtime.stopTracks();
     return runtime.stop();
   }
 
   function dispose() {
     const stopped = runtime.stop();
+    runtime.stopTracks();
     removeMutationObserver();
     removeLifecycleHandlers();
     return stopped;
+  }
+
+  function sampleTracks(sampleOptions = {}) {
+    return runtime.sampleTracks(inputProvider(), sampleOptions);
+  }
+
+  function tickTracks(sampleOptions = {}) {
+    return runtime.tickTracks(inputProvider(), sampleOptions);
+  }
+
+  function startTracks(startOptions = {}) {
+    return runtime.startTracks(() => inputProvider(), startOptions);
   }
 
   return {
@@ -746,6 +841,12 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
     },
     tick(sampleOptions = {}) {
       return runtime.tick(inputProvider(), sampleOptions);
+    },
+    sampleTracks,
+    tickTracks,
+    startTracks,
+    stopTracks() {
+      return runtime.stopTracks();
     },
     handleMessage,
     installLifecycleHandlers,

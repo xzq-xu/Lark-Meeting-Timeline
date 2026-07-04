@@ -25,6 +25,7 @@ export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA = 'meeting_app_integration_p
 export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION = 1;
 export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS = MEETING_APP_FIXTURE_PLATFORMS;
 export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA = 'meeting_app_runtime_adapter_config';
+export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA = 'meeting_app_runtime_adapter_profile_resolution';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA = 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA = 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA = 'meeting_app_live_evidence_package';
@@ -188,6 +189,101 @@ function launchGateOptions(options = {}) {
   };
 }
 
+function locationHref(value) {
+  if (!value) return undefined;
+  if (typeof value === 'string') return value;
+  return String(value.href ?? value.url ?? value.toString?.() ?? '') || undefined;
+}
+
+function resolverUrl(input = {}, options = {}) {
+  return firstNonEmpty(
+    options.url,
+    input.url,
+    input.href,
+    input.meeting_url,
+    input.meetingUrl,
+    input.location,
+    input.window?.location,
+    input.document?.location,
+    input.tab?.url,
+    input.page?.url,
+    input.dom?.url,
+  );
+}
+
+function resolverTitle(input = {}, options = {}) {
+  return firstNonEmpty(
+    options.title,
+    input.title,
+    input.name,
+    input.topic,
+    input.document?.title,
+    input.window?.document?.title,
+    input.tab?.title,
+    input.page?.title,
+    input.dom?.title,
+  );
+}
+
+function detectResolverPlatform(input = {}, options = {}) {
+  const explicit = firstNonEmpty(
+    options.platform,
+    options.provider,
+    options.key,
+    input.platform,
+    input.provider,
+    input.key,
+    input.meeting_platform,
+    input.meetingPlatform,
+  );
+  if (explicit) return { platform: normalizeAppPlatform(explicit), reason: 'explicit_platform' };
+  const captureProfile = meetingAppDomCaptureProfile(input, options);
+  if (captureProfile?.platform) return { platform: captureProfile.platform, reason: 'capture_profile' };
+  throw new MeetingTimelineSdkError('Meeting app runtime adapter profile could not detect platform.', {
+    supported_platforms: MEETING_APP_INTEGRATION_PROFILE_PLATFORMS,
+  });
+}
+
+function speakerTrackDefaults(platform, options = {}) {
+  const key = normalizeAppPlatform(platform);
+  const defaults = {
+    google_meet: { minStableMs: 650, switchStableMs: 700, endIdleMs: 1_500, minSegmentMs: 800, mergeGapMs: 1_200 },
+    microsoft_teams: { minStableMs: 700, switchStableMs: 800, endIdleMs: 1_600, minSegmentMs: 900, mergeGapMs: 1_200 },
+    zoom: { minStableMs: 650, switchStableMs: 750, endIdleMs: 1_500, minSegmentMs: 800, mergeGapMs: 1_200 },
+    lark: { minStableMs: 700, switchStableMs: 800, endIdleMs: 1_600, minSegmentMs: 900, mergeGapMs: 1_200 },
+    webex: { minStableMs: 700, switchStableMs: 800, endIdleMs: 1_600, minSegmentMs: 900, mergeGapMs: 1_200 },
+  }[key];
+  return {
+    ...defaults,
+    ...(options.speakerTrackOptions ?? {}),
+    ...(options.speaker_track_options ?? {}),
+  };
+}
+
+function participantTrackDefaults(platform, options = {}) {
+  normalizeAppPlatform(platform);
+  return {
+    duplicateWindowMs: 1_500,
+    suppressReconnectGapMs: 10_000,
+    leaveStableMs: 1_500,
+    emitInitialRoster: false,
+    ...(options.participantTrackOptions ?? {}),
+    ...(options.participant_track_options ?? {}),
+  };
+}
+
+function trackRuntimeDefaults(platform, options = {}) {
+  return compactObject({
+    platform: normalizeAppPlatform(platform),
+    speakerTrackOptions: speakerTrackDefaults(platform, options),
+    speaker_track_options: speakerTrackDefaults(platform, options),
+    participantTrackOptions: participantTrackDefaults(platform, options),
+    participant_track_options: participantTrackDefaults(platform, options),
+    maxSnapshots: firstNonEmpty(options.maxSnapshots, options.max_snapshots, 500),
+    max_snapshots: firstNonEmpty(options.max_snapshots, options.maxSnapshots, 500),
+  });
+}
+
 function readinessFor(gate = {}, runtimePreset = {}, captureProfile = {}) {
   const nextActions = [];
   if (gate.production_ready !== true) nextActions.push('capture_live_dom_snapshots_for_this_platform');
@@ -229,6 +325,97 @@ function eventModel(platform, capability = {}, integrationPlan = {}) {
     },
     post_meeting_transcript: capability.post_meeting_transcript,
   };
+}
+
+export function resolveMeetingAppRuntimeAdapterProfile(input = {}, options = {}) {
+  const rawInput = typeof input === 'string' ? { url: input } : (input ?? {});
+  const rawUrl = resolverUrl(rawInput, options);
+  const url = locationHref(rawUrl) ?? rawUrl;
+  const title = resolverTitle(rawInput, options);
+  const merged = {
+    ...rawInput,
+    ...options,
+    url,
+    title,
+  };
+  try {
+    const detected = detectResolverPlatform(merged, options);
+    const platform = detected.platform;
+    const runtimeConfig = buildMeetingAppRuntimeAdapterConfig(platform, {
+      ...merged,
+      includeLaunchGate: false,
+    });
+    const captureProfile = meetingAppDomCaptureProfile(platform, merged);
+    const runtimePreset = meetingAppBrowserRuntimePreset(platform, merged);
+    const trackOptions = trackRuntimeDefaults(platform, merged);
+    return compactObject({
+      type: 'meeting_app_runtime_adapter_profile_resolution',
+      schema: MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA,
+      version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+      detected: true,
+      reason: detected.reason,
+      platform,
+      display_name: runtimeConfig.display_name,
+      url,
+      title,
+      extension: runtimeConfig.extension,
+      runtime_config: runtimeConfig,
+      capture: {
+        profile: captureProfile,
+        options: runtimeConfig.capture_options,
+      },
+      runtime: {
+        preset: runtimePreset,
+        options: runtimeConfig.runtime_options,
+      },
+      tracks: {
+        enabled_by_default: false,
+        enable_with: ['observeTracks', 'observe_tracks', 'trackMutations', 'track_mutations'],
+        runtime_options: trackOptions,
+        output_intents: ['speaker_track', 'participant_track'],
+        content_policy: 'position_markers_only_no_transcript_text_required',
+      },
+      host: {
+        supported_client_methods: runtimeConfig.supported_client_methods,
+        startup: runtimeConfig.startup,
+        bridge_options: runtimeConfig.bridge_options,
+      },
+      readiness: {
+        runtime_ready: runtimeConfig.readiness?.runtime_ready === true,
+        adapter_ready: true,
+        production_requires_live_snapshot: runtimeConfig.readiness?.requires_live_snapshot_before_production === true,
+      },
+      next_actions: [
+        'createMeetingAppBrowserRuntime(client, resolution.runtime_config.runtime_options)',
+        'pass_resolution.capture.options_to_dom_capture',
+        'enable_observeTracks_or_trackMutations_when_speaker_position_marks_are_needed',
+        'validate_with_live_snapshot_before_production_rollout',
+      ],
+    });
+  } catch (error) {
+    return {
+      type: 'meeting_app_runtime_adapter_profile_resolution',
+      schema: MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA,
+      version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+      detected: false,
+      platform: null,
+      url,
+      title,
+      readiness: {
+        runtime_ready: false,
+        adapter_ready: false,
+        production_requires_live_snapshot: true,
+      },
+      issues: [issue('warning', 'platform_not_detected', 'No meeting app adapter profile matched this input.', {
+        error: String(error?.message ?? error),
+        supported_platforms: MEETING_APP_INTEGRATION_PROFILE_PLATFORMS,
+      })],
+      next_actions: [
+        'call_again_with_explicit_platform_or_supported_meeting_url',
+        'capture_live_snapshot_from_supported_meeting_app',
+      ],
+    };
+  }
 }
 
 export function buildMeetingAppIntegrationProfile(platformOrInput = {}, options = {}) {

@@ -56,6 +56,20 @@ assert.equal(normalized[0].activeSpeaker.name, 'Ada Lovelace');
 assert.equal(normalized[0].activeSpeaker.speaking, true);
 assert.equal(normalized[0].participants.length, 2);
 
+const explicitPlatformNormalized = normalizeMeetingAppSnapshot({
+  url: 'https://meet.google.com/abc-defg-hij',
+  title: 'Design review - Google Meet',
+  page: {
+    controls: [{ label: 'Leave call' }],
+    participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+  },
+}, {
+  platform: 'google_meet',
+});
+assert.equal(explicitPlatformNormalized.platform, 'google_meet');
+assert.equal(explicitPlatformNormalized.meeting_id, 'abc-defg-hij');
+assert.equal(explicitPlatformNormalized.meeting.meeting_id, 'abc-defg-hij');
+
 let observed = observeMeetingAppSample(null, googleMeetDomSnapshot(), {
   source: 'browser_extension',
   minStableMs: 0,

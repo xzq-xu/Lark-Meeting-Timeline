@@ -895,6 +895,10 @@ await meetingSources.observeMeetingApp(snapshot, { observedAtMs: snapshot.observ
 
 ```js
 import { createMeetingAppTimelineRuntime } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime';
+import { resolveMeetingAppRuntimeAdapterProfile } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-profile';
+
+const profile = resolveMeetingAppRuntimeAdapterProfile({ document, location, window });
+if (!profile.detected) throw new Error('当前页面不是已支持的会议应用');
 
 const runtime = createMeetingAppTimelineRuntime({
   baseUrl: 'http://localhost:8787',
@@ -902,7 +906,8 @@ const runtime = createMeetingAppTimelineRuntime({
 }, {
   applyOptions: { speakerAsAnnotation: true },
   speakerOptions: { minStableMs: 300, switchStableMs: 400, endIdleMs: 1500 },
-  captureOptions: { browserName: 'Chrome', platform: 'google_meet' },
+  captureOptions: { browserName: 'Chrome', ...profile.capture.options },
+  trackRuntimeOptions: profile.tracks.runtime_options,
   sampleIntervalMs: 1000,
   unchangedObserveEveryMs: 1000,
 });

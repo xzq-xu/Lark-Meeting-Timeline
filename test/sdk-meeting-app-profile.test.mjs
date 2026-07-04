@@ -10,6 +10,7 @@ import {
   MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA,
   MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
+  MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA,
   assertMeetingAppDeploymentManifest,
   buildAllMeetingAppDeploymentManifests,
   buildAllMeetingAppDomAdaptationDiagnoses,
@@ -32,6 +33,7 @@ import {
   buildMeetingAppRuntimeAdapterAcceptanceReport,
   buildMeetingAppRuntimeAdapterConfig,
   buildMeetingAppRuntimeAdapterValidationReport,
+  resolveMeetingAppRuntimeAdapterProfile,
   assertMeetingAppRuntimeAdapterConfig,
   assertMeetingAppRuntimeAdapterValidation,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-profile.mjs';
@@ -45,6 +47,7 @@ assert.deepEqual(MEETING_APP_INTEGRATION_PROFILE_PLATFORMS, [
 ]);
 assert.equal(MEETING_APP_INTEGRATION_PROFILE_SCHEMA, 'meeting_app_integration_profile');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA, 'meeting_app_runtime_adapter_config');
+assert.equal(MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA, 'meeting_app_runtime_adapter_profile_resolution');
 assert.equal(MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA, 'meeting_app_live_snapshot_capture_plan');
 assert.equal(MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA, 'meeting_app_deployment_manifest');
 assert.equal(MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA, 'meeting_app_live_evidence_package');
@@ -98,6 +101,37 @@ assert.equal(googleRuntimeConfig.supported_client_methods.includes('insertMark')
 assert.equal(googleRuntimeConfig.extension.permissions.includes('tabs'), true);
 assert.equal(googleRuntimeConfig.extension.message_types.observe_candidates, 'meeting_timeline.observe_candidates');
 assert.equal(googleRuntimeConfig.readiness.runtime_ready, true);
+
+const googleResolved = resolveMeetingAppRuntimeAdapterProfile({
+  url: 'https://meet.google.com/abc-defg-hij',
+  title: 'Design review',
+});
+assert.equal(googleResolved.type, 'meeting_app_runtime_adapter_profile_resolution');
+assert.equal(googleResolved.schema, MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA);
+assert.equal(googleResolved.detected, true);
+assert.equal(googleResolved.platform, 'google_meet');
+assert.equal(googleResolved.reason, 'capture_profile');
+assert.deepEqual(googleResolved.extension.matches, ['https://meet.google.com/*']);
+assert.equal(googleResolved.capture.profile.platform, 'google_meet');
+assert.equal(googleResolved.runtime.options.runtimePreset, 'google_meet');
+assert.equal(googleResolved.tracks.output_intents.includes('speaker_track'), true);
+assert.equal(googleResolved.tracks.runtime_options.speakerTrackOptions.minStableMs >= 500, true);
+assert.equal(googleResolved.tracks.content_policy, 'position_markers_only_no_transcript_text_required');
+assert.equal(googleResolved.readiness.runtime_ready, true);
+assert.equal(googleResolved.next_actions.includes('enable_observeTracks_or_trackMutations_when_speaker_position_marks_are_needed'), true);
+
+const teamsResolved = resolveMeetingAppRuntimeAdapterProfile('https://teams.microsoft.com/l/meetup-join/19%3ameeting');
+assert.equal(teamsResolved.detected, true);
+assert.equal(teamsResolved.platform, 'microsoft_teams');
+assert.equal(teamsResolved.runtime_config.extension.matches.includes('https://teams.microsoft.com/*'), true);
+
+const unknownResolved = resolveMeetingAppRuntimeAdapterProfile({
+  url: 'https://example.com/not-a-meeting',
+  title: 'Not a meeting',
+});
+assert.equal(unknownResolved.detected, false);
+assert.equal(unknownResolved.platform, null);
+assert.equal(unknownResolved.issues.some((item) => item.code === 'platform_not_detected'), true);
 
 const googleCapturePlan = buildMeetingAppLiveSnapshotCapturePlan('google-meet');
 assert.equal(googleCapturePlan.type, 'meeting_app_live_snapshot_capture_plan');

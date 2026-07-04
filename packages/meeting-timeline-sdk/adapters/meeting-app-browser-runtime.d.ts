@@ -7,6 +7,11 @@ import type {
   MeetingAppTimelineRuntimeOptions,
 } from './meeting-app-runtime.mjs';
 import type { MeetingAppMonitorOptions, MeetingAppMonitorSampleResult, MeetingAppMonitorState } from './meeting-app-monitor.mjs';
+import type {
+  MeetingAppTrackRuntimeObservation,
+  MeetingAppTrackRuntimeOptions,
+  MeetingAppTrackRuntimePreview,
+} from './meeting-app-track-runtime.mjs';
 import type { MeetingSourceResult } from './meeting-source.mjs';
 
 export interface MeetingAppBrowserRuntimeOptions extends MeetingAppTimelineRuntimeOptions {
@@ -63,6 +68,14 @@ export interface MeetingAppBrowserRuntimeOptions extends MeetingAppTimelineRunti
   mutation_stable_followup_ms?: number;
   keepMutationObserverOnStop?: boolean;
   keep_mutation_observer_on_stop?: boolean;
+  observeTracks?: boolean;
+  observe_tracks?: boolean;
+  trackMutations?: boolean;
+  track_mutations?: boolean;
+  trackSampleOptions?: MeetingAppMonitorOptions;
+  track_sample_options?: MeetingAppMonitorOptions;
+  startTracksInterval?: boolean;
+  start_tracks_interval?: boolean;
   [key: string]: unknown;
 }
 
@@ -126,6 +139,12 @@ export function createMeetingAppBrowserRuntime(
   stop(): MeetingAppMonitorState;
   sample(options?: MeetingAppMonitorOptions): Promise<MeetingAppMonitorSampleResult>;
   tick(options?: MeetingAppMonitorOptions): Promise<MeetingAppMonitorSampleResult>;
+  sampleTracks(options?: MeetingAppMonitorOptions): Promise<MeetingAppMonitorSampleResult>;
+  tickTracks(options?: MeetingAppMonitorOptions): Promise<MeetingAppMonitorSampleResult>;
+  startTracks(options?: MeetingAppMonitorOptions): MeetingAppMonitorState;
+  stopTracks(): MeetingAppMonitorState;
+  observeMeetingAppTracks(input?: Record<string, unknown> | Record<string, unknown>[], options?: MeetingAppTrackRuntimeOptions): Promise<MeetingAppTrackRuntimeObservation>;
+  previewMeetingAppTracks(input?: Record<string, unknown> | Record<string, unknown>[], options?: MeetingAppTrackRuntimeOptions): MeetingAppTrackRuntimePreview;
   handleMessage(message?: MeetingAppBrowserRuntimeMessage, options?: Record<string, unknown>): Promise<{
     handled: boolean;
     action?: string;

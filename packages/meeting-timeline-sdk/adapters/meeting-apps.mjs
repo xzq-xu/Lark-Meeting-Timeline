@@ -461,9 +461,15 @@ export function detectMeetingAppPreset(input = {}, options = {}) {
     'platform',
     'provider',
   ]) ?? options.platform);
+  const discovered = detectMeetingApplication(input);
   const detected = explicit
-    ? { platform: explicit, confidence: 'explicit', reason: 'explicit_platform' }
-    : detectMeetingApplication(input);
+    ? {
+      ...discovered,
+      platform: explicit,
+      confidence: 'explicit',
+      reason: 'explicit_platform',
+    }
+    : discovered;
   const preset = presetForPlatform(detected?.platform);
   if (!preset) return null;
   return {

@@ -87,6 +87,8 @@ assert.equal(packedFiles.includes('adapters/meeting-app-fixture-tracks.mjs'), tr
 assert.equal(packedFiles.includes('adapters/meeting-app-fixture-tracks.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-profile.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-profile.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-pipeline.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-pipeline.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-runtime.mjs'), true);
@@ -277,6 +279,7 @@ import {
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate';
 import {
   buildMeetingAppDomAdaptationDiagnosisMatrix,
+  resolveMeetingAppRuntimeAdapterProfile,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-profile';
 import {
   buildMeetingAppFixtureTrackReadinessReport,
@@ -611,6 +614,8 @@ assert.equal((await createMeetingAppTimelineRuntime(client, {
     participants: [{ id: 'ada', name: 'Ada', speaking: true }],
   },
 ])).new_mark_count, 1);
+assert.equal(resolveMeetingAppRuntimeAdapterProfile('https://meet.google.com/abc-defg-hij').platform, 'google_meet');
+assert.equal(resolveMeetingAppRuntimeAdapterProfile('https://example.com/not-a-meeting').detected, false);
 assert.equal(kit.platformTimelineViewPlan('zoom').schema, 'meeting_platform_timeline_view_plan');
 assert.equal(kit.platformTimelineViewMatrix({
   platforms: ['zoom'],
