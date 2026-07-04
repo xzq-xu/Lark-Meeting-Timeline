@@ -91,6 +91,8 @@ assert.equal(packedFiles.includes('adapters/meeting-app-profile.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-profile.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-observer-scheduler.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-observer-scheduler.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-platform-runtime-host.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-platform-runtime-host.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-pipeline.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-pipeline.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-runtime.mjs'), true);
@@ -314,6 +316,11 @@ import {
   buildMeetingAppObserverSchedulerConfigMatrix,
   createMeetingAppObserverScheduler,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-observer-scheduler';
+import {
+  buildMeetingPlatformRuntimeHostConfig,
+  buildMeetingPlatformRuntimeHostConfigMatrix,
+  createMeetingPlatformRuntimeHost,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-runtime-host';
 
 assert.equal(SDK_VERSION, '0.1.0');
 const client = createMeetingTimelineClient({
@@ -704,6 +711,18 @@ assert.equal(typeof createMeetingAppObserverScheduler({
     return { ok: true };
   },
 }, 'google-meet').handleTrigger, 'function');
+assert.equal(buildMeetingPlatformRuntimeHostConfig('google-meet').schema, 'meeting_platform_runtime_host_config');
+assert.equal(buildMeetingPlatformRuntimeHostConfigMatrix({ platforms: ['google-meet'] }).schema, 'meeting_platform_runtime_host_config_matrix');
+assert.equal(typeof createMeetingPlatformRuntimeHost({
+  async sample() {
+    return { ok: true };
+  },
+}, 'google-meet', {
+  setInterval() {
+    return {};
+  },
+  clearInterval() {},
+}).changed, 'function');
 assert.equal(resolveMeetingAppRuntimeAdapterProfile('https://example.com/not-a-meeting').detected, false);
 assert.equal(selectMeetingAppRuntimeAdapter('https://meet.google.com/abc-defg-hij').selected, true);
 assert.equal(buildMeetingAppRuntimeAdapterHandoff('https://meet.google.com/abc-defg-hij').surface, 'browser_extension');
@@ -821,6 +840,10 @@ assert.equal(kit.platformRuntimeBundle('google-meet').schema, 'meeting_platform_
 assert.equal(kit.platformRuntimeBundleMatrix({
   platforms: ['google-meet'],
 }).platform_count, 1);
+assert.equal(kit.platformRuntimeHostConfig('google-meet').schema, 'meeting_platform_runtime_host_config');
+assert.equal(kit.platformRuntimeHostConfigMatrix({
+  platforms: ['google-meet'],
+}).host_ready_count, 1);
 assert.equal(kit.platformRuntimeEventPlan('google-meet').schema, 'meeting_platform_runtime_event_plan');
 assert.equal(kit.platformRuntimeEventPlan('google-meet').realtime_contract.provider_events_required_for_realtime, false);
 assert.equal(kit.platformRuntimeEventPlanMatrix({

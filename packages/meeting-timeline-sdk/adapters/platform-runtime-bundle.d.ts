@@ -65,6 +65,12 @@ export interface MeetingPlatformRuntimeBundle {
       create_function: string;
       config: MeetingAppObserverSchedulerConfig;
     } | null;
+    runtime_host?: {
+      module: string;
+      create_function: string;
+      config_function: string;
+      driver: string;
+    } | null;
   };
   messaging: {
     message_types: Record<string, string>;
@@ -92,6 +98,7 @@ export interface MeetingPlatformRuntimeBundle {
     runtime_ready: boolean;
     observer_plan_ready?: boolean;
     observer_scheduler_ready?: boolean;
+    runtime_host_ready?: boolean;
     observer_preflight_status?: string;
     provider_required_for_realtime: boolean;
     transcript_blocks_realtime: boolean;
@@ -110,6 +117,7 @@ export interface MeetingPlatformRuntimeBundleMatrix {
   runtime_ready_count: number;
   sdk_wiring_ready_count: number;
   observer_plan_ready_count?: number;
+  runtime_host_ready_count?: number;
   candidate_observer_count: number;
   provider_required_for_realtime_count: number;
   transcript_blocking_count: number;

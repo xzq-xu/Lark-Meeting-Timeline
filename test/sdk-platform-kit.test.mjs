@@ -178,6 +178,31 @@ const appObserverPlanMatrix = kit.meetingAppRuntimeObserverPlanMatrix({
 assert.equal(appObserverPlanMatrix.platform_count, 2);
 assert.equal(appObserverPlanMatrix.preflight_accepted_count, 2);
 assert.equal(kit.report({ platforms: ['google-meet'] }).meeting_app_runtime_observer_plan_matrix.platform_count, 1);
+const platformHostConfig = kit.platformRuntimeHostConfig('google-meet');
+assert.equal(platformHostConfig.schema, 'meeting_platform_runtime_host_config');
+assert.equal(platformHostConfig.readiness.host_ready, true);
+assert.equal(platformHostConfig.driver.change_observer.enabled, true);
+const platformHostConfigMatrix = kit.platformRuntimeHostConfigMatrix({ platforms: ['google-meet', 'zoom'] });
+assert.equal(platformHostConfigMatrix.platform_count, 2);
+assert.equal(platformHostConfigMatrix.host_ready_count, 2);
+assert.equal(kit.report({ platforms: ['google-meet'] }).platform_runtime_host_config_matrix.host_ready_count, 1);
+const kitRuntimeHost = kit.createPlatformRuntimeHost({
+  inputProvider() {
+    return { platform: 'google_meet', url: 'https://meet.google.com/abc-defg-hij' };
+  },
+  sample(options = {}) {
+    return { ok: true, trigger: options.trigger };
+  },
+  stop() {
+    return { stopped: true };
+  },
+}, 'google-meet', {
+  setInterval() {
+    return {};
+  },
+  clearInterval() {},
+});
+assert.equal(kitRuntimeHost.config.platform, 'google_meet');
 
 const appGate = kit.meetingAppLaunchGate('google-meet', {
   allowFixtureProduction: true,

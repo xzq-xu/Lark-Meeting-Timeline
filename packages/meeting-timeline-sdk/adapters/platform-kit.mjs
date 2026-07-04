@@ -173,6 +173,11 @@ import {
   buildMeetingPlatformRuntimeBundleMatrix,
 } from './platform-runtime-bundle.mjs';
 import {
+  buildMeetingPlatformRuntimeHostConfig,
+  buildMeetingPlatformRuntimeHostConfigMatrix,
+  createMeetingPlatformRuntimeHost,
+} from './meeting-platform-runtime-host.mjs';
+import {
   buildMeetingPlatformRuntimeEventPlan,
   buildMeetingPlatformRuntimeEventPlanMatrix,
 } from './platform-runtime-event.mjs';
@@ -426,6 +431,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_adaptation_package_matrix: buildMeetingPlatformAdaptationPackageMatrix(options),
     platform_runtime_event_plan_matrix: buildMeetingPlatformRuntimeEventPlanMatrix(options),
     platform_runtime_bundle_matrix: buildMeetingPlatformRuntimeBundleMatrix(options),
+    platform_runtime_host_config_matrix: buildMeetingPlatformRuntimeHostConfigMatrix(options),
     platform_adapter_contract_matrix: buildMeetingPlatformAdapterContractMatrix(options),
     platform_adapter_contract_acceptance_matrix: buildMeetingPlatformAdapterContractAcceptanceMatrix(options),
     platform_field_capture_matrix: buildMeetingPlatformFieldCaptureMatrix(options),
@@ -757,6 +763,21 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformRuntimeBundleMatrix(bundleOptions = {}) {
       return buildMeetingPlatformRuntimeBundleMatrix(withDefaults(defaults, bundleOptions));
+    },
+    platformRuntimeHostConfig(platform, hostOptions = {}) {
+      return buildMeetingPlatformRuntimeHostConfig(platform, withDefaults(defaults, hostOptions));
+    },
+    platformRuntimeHostConfigMatrix(hostOptions = {}) {
+      return buildMeetingPlatformRuntimeHostConfigMatrix(withDefaults(defaults, hostOptions));
+    },
+    createPlatformRuntimeHost(clientOrRuntime = bridge.client, platformOrConfig = {}, hostOptions = {}) {
+      const hostInput = typeof platformOrConfig === 'string' || platformOrConfig?.schema
+        ? platformOrConfig
+        : {
+          ...platformOrConfig,
+          platform: firstNonEmpty(platformOrConfig.platform, platformOrConfig.provider, hostOptions.platform, defaults.platform),
+        };
+      return createMeetingPlatformRuntimeHost(clientOrRuntime, hostInput, withDefaults(defaults, hostOptions));
     },
     platformRuntimeEventPlan(platform, planOptions = {}) {
       return buildMeetingPlatformRuntimeEventPlan(platform, withDefaults(defaults, planOptions));

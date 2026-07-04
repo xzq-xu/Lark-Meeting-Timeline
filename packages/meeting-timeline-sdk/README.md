@@ -930,6 +930,25 @@ await scheduler.triggerChanged();
 scheduler.triggerCandidateMissing(undefined, { schedule: true });
 ```
 
+更推荐给外部项目的入口是 `meeting-platform-runtime-host`。它把 runtime bundle、browser runtime、observer scheduler 和宿主侧 MutationObserver/lifecycle 组合好，宿主只需要提供 timeline client 和平台名：
+
+```js
+import { createMeetingTimelineClient } from '@ai-annotation/meeting-timeline-sdk';
+import { createMeetingPlatformRuntimeHost } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-runtime-host';
+
+const timeline = createMeetingTimelineClient({ baseUrl: 'http://localhost:8787' });
+const host = createMeetingPlatformRuntimeHost(timeline, 'google-meet', {
+  window,
+  document,
+});
+
+host.start(); // 安装 change observer + keep-alive scheduler。
+host.changed(); // 宿主也可以从自己的 DOM/AX/native 变化回调显式触发。
+host.candidateMissing(); // 当前会议页面/窗口消失时，按 grace window 补 meeting_ended。
+```
+
+同一个 API 也适用于 Teams / Zoom / Webex / Lark。平台差异主要落在 runtime bundle 的 selector、host permission、cadence 和 provider reconcile 描述里；实时标注仍然坚持本地观察优先，provider event 和 transcript 只做后处理校准。
+
 浏览器扩展或 WebView 里可以再往前接一层 `meeting-app-capture`。它只读取 DOM 文本、按钮、`aria-label`、participant tile、常见 `data-participant-*` / `data-user-*` / `data-person-*` 属性和音量/发言状态，输出 `meeting-apps` 可识别的快照；不截图、不 OCR、不读取转写正文：
 
 ```js

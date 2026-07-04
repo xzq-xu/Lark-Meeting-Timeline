@@ -142,6 +142,12 @@ import type {
   MeetingPlatformRuntimeBundleOptions,
 } from './platform-runtime-bundle.mjs';
 import type {
+  MeetingPlatformRuntimeHost,
+  MeetingPlatformRuntimeHostConfig,
+  MeetingPlatformRuntimeHostConfigMatrix,
+  MeetingPlatformRuntimeHostOptions,
+} from './meeting-platform-runtime-host.mjs';
+import type {
   MeetingPlatformRuntimeEventClientOptions,
   MeetingPlatformRuntimeEventPlan,
   MeetingPlatformRuntimeEventPlanMatrix,
@@ -418,6 +424,13 @@ export interface MeetingPlatformTimelineKit {
   platformAdaptationPackageMatrix(packageOptions?: MeetingPlatformAdaptationPackageOptions): MeetingPlatformAdaptationPackageMatrix;
   platformRuntimeBundle(platform: string, bundleOptions?: MeetingPlatformRuntimeBundleOptions): MeetingPlatformRuntimeBundle;
   platformRuntimeBundleMatrix(bundleOptions?: MeetingPlatformRuntimeBundleOptions): MeetingPlatformRuntimeBundleMatrix;
+  platformRuntimeHostConfig(platform: string | MeetingPlatformRuntimeBundle | Record<string, unknown>, hostOptions?: MeetingPlatformRuntimeHostOptions): MeetingPlatformRuntimeHostConfig;
+  platformRuntimeHostConfigMatrix(hostOptions?: MeetingPlatformRuntimeHostOptions): MeetingPlatformRuntimeHostConfigMatrix;
+  createPlatformRuntimeHost(
+    clientOrRuntime?: MeetingTimelineClient | Record<string, unknown>,
+    platformOrConfig?: string | MeetingPlatformRuntimeBundle | MeetingPlatformRuntimeHostConfig | Record<string, unknown>,
+    hostOptions?: MeetingPlatformRuntimeHostOptions,
+  ): MeetingPlatformRuntimeHost;
   platformRuntimeEventPlan(platform: string, planOptions?: MeetingPlatformRuntimeEventClientOptions): MeetingPlatformRuntimeEventPlan;
   platformRuntimeEventPlanMatrix(planOptions?: MeetingPlatformRuntimeEventClientOptions): MeetingPlatformRuntimeEventPlanMatrix;
   platformRegistryEntry(platform: string, registryOptions?: MeetingPlatformRegistryOptions): MeetingPlatformRegistryEntry;
