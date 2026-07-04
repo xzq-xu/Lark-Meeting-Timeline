@@ -17,6 +17,9 @@ import {
   buildMeetingPlatformRuntimeEventPlan,
 } from './platform-runtime-event.mjs';
 import {
+  buildMeetingPlatformAdapterRoute,
+} from './platform-adapter-route.mjs';
+import {
   MEETING_PLATFORM_ALIASES,
   MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
@@ -106,6 +109,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
   const contractAcceptance = buildMeetingPlatformAdapterContractAcceptanceReport(contract, options);
   const runtimeBundle = buildMeetingPlatformRuntimeBundle(key, options);
   const runtimeEventPlan = buildMeetingPlatformRuntimeEventPlan(key, options);
+  const adapterRoute = buildMeetingPlatformAdapterRoute(key, options);
   const candidateObservation = runtimeBundle.messaging?.candidate_observation ?? runtimeBundle.browser?.candidate_observation;
   const candidateObservationReady = candidateObservation?.runtime_event_action === 'observe_platform_candidates'
     && runtimeEventPlan.supported_actions?.includes?.('observe_platform_candidates');
@@ -178,6 +182,19 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
       transcript_blocks_realtime: contract.timebase?.transcript_blocks_realtime === true,
       local_observer_may_start_axis: contract.timebase?.local_observer_may_start_axis === true,
     },
+    adapter_route: {
+      schema: adapterRoute.schema,
+      recommended_mode: adapterRoute.recommended_mode,
+      route_order: adapterRoute.route_order,
+      route_count: adapterRoute.route_count,
+      first_route: adapterRoute.routes?.[0]?.route,
+      browser_match_count: adapterRoute.entrypoints?.browser_extension?.matches?.length ?? 0,
+      native_detector: adapterRoute.entrypoints?.native_detector,
+      provider_transport: adapterRoute.entrypoints?.provider_webhook?.transport,
+      production_gate: adapterRoute.gates?.production,
+      provider_events_block_realtime: adapterRoute.realtime_invariants?.provider_events_block_realtime,
+      transcript_blocks_realtime: adapterRoute.realtime_invariants?.transcript_blocks_realtime,
+    },
     transcript: {
       availability: contract.transcript?.availability,
       source: contract.transcript?.source,
@@ -191,6 +208,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
         platform_events: hostBasePath,
         platform_event: `${hostBasePath}/${key.replaceAll('_', '-')}`,
         annotations: '/api/annotations',
+        adapter_routes: '/api/meeting-platform/adapter-routes',
         runtime_bundles: '/api/meeting-platform/runtime-bundles',
         runtime_event_plans: '/api/meeting-platform/runtime-event-plans',
         runtime_events: '/api/meeting-platform/runtime-events',
@@ -207,6 +225,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
         kit: '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
         runtime_bundle: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
         runtime_event: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event',
+        adapter_route: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-route',
         adapter_contract: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract',
         provider_connection: '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection',
         events: capabilities.sdk_modules?.events,
@@ -228,6 +247,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
     commands: {
       print_registry: `npm run meeting-platform:registry -- --platforms=${key}`,
       print_runtime_bundle: `npm run meeting-platform:runtime-bundle -- --platforms=${key}`,
+      print_adapter_route: `npm run meeting-platform:adapter-route -- --platforms=${key}`,
       print_runtime_event_plan: `npm run meeting-platform:runtime-event-plan -- --platforms=${key}`,
       print_adaptation_package: `npm run meeting-platform:adaptation-package -- --platforms=${key}`,
       verify_contract: `npm run meeting-platform:adapter-contract -- --platforms=${key} --fail-on-rejected=true`,
@@ -238,6 +258,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
       ...(contract.next_actions ?? []),
       'choose_platform_from_registry_manifest',
       'wire_host_runtime_bundles_endpoint_before_building_extension',
+      'export_adapter_route_before_wiring_external_host',
       'export_runtime_event_plan_before_wiring_external_host',
       'verify_candidate_observation_before_host_handoff',
     ]),
@@ -275,6 +296,9 @@ export function buildMeetingPlatformRegistryManifest(options = {}) {
       candidate_observer_permission: entry.runtime?.candidate_observation?.required_permission,
       candidate_observer_endpoint: entry.runtime?.candidate_observation?.endpoint,
       runtime_event_action_count: entry.runtime?.runtime_event_action_count ?? entry.annotations?.runtime_event_plan?.action_count ?? 0,
+      adapter_route_mode: entry.adapter_route?.recommended_mode,
+      adapter_first_route: entry.adapter_route?.first_route,
+      adapter_route_count: entry.adapter_route?.route_count ?? 0,
       provider_transport: entry.provider?.transport,
       provider_ready: entry.provider?.ready === true,
       provider_required_for_realtime: entry.readiness?.provider_required_for_realtime === true,
@@ -315,6 +339,9 @@ function registryManifestFrom(input = {}, options = {}) {
         candidate_observer_permission: input.runtime?.candidate_observation?.required_permission,
         candidate_observer_endpoint: input.runtime?.candidate_observation?.endpoint,
         runtime_event_action_count: input.runtime?.runtime_event_action_count ?? input.annotations?.runtime_event_plan?.action_count ?? 0,
+        adapter_route_mode: input.adapter_route?.recommended_mode,
+        adapter_first_route: input.adapter_route?.first_route,
+        adapter_route_count: input.adapter_route?.route_count ?? 0,
         provider_transport: input.provider?.transport,
         provider_ready: input.provider?.ready === true,
         provider_required_for_realtime: input.readiness?.provider_required_for_realtime === true,
@@ -440,8 +467,20 @@ function registryAcceptanceIssues(manifest = {}, options = {}) {
     if (!entry.host?.endpoints?.runtime_bundles) {
       issues.push(issue('error', 'entry_missing_runtime_bundle_endpoint', 'Registry entry must include the host runtime bundle endpoint.', { platform }));
     }
+    if (!entry.host?.endpoints?.adapter_routes) {
+      issues.push(issue('error', 'entry_missing_adapter_route_endpoint', 'Registry entry must include the host adapter route endpoint.', { platform }));
+    }
     if (!entry.sdk?.imports?.runtime_bundle) {
       issues.push(issue('error', 'entry_missing_runtime_bundle_import', 'Registry entry must include the runtime bundle SDK import path.', { platform }));
+    }
+    if (!entry.sdk?.imports?.adapter_route) {
+      issues.push(issue('error', 'entry_missing_adapter_route_import', 'Registry entry must include the adapter route SDK import path.', { platform }));
+    }
+    if (!entry.adapter_route?.recommended_mode || !entry.adapter_route?.first_route) {
+      issues.push(issue('error', 'entry_missing_adapter_route', 'Registry entry must include adapter route planning for external host wiring.', { platform }));
+    }
+    if (entry.adapter_route?.provider_events_block_realtime === true || entry.adapter_route?.transcript_blocks_realtime === true) {
+      issues.push(issue('error', 'entry_adapter_route_blocks_realtime', 'Adapter route must keep provider events and transcript non-blocking for realtime annotations.', { platform }));
     }
     if (requireProviderReady && entry.provider?.ready !== true) {
       issues.push(issue('error', 'entry_provider_not_ready', 'Provider setup must be ready when requireProviderReady=true.', {

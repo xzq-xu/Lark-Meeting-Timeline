@@ -50,18 +50,26 @@ assert.equal(google.annotations.candidate_observation_runtime_action, 'observe_p
 assert.equal(google.annotations.timestamp_field, 'captured_at_ms');
 assert.equal(google.annotations.provider_events_block_realtime, false);
 assert.equal(google.annotations.transcript_blocks_realtime, false);
+assert.equal(google.adapter_route.schema, 'meeting_platform_adapter_route');
+assert.equal(google.adapter_route.recommended_mode, 'local_observer_first_provider_reconcile');
+assert.equal(google.adapter_route.first_route, 'local_observer_axis');
+assert.equal(google.adapter_route.provider_events_block_realtime, false);
+assert.equal(google.adapter_route.transcript_blocks_realtime, false);
 assert.equal(google.transcript.blocks_realtime_annotation, false);
+assert.equal(google.host.endpoints.adapter_routes, '/api/meeting-platform/adapter-routes');
 assert.equal(google.host.endpoints.runtime_bundles, '/api/meeting-platform/runtime-bundles');
 assert.equal(google.host.endpoints.runtime_event_plans, '/api/meeting-platform/runtime-event-plans');
 assert.equal(google.host.endpoints.runtime_events, '/api/meeting-platform/runtime-events');
 assert.equal(google.host.endpoints.platform_candidate_observation, '/api/meeting-platform/observe-candidates');
 assert.equal(google.sdk.imports.runtime_bundle, '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle');
 assert.equal(google.sdk.imports.runtime_event, '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event');
+assert.equal(google.sdk.imports.adapter_route, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-route');
 assert.equal(google.readiness.contract_accepted, true);
 assert.equal(google.readiness.candidate_observation_ready, true);
 assert.equal(google.readiness.provider_required_for_realtime, false);
 assert.equal(google.readiness.transcript_blocks_realtime, false);
 assert.equal(google.commands.print_registry.includes('meeting-platform:registry'), true);
+assert.equal(google.commands.print_adapter_route.includes('meeting-platform:adapter-route'), true);
 assert.equal(google.commands.print_runtime_event_plan.includes('meeting-platform:runtime-event-plan'), true);
 
 const local = buildMeetingPlatformRegistryEntry('local-detector', { baseUrl });
@@ -87,8 +95,11 @@ assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').can
 assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').candidate_observer_message_type, 'meeting_timeline.observe_candidates');
 assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').candidate_observer_permission, 'tabs');
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 14);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').adapter_route_mode, 'local_observer_first_provider_reconcile');
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');
 assert.equal(manifest.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 assert.equal(manifest.next_actions.includes('export_runtime_event_plan_before_wiring_external_host'), true);
+assert.equal(manifest.next_actions.includes('export_adapter_route_before_wiring_external_host'), true);
 
 const acceptance = buildMeetingPlatformRegistryAcceptanceReport(manifest);
 assert.equal(acceptance.schema, MEETING_PLATFORM_REGISTRY_ACCEPTANCE_SCHEMA);
@@ -149,6 +160,35 @@ assert.equal(missingRuntimeEventPlanAcceptance.accepted, false);
 assert.equal(missingRuntimeEventPlanAcceptance.issues.some((item) => item.code === 'entry_missing_runtime_event_import'), true);
 assert.equal(missingRuntimeEventPlanAcceptance.issues.some((item) => item.code === 'entry_missing_runtime_event_plan_endpoint'), true);
 assert.equal(missingRuntimeEventPlanAcceptance.issues.some((item) => item.code === 'entry_missing_runtime_insert_action'), true);
+
+const missingAdapterRoute = {
+  ...manifest,
+  entries: manifest.entries.map((entry) => entry.platform === 'google_meet'
+    ? {
+      ...entry,
+      adapter_route: undefined,
+      sdk: {
+        ...entry.sdk,
+        imports: {
+          ...entry.sdk.imports,
+          adapter_route: undefined,
+        },
+      },
+      host: {
+        ...entry.host,
+        endpoints: {
+          ...entry.host.endpoints,
+          adapter_routes: undefined,
+        },
+      },
+    }
+    : entry),
+};
+const missingAdapterRouteAcceptance = buildMeetingPlatformRegistryAcceptanceReport(missingAdapterRoute);
+assert.equal(missingAdapterRouteAcceptance.accepted, false);
+assert.equal(missingAdapterRouteAcceptance.issues.some((item) => item.code === 'entry_missing_adapter_route'), true);
+assert.equal(missingAdapterRouteAcceptance.issues.some((item) => item.code === 'entry_missing_adapter_route_import'), true);
+assert.equal(missingAdapterRouteAcceptance.issues.some((item) => item.code === 'entry_missing_adapter_route_endpoint'), true);
 
 const missingCandidateObservation = {
   ...manifest,

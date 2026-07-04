@@ -38,6 +38,7 @@ export interface MeetingPlatformRegistryEntry {
   runtime: Record<string, unknown>;
   provider: Record<string, unknown>;
   annotations: Record<string, unknown>;
+  adapter_route: Record<string, unknown>;
   transcript: Record<string, unknown>;
   host: Record<string, unknown>;
   sdk: Record<string, unknown>;
