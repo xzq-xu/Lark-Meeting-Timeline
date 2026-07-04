@@ -134,6 +134,14 @@ function gateIssues({ options, evidenceLevel, evidenceCount, onboarding, accepta
       { readiness: onboarding.permission_plan.readiness },
     ));
   }
+  if (onboarding.candidate_observation_gate?.accepted === false) {
+    issues.push(issue(
+      'error',
+      'runtime_contract_not_ready',
+      'Platform runtime contract must support candidate observation before launch.',
+      { candidate_observation_gate: onboarding.candidate_observation_gate },
+    ));
+  }
   if (evidenceLevel === 'none') {
     issues.push(issue(
       'error',

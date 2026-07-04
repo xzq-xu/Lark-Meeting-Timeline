@@ -61,6 +61,11 @@ assert.equal(googleReport.status, 'ready');
 assert.equal(googleReport.ready, true);
 assert.equal(googleReport.runtime_contract.annotation_time_field, 'captured_at_ms');
 assert.equal(googleReport.runtime_contract.primary_axis_source, 'local_observer');
+assert.equal(googleReport.runtime_contract.candidate_observation_required_for_host_axis_binding, true);
+assert.equal(googleReport.runtime_contract.candidate_observation_ready, true);
+assert.equal(googleReport.candidate_observation.message_type, 'meeting_timeline.observe_candidates');
+assert.equal(googleReport.candidate_observation.required_permission, 'tabs');
+assert.equal(googleReport.candidate_observation_gate.accepted, true);
 assert.equal(googleReport.permission_plan.required_scopes.includes('https://www.googleapis.com/auth/drive.meet.readonly'), true);
 assert.equal(googleReport.acceptance.accepted, true);
 assert.equal(googleReport.acceptance.coverage.meeting_start, true);
@@ -93,6 +98,24 @@ assert.equal(zoomBlocked.ready, false);
 assert.equal(zoomBlocked.next_actions.includes('configure_env:ZOOM_WEBHOOK_SECRET_TOKEN'), true);
 assert.equal(zoomBlocked.next_actions.includes('fix_setup:required_security_env'), true);
 
+const googleBlockedByRuntimeContract = buildMeetingPlatformOnboardingReport('google-meet', {
+  baseUrl,
+  env: googleEnv,
+  candidateObservation: {
+    ready: false,
+    message_type: 'wrong.message',
+  },
+  samples: {
+    google_meet: [{ label: 'provider start', body: googleStart }],
+  },
+});
+assert.equal(googleBlockedByRuntimeContract.status, 'blocked_by_runtime_contract');
+assert.equal(googleBlockedByRuntimeContract.ready, false);
+assert.equal(googleBlockedByRuntimeContract.runtime_contract.candidate_observation_ready, false);
+assert.equal(googleBlockedByRuntimeContract.candidate_observation_gate.accepted, false);
+assert.equal(googleBlockedByRuntimeContract.next_actions.includes('fix_candidate_observation:candidate_observation_not_ready'), true);
+assert.equal(googleBlockedByRuntimeContract.next_actions.includes('fix_candidate_observation:candidate_observation_invalid_message_type'), true);
+
 const allReports = buildAllMeetingPlatformOnboardingReports({
   baseUrl,
   env: googleEnv,
@@ -116,6 +139,7 @@ assert.equal(summary.reports.length, 6);
 assert.equal(summary.ok, false);
 assert.equal(summary.ready_count >= 1, true);
 assert.equal(summary.blocked_count >= 1, true);
+assert.equal(summary.blocked_by_runtime_contract_count, 0);
 assert.equal(summary.acceptance_summary.reports.length, 6);
 
 console.log('ok meeting platform onboarding reports');

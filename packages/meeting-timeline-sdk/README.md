@@ -1438,6 +1438,7 @@ if (!gate.production_ready) {
   console.error(gate.blocking_issues, gate.next_actions);
 }
 
+// gate 会同时检查 setup、candidate observation runtime contract、真实样本 coverage 和 fixture 污染。
 assertPlatformLaunchGate('google-meet', {
   baseUrl: 'https://timeline.example.com',
   env: process.env,
@@ -1446,7 +1447,7 @@ assertPlatformLaunchGate('google-meet', {
 });
 ```
 
-如果要给配置页、接入向导或 CI 验收生成一份“这个会议平台现在能不能接进 timeline”的总报告，可以用 `platform-onboarding`。它会合并 `permission plan`、`integration plan`、真实样本 `acceptance` 和 `artifact-plan`：
+如果要给配置页、接入向导或 CI 验收生成一份“这个会议平台现在能不能接进 timeline”的总报告，可以用 `platform-onboarding`。它会合并 `permission plan`、`integration plan`、候选观察 gate、真实样本 `acceptance` 和 `artifact-plan`：
 
 ```js
 import { buildMeetingPlatformOnboardingReport } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-onboarding';
@@ -1463,9 +1464,10 @@ const onboarding = buildMeetingPlatformOnboardingReport('google-meet', {
   },
 });
 
-// onboarding.status === 'ready' | 'blocked_by_setup' | 'needs_real_samples' | 'needs_more_coverage'
+// onboarding.status === 'ready' | 'blocked_by_setup' | 'blocked_by_runtime_contract' | 'needs_real_samples' | 'needs_more_coverage'
 // onboarding.runtime_contract.annotation_time_field === 'captured_at_ms'
-// onboarding.next_actions includes missing env/config steps and post-meeting artifact fetch actions
+// onboarding.candidate_observation_gate.accepted === true 表示 observe-candidates 建轴入口可交给宿主项目。
+// onboarding.next_actions includes missing env/config steps, candidate observation fixes, and post-meeting artifact fetch actions
 ```
 
 如果宿主同时接本地观察器和官方 webhook，建议用有状态的 `createReconciledPlatformEventIngestor()`。它会过滤 exact duplicate、重复 speaker 信号，并处理“本地观察先建轴，Google Meet / Teams / Zoom / Webex 官方事件后到用于校准”的优先级。匹配时会同时看 `meeting_url`、`meeting_id`、`external_meeting_id`，所以 Zoom 本地数字会议号和官方 `uuid`、Teams Graph resource 里的 `joinWebUrl` 都可以对齐到同一场会议：

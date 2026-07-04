@@ -65,8 +65,61 @@ function artifactNextActions(artifactPlans = []) {
   });
 }
 
-function onboardingStatus(permissionPlan = {}, acceptance = {}) {
+function issue(severity, code, message, details = {}) {
+  return compactObject({ severity, code, message, ...details });
+}
+
+function candidateObservationContract(platform, options = {}) {
+  const override = options.candidateObservation ?? options.candidate_observation ?? {};
+  return compactObject({
+    platform,
+    ready: override.ready ?? override.candidate_observation_ready ?? true,
+    message_type: override.message_type ?? 'meeting_timeline.observe_candidates',
+    required_permission: override.required_permission ?? 'tabs',
+    runtime_event_action: override.runtime_event_action ?? 'observe_platform_candidates',
+    runtime_event_client_method: override.runtime_event_client_method ?? 'observePlatformCandidates',
+    endpoint: override.endpoint ?? '/api/meeting-platform/observe-candidates',
+    producer: override.producer ?? 'browser_extension_background_or_native_host',
+  });
+}
+
+function candidateObservationGate(candidateObservation = {}) {
+  const issues = [];
+  if (candidateObservation.ready !== true) {
+    issues.push(issue('error', 'candidate_observation_not_ready', 'Candidate observation must be ready for host-level realtime axis binding.'));
+  }
+  if (candidateObservation.message_type !== 'meeting_timeline.observe_candidates') {
+    issues.push(issue('error', 'candidate_observation_invalid_message_type', 'Candidate observation must use meeting_timeline.observe_candidates.'));
+  }
+  if (candidateObservation.required_permission !== 'tabs') {
+    issues.push(issue('error', 'candidate_observation_missing_tabs_permission', 'Candidate observation must declare the tabs permission.'));
+  }
+  if (candidateObservation.runtime_event_action !== 'observe_platform_candidates') {
+    issues.push(issue('error', 'candidate_observation_invalid_runtime_action', 'Candidate observation must route to observe_platform_candidates.'));
+  }
+  if (!candidateObservation.endpoint) {
+    issues.push(issue('error', 'candidate_observation_missing_endpoint', 'Candidate observation must expose a host endpoint.'));
+  }
+  const blocking = issues.filter((item) => item.severity === 'error');
+  return {
+    accepted: blocking.length === 0,
+    blocking_count: blocking.length,
+    warning_count: issues.length - blocking.length,
+    issues,
+    candidate_observation: candidateObservation,
+  };
+}
+
+function candidateObservationNextActions(gate = {}) {
+  if (gate.accepted === true) return [];
+  return (gate.issues ?? [])
+    .filter((issue) => issue.severity === 'error')
+    .map((issue) => `fix_candidate_observation:${issue.code}`);
+}
+
+function onboardingStatus(permissionPlan = {}, acceptance = {}, candidateGate = {}) {
   if (permissionPlan.readiness?.blocking_count > 0) return 'blocked_by_setup';
+  if (candidateGate.accepted !== true) return 'blocked_by_runtime_contract';
   if (acceptance.accepted) return 'ready';
   if (acceptance.status === 'pending_samples') return 'needs_real_samples';
   if (acceptance.status === 'missing_required_coverage') return 'needs_more_coverage';
@@ -74,12 +127,15 @@ function onboardingStatus(permissionPlan = {}, acceptance = {}) {
   return acceptance.status ?? 'unknown';
 }
 
-function runtimeContract(integrationPlan = {}) {
+function runtimeContract(integrationPlan = {}, candidateObservation = {}) {
   return compactObject({
     mode: integrationPlan.recommended_mode,
     source_priority: integrationPlan.source_priority,
     annotation_time_field: integrationPlan.realtime_annotations?.required_field ?? 'captured_at_ms',
     primary_axis_source: integrationPlan.realtime_axis?.primary,
+    candidate_observation_required_for_host_axis_binding: true,
+    candidate_observation_ready: candidateObservation.ready === true,
+    candidate_observation: candidateObservation,
     provider_events_enabled: integrationPlan.provider_events?.enabled,
     provider_event_endpoint: integrationPlan.provider_events?.endpoint,
     transcript_import_strategy: integrationPlan.post_meeting_transcript?.strategy,
@@ -92,24 +148,31 @@ export function buildMeetingPlatformOnboardingReport(platform, options = {}) {
   const key = normalizeMeetingPlatform(platform);
   const permissionPlan = buildPlatformPermissionPlan(key, options);
   const integrationPlan = buildPlatformIntegrationPlan(key, options);
+  const candidateObservation = candidateObservationContract(key, options);
+  const candidateGate = candidateObservationGate(candidateObservation);
   const acceptance = buildPlatformAcceptanceReport(key, acceptanceOptions(options));
   const artifactPlans = buildArtifactImportPlans(selectedArtifactSignals(acceptance, options), {
     importEndpoint: options.importEndpoint ?? options.import_endpoint,
   });
   const nextActions = uniqueList([
     ...setupNextActions(permissionPlan),
+    ...candidateObservationNextActions(candidateGate),
     ...acceptanceNextActions(acceptance),
     ...artifactNextActions(artifactPlans),
   ]);
   return compactObject({
     platform: key,
     display_name: integrationPlan.display_name,
-    status: onboardingStatus(permissionPlan, acceptance),
-    ready: permissionPlan.readiness?.ready === true && acceptance.accepted === true,
+    status: onboardingStatus(permissionPlan, acceptance, candidateGate),
+    ready: permissionPlan.readiness?.ready === true
+      && candidateGate.accepted === true
+      && acceptance.accepted === true,
     recommended_mode: integrationPlan.recommended_mode,
-    runtime_contract: runtimeContract(integrationPlan),
+    runtime_contract: runtimeContract(integrationPlan, candidateObservation),
     permission_plan: permissionPlan,
     integration_plan: integrationPlan,
+    candidate_observation: candidateObservation,
+    candidate_observation_gate: candidateGate,
     acceptance,
     artifact_import_plans: artifactPlans,
     next_actions: nextActions,
@@ -127,6 +190,7 @@ export function buildMeetingPlatformOnboardingSummary(options = {}) {
     ok: reports.every((item) => item.ready),
     ready_count: reports.filter((item) => item.ready).length,
     blocked_count: reports.filter((item) => item.status === 'blocked_by_setup').length,
+    blocked_by_runtime_contract_count: reports.filter((item) => item.status === 'blocked_by_runtime_contract').length,
     needs_real_samples_count: reports.filter((item) => item.status === 'needs_real_samples').length,
     needs_more_coverage_count: reports.filter((item) => item.status === 'needs_more_coverage').length,
     samples_failed_count: reports.filter((item) => item.status === 'samples_failed').length,

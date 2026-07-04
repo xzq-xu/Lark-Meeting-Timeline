@@ -9,6 +9,8 @@ export function buildMeetingPlatformOnboardingReport(platform: string, options?:
   sample_events?: unknown[] | Record<string, unknown[]>;
   artifactSignals?: unknown[];
   artifact_signals?: unknown[];
+  candidateObservation?: Record<string, unknown>;
+  candidate_observation?: Record<string, unknown>;
   importEndpoint?: string;
   import_endpoint?: string;
   diagnosticOptions?: Record<string, unknown>;
@@ -27,6 +29,8 @@ export function buildAllMeetingPlatformOnboardingReports(options?: {
   sample_events?: unknown[] | Record<string, unknown[]>;
   artifactSignals?: unknown[];
   artifact_signals?: unknown[];
+  candidateObservation?: Record<string, unknown>;
+  candidate_observation?: Record<string, unknown>;
   importEndpoint?: string;
   import_endpoint?: string;
   diagnosticOptions?: Record<string, unknown>;
@@ -45,6 +49,8 @@ export function buildMeetingPlatformOnboardingSummary(options?: {
   sample_events?: unknown[] | Record<string, unknown[]>;
   artifactSignals?: unknown[];
   artifact_signals?: unknown[];
+  candidateObservation?: Record<string, unknown>;
+  candidate_observation?: Record<string, unknown>;
   importEndpoint?: string;
   import_endpoint?: string;
   diagnosticOptions?: Record<string, unknown>;

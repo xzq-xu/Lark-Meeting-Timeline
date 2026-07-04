@@ -89,6 +89,20 @@ assert.throws(
   /launch gate failed/i,
 );
 
+const brokenRuntimeContractGate = buildPlatformLaunchGate('google-meet', {
+  baseUrl,
+  env: googleEnv,
+  records: googleRecords,
+  candidateObservation: {
+    ready: false,
+    message_type: 'wrong.message',
+  },
+});
+assert.equal(brokenRuntimeContractGate.status, 'failed');
+assert.equal(brokenRuntimeContractGate.onboarding_status, 'blocked_by_runtime_contract');
+assert.equal(brokenRuntimeContractGate.blocking_issues.some((item) => item.code === 'runtime_contract_not_ready'), true);
+assert.equal(brokenRuntimeContractGate.next_actions.includes('fix_candidate_observation:candidate_observation_not_ready'), true);
+
 const summary = buildMeetingPlatformLaunchGateSummary({
   ...buildFixtureLaunchGateInput({
     baseUrl,
