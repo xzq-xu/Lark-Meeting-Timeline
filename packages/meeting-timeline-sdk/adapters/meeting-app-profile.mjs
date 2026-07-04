@@ -7,7 +7,10 @@ import {
   buildMeetingAppSnapshotRecordSet,
   meetingAppSnapshotRecords,
 } from './meeting-app-snapshot-recorder.mjs';
-import { normalizeMeetingAppSnapshot } from './meeting-apps.mjs';
+import {
+  buildMeetingAppAdapterFitReport,
+  normalizeMeetingAppSnapshot,
+} from './meeting-apps.mjs';
 import { selectMeetingSessionCandidate } from './meeting-session-discovery.mjs';
 import {
   MEETING_APP_EXTENSION_MESSAGE_TYPES,
@@ -29,6 +32,8 @@ export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA = 'meeting_app_runtime_ad
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA = 'meeting_app_runtime_adapter_profile_resolution';
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA = 'meeting_app_runtime_adapter_profile_matrix';
 export const MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA = 'meeting_app_runtime_adapter_selection';
+export const MEETING_APP_RUNTIME_OBSERVER_PLAN_SCHEMA = 'meeting_app_runtime_observer_plan';
+export const MEETING_APP_RUNTIME_OBSERVER_PLAN_MATRIX_SCHEMA = 'meeting_app_runtime_observer_plan_matrix';
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_SCHEMA = 'meeting_app_runtime_adapter_handoff';
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_MATRIX_SCHEMA = 'meeting_app_runtime_adapter_handoff_matrix';
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_ACCEPTANCE_SCHEMA = 'meeting_app_runtime_adapter_handoff_acceptance';
@@ -671,6 +676,275 @@ export function buildMeetingAppRuntimeAdapterProfileMatrix(options = {}) {
     })),
     profiles,
     next_actions: uniqueList(profiles.flatMap((profile) => profile.next_actions ?? [])),
+  };
+}
+
+function numericOption(options = {}, names = [], fallback = 0) {
+  const value = firstNonEmpty(...names.map((name) => options[name]), fallback);
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, numeric) : fallback;
+}
+
+function planInputObject(input = {}) {
+  if (typeof input === 'string') {
+    try {
+      return { platform: normalizeAppPlatform(input) };
+    } catch {
+      return { url: input };
+    }
+  }
+  return input ?? {};
+}
+
+function hasObserverPreflightInput(input = {}) {
+  if (typeof input === 'string') {
+    try {
+      normalizeAppPlatform(input);
+      return false;
+    } catch {
+      return true;
+    }
+  }
+  if (!input || typeof input !== 'object') return false;
+  return [
+    'url',
+    'href',
+    'meeting_url',
+    'meetingUrl',
+    'tabs',
+    'windows',
+    'pages',
+    'frames',
+    'applications',
+    'apps',
+    'processes',
+    'page',
+    'dom',
+    'window',
+    'tab',
+    'accessibility',
+    'ax',
+    'participants',
+    'tiles',
+    'controls',
+    'buttons',
+    'activeSpeaker',
+    'active_speaker',
+  ].some((key) => input[key] != null);
+}
+
+function observerPlanPlatform(input = {}, options = {}) {
+  const explicit = firstNonEmpty(
+    options.platform,
+    options.provider,
+    options.key,
+    options.name,
+    input.platform,
+    input.provider,
+    input.key,
+    input.name,
+  );
+  if (explicit) return normalizeAppPlatform(explicit);
+  const profile = resolveMeetingAppRuntimeAdapterProfile(input, options);
+  if (profile.platform) return normalizeAppPlatform(profile.platform);
+  throw new MeetingTimelineSdkError('Meeting app runtime observer plan requires a platform or detectable meeting app input.', {
+    supported_platforms: MEETING_APP_INTEGRATION_PROFILE_PLATFORMS,
+    issues: profile.issues,
+  });
+}
+
+function observerCadence(surface, runtimePreset = {}, trackOptions = {}, options = {}) {
+  const speakerOptions = trackOptions.speakerTrackOptions ?? trackOptions.speaker_track_options ?? {};
+  const nativeSurface = surface === 'native_detector';
+  const changedFallback = nativeSurface
+    ? 500
+    : numericOption(runtimePreset, ['mutationDebounceMs', 'mutation_debounce_ms'], 250);
+  const sampleFallback = nativeSurface
+    ? 1_000
+    : numericOption(runtimePreset, ['sampleIntervalMs', 'sample_interval_ms'], 10_000);
+  return {
+    min_observe_interval_ms: numericOption(options, ['minObserveIntervalMs', 'min_observe_interval_ms'], nativeSurface ? 500 : 250),
+    changed_observe_every_ms: numericOption(options, ['changedObserveEveryMs', 'changed_observe_every_ms'], changedFallback),
+    unchanged_observe_every_ms: numericOption(options, ['unchangedObserveEveryMs', 'unchanged_observe_every_ms'], numericOption(runtimePreset, ['unchangedObserveEveryMs', 'unchanged_observe_every_ms'], nativeSurface ? 2_000 : 10_000)),
+    fallback_poll_interval_ms: numericOption(options, ['sampleIntervalMs', 'sample_interval_ms'], sampleFallback),
+    speaker_stable_followup_ms: numericOption(options, ['speakerStableFollowupMs', 'speaker_stable_followup_ms'], numericOption(runtimePreset, ['speakerStableFollowupMs', 'speaker_stable_followup_ms'], speakerOptions.minStableMs ?? speakerOptions.min_stable_ms ?? 300)),
+    speaker_min_stable_ms: numericOption(speakerOptions, ['minStableMs', 'min_stable_ms'], nativeSurface ? 700 : 650),
+    speaker_end_idle_ms: numericOption(speakerOptions, ['endIdleMs', 'end_idle_ms'], 1_500),
+    meeting_missing_end_grace_ms: numericOption(options, ['meetingMissingEndGraceMs', 'meeting_missing_end_grace_ms', 'candidateMissingEndGraceMs', 'candidate_missing_end_grace_ms'], nativeSurface ? 5_000 : 4_000),
+  };
+}
+
+function observerTriggerPolicy(surface, cadence = {}) {
+  const mutationSurface = surface === 'browser_extension' || surface === 'electron_webview' || surface === 'webview';
+  return [
+    mutationSurface ? {
+      trigger: 'dom_mutation',
+      action: 'observe_changed_snapshot',
+      debounce_ms: cadence.changed_observe_every_ms,
+      applies_to: ['meeting_controls', 'participant_tiles', 'status_text'],
+    } : {
+      trigger: 'host_snapshot_change',
+      action: 'observe_changed_snapshot',
+      debounce_ms: cadence.changed_observe_every_ms,
+      applies_to: ['window_title', 'accessibility_tree', 'participant_tiles', 'audio_activity'],
+    },
+    {
+      trigger: 'unchanged_keep_alive',
+      action: 'observe_snapshot_for_state_timeout',
+      interval_ms: cadence.unchanged_observe_every_ms,
+    },
+    {
+      trigger: 'active_speaker_candidate',
+      action: 'schedule_speaker_stable_followup',
+      delay_ms: cadence.speaker_stable_followup_ms,
+    },
+    {
+      trigger: 'meeting_candidate_missing',
+      action: 'emit_meeting_ended_after_grace_window',
+      grace_ms: cadence.meeting_missing_end_grace_ms,
+    },
+  ];
+}
+
+function observerInputContract(surface, config = {}) {
+  if (surface === 'native_detector') {
+    return {
+      accepted_shapes: ['application_snapshot', 'window_snapshot', 'accessibility_snapshot', 'audio_activity_snapshot'],
+      required_fields: ['platform_or_detectable_app_name', 'meeting_id_or_url_or_stable_window_id', 'observedAtMs'],
+      recommended_fields: ['participants[]', 'activeSpeaker', 'controls[]', 'window.title', 'app.name'],
+      capture_profile: config.capture_options?.captureProfile,
+    };
+  }
+  return {
+    accepted_shapes: ['browser_tab', 'browser_window', 'dom_snapshot', 'live_document'],
+    required_fields: ['url_or_location', 'title_or_meeting_id', 'observedAtMs'],
+    recommended_fields: ['page.controls[]', 'page.tiles[]', 'page.texts[]', 'activeSpeaker'],
+    capture_profile: config.capture_options?.captureProfile,
+    control_selectors: config.capture_options?.controlSelectors,
+    participant_selectors: config.capture_options?.participantSelectors,
+    text_selectors: config.capture_options?.textSelectors,
+  };
+}
+
+export function buildMeetingAppRuntimeObserverPlan(platformOrInput = {}, options = {}) {
+  const input = planInputObject(platformOrInput);
+  const merged = { ...input, ...options };
+  const platform = observerPlanPlatform(input, options);
+  const surface = normalizeHandoffSurface(firstNonEmpty(
+    merged.surface,
+    merged.targetSurface,
+    merged.target_surface,
+    merged.runtimeSurface,
+    merged.runtime_surface,
+    'browser_extension',
+  ));
+  const config = buildMeetingAppRuntimeAdapterConfig(platform, {
+    ...merged,
+    includeLaunchGate: false,
+  });
+  const runtimePreset = meetingAppBrowserRuntimePreset(platform, merged);
+  const trackOptions = trackRuntimeDefaults(platform, merged);
+  const cadence = observerCadence(surface, runtimePreset, trackOptions, merged);
+  const fitInput = firstNonEmpty(merged.input, input);
+  const fitReport = hasObserverPreflightInput(fitInput)
+    ? buildMeetingAppAdapterFitReport(fitInput, {
+      ...merged,
+      platform,
+    })
+    : null;
+  const configAcceptance = buildMeetingAppRuntimeAdapterAcceptanceReport(config, merged);
+  return compactObject({
+    type: 'meeting_app_runtime_observer_plan',
+    schema: MEETING_APP_RUNTIME_OBSERVER_PLAN_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    platform,
+    display_name: config.display_name,
+    surface,
+    accepted: configAcceptance.accepted && (fitReport ? fitReport.accepted : true),
+    sdk_ready: configAcceptance.accepted,
+    preflight_status: fitReport ? (fitReport.accepted ? 'accepted' : 'rejected') : 'not_run',
+    ready_for_realtime_axis: fitReport ? fitReport.ready_for_realtime_axis : null,
+    ready_for_speaker_track: fitReport ? fitReport.ready_for_speaker_track : null,
+    ready_for_participant_track: fitReport ? fitReport.ready_for_participant_track : null,
+    input_contract: observerInputContract(surface, config),
+    observer_runtime: {
+      factory: surface === 'native_detector' ? 'createMeetingAppTrackRuntime' : 'createMeetingAppBrowserRuntime',
+      source: surface === 'native_detector' ? 'native_meeting_app_observer' : 'meeting_app_browser_runtime',
+      observe_method: 'observeMeetingApp',
+      track_observe_method: 'observeMeetingAppTracks',
+      mutation_observer: surface !== 'native_detector' && runtimePreset?.observeMutations === true,
+      mutation_track_selectors: surface === 'native_detector' ? [] : runtimePreset?.mutationTrackSelectors,
+      mutation_ignore_selectors: surface === 'native_detector' ? [] : runtimePreset?.mutationIgnoreSelectors,
+      capture_options: config.capture_options,
+      bridge_options: config.bridge_options,
+    },
+    cadence,
+    trigger_policy: observerTriggerPolicy(surface, cadence),
+    signal_contract: {
+      starts_axis_on: ['meeting_started'],
+      ends_axis_on: ['meeting_ended'],
+      speaker_markers: ['speaker_started', 'speaker_ended'],
+      participant_markers: ['participant_joined', 'participant_left'],
+      timestamp_field: 'captured_at_ms',
+      provider_events_role: 'reconcile_and_backfill_only',
+      transcript_role: 'post_meeting_backfill_only',
+    },
+    track_runtime: {
+      factory: 'createMeetingAppTrackRuntime',
+      options: trackOptions,
+      output_intents: ['speaker_track', 'participant_track'],
+      content_policy: 'position_markers_only_no_transcript_text_required',
+    },
+    preflight: fitReport,
+    acceptance: configAcceptance,
+    next_actions: uniqueList([
+      ...(fitReport ? fitReport.next_actions : ['run_meetingAppAdapterFit_with_real_host_input']),
+      'wire_observer_plan_to_host_scheduler',
+      surface === 'native_detector' ? 'feed_native_window_or_accessibility_snapshots' : 'install_browser_or_webview_dom_observer',
+      'write_annotations_with_captured_at_ms',
+      'validate_with_live_snapshot_before_production_rollout',
+    ]),
+  });
+}
+
+export function buildMeetingAppRuntimeObserverPlanMatrix(options = {}) {
+  const platforms = platformList(options);
+  const plans = platforms.map((platform) => buildMeetingAppRuntimeObserverPlan(
+    matrixInputForPlatform(platform, options),
+    {
+      ...options,
+      platform,
+    },
+  ));
+  return {
+    type: 'meeting_app_runtime_observer_plan_matrix',
+    schema: MEETING_APP_RUNTIME_OBSERVER_PLAN_MATRIX_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    platform_count: plans.length,
+    accepted_count: plans.filter((plan) => plan.accepted).length,
+    sdk_ready_count: plans.filter((plan) => plan.sdk_ready).length,
+    preflight_accepted_count: plans.filter((plan) => plan.preflight_status === 'accepted').length,
+    realtime_axis_ready_count: plans.filter((plan) => plan.ready_for_realtime_axis === true).length,
+    speaker_track_ready_count: plans.filter((plan) => plan.ready_for_speaker_track === true).length,
+    participant_track_ready_count: plans.filter((plan) => plan.ready_for_participant_track === true).length,
+    platforms: plans.map((plan) => plan.platform),
+    rows: plans.map((plan) => ({
+      platform: plan.platform,
+      surface: plan.surface,
+      accepted: plan.accepted,
+      sdk_ready: plan.sdk_ready,
+      preflight_status: plan.preflight_status,
+      ready_for_realtime_axis: plan.ready_for_realtime_axis,
+      ready_for_speaker_track: plan.ready_for_speaker_track,
+      ready_for_participant_track: plan.ready_for_participant_track,
+      fallback_poll_interval_ms: plan.cadence.fallback_poll_interval_ms,
+      changed_observe_every_ms: plan.cadence.changed_observe_every_ms,
+      meeting_missing_end_grace_ms: plan.cadence.meeting_missing_end_grace_ms,
+      observer_factory: plan.observer_runtime.factory,
+      next_actions: plan.next_actions,
+    })),
+    plans,
+    next_actions: uniqueList(plans.flatMap((plan) => plan.next_actions ?? [])),
   };
 }
 

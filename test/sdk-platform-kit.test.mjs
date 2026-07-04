@@ -144,6 +144,40 @@ const appFitMatrix = kit.meetingAppAdapterFitMatrix({
 });
 assert.equal(appFitMatrix.platform_count, 2);
 assert.equal(appFitMatrix.realtime_axis_ready_count, 2);
+const appObserverPlan = kit.meetingAppRuntimeObserverPlan({
+  url: 'https://meet.google.com/abc-defg-hij',
+  page: {
+    controls: [{ label: 'Leave call' }],
+    participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+  },
+}, {
+  platform: 'google-meet',
+});
+assert.equal(appObserverPlan.accepted, true);
+assert.equal(appObserverPlan.preflight_status, 'accepted');
+assert.equal(appObserverPlan.observer_runtime.factory, 'createMeetingAppBrowserRuntime');
+assert.equal(appObserverPlan.signal_contract.timestamp_field, 'captured_at_ms');
+const appObserverPlanMatrix = kit.meetingAppRuntimeObserverPlanMatrix({
+  platforms: ['google-meet', 'zoom'],
+  inputs: {
+    google_meet: {
+      url: 'https://meet.google.com/abc-defg-hij',
+      page: {
+        controls: [{ label: 'Leave call' }],
+        participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace speaking' }],
+      },
+    },
+    zoom: {
+      app: { name: 'Zoom Workplace' },
+      window: { title: 'Zoom Meeting', controls: [{ label: 'Leave Meeting' }] },
+      meeting_id: 'zoom-local',
+      tiles: [{ id: 'mira', ariaLabel: 'Mira Patel is speaking' }],
+    },
+  },
+});
+assert.equal(appObserverPlanMatrix.platform_count, 2);
+assert.equal(appObserverPlanMatrix.preflight_accepted_count, 2);
+assert.equal(kit.report({ platforms: ['google-meet'] }).meeting_app_runtime_observer_plan_matrix.platform_count, 1);
 
 const appGate = kit.meetingAppLaunchGate('google-meet', {
   allowFixtureProduction: true,

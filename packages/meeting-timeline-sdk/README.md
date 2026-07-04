@@ -891,6 +891,27 @@ const fit = kit.meetingAppAdapterFit({
 
 多平台宿主可以把不同会议软件的样本放进 `meetingAppAdapterFitMatrix()`，先比较 Google Meet / Teams / Zoom / Lark / Webex 哪些输入已经能接入，哪些还缺本地观察字段。这个报告适合作为接入面板或 CI preflight；生产发布前仍然要继续跑 live snapshot diagnosis 和 handoff readiness。
 
+fit 通过后，宿主可以再生成 `meetingAppRuntimeObserverPlan()`，把“怎么持续观察”固化成机器可读计划。它会把 runtime preset、DOM/AX 输入契约、采样节流、active speaker 稳定窗口、会议消失后的 end grace window 和 provider/transcript 非阻塞规则放在同一个对象里：
+
+```js
+const observerPlan = kit.meetingAppRuntimeObserverPlan({
+  url: 'https://meet.google.com/abc-defg-hij',
+  page: {
+    controls: [{ label: 'Leave call' }],
+    participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+  },
+}, {
+  platform: 'google-meet',
+  surface: 'browser-extension',
+});
+
+// observerPlan.cadence.changed_observe_every_ms 控制 DOM 变化触发后的节流。
+// observerPlan.cadence.meeting_missing_end_grace_ms 控制候选会议消失后多久补 meeting_ended。
+// observerPlan.trigger_policy 明确 start/end/speaker/keep-alive 的触发方式。
+```
+
+`meetingAppRuntimeObserverPlanMatrix()` 可以一次生成多平台计划。浏览器扩展和 WebView 默认用 mutation observer + 低频 keep-alive；native detector 默认按窗口/Accessibility/音频快照变化触发。它仍然不替代真实 DOM 证据，只是把外部项目的观察循环和节流参数标准化，避免每个宿主自己猜采样频率。
+
 浏览器扩展或 WebView 里可以再往前接一层 `meeting-app-capture`。它只读取 DOM 文本、按钮、`aria-label`、participant tile、常见 `data-participant-*` / `data-user-*` / `data-person-*` 属性和音量/发言状态，输出 `meeting-apps` 可识别的快照；不截图、不 OCR、不读取转写正文：
 
 ```js

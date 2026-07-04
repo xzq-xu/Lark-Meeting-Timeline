@@ -259,6 +259,8 @@ import {
   buildMeetingAppRuntimeAdapterHandoffMatrix,
   buildMeetingAppRuntimeAdapterHostPackage,
   buildMeetingAppRuntimeAdapterProfileMatrix,
+  buildMeetingAppRuntimeObserverPlan,
+  buildMeetingAppRuntimeObserverPlanMatrix,
   buildMeetingAppRuntimeAdapterValidationReport,
   selectMeetingAppRuntimeAdapter,
   resolveMeetingAppRuntimeAdapterProfile,
@@ -392,6 +394,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_dom_adaptation_diagnosis_matrix: buildMeetingAppDomAdaptationDiagnosisMatrix(options),
     meeting_app_runtime_adapter_configs: buildAllMeetingAppRuntimeAdapterConfigs(options),
     meeting_app_runtime_adapter_acceptance: buildAllMeetingAppRuntimeAdapterAcceptanceReports(options),
+    meeting_app_runtime_observer_plan_matrix: buildMeetingAppRuntimeObserverPlanMatrix(options),
     meeting_app_live_snapshot_capture_plans: buildAllMeetingAppLiveSnapshotCapturePlans(options),
     meeting_app_runtime_adapter_validation: buildAllMeetingAppRuntimeAdapterValidationReports(options),
     meeting_app_fixture_acceptance: meetingAppFixtureAcceptance,
@@ -899,6 +902,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppRuntimeAdapterProfileMatrix(profileOptions = {}) {
       return buildMeetingAppRuntimeAdapterProfileMatrix(withDefaults(defaults, profileOptions));
+    },
+    meetingAppRuntimeObserverPlan(platformOrInput = {}, planOptions = {}) {
+      return buildMeetingAppRuntimeObserverPlan(platformOrInput, withDefaults(defaults, planOptions));
+    },
+    meetingAppRuntimeObserverPlanMatrix(planOptions = {}) {
+      return buildMeetingAppRuntimeObserverPlanMatrix(withDefaults(defaults, planOptions));
     },
     selectMeetingAppRuntimeAdapter(input = {}, selectionOptions = {}) {
       return selectMeetingAppRuntimeAdapter(input, withDefaults(defaults, selectionOptions));

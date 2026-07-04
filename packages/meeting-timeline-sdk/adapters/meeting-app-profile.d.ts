@@ -8,6 +8,8 @@ export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA: 'meeting_app_runtime_ada
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA: 'meeting_app_runtime_adapter_profile_resolution';
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA: 'meeting_app_runtime_adapter_profile_matrix';
 export const MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA: 'meeting_app_runtime_adapter_selection';
+export const MEETING_APP_RUNTIME_OBSERVER_PLAN_SCHEMA: 'meeting_app_runtime_observer_plan';
+export const MEETING_APP_RUNTIME_OBSERVER_PLAN_MATRIX_SCHEMA: 'meeting_app_runtime_observer_plan_matrix';
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_SCHEMA: 'meeting_app_runtime_adapter_handoff';
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_MATRIX_SCHEMA: 'meeting_app_runtime_adapter_handoff_matrix';
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_ACCEPTANCE_SCHEMA: 'meeting_app_runtime_adapter_handoff_acceptance';
@@ -108,6 +110,47 @@ export interface MeetingAppRuntimeAdapterProfileMatrix {
   platforms: MeetingAppDomCaptureProfilePlatform[];
   rows: Array<Record<string, unknown>>;
   profiles: MeetingAppRuntimeAdapterProfileResolution[];
+  next_actions: string[];
+}
+
+export interface MeetingAppRuntimeObserverPlan {
+  type: 'meeting_app_runtime_observer_plan';
+  schema: 'meeting_app_runtime_observer_plan';
+  version: number;
+  platform: MeetingAppDomCaptureProfilePlatform;
+  display_name: string;
+  surface: string;
+  accepted: boolean;
+  sdk_ready: boolean;
+  preflight_status: 'accepted' | 'rejected' | 'not_run' | string;
+  ready_for_realtime_axis: boolean | null;
+  ready_for_speaker_track: boolean | null;
+  ready_for_participant_track: boolean | null;
+  input_contract: Record<string, unknown>;
+  observer_runtime: Record<string, unknown>;
+  cadence: Record<string, number>;
+  trigger_policy: Array<Record<string, unknown>>;
+  signal_contract: Record<string, unknown>;
+  track_runtime: Record<string, unknown>;
+  preflight?: Record<string, unknown> | null;
+  acceptance: MeetingAppRuntimeAdapterAcceptanceReport;
+  next_actions: string[];
+}
+
+export interface MeetingAppRuntimeObserverPlanMatrix {
+  type: 'meeting_app_runtime_observer_plan_matrix';
+  schema: 'meeting_app_runtime_observer_plan_matrix';
+  version: number;
+  platform_count: number;
+  accepted_count: number;
+  sdk_ready_count: number;
+  preflight_accepted_count: number;
+  realtime_axis_ready_count: number;
+  speaker_track_ready_count: number;
+  participant_track_ready_count: number;
+  platforms: MeetingAppDomCaptureProfilePlatform[];
+  rows: Array<Record<string, unknown>>;
+  plans: MeetingAppRuntimeObserverPlan[];
   next_actions: string[];
 }
 
@@ -419,6 +462,15 @@ export function resolveMeetingAppRuntimeAdapterProfile(
 export function buildMeetingAppRuntimeAdapterProfileMatrix(
   options?: MeetingAppIntegrationProfileOptions,
 ): MeetingAppRuntimeAdapterProfileMatrix;
+
+export function buildMeetingAppRuntimeObserverPlan(
+  platformOrInput?: MeetingAppDomCaptureProfilePlatform | string | Record<string, unknown>,
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppRuntimeObserverPlan;
+
+export function buildMeetingAppRuntimeObserverPlanMatrix(
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppRuntimeObserverPlanMatrix;
 
 export function selectMeetingAppRuntimeAdapter(
   input?: string | Record<string, unknown>,

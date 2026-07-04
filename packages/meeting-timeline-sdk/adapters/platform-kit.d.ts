@@ -211,6 +211,8 @@ import type {
   MeetingAppRuntimeAdapterProfileResolution,
   MeetingAppRuntimeAdapterSelection,
   MeetingAppRuntimeAdapterValidationReport,
+  MeetingAppRuntimeObserverPlan,
+  MeetingAppRuntimeObserverPlanMatrix,
 } from './meeting-app-profile.mjs';
 import type {
   MeetingAppExtensionInstallPlan,
@@ -494,6 +496,8 @@ export interface MeetingPlatformTimelineKit {
   meetingAppRuntimeAdapterConfig(platform: string, configOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterConfig;
   meetingAppRuntimeAdapterProfile(input?: string | Record<string, unknown>, profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterProfileResolution;
   meetingAppRuntimeAdapterProfileMatrix(profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterProfileMatrix;
+  meetingAppRuntimeObserverPlan(platformOrInput?: string | Record<string, unknown>, planOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeObserverPlan;
+  meetingAppRuntimeObserverPlanMatrix(planOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeObserverPlanMatrix;
   selectMeetingAppRuntimeAdapter(input?: string | Record<string, unknown>, selectionOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterSelection;
   meetingAppRuntimeAdapterHandoff(selectionOrInput?: string | Record<string, unknown> | MeetingAppRuntimeAdapterSelection, handoffOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterHandoff;
   meetingAppRuntimeAdapterHandoffMatrix(handoffOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterHandoffMatrix;

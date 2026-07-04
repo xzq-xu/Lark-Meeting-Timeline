@@ -17,6 +17,8 @@ import {
   MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA,
+  MEETING_APP_RUNTIME_OBSERVER_PLAN_MATRIX_SCHEMA,
+  MEETING_APP_RUNTIME_OBSERVER_PLAN_SCHEMA,
   assertMeetingAppDeploymentManifest,
   assertMeetingAppRuntimeAdapterHandoff,
   assertMeetingAppRuntimeAdapterHandoffMatrix,
@@ -46,6 +48,8 @@ import {
   buildMeetingAppRuntimeAdapterHandoffMatrix,
   buildMeetingAppRuntimeAdapterHostPackage,
   buildMeetingAppRuntimeAdapterProfileMatrix,
+  buildMeetingAppRuntimeObserverPlan,
+  buildMeetingAppRuntimeObserverPlanMatrix,
   buildMeetingAppRuntimeAdapterValidationReport,
   selectMeetingAppRuntimeAdapter,
   resolveMeetingAppRuntimeAdapterProfile,
@@ -65,6 +69,8 @@ assert.equal(MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA, 'meeting_app_runtime_ada
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA, 'meeting_app_runtime_adapter_profile_resolution');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA, 'meeting_app_runtime_adapter_profile_matrix');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA, 'meeting_app_runtime_adapter_selection');
+assert.equal(MEETING_APP_RUNTIME_OBSERVER_PLAN_SCHEMA, 'meeting_app_runtime_observer_plan');
+assert.equal(MEETING_APP_RUNTIME_OBSERVER_PLAN_MATRIX_SCHEMA, 'meeting_app_runtime_observer_plan_matrix');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_HANDOFF_SCHEMA, 'meeting_app_runtime_adapter_handoff');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_HANDOFF_MATRIX_SCHEMA, 'meeting_app_runtime_adapter_handoff_matrix');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_HANDOFF_ACCEPTANCE_SCHEMA, 'meeting_app_runtime_adapter_handoff_acceptance');
@@ -172,6 +178,76 @@ assert.equal(profileMatrix.rows.find((row) => row.platform === 'google_meet').ex
 assert.equal(profileMatrix.rows.find((row) => row.platform === 'microsoft_teams').runtime_preset, 'microsoft_teams');
 assert.equal(profileMatrix.rows.find((row) => row.platform === 'zoom').capture_profile, 'zoom');
 assert.equal(profileMatrix.next_actions.includes('enable_observeTracks_or_trackMutations_when_speaker_position_marks_are_needed'), true);
+
+const googleObserverPlan = buildMeetingAppRuntimeObserverPlan({
+  url: 'https://meet.google.com/abc-defg-hij',
+  title: 'Design review - Google Meet',
+  page: {
+    controls: [{ label: 'Leave call' }],
+    participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+  },
+}, {
+  platform: 'google-meet',
+  surface: 'browser-extension',
+});
+assert.equal(googleObserverPlan.type, 'meeting_app_runtime_observer_plan');
+assert.equal(googleObserverPlan.schema, MEETING_APP_RUNTIME_OBSERVER_PLAN_SCHEMA);
+assert.equal(googleObserverPlan.platform, 'google_meet');
+assert.equal(googleObserverPlan.surface, 'browser_extension');
+assert.equal(googleObserverPlan.accepted, true);
+assert.equal(googleObserverPlan.sdk_ready, true);
+assert.equal(googleObserverPlan.preflight_status, 'accepted');
+assert.equal(googleObserverPlan.ready_for_realtime_axis, true);
+assert.equal(googleObserverPlan.ready_for_speaker_track, true);
+assert.equal(googleObserverPlan.observer_runtime.factory, 'createMeetingAppBrowserRuntime');
+assert.equal(googleObserverPlan.observer_runtime.mutation_observer, true);
+assert.equal(googleObserverPlan.cadence.fallback_poll_interval_ms, 10000);
+assert.equal(googleObserverPlan.trigger_policy.some((item) => item.trigger === 'meeting_candidate_missing'), true);
+assert.equal(googleObserverPlan.signal_contract.timestamp_field, 'captured_at_ms');
+assert.equal(googleObserverPlan.track_runtime.output_intents.includes('speaker_track'), true);
+
+const nativeObserverPlan = buildMeetingAppRuntimeObserverPlan({
+  app: { name: 'Zoom Workplace' },
+  window: {
+    title: 'Zoom Meeting',
+    controls: [{ label: 'Leave Meeting' }],
+  },
+  meeting_id: 'zoom-local-123',
+  tiles: [{ id: 'mira', ariaLabel: 'Mira Patel is speaking' }],
+}, {
+  platform: 'zoom',
+  surface: 'native-detector',
+});
+assert.equal(nativeObserverPlan.surface, 'native_detector');
+assert.equal(nativeObserverPlan.observer_runtime.factory, 'createMeetingAppTrackRuntime');
+assert.equal(nativeObserverPlan.observer_runtime.mutation_observer, false);
+assert.equal(nativeObserverPlan.cadence.fallback_poll_interval_ms, 1000);
+assert.equal(nativeObserverPlan.input_contract.accepted_shapes.includes('accessibility_snapshot'), true);
+
+const observerPlanMatrix = buildMeetingAppRuntimeObserverPlanMatrix({
+  platforms: ['google-meet', 'zoom'],
+  inputs: {
+    google_meet: {
+      url: 'https://meet.google.com/abc-defg-hij',
+      page: {
+        controls: [{ label: 'Leave call' }],
+        participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+      },
+    },
+    zoom: {
+      app: { name: 'Zoom Workplace' },
+      window: { title: 'Zoom Meeting', controls: [{ label: 'Leave Meeting' }] },
+      meeting_id: 'zoom-local-123',
+      tiles: [{ id: 'mira', ariaLabel: 'Mira Patel is speaking' }],
+    },
+  },
+});
+assert.equal(observerPlanMatrix.schema, MEETING_APP_RUNTIME_OBSERVER_PLAN_MATRIX_SCHEMA);
+assert.equal(observerPlanMatrix.platform_count, 2);
+assert.equal(observerPlanMatrix.accepted_count, 2);
+assert.equal(observerPlanMatrix.sdk_ready_count, 2);
+assert.equal(observerPlanMatrix.preflight_accepted_count, 2);
+assert.equal(observerPlanMatrix.realtime_axis_ready_count, 2);
 
 const adapterSelection = selectMeetingAppRuntimeAdapter({
   windows: [{
