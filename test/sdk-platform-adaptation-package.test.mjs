@@ -19,7 +19,12 @@ assert.equal(google.runtime_contract.annotation_timestamp_field, 'captured_at_ms
 assert.equal(google.runtime_contract.provider_events_block_realtime, false);
 assert.equal(google.runtime_contract.transcript_blocks_realtime, false);
 assert.equal(google.local_observer.required_for_realtime_axis, true);
+assert.equal(google.local_observer.candidate_observation.runtime_event_action, 'observe_platform_candidates');
 assert.deepEqual(google.extension.matches, ['https://meet.google.com/*']);
+assert.equal(google.extension.permissions.includes('tabs'), true);
+assert.equal(google.extension.candidate_observation.message_type, 'meeting_timeline.observe_candidates');
+assert.equal(google.candidate_observation.runtime_event_client_method, 'observePlatformCandidates');
+assert.equal(google.candidate_observation.example.action, 'observe_platform_candidates');
 assert.equal(google.annotation_pipeline.insert_endpoint, `${baseUrl}/api/annotations`);
 assert.equal(google.annotation_pipeline.runtime_event_endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);
 assert.equal(google.annotation_pipeline.runtime_event.client_factory, 'createMeetingPlatformRuntimeEventClient');

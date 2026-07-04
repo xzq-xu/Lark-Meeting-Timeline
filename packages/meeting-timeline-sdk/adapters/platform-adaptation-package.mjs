@@ -25,6 +25,7 @@ import {
   buildMeetingAppRuntimeAdapterConfig,
 } from './meeting-app-profile.mjs';
 import {
+  MEETING_APP_EXTENSION_MESSAGE_TYPES,
   buildMeetingAppExtensionInstallPlan,
   buildMeetingAppExtensionMatchPatterns,
 } from './meeting-app-extension.mjs';
@@ -96,7 +97,7 @@ function providerEventSummary(provider = {}, runtime = {}) {
   });
 }
 
-function localObserverSummary(collector = {}, runtimeAdapter = {}) {
+function localObserverSummary(collector = {}, runtimeAdapter = {}, runtimeEventPlan = {}, extensionPlan = {}) {
   const observer = collector.browser_observer;
   const snapshots = collector.local_snapshot_collector;
   return compactObject({
@@ -107,8 +108,24 @@ function localObserverSummary(collector = {}, runtimeAdapter = {}) {
     content_scripts: observer?.content_scripts ?? [],
     runtime_preset: runtimeAdapter.runtime_options?.runtimePreset ?? runtimeAdapter.bridge_options?.browser_runtime_preset,
     capture_profile: runtimeAdapter.capture_options?.captureProfile,
+    candidate_observation: candidateObservationSummary(runtimeAdapter, runtimeEventPlan, extensionPlan),
     required_snapshots: snapshots?.required_snapshots ?? [],
     minimum_record_count: snapshots?.minimum_record_count ?? 0,
+  });
+}
+
+function candidateObservationSummary(runtimeAdapter = {}, runtimeEventPlan = {}, extensionPlan = {}) {
+  const observeAction = asArray(runtimeEventPlan.actions).find((row) => row?.action === 'observe_platform_candidates');
+  return compactObject({
+    message_type: runtimeAdapter.extension?.message_types?.observe_candidates
+      ?? MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+    runtime_event_action: 'observe_platform_candidates',
+    runtime_event_client_method: observeAction?.client_method ?? 'observePlatformCandidates',
+    runtime_event_endpoint: runtimeEventPlan.endpoint,
+    required_permission: 'tabs',
+    permissions: runtimeAdapter.extension?.permissions ?? extensionPlan.manifest?.permissions ?? [],
+    producer: 'browser_extension_background_or_native_host',
+    example: runtimeEventPlan.examples?.observe_platform_candidates,
   });
 }
 
@@ -165,6 +182,7 @@ function implementationSummary(capabilities = {}, contract = {}, runtimeAdapter 
     extension: {
       install_plan_schema: extensionPlan.schema,
       match_count: extensionPlan.matches?.length ?? extensionPlan.content_scripts?.[0]?.matches?.length ?? 0,
+      candidate_observer_message_type: MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
     },
   };
 }
@@ -279,6 +297,7 @@ export function buildMeetingPlatformAdaptationPackage(platform, options = {}) {
   const extensionPlan = safeExtensionInstallPlan(key, options);
   const liveReadiness = safeLiveReadiness(key, options);
   const handoffReadiness = safeHandoffReadiness(key, options);
+  const candidateObservation = candidateObservationSummary(runtimeAdapter, runtimeEventPlan, extensionPlan);
 
   const base = compactObject({
     type: 'meeting_platform_adaptation_package',
@@ -291,16 +310,19 @@ export function buildMeetingPlatformAdaptationPackage(platform, options = {}) {
     mode: collector.mode,
     recommended_mode: integration.recommended_mode,
     runtime_contract: runtime.runtime_contract,
-    local_observer: localObserverSummary(collector, runtimeAdapter),
+    local_observer: localObserverSummary(collector, runtimeAdapter, runtimeEventPlan, extensionPlan),
     provider_observer: providerEventSummary(provider, runtime),
     annotation_pipeline: annotationSummary(contract, collector, runtimeEventPlan),
+    candidate_observation: candidateObservation,
     runtime_event_plan: runtimeEventPlan,
     speaker_markers: runtime.speaker_markers,
     transcript: transcriptSummary(capabilities, runtime),
     extension: {
       matches: extensionMatches.matches ?? [],
       host_permissions: extensionMatches.host_permissions ?? [],
+      permissions: runtimeAdapter.extension?.permissions ?? extensionPlan.manifest?.permissions ?? [],
       content_scripts: extensionMatches.content_scripts ?? [],
+      candidate_observation: candidateObservation,
       install_plan: extensionPlan,
     },
     evidence: {

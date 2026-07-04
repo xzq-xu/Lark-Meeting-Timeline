@@ -15,6 +15,7 @@ import {
   buildMeetingAppContentScriptManifest,
   buildMeetingAppExtensionAttachedMessage,
   buildMeetingAppExtensionClientCallMessage,
+  buildMeetingAppExtensionObserveCandidatesMessage,
   buildMeetingAppExtensionStatusMessage,
 } from './meeting-app-extension.mjs';
 import {
@@ -88,6 +89,15 @@ function messageExamples(platform, options = {}) {
       platform: extensionPlatform,
       capturedAtMs,
       url,
+    }),
+    observe_candidates: buildMeetingAppExtensionObserveCandidatesMessage({
+      requestId: 'observe-001',
+      capturedAtMs,
+      tabs: [{
+        url,
+        title: `${extensionPlatform ?? 'local'} meeting`,
+        active: true,
+      }],
     }),
     insert_annotation: buildMeetingAppExtensionClientCallMessage('insertMark', {
       id: 'note-001',
@@ -235,8 +245,10 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
     browser: {
       matches: extension.matches ?? [],
       host_permissions: extension.host_permissions ?? [],
+      permissions: extension.permissions ?? adaptationPackage.runtime_profile?.extension?.recommended_permissions ?? [],
       content_scripts: extension.content_scripts ?? [],
       manifest,
+      candidate_observation: adaptationPackage.candidate_observation,
     },
     runtime: {
       preset: key,
@@ -265,6 +277,10 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
         'meeting_timeline.insert_marks',
         'meeting_timeline.provider_event',
       ],
+      background_message_types: [
+        MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+      ],
+      candidate_observation: adaptationPackage.candidate_observation,
       accepted_methods: Object.keys(endpoints).filter((method) => endpoints[method]),
       runtime_event: {
         schema: MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,

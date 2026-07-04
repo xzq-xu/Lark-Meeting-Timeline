@@ -527,6 +527,7 @@ const googlePackage = buildMeetingPlatformAdaptationPackage('google-meet', {
 });
 
 // googlePackage.extension.matches 可直接给浏览器扩展 / WebView preload。
+// googlePackage.extension.permissions 与 googlePackage.candidate_observation 可直接给 background/native host 生成候选会议观察器。
 // googlePackage.annotation_pipeline.insert_endpoint 是设备端实时标注写入地址。
 // googlePackage.annotation_pipeline.runtime_event_plan 是 observe/provider/annotation/speaker/view 的动作契约。
 // googlePackage.runtime_event_plan.examples.insert_annotation 是外部项目插入标注的样例 envelope。
@@ -566,8 +567,10 @@ const googleRuntime = buildMeetingPlatformRuntimeBundle('google-meet', {
 });
 
 // googleRuntime.browser.manifest 可交给扩展构建器。
+// googleRuntime.browser.permissions 和 googleRuntime.messaging.background_message_types 包含候选会议观察所需的 tabs + meeting_timeline.observe_candidates。
 // googleRuntime.runtime.content_script_bridge.options 可直接传给平台级 content-script bridge。
 // googleRuntime.messaging.examples.content_script_insert_annotation 是外部插入标注的消息格式。
+// googleRuntime.messaging.examples.observe_candidates 是 background/native host 触发 observe_platform_candidates 的消息格式。
 // googleRuntime.host.endpoints.insertMark 是实时标注写入地址。
 // googleRuntime.host.endpoints.runtimeEvents 是统一 runtime event envelope 写入地址。
 // googleRuntime.messaging.runtime_event.client_factory 指向 createMeetingPlatformRuntimeEventClient。
