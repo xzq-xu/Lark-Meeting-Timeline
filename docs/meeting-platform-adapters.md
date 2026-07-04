@@ -386,7 +386,7 @@ GET  /api/platform-events/status
 
 如果宿主项目只需要一个更直接的决策对象，而不是完整 setup/rollout 细节，可以调用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-strategy`，或运行 `npm run meeting-platform:strategy` 导出 `meeting_platform_adaptation_strategy_report`。`buildMeetingPlatformAdaptationStrategyMatrix()` 会把每个平台收敛成同一组字段：实时轴主来源、provider 事件是否阻塞实时、转写是否阻塞实时、发言人位置来源、pilot gate、production gate 和 handoff package 入口。这里的策略结论固定为：Google Meet、Teams、Zoom、Webex、Lark 的 provider 事件都不能作为当前标注的唯一低延迟时钟；真实用户边写边标注时，必须优先使用本地观察或 host detector 建轴，provider 事件用于回填和审计。
 
-SDK 还导出 `MEETING_PLATFORM_KEYS`、`MEETING_PLATFORM_ALIASES` 和 `normalizeMeetingPlatform()`，宿主项目应从这里读取平台列表和别名映射。新增平台时必须同时补齐 event adapter、setup manifest、capability contract、endpoint、安全配置，以及适用的 transcript normalizer，并通过 `test/sdk-platform-conformance.test.mjs`。
+SDK 还导出 `MEETING_PLATFORM_KEYS`、`MEETING_PLATFORM_ALIASES` 和 `normalizeMeetingPlatform()`，宿主项目应从这里读取平台列表和别名映射。新增平台时必须同时补齐 event adapter、setup manifest、capability contract、endpoint、安全配置，以及适用的 transcript normalizer，并通过 `test/sdk-platform-conformance.test.mjs`。最基础的 `platform-adapter-contract` 也会验 `candidate_observation`：真实会议平台必须声明 `meeting_timeline.observe_candidates`、`tabs` 权限、`observe_platform_candidates` runtime action 和 `/api/meeting-platform/observe-candidates` host endpoint；后续 registry/onboarding/handoff readiness 只是对这条实时建轴合同的更高层复验。
 
 真实 webhook 接入的安全层也已经放进 SDK：
 

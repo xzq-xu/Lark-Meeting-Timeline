@@ -170,8 +170,8 @@ function statusFor({
   if (productionReady) return 'production_ready';
   if (pilotReady && providerReady) return 'pilot_ready_provider_reconcile_pending';
   if (pilotReady) return 'pilot_ready_provider_setup_pending';
-  if (!contractAccepted) return 'adapter_contract_blocked';
   if (!candidateObservationReady) return 'needs_candidate_observation_contract';
+  if (!contractAccepted) return 'adapter_contract_blocked';
   if (!domAccepted) return 'needs_local_observer_evidence';
   if (providerMissingEnv.length > 0) return 'needs_provider_credentials';
   if (!realAccepted) return 'needs_provider_or_package_evidence';

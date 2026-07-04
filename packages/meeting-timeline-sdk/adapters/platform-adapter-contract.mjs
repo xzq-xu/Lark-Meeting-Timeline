@@ -16,6 +16,8 @@ export const MEETING_PLATFORM_ADAPTER_CONTRACT_MATRIX_SCHEMA = 'meeting_platform
 export const MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTANCE_SCHEMA = 'meeting_platform_adapter_contract_acceptance';
 export const MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTANCE_MATRIX_SCHEMA = 'meeting_platform_adapter_contract_acceptance_matrix';
 export const MEETING_PLATFORM_ADAPTER_CONTRACT_SCHEMA_VERSION = 1;
+export const MEETING_PLATFORM_CANDIDATE_OBSERVATION_ENDPOINT = '/api/meeting-platform/observe-candidates';
+export const MEETING_PLATFORM_CANDIDATE_OBSERVATION_MESSAGE_TYPE = 'meeting_timeline.observe_candidates';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -106,6 +108,64 @@ function evidenceContract(collector = {}) {
   });
 }
 
+function candidateObservationContract(platform, options = {}) {
+  const override = firstNonEmpty(
+    options.candidateObservation,
+    options.candidate_observation,
+    options.candidateObserver,
+    options.candidate_observer,
+    {},
+  ) ?? {};
+  const runtimeEventAction = firstNonEmpty(
+    override.runtime_event_action,
+    override.runtimeEventAction,
+    override.action,
+    'observe_platform_candidates',
+  );
+  const messageType = firstNonEmpty(
+    override.message_type,
+    override.messageType,
+    MEETING_PLATFORM_CANDIDATE_OBSERVATION_MESSAGE_TYPE,
+  );
+  const requiredPermission = firstNonEmpty(
+    override.required_permission,
+    override.requiredPermission,
+    override.permission,
+    'tabs',
+  );
+  const endpoint = firstNonEmpty(
+    override.endpoint,
+    endpointUrl(MEETING_PLATFORM_CANDIDATE_OBSERVATION_ENDPOINT, options),
+  );
+  const runtimeEventEndpoint = firstNonEmpty(
+    override.runtime_event_endpoint,
+    override.runtimeEventEndpoint,
+    endpointUrl(MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT, options),
+  );
+  const clientMethod = firstNonEmpty(
+    override.runtime_event_client_method,
+    override.runtimeEventClientMethod,
+    override.client_method,
+    override.clientMethod,
+    'observePlatformCandidates',
+  );
+  const enabled = platform !== 'local_detector';
+  return compactObject({
+    required_for_host_axis_binding: enabled,
+    enabled,
+    message_type: enabled ? messageType : undefined,
+    required_permission: enabled ? requiredPermission : undefined,
+    runtime_event_action: enabled ? runtimeEventAction : undefined,
+    runtime_event_endpoint: enabled ? runtimeEventEndpoint : undefined,
+    endpoint: enabled ? endpoint : undefined,
+    runtime_event_client_method: enabled ? clientMethod : undefined,
+    producer: enabled ? firstNonEmpty(override.producer, 'browser_extension_background_or_native_host') : undefined,
+    required_snapshot_fields: enabled ? ['url', 'title', 'active', 'captured_at_ms'] : undefined,
+    direct_host_endpoint: enabled,
+    runtime_event_supported: enabled,
+  });
+}
+
 function implementationContract(capabilities = {}, collector = {}, runtime = {}) {
   return {
     imports: compactObject({
@@ -124,6 +184,7 @@ function implementationContract(capabilities = {}, collector = {}, runtime = {})
       'platformAdapterContract',
       'platformRuntimeProfile',
       'platformRuntimeBundle',
+      'platformRuntimeEventPlan',
       'platformProviderConnectionPack',
       'platformFieldCollectorConfig',
       'platformFieldEvidenceBundle',
@@ -206,6 +267,40 @@ function buildAcceptanceIssues(contract = {}, target = 'contract') {
   if (!hasValue(contract.annotations?.endpoints?.runtimeEvents)) {
     issues.push(issue('error', 'missing_runtime_events_endpoint', 'Contract must expose annotations.endpoints.runtimeEvents.'));
   }
+  if (contract.supported_surfaces?.candidate_observation === true) {
+    if (contract.candidate_observation?.required_for_host_axis_binding !== true) {
+      issues.push(issue('error', 'candidate_observation_not_required', 'Contract must require candidate observation for host-level realtime axis binding.'));
+    }
+    if (contract.candidate_observation?.message_type !== MEETING_PLATFORM_CANDIDATE_OBSERVATION_MESSAGE_TYPE) {
+      issues.push(issue('error', 'invalid_candidate_observation_message_type', 'Candidate observation must use meeting_timeline.observe_candidates.', {
+        message_type: contract.candidate_observation?.message_type,
+      }));
+    }
+    if (contract.candidate_observation?.required_permission !== 'tabs') {
+      issues.push(issue('error', 'missing_candidate_observation_tabs_permission', 'Candidate observation must declare tabs permission for browser candidate discovery.', {
+        required_permission: contract.candidate_observation?.required_permission,
+      }));
+    }
+    if (contract.candidate_observation?.runtime_event_action !== 'observe_platform_candidates') {
+      issues.push(issue('error', 'invalid_candidate_observation_runtime_action', 'Candidate observation must route to observe_platform_candidates.', {
+        runtime_event_action: contract.candidate_observation?.runtime_event_action,
+      }));
+    }
+    if (!hasValue(contract.candidate_observation?.endpoint)) {
+      issues.push(issue('error', 'missing_candidate_observation_endpoint', 'Candidate observation must expose a direct host endpoint.'));
+    }
+    if (!hasValue(contract.candidate_observation?.runtime_event_endpoint)) {
+      issues.push(issue('error', 'missing_candidate_observation_runtime_event_endpoint', 'Candidate observation must expose a runtime event endpoint.'));
+    }
+    if (contract.candidate_observation?.runtime_event_client_method !== 'observePlatformCandidates') {
+      issues.push(issue('error', 'invalid_candidate_observation_client_method', 'Candidate observation must use observePlatformCandidates client method.', {
+        runtime_event_client_method: contract.candidate_observation?.runtime_event_client_method,
+      }));
+    }
+    if (!includesValue(contract.annotations?.runtime_event?.accepted_actions, 'observe_platform_candidates')) {
+      issues.push(issue('error', 'missing_candidate_observation_runtime_action', 'Runtime event accepted_actions must include observe_platform_candidates.'));
+    }
+  }
   if (contract.annotations?.timestamp_field !== 'captured_at_ms') {
     issues.push(issue('error', 'invalid_annotation_endpoint_timestamp_field', 'Annotation endpoint contract must name captured_at_ms.'));
   }
@@ -280,6 +375,7 @@ export function buildMeetingPlatformAdapterContract(platform, options = {}) {
   const provider = buildMeetingPlatformProviderConnectionPack(key, options);
   const collector = buildMeetingPlatformFieldCollectorConfig(key, options);
   const readiness = readinessContract(provider, collector, runtime);
+  const candidateObservation = candidateObservationContract(key, options);
   const nextActions = unique([
     ...(collector.next_actions ?? []),
     ...(provider.next_actions ?? []),
@@ -297,6 +393,7 @@ export function buildMeetingPlatformAdapterContract(platform, options = {}) {
     supported_surfaces: {
       local_observer_or_host_detector: true,
       browser_observer: Boolean(collector.browser_observer),
+      candidate_observation: candidateObservation.enabled === true,
       provider_webhook_or_event_subscription: key !== 'local_detector',
       post_meeting_transcript_import: capabilities.post_meeting_transcript?.status ?? 'unknown',
       realtime_transcript_required: false,
@@ -328,6 +425,7 @@ export function buildMeetingPlatformAdapterContract(platform, options = {}) {
         client_factory: 'createMeetingPlatformRuntimeEventClient',
         accepted_actions: [
           'observe_meeting_app',
+          'observe_platform_candidates',
           'provider_event',
           'insert_annotation',
           'speaker_track',
@@ -336,6 +434,7 @@ export function buildMeetingPlatformAdapterContract(platform, options = {}) {
         ],
       },
     },
+    candidate_observation: candidateObservation,
     local_observer: localObserverContract(collector, runtime),
     provider_observer: providerObserverContract(provider, runtime, collector),
     transcript: runtime.transcript,
@@ -359,6 +458,7 @@ export function buildMeetingPlatformAdapterContractMatrix(options = {}) {
     platform_count: contracts.length,
     browser_observer_count: contracts.filter((contract) => contract.supported_surfaces.browser_observer).length,
     provider_observer_count: contracts.filter((contract) => contract.supported_surfaces.provider_webhook_or_event_subscription).length,
+    candidate_observer_count: contracts.filter((contract) => contract.candidate_observation?.runtime_event_action === 'observe_platform_candidates').length,
     production_ready_count: contracts.filter((contract) => contract.readiness.production_ready).length,
     realtime_ready_count: contracts.filter((contract) => contract.readiness.ready_for_realtime_annotations).length,
     platforms: contracts.map((contract) => contract.platform),
@@ -367,6 +467,10 @@ export function buildMeetingPlatformAdapterContractMatrix(options = {}) {
       display_name: contract.display_name,
       mode: contract.mode,
       browser_observer: contract.supported_surfaces.browser_observer,
+      candidate_observation_ready: contract.candidate_observation?.runtime_event_action === 'observe_platform_candidates',
+      candidate_observer_message_type: contract.candidate_observation?.message_type,
+      candidate_observer_permission: contract.candidate_observation?.required_permission,
+      candidate_observer_endpoint: contract.candidate_observation?.endpoint,
       provider_transport: contract.provider_observer?.transport,
       provider_ready: contract.readiness.provider_ready,
       production_ready: contract.readiness.production_ready,
@@ -408,6 +512,9 @@ export function buildMeetingPlatformAdapterContractAcceptanceReport(contractOrPl
       browser_observer: contract.supported_surfaces?.browser_observer === true,
       provider_observer: contract.supported_surfaces?.provider_webhook_or_event_subscription === true,
       provider_ready: contract.readiness?.provider_ready === true,
+      candidate_observation_ready: contract.candidate_observation?.runtime_event_action === 'observe_platform_candidates',
+      candidate_observer_message_type: contract.candidate_observation?.message_type,
+      candidate_observer_endpoint: contract.candidate_observation?.endpoint,
       production_ready: contract.readiness?.production_ready === true,
       ready_for_realtime_annotations: contract.readiness?.ready_for_realtime_annotations === true,
       insert_mark_endpoint: contract.annotations?.endpoints?.insertMark,
@@ -445,6 +552,7 @@ export function buildMeetingPlatformAdapterContractAcceptanceMatrix(options = {}
       accepted: report.accepted,
       mode: report.summary.mode,
       browser_observer: report.summary.browser_observer,
+      candidate_observation_ready: report.summary.candidate_observation_ready,
       provider_observer: report.summary.provider_observer,
       provider_ready: report.summary.provider_ready,
       production_ready: report.summary.production_ready,

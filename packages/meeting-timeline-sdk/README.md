@@ -457,7 +457,7 @@ const collector = buildMeetingPlatformFieldCollectorConfig('google-meet', {
 // collector.storage.files.field_evidence_input 是采样端应写入的 raw JSON 路径。
 ```
 
-如果下游项目只想拿“一个平台如何接入会议时间轴”的最终契约，直接用 `platform-adapter-contract`。它会把 runtime profile、provider connection、collector config、证据验收条件收敛成一个对象：
+如果下游项目只想拿“一个平台如何接入会议时间轴”的最终契约，直接用 `platform-adapter-contract`。它会把 runtime profile、provider connection、collector config、候选会议观察和证据验收条件收敛成一个对象：
 
 ```js
 import {
@@ -475,6 +475,7 @@ const google = buildMeetingPlatformAdapterContract('google-meet', {
 // google.annotations.endpoints.insertMark 是实时标注写入 endpoint。
 // google.annotations.endpoints.runtimeEvents 是 observe/provider/annotation 的统一 runtime event endpoint。
 // google.annotations.runtime_event.client_factory 指向 createMeetingPlatformRuntimeEventClient。
+// google.candidate_observation 定义 meeting_timeline.observe_candidates -> observe_platform_candidates -> /api/meeting-platform/observe-candidates。
 // google.provider_observer.events 列出 Google Workspace Events 需要监听的 started/ended/participant/artifact 事件。
 // google.local_observer.matches 可交给浏览器扩展或 WebView preload 白名单。
 // google.evidence.missing_items 表示当前离 production-ready 还缺哪些真实会议样本。
@@ -492,7 +493,7 @@ const acceptance = buildMeetingPlatformAdapterContractAcceptanceMatrix({
 });
 
 // 默认 target=contract，只检查结构和实时策略：captured_at_ms、provider 不阻塞实时、
-// transcript 不阻塞实时、insertMark endpoint、浏览器匹配、provider start/end 事件等。
+// transcript 不阻塞实时、insertMark endpoint、候选观察、浏览器匹配、provider start/end 事件等。
 console.log(acceptance.accepted_count);
 
 assertMeetingPlatformAdapterContract(google);
@@ -510,7 +511,7 @@ npm run meeting-platform:adapter-contract -- \
   --report-file=data/meeting-platform-adapter-contract-report.json
 ```
 
-每个平台会生成一份 `{platform}.json`，例如 `google_meet.json`。其中 `annotations.endpoints` 给实时标注写入地址，`local_observer` 给浏览器扩展或 native host 的观察配置，`provider_observer` 给官方事件订阅/校准配置，`evidence.missing_items` 表示离 production-ready 还缺哪些真实会议样本。
+每个平台会生成一份 `{platform}.json`，例如 `google_meet.json`。其中 `annotations.endpoints` 给实时标注写入地址，`candidate_observation` 给 background/native host 的多窗口候选观察契约，`local_observer` 给浏览器扩展或 native host 的页面内观察配置，`provider_observer` 给官方事件订阅/校准配置，`evidence.missing_items` 表示离 production-ready 还缺哪些真实会议样本。
 
 CLI 报告会同时输出 `acceptance`。默认 `--acceptance-target=contract` 只检查 contract 是否能被宿主项目安全接入；如果要把真实证据也纳入 gate，可以用 `--acceptance-target=production --fail-on-rejected=true`，此时缺真实 DOM / provider start-end 样本的平台会失败。
 

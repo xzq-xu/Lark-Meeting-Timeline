@@ -5,6 +5,8 @@ export const MEETING_PLATFORM_ADAPTER_CONTRACT_MATRIX_SCHEMA: 'meeting_platform_
 export const MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTANCE_SCHEMA: 'meeting_platform_adapter_contract_acceptance';
 export const MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTANCE_MATRIX_SCHEMA: 'meeting_platform_adapter_contract_acceptance_matrix';
 export const MEETING_PLATFORM_ADAPTER_CONTRACT_SCHEMA_VERSION: 1;
+export const MEETING_PLATFORM_CANDIDATE_OBSERVATION_ENDPOINT: '/api/meeting-platform/observe-candidates';
+export const MEETING_PLATFORM_CANDIDATE_OBSERVATION_MESSAGE_TYPE: 'meeting_timeline.observe_candidates';
 
 export interface MeetingPlatformAdapterContractOptions extends MeetingPlatformFieldCaptureOptions {
   platforms?: string[];
@@ -22,6 +24,7 @@ export interface MeetingPlatformAdapterContract {
   supported_surfaces: {
     local_observer_or_host_detector: boolean;
     browser_observer: boolean;
+    candidate_observation: boolean;
     provider_webhook_or_event_subscription: boolean;
     post_meeting_transcript_import: string;
     realtime_transcript_required: boolean;
@@ -29,6 +32,7 @@ export interface MeetingPlatformAdapterContract {
   timebase: Record<string, unknown>;
   realtime_axis: Record<string, unknown>;
   annotations: Record<string, unknown>;
+  candidate_observation?: Record<string, unknown>;
   local_observer?: Record<string, unknown>;
   provider_observer: Record<string, unknown>;
   transcript: Record<string, unknown>;
@@ -53,6 +57,7 @@ export interface MeetingPlatformAdapterContractMatrix {
   platform_count: number;
   browser_observer_count: number;
   provider_observer_count: number;
+  candidate_observer_count: number;
   production_ready_count: number;
   realtime_ready_count: number;
   platforms: string[];

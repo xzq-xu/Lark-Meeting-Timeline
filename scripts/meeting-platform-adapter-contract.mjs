@@ -43,6 +43,10 @@ function summarizeContract(contract = {}) {
     display_name: contract.display_name,
     mode: contract.mode,
     browser_observer: contract.supported_surfaces?.browser_observer === true,
+    candidate_observation_ready: contract.candidate_observation?.runtime_event_action === 'observe_platform_candidates',
+    candidate_observer_message_type: contract.candidate_observation?.message_type,
+    candidate_observer_permission: contract.candidate_observation?.required_permission,
+    candidate_observer_endpoint: contract.candidate_observation?.endpoint,
     provider_observer: contract.supported_surfaces?.provider_webhook_or_event_subscription === true,
     provider_transport: contract.provider_observer?.transport,
     provider_ready: contract.readiness?.provider_ready === true,
@@ -99,6 +103,7 @@ async function buildReport() {
     write_contracts: writeContracts,
     platform_count: matrix.platform_count,
     browser_observer_count: matrix.browser_observer_count,
+    candidate_observer_count: matrix.candidate_observer_count,
     provider_observer_count: matrix.provider_observer_count,
     production_ready_count: matrix.production_ready_count,
     realtime_ready_count: matrix.realtime_ready_count,
@@ -118,10 +123,10 @@ try {
   if (jsonOutput) {
     console.log(JSON.stringify(report, null, 2));
   } else {
-    console.log(`meeting_platform_adapter_contract_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | browser_observers=${report.browser_observer_count} | providers=${report.provider_observer_count} | accepted=${report.acceptance.accepted_count}/${report.acceptance.platform_count} | production_ready=${report.production_ready_count} | realtime_ready=${report.realtime_ready_count} | missing_items=${report.missing_item_count} | written=${report.written_files.length}`);
+    console.log(`meeting_platform_adapter_contract_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | browser_observers=${report.browser_observer_count} | candidate_observers=${report.candidate_observer_count} | providers=${report.provider_observer_count} | accepted=${report.acceptance.accepted_count}/${report.acceptance.platform_count} | production_ready=${report.production_ready_count} | realtime_ready=${report.realtime_ready_count} | missing_items=${report.missing_item_count} | written=${report.written_files.length}`);
     for (const row of report.rows) {
       const acceptanceRow = report.acceptance.rows.find((item) => item.platform === row.platform);
-      console.log(`${row.platform}: mode=${row.mode} accepted=${boolLabel(acceptanceRow?.accepted)} browser=${boolLabel(row.browser_observer)} provider=${boolLabel(row.provider_observer)} provider_ready=${boolLabel(row.provider_ready)} missing=${row.missing_items.length} contract=${row.contract_file}`);
+      console.log(`${row.platform}: mode=${row.mode} accepted=${boolLabel(acceptanceRow?.accepted)} browser=${boolLabel(row.browser_observer)} candidates=${boolLabel(row.candidate_observation_ready)} provider=${boolLabel(row.provider_observer)} provider_ready=${boolLabel(row.provider_ready)} missing=${row.missing_items.length} contract=${row.contract_file}`);
     }
     if (report.next_actions.length > 0) console.log(`next_actions=${report.next_actions.join(',')}`);
   }
