@@ -963,6 +963,22 @@ if (handoff.readiness.ready_to_start) {
 
 `meetingAppRuntimeAdapterHandoff()` 是推荐给宿主项目保存/传递的边界对象：`surface` 可选 `browser-extension`、`electron-webview`、`webview`、`native-detector`，输出包含安装目标、权限、runtime options、capture options、speaker/participant track options、时间戳字段和非阻塞规则。
 
+如果宿主要先评估多个会议软件和多个接入面，可以生成 handoff matrix：
+
+```js
+const matrix = kit.meetingAppRuntimeAdapterHandoffMatrix({
+  platforms: ['google-meet', 'teams', 'zoom', 'webex'],
+  surfaces: ['browser-extension', 'electron-webview', 'native-detector'],
+});
+
+console.table(matrix.rows.map((row) => ({
+  platform: row.platform,
+  surface: row.surface,
+  ready: row.ready_to_start,
+  install: row.install_target,
+})));
+```
+
 如果是在浏览器扩展 content script、内嵌浏览器或 Electron WebView 里运行，可以用 `meeting-app-content-script` 直接安装浏览器侧 bridge。它会创建 `meeting-app-browser-runtime`，自动读取当前 `document/location/window`，安装扩展消息监听，并把 background script 或宿主转发来的标注消息写入时间轴：
 
 ```js

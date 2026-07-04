@@ -191,6 +191,13 @@ assert.equal(runtimeAdapterHandoff.selected, true);
 assert.equal(runtimeAdapterHandoff.surface, 'native_detector');
 assert.equal(runtimeAdapterHandoff.install.required_capabilities.includes('capture_window_snapshot'), true);
 assert.equal(runtimeAdapterHandoff.tracks.options.platform, 'google_meet');
+const runtimeAdapterHandoffMatrix = kit.meetingAppRuntimeAdapterHandoffMatrix({
+  platforms: ['google-meet', 'teams'],
+  surfaces: ['browser-extension', 'electron-webview'],
+});
+assert.equal(runtimeAdapterHandoffMatrix.handoff_count, 4);
+assert.equal(runtimeAdapterHandoffMatrix.ready_count, 4);
+assert.equal(runtimeAdapterHandoffMatrix.rows.find((row) => row.surface === 'electron_webview').start_mode, 'host_injected_runtime');
 const capturePlan = kit.meetingAppLiveSnapshotCapturePlan('google-meet');
 assert.equal(capturePlan.platform, 'google_meet');
 assert.equal(capturePlan.required_snapshots.some((item) => item.id === 'active_speaker'), true);

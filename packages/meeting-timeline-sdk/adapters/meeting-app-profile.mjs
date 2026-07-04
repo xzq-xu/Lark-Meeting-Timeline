@@ -30,6 +30,7 @@ export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA = 'meeting_ap
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA = 'meeting_app_runtime_adapter_profile_matrix';
 export const MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA = 'meeting_app_runtime_adapter_selection';
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_SCHEMA = 'meeting_app_runtime_adapter_handoff';
+export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_MATRIX_SCHEMA = 'meeting_app_runtime_adapter_handoff_matrix';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA = 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA = 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA = 'meeting_app_live_evidence_package';
@@ -402,6 +403,23 @@ function normalizeHandoffSurface(value = 'browser_extension') {
     'native_detector',
     'custom_host',
   ].includes(normalized) ? normalized : 'custom_host';
+}
+
+function handoffSurfaceList(options = {}) {
+  const raw = firstNonEmpty(
+    options.surfaces,
+    options.surface_keys,
+    options.surfaceKeys,
+    options.targetSurfaces,
+    options.target_surfaces,
+    options.runtimeSurfaces,
+    options.runtime_surfaces,
+    options.surface,
+    options.targetSurface,
+    options.target_surface,
+    ['browser_extension', 'electron_webview', 'webview', 'native_detector'],
+  );
+  return uniqueList(asArray(raw).map((surface) => normalizeHandoffSurface(surface)));
 }
 
 function endpointUrl(path, options = {}) {
@@ -832,6 +850,62 @@ export function buildMeetingAppRuntimeAdapterHandoff(selectionOrInput = {}, opti
       'insert_annotations_with_captured_at_ms',
     ]),
   });
+}
+
+export function buildMeetingAppRuntimeAdapterHandoffMatrix(options = {}) {
+  const platforms = platformList(options);
+  const surfaces = handoffSurfaceList(options);
+  const handoffs = platforms.flatMap((platform) => surfaces.map((surface) => buildMeetingAppRuntimeAdapterHandoff(
+    { platform },
+    {
+      ...options,
+      platforms,
+      surface,
+    },
+  )));
+  const rows = handoffs.map((handoff) => compactObject({
+    platform: handoff.platform,
+    display_name: handoff.display_name,
+    surface: handoff.surface,
+    selected: handoff.selected === true,
+    ready_to_start: handoff.readiness?.ready_to_start === true,
+    realtime_annotation_ready: handoff.readiness?.realtime_annotation_ready === true,
+    speaker_track_ready: handoff.readiness?.speaker_track_ready === true,
+    participant_track_ready: handoff.readiness?.participant_track_ready === true,
+    install_target: handoff.install?.install_target,
+    start_mode: handoff.install?.start_mode,
+    runtime_factory: handoff.runtime?.factory,
+    track_runtime_factory: handoff.tracks?.factory,
+    extension_match_count: handoff.adapter?.extension_matches?.length ?? handoff.install?.matches?.length ?? 0,
+    required_permission_count: handoff.install?.required_permissions?.length ?? 0,
+    required_capability_count: handoff.install?.required_capabilities?.length ?? 0,
+    timestamp_field: handoff.annotations?.timestamp_field,
+    provider_events_block_realtime: handoff.annotations?.provider_events_block_realtime === true,
+    transcript_blocks_realtime: handoff.annotations?.transcript_blocks_realtime === true,
+    production_requires_live_snapshot: handoff.readiness?.production_requires_live_snapshot === true,
+    issue_count: handoff.issues?.length ?? 0,
+  }));
+  return {
+    type: 'meeting_app_runtime_adapter_handoff_matrix',
+    schema: MEETING_APP_RUNTIME_ADAPTER_HANDOFF_MATRIX_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    platform_count: platforms.length,
+    surface_count: surfaces.length,
+    handoff_count: handoffs.length,
+    ready_count: handoffs.filter((handoff) => handoff.readiness?.ready_to_start === true).length,
+    realtime_annotation_ready_count: handoffs.filter((handoff) => handoff.readiness?.realtime_annotation_ready === true).length,
+    browser_extension_ready_count: handoffs.filter((handoff) => (
+      handoff.surface === 'browser_extension' && handoff.readiness?.ready_to_start === true
+    )).length,
+    native_detector_ready_count: handoffs.filter((handoff) => (
+      handoff.surface === 'native_detector' && handoff.readiness?.ready_to_start === true
+    )).length,
+    platforms,
+    surfaces,
+    rows,
+    handoffs,
+    next_actions: uniqueList(handoffs.flatMap((handoff) => handoff.next_actions ?? [])),
+  };
 }
 
 export function buildMeetingAppIntegrationProfile(platformOrInput = {}, options = {}) {

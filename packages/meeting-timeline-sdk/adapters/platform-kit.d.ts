@@ -203,6 +203,7 @@ import type {
   MeetingAppRuntimeAdapterAcceptanceReport,
   MeetingAppRuntimeAdapterConfig,
   MeetingAppRuntimeAdapterHandoff,
+  MeetingAppRuntimeAdapterHandoffMatrix,
   MeetingAppRuntimeAdapterProfileMatrix,
   MeetingAppRuntimeAdapterProfileResolution,
   MeetingAppRuntimeAdapterSelection,
@@ -479,6 +480,7 @@ export interface MeetingPlatformTimelineKit {
   meetingAppRuntimeAdapterProfileMatrix(profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterProfileMatrix;
   selectMeetingAppRuntimeAdapter(input?: string | Record<string, unknown>, selectionOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterSelection;
   meetingAppRuntimeAdapterHandoff(selectionOrInput?: string | Record<string, unknown> | MeetingAppRuntimeAdapterSelection, handoffOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterHandoff;
+  meetingAppRuntimeAdapterHandoffMatrix(handoffOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterHandoffMatrix;
   meetingAppLiveSnapshotCapturePlan(platform: string, planOptions?: MeetingAppIntegrationProfileOptions): MeetingAppLiveSnapshotCapturePlan;
   allMeetingAppLiveSnapshotCapturePlans(planOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppLiveSnapshotCapturePlan>>;
   allMeetingAppRuntimeAdapterConfigs(configOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppRuntimeAdapterConfig>>;

@@ -11,6 +11,7 @@ import {
   MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_HANDOFF_SCHEMA,
+  MEETING_APP_RUNTIME_ADAPTER_HANDOFF_MATRIX_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA,
@@ -36,6 +37,7 @@ import {
   buildMeetingAppRuntimeAdapterAcceptanceReport,
   buildMeetingAppRuntimeAdapterConfig,
   buildMeetingAppRuntimeAdapterHandoff,
+  buildMeetingAppRuntimeAdapterHandoffMatrix,
   buildMeetingAppRuntimeAdapterProfileMatrix,
   buildMeetingAppRuntimeAdapterValidationReport,
   selectMeetingAppRuntimeAdapter,
@@ -57,6 +59,7 @@ assert.equal(MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA, 'meeting_app
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA, 'meeting_app_runtime_adapter_profile_matrix');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA, 'meeting_app_runtime_adapter_selection');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_HANDOFF_SCHEMA, 'meeting_app_runtime_adapter_handoff');
+assert.equal(MEETING_APP_RUNTIME_ADAPTER_HANDOFF_MATRIX_SCHEMA, 'meeting_app_runtime_adapter_handoff_matrix');
 assert.equal(MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA, 'meeting_app_live_snapshot_capture_plan');
 assert.equal(MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA, 'meeting_app_deployment_manifest');
 assert.equal(MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA, 'meeting_app_live_evidence_package');
@@ -240,6 +243,26 @@ assert.equal(electronHandoff.surface, 'electron_webview');
 assert.equal(electronHandoff.install.required_capabilities.includes('inject_preload_script'), true);
 assert.equal(electronHandoff.runtime.bridge_options.extensionMessaging, false);
 assert.equal(electronHandoff.runtime.bridge_options.windowMessaging, true);
+
+const handoffMatrix = buildMeetingAppRuntimeAdapterHandoffMatrix({
+  platforms: ['google-meet', 'teams'],
+  surfaces: ['browser-extension', 'native-detector'],
+  baseUrl: 'https://timeline.example.com',
+});
+assert.equal(handoffMatrix.type, 'meeting_app_runtime_adapter_handoff_matrix');
+assert.equal(handoffMatrix.schema, MEETING_APP_RUNTIME_ADAPTER_HANDOFF_MATRIX_SCHEMA);
+assert.deepEqual(handoffMatrix.platforms, ['google_meet', 'microsoft_teams']);
+assert.deepEqual(handoffMatrix.surfaces, ['browser_extension', 'native_detector']);
+assert.equal(handoffMatrix.platform_count, 2);
+assert.equal(handoffMatrix.surface_count, 2);
+assert.equal(handoffMatrix.handoff_count, 4);
+assert.equal(handoffMatrix.ready_count, 4);
+assert.equal(handoffMatrix.browser_extension_ready_count, 2);
+assert.equal(handoffMatrix.native_detector_ready_count, 2);
+assert.equal(handoffMatrix.rows.find((row) => row.platform === 'google_meet' && row.surface === 'browser_extension').install_target, 'manifest_v3_content_script');
+assert.equal(handoffMatrix.rows.find((row) => row.platform === 'microsoft_teams' && row.surface === 'native_detector').start_mode, 'host_supplies_snapshots');
+assert.equal(handoffMatrix.rows.every((row) => row.timestamp_field === 'captured_at_ms'), true);
+assert.equal(handoffMatrix.next_actions.includes('insert_annotations_with_captured_at_ms'), true);
 
 const googleCapturePlan = buildMeetingAppLiveSnapshotCapturePlan('google-meet');
 assert.equal(googleCapturePlan.type, 'meeting_app_live_snapshot_capture_plan');
