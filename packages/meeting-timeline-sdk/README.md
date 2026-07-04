@@ -131,6 +131,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-gate`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-rollout`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-strategy`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-route`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-correlation`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-session`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter`
@@ -332,6 +333,26 @@ const matrix = buildMeetingPlatformAdaptationStrategyMatrix({
 });
 
 console.log(matrix.rows);
+```
+
+如果另一个项目只想知道“这个会议软件应该接哪条链路”，优先用 `platform-adapter-route`。它把 strategy/runtime profile 收敛成宿主可直接消费的 route：第一优先级永远是本地观察或 host detector 建当前会议轴，第二步用 `captured_at_ms` 插入标注，发言人只写位置 marker，provider webhook 做非阻塞校准，会后 transcript/recording 只做回填：
+
+```js
+import {
+  buildMeetingPlatformAdapterRoute,
+  buildMeetingPlatformAdapterRouteMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-route';
+
+const google = buildMeetingPlatformAdapterRoute('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+});
+
+console.log(google.route_order);
+console.log(google.entrypoints.browser_extension.matches);
+
+const routeMatrix = buildMeetingPlatformAdapterRouteMatrix({
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
 ```
 
 也可以直接导出策略报告，给别的项目做平台选择或接入面板：

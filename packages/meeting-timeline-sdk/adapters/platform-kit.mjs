@@ -104,6 +104,10 @@ import {
   buildMeetingPlatformAdaptationStrategyMatrix,
 } from './platform-strategy.mjs';
 import {
+  buildMeetingPlatformAdapterRoute,
+  buildMeetingPlatformAdapterRouteMatrix,
+} from './platform-adapter-route.mjs';
+import {
   assertMeetingPlatformHostIntegrationScaffold,
   buildMeetingPlatformHostIntegrationPlan,
   buildMeetingPlatformHostIntegrationScaffold,
@@ -426,6 +430,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_rollout: buildMeetingPlatformRolloutSummary(options),
     platform_adaptation_runbook: buildMeetingPlatformAdaptationRunbookSummary(options),
     platform_adaptation_strategy: buildMeetingPlatformAdaptationStrategyMatrix(options),
+    platform_adapter_route_matrix: buildMeetingPlatformAdapterRouteMatrix(options),
     platform_live_adapter_matrix: buildMeetingPlatformLiveAdapterMatrix(options),
     platform_live_adapter_readiness_matrix: buildMeetingPlatformLiveAdapterReadinessMatrix(options),
     platform_live_adapter_handoff_bundle: buildMeetingPlatformLiveAdapterHandoffBundle(options),
@@ -569,6 +574,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdaptationStrategyMatrix(strategyOptions = {}) {
       return buildMeetingPlatformAdaptationStrategyMatrix(withDefaults(defaults, strategyOptions));
+    },
+    platformAdapterRoute(platform, routeOptions = {}) {
+      return buildMeetingPlatformAdapterRoute(platform, withDefaults(defaults, routeOptions));
+    },
+    platformAdapterRouteMatrix(routeOptions = {}) {
+      return buildMeetingPlatformAdapterRouteMatrix(withDefaults(defaults, routeOptions));
     },
     platformEvidencePackage(platformOrInput, input = {}, packageOptions = {}) {
       if (platformOrInput && typeof platformOrInput === 'object' && !Array.isArray(platformOrInput)) {

@@ -54,6 +54,11 @@ import type {
   MeetingPlatformAdaptationStrategyMatrix,
 } from './platform-strategy.mjs';
 import type {
+  MeetingPlatformAdapterRoute,
+  MeetingPlatformAdapterRouteMatrix,
+  MeetingPlatformAdapterRouteOptions,
+} from './platform-adapter-route.mjs';
+import type {
   MeetingPlatformHostIntegrationOptions,
   MeetingPlatformHostIntegrationPlan,
   MeetingPlatformHostIntegrationScaffold,
@@ -320,6 +325,8 @@ export interface MeetingPlatformTimelineKit {
   platformAdaptationStrategy(platform: string, strategyOptions?: MeetingPlatformRolloutOptions): MeetingPlatformAdaptationStrategy;
   allPlatformAdaptationStrategies(strategyOptions?: MeetingPlatformRolloutOptions): MeetingPlatformAdaptationStrategy[];
   platformAdaptationStrategyMatrix(strategyOptions?: MeetingPlatformRolloutOptions): MeetingPlatformAdaptationStrategyMatrix;
+  platformAdapterRoute(platform: string, routeOptions?: MeetingPlatformAdapterRouteOptions): MeetingPlatformAdapterRoute;
+  platformAdapterRouteMatrix(routeOptions?: MeetingPlatformAdapterRouteOptions): MeetingPlatformAdapterRouteMatrix;
   platformEvidencePackage(platformOrInput: string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, packageOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackage;
   platformEvidencePackageSummary(packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, summaryOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageSummary;
   platformEvidencePackageBuilder(platform: string, builderOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageBuilder;

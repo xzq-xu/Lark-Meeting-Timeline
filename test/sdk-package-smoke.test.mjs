@@ -39,6 +39,8 @@ assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-route.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-route.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-correlation.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-correlation.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-session.mjs'), true);
@@ -167,6 +169,10 @@ import {
   buildMeetingPlatformAdaptationStrategy,
   buildMeetingPlatformAdaptationStrategyMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-strategy';
+import {
+  buildMeetingPlatformAdapterRoute,
+  buildMeetingPlatformAdapterRouteMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-route';
 import {
   buildMeetingPlatformEvidenceCorrelation,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-correlation';
@@ -1289,6 +1295,15 @@ assert.equal(kit.platformAdapterContract('google-meet').schema, 'meeting_platfor
 assert.equal(kit.platformAdapterContractMatrix({ platforms: ['zoom'] }).platform_count, 1);
 assert.equal(kit.platformAdapterContractAcceptance('google-meet').accepted, true);
 assert.equal(kit.platformAdapterContractAcceptanceMatrix({ platforms: ['zoom'] }).accepted_count, 1);
+assert.equal(buildMeetingPlatformAdapterRoute('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).routes[0].route, 'local_observer_axis');
+assert.equal(buildMeetingPlatformAdapterRouteMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).platform_count, 1);
+assert.equal(kit.platformAdapterRoute('google-meet').realtime_invariants.provider_events_block_realtime, false);
+assert.equal(kit.platformAdapterRouteMatrix({ platforms: ['zoom'] }).rows[0].first_route, 'local_observer_axis');
 assert.equal(kit.platformRealEvidenceIntakePlan('google-meet').schema, 'meeting_platform_real_evidence_intake_plan');
 assert.equal(kit.platformRealEvidenceIntake('google-meet', {}, {
   requireProductionReady: false,
