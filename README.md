@@ -60,6 +60,14 @@ npm run meeting-app:evidence-matrix
 
 矩阵会写出 `data/meeting-app-evidence-matrix.json`，汇总 Google Meet、Teams、Zoom、Webex、Lark 的 `production_ready` 状态和缺口，便于逐个平台收敛真实 DOM 适配。
 
+没有真实 DOM 样本前，可以先跑 fixture 级轨道连通性检查：
+
+```bash
+npm run meeting-app:fixture-tracks
+```
+
+它会写出 `data/meeting-app-fixture-track-readiness.json`，验证 Google Meet、Teams、Zoom、Webex、Lark 的 fixture 快照是否能驱动 `speaker_track` 和 `participant_track`。这只能证明 SDK wiring 和轨道格式，不替代真实会议页采样。
+
 如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
 
 ```bash

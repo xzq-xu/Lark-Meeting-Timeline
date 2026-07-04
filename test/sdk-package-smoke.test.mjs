@@ -83,6 +83,8 @@ assert.equal(packedFiles.includes('adapters/platform-handoff-readiness.mjs'), tr
 assert.equal(packedFiles.includes('adapters/platform-handoff-readiness.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-fixture-tracks.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-fixture-tracks.d.ts'), true);
 assert.equal(packedFiles.includes('README.md'), true);
 assert.equal(packedFiles.some((item) => item.startsWith('test/')), false);
 assert.equal(packedFiles.some((item) => item.startsWith('scripts/')), false);
@@ -270,6 +272,9 @@ import {
 import {
   buildMeetingAppDomAdaptationDiagnosisMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-profile';
+import {
+  buildMeetingAppFixtureTrackReadinessReport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixture-tracks';
 
 assert.equal(SDK_VERSION, '0.1.0');
 const client = createMeetingTimelineClient({
@@ -465,6 +470,9 @@ assert.equal(kit.platformParticipantTrack('zoom', {
     },
   ],
 }).mark_count, 1);
+assert.equal(buildMeetingAppFixtureTrackReadinessReport({
+  platforms: ['google-meet'],
+}).accepted, true);
 assert.equal(kit.platformTimelineViewPlan('zoom').schema, 'meeting_platform_timeline_view_plan');
 assert.equal(kit.platformTimelineViewMatrix({
   platforms: ['zoom'],

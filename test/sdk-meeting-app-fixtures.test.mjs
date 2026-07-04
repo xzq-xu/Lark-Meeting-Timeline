@@ -8,6 +8,10 @@ import {
   diagnoseMeetingAppFixture,
   diagnoseMeetingAppFixtureLifecycle,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
+import {
+  buildMeetingAppFixtureTrackReadinessReport,
+  diagnoseMeetingAppFixtureTrackReadiness,
+} from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixture-tracks.mjs';
 import { createMeetingAppTimelineRuntime } from '../packages/meeting-timeline-sdk/adapters/meeting-app-runtime.mjs';
 import { normalizeMeetingAppSnapshot } from '../packages/meeting-timeline-sdk/adapters/meeting-apps.mjs';
 
@@ -52,6 +56,14 @@ for (const platform of MEETING_APP_FIXTURE_PLATFORMS) {
   assert.deepEqual(lifecycle.signal_types, ['meeting_started', 'speaker_started', 'meeting_ended']);
   assert.equal(lifecycle.coverage.meeting_ended, true);
   assert.equal(lifecycle.coverage.ended_in_meeting_false, true);
+
+  const trackReadiness = diagnoseMeetingAppFixtureTrackReadiness(platform, { observedAtMs });
+  assert.equal(trackReadiness.coverage.participant_roster_snapshot, true);
+  assert.equal(trackReadiness.coverage.participant_roster_count >= 2, true);
+  assert.equal(trackReadiness.coverage.speaker_track_mark, true);
+  assert.equal(trackReadiness.coverage.participant_track_mark, true);
+  assert.equal(trackReadiness.speaker_track.marks[0].intent, 'speaker_track');
+  assert.equal(trackReadiness.participant_track.marks[0].intent, 'participant_track');
 }
 
 const report = buildMeetingAppFixtureAcceptanceReport({ observedAtMs });
@@ -63,6 +75,15 @@ assert.deepEqual(report.missing, []);
 assert.equal(report.coverage_by_platform.webex.active_speaker, true);
 assert.equal(report.coverage_by_platform.webex.meeting_ended, true);
 assert.equal(report.lifecycle_reports.length, MEETING_APP_FIXTURE_PLATFORMS.length);
+
+const trackReadinessReport = buildMeetingAppFixtureTrackReadinessReport({ observedAtMs });
+assert.equal(trackReadinessReport.schema, 'meeting_app_fixture_track_readiness_report');
+assert.equal(trackReadinessReport.accepted, true);
+assert.equal(trackReadinessReport.accepted_count, MEETING_APP_FIXTURE_PLATFORMS.length);
+assert.deepEqual(trackReadinessReport.missing, []);
+assert.equal(trackReadinessReport.coverage_by_platform.webex.participant_roster_snapshot, true);
+assert.equal(trackReadinessReport.coverage_by_platform.webex.speaker_track_mark, true);
+assert.equal(trackReadinessReport.coverage_by_platform.webex.participant_track_mark, true);
 
 const calls = [];
 const runtime = createMeetingAppTimelineRuntime({

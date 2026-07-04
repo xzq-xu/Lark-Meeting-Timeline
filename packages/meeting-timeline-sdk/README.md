@@ -110,6 +110,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-extension`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixture-tracks`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-source`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
@@ -967,6 +968,17 @@ import { buildMeetingAppFixtureAcceptanceReport } from '@ai-annotation/meeting-t
 
 const report = buildMeetingAppFixtureAcceptanceReport();
 // report.accepted === true 表示本地 DOM/AX 归一化链路基线通过
+```
+
+如果还要验证这些 fixture 是否足以驱动时间轴上的发言人轨和参会人轨，用 `meeting-app-fixture-tracks`。它会把 fixture 的 active speaker signal 喂给 `platform-speaker-track`，把 roster 变化喂给 `platform-participant-track`，确认五个平台都能生成不依赖 transcript 文本的 `speaker_track` / `participant_track` marks：
+
+```js
+import {
+  buildMeetingAppFixtureTrackReadinessReport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixture-tracks';
+
+const trackReport = buildMeetingAppFixtureTrackReadinessReport();
+// trackReport.accepted === true 表示 fixture 级轨道连通性通过
 ```
 
 正式接入 Google Meet / Teams Web / Zoom Web / Webex Web / Lark Web 前，建议再跑 `meeting-app-gate`。它不检查官方 webhook 权限，而是检查本地会议 App 路径是否满足实时标注：browser runtime preset、DOM capture profile、MutationObserver track/ignore selectors、建轴、发言人位置和结束信号。fixture-only 只能证明 SDK wiring；要证明生产可用，需要用 `meeting-app-snapshot-recorder` 记录真实采集到的 DOM snapshots：
