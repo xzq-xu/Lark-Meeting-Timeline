@@ -145,6 +145,8 @@ import {
   MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
   buildMeetingPlatformAnnotationRuntimeEvent,
   buildMeetingPlatformCandidateObservationRuntimeEvent,
+  buildMeetingPlatformRunHandoffReadinessRuntimeEvent,
+  buildMeetingPlatformRunManifestRuntimeEvent,
   buildMeetingPlatformRuntimeEventPlan,
   buildMeetingPlatformRuntimeEventPlanMatrix,
   createMeetingPlatformRuntimeEventClient,
@@ -469,13 +471,27 @@ assert.equal(buildMeetingPlatformCandidateObservationRuntimeEvent({
 }, {
   now: () => 1_782_614_402_000,
 }).action, 'observe_platform_candidates');
+assert.equal(buildMeetingPlatformRunManifestRuntimeEvent({
+  platforms: ['google-meet'],
+  requireHandoffReady: true,
+}, {
+  now: () => 1_782_614_402_000,
+}).action, 'run_manifest');
+assert.equal(buildMeetingPlatformRunHandoffReadinessRuntimeEvent({
+  platforms: ['zoom'],
+}, {
+  now: () => 1_782_614_402_000,
+}).action, 'run_handoff_readiness');
 assert.equal(meetingPlatformRuntimeEventEndpoint({
   baseUrl: 'http://localhost:8787',
 }), 'http://localhost:8787/api/meeting-platform/runtime-events');
-assert.equal(typeof createMeetingPlatformRuntimeEventClient({
+const smokeRuntimeEventClient = createMeetingPlatformRuntimeEventClient({
   baseUrl: 'http://localhost:8787',
   fetch: async () => new Response('{}'),
-}).send, 'function');
+});
+assert.equal(typeof smokeRuntimeEventClient.send, 'function');
+assert.equal(typeof smokeRuntimeEventClient.runManifest, 'function');
+assert.equal(typeof smokeRuntimeEventClient.runHandoffReadiness, 'function');
 assert.equal(kit.platformRegistryEntry('google-meet').annotations.timestamp_field, 'captured_at_ms');
 assert.equal(kit.platformRegistryManifest({ platforms: ['zoom'] }).rows[0].platform, 'zoom');
 assert.equal(meetingPlatformEventAdapterFor('teams').key, 'microsoft_teams');

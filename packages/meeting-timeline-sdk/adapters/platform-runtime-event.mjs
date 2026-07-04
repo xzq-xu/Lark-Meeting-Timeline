@@ -26,8 +26,10 @@ export const MEETING_PLATFORM_RUNTIME_EVENT_ACTIONS = Object.freeze([
   'runtime_bundles',
   'registry',
   'manifest',
+  'run_manifest',
   'readiness',
   'handoff_readiness',
+  'run_handoff_readiness',
 ]);
 
 const ACTION_ALIASES = new Map([
@@ -62,9 +64,16 @@ const ACTION_ALIASES = new Map([
   ['runtime_manifest', 'manifest'],
   ['integration_manifest', 'manifest'],
   ['manifest', 'manifest'],
+  ['run_manifest', 'run_manifest'],
+  ['runtime_manifest_run', 'run_manifest'],
+  ['integration_manifest_run', 'run_manifest'],
+  ['integration_runtime_run_manifest', 'run_manifest'],
+  ['integration_runtime_manifest_run', 'run_manifest'],
   ['live_readiness', 'readiness'],
   ['readiness', 'readiness'],
   ['handoff_readiness', 'handoff_readiness'],
+  ['run_handoff_readiness', 'run_handoff_readiness'],
+  ['handoff_readiness_run', 'run_handoff_readiness'],
 ]);
 
 const PLATFORM_REQUIRED_ACTIONS = new Set([
@@ -235,8 +244,6 @@ function platformFor(input = {}, options = {}, payload = undefined) {
 
 function actionFor(input = {}, options = {}) {
   return normalizedAction(firstNonEmpty(
-    options.action,
-    options.kind,
     input.action,
     input.kind,
     input.event_kind,
@@ -244,6 +251,8 @@ function actionFor(input = {}, options = {}) {
     input.runtime_action,
     input.runtimeAction,
     input.type,
+    options.action,
+    options.kind,
   ));
 }
 
@@ -389,6 +398,22 @@ export function buildMeetingPlatformTimelineViewRuntimeEvent(platform, input = {
   }, options);
 }
 
+export function buildMeetingPlatformRunManifestRuntimeEvent(input = {}, options = {}) {
+  return buildMeetingPlatformRuntimeEvent({
+    ...input,
+    action: 'run_manifest',
+    payload: input,
+  }, options);
+}
+
+export function buildMeetingPlatformRunHandoffReadinessRuntimeEvent(input = {}, options = {}) {
+  return buildMeetingPlatformRuntimeEvent({
+    ...input,
+    action: 'run_handoff_readiness',
+    payload: input,
+  }, options);
+}
+
 function runtimeEventExamples(platform, options = {}) {
   const capturedAtMs = maybeAbsoluteMs(firstNonEmpty(
     options.capturedAtMs,
@@ -487,6 +512,15 @@ function runtimeEventExamples(platform, options = {}) {
         marks: participantSignals,
       },
     }, options),
+    run_manifest: buildMeetingPlatformRunManifestRuntimeEvent({
+      platforms: [platform],
+      target: 'production',
+      requireHandoffReady: false,
+    }, options),
+    run_handoff_readiness: buildMeetingPlatformRunHandoffReadinessRuntimeEvent({
+      platforms: [platform],
+      target: 'production',
+    }, options),
   };
 }
 
@@ -569,6 +603,83 @@ function runtimeEventActionRows(platform, endpoint) {
       transcript_dependency: false,
       endpoint,
     },
+    {
+      action: 'runtime_bundles',
+      client_method: 'runtimeBundles',
+      producer: 'host_ci_or_admin_panel',
+      realtime_role: 'runtime_bundle_inspection',
+      required_fields: [],
+      recommended_fields: ['platforms'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'registry',
+      client_method: 'registry',
+      producer: 'host_ci_or_admin_panel',
+      realtime_role: 'platform_registry_inspection',
+      required_fields: [],
+      recommended_fields: ['platforms'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'manifest',
+      client_method: 'manifest',
+      producer: 'host_ci_or_admin_panel',
+      realtime_role: 'static_integration_contract_gate',
+      required_fields: [],
+      recommended_fields: ['platforms'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'run_manifest',
+      client_method: 'runManifest',
+      producer: 'host_ci_or_admin_panel',
+      realtime_role: 'executable_integration_handoff_gate',
+      required_fields: [],
+      recommended_fields: ['platforms', 'requireHandoffReady', 'evidencePackage'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'readiness',
+      client_method: 'readiness',
+      producer: 'host_ci_or_admin_panel',
+      realtime_role: 'live_adapter_readiness_inspection',
+      required_fields: [],
+      recommended_fields: ['platforms'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'handoff_readiness',
+      client_method: 'handoffReadiness',
+      producer: 'host_ci_or_admin_panel',
+      realtime_role: 'static_handoff_readiness_inspection',
+      required_fields: [],
+      recommended_fields: ['platforms', 'target'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'run_handoff_readiness',
+      client_method: 'runHandoffReadiness',
+      producer: 'host_ci_or_admin_panel',
+      realtime_role: 'executable_handoff_readiness_gate',
+      required_fields: [],
+      recommended_fields: ['platforms', 'target', 'evidencePackage'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
   ].map((row) => ({
     platform,
     ...row,
@@ -617,6 +728,7 @@ export function buildMeetingPlatformRuntimeEventPlan(platform, options = {}) {
       'send speaker_track or participant_track only after local filtering/debounce',
       'send provider_event as reconcile/backfill evidence when official events arrive',
       'request timeline_view from the host UI instead of duplicating SVG positioning logic',
+      'send run_manifest or run_handoff_readiness from CI/admin tooling before host handoff',
     ],
     actions: actionRows,
     examples,
@@ -757,6 +869,12 @@ export function createMeetingPlatformRuntimeEventClient(options = {}) {
     },
     handoffReadiness(readinessOptions = {}) {
       return send({ action: 'handoff_readiness' }, readinessOptions);
+    },
+    runManifest(manifestOptions = {}) {
+      return send(buildMeetingPlatformRunManifestRuntimeEvent(manifestOptions, manifestOptions), manifestOptions);
+    },
+    runHandoffReadiness(readinessOptions = {}) {
+      return send(buildMeetingPlatformRunHandoffReadinessRuntimeEvent(readinessOptions, readinessOptions), readinessOptions);
     },
   };
 }

@@ -8,6 +8,8 @@ import {
   buildMeetingPlatformCandidateObservationRuntimeEvent,
   buildMeetingPlatformObserveRuntimeEvent,
   buildMeetingPlatformProviderRuntimeEvent,
+  buildMeetingPlatformRunHandoffReadinessRuntimeEvent,
+  buildMeetingPlatformRunManifestRuntimeEvent,
   buildMeetingPlatformRuntimeEventPlan,
   buildMeetingPlatformRuntimeEventPlanMatrix,
   createMeetingPlatformRuntimeEventClient,
@@ -26,6 +28,8 @@ const now = 1_782_614_400_000;
 
 assert.equal(normalizeMeetingPlatformRuntimeEventAction('insert-mark'), 'insert_annotation');
 assert.equal(normalizeMeetingPlatformRuntimeEventAction('observe-candidates'), 'observe_platform_candidates');
+assert.equal(normalizeMeetingPlatformRuntimeEventAction('integration-runtime-run-manifest'), 'run_manifest');
+assert.equal(normalizeMeetingPlatformRuntimeEventAction('handoff-readiness-run'), 'run_handoff_readiness');
 assert.equal(meetingPlatformRuntimeEventEndpoint({ baseUrl }), `${baseUrl}${MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT}`);
 
 const observeEvent = buildMeetingPlatformObserveRuntimeEvent('google-meet', {
@@ -86,6 +90,26 @@ assert.throws(
   }),
   /requires platform/,
 );
+
+const runManifestEvent = buildMeetingPlatformRunManifestRuntimeEvent({
+  platforms: ['google-meet'],
+  requireHandoffReady: true,
+  target: 'production',
+}, {
+  now: () => now + 4,
+});
+assert.equal(runManifestEvent.action, 'run_manifest');
+assert.equal(runManifestEvent.requireHandoffReady, true);
+assert.deepEqual(runManifestEvent.platforms, ['google-meet']);
+
+const runHandoffReadinessEvent = buildMeetingPlatformRunHandoffReadinessRuntimeEvent({
+  platforms: ['zoom'],
+  target: 'pilot',
+}, {
+  now: () => now + 5,
+});
+assert.equal(runHandoffReadinessEvent.action, 'run_handoff_readiness');
+assert.deepEqual(runHandoffReadinessEvent.platforms, ['zoom']);
 
 const calls = [];
 const client = {
@@ -151,6 +175,25 @@ const providerResult = await runtime.handleEvent(providerEvent);
 assert.equal(providerResult.action, 'ingest_provider');
 assert.equal(providerResult.live_evidence.provider_record_count, 1);
 
+const runtimeRunManifestResult = await runtime.handleEvent({
+  action: 'run_manifest',
+  platforms: ['google-meet'],
+  requireHandoffReady: true,
+  target: 'production',
+});
+assert.equal(runtimeRunManifestResult.require_handoff_ready, true);
+assert.equal(runtimeRunManifestResult.platform_count, 1);
+assert.equal(runtimeRunManifestResult.host_integration_ready, false);
+assert.equal(runtimeRunManifestResult.issues.some((issue) => issue.code === 'runtime_host_replay_not_ready'), true);
+
+const runtimeRunHandoffReadinessResult = await runtime.handleEvent({
+  action: 'run_handoff_readiness',
+  platforms: ['zoom'],
+  target: 'production',
+});
+assert.equal(runtimeRunHandoffReadinessResult.platform_count, 1);
+assert.equal(runtimeRunHandoffReadinessResult.runtime_host_replay_ready_count, 0);
+
 const googlePlan = buildMeetingPlatformRuntimeEventPlan('google-meet', {
   baseUrl,
   now: () => now + 6,
@@ -166,9 +209,13 @@ assert.equal(googlePlan.provider_start_event_example, 'google.workspace.meet.con
 assert.equal(googlePlan.provider_end_event_example, 'google.workspace.meet.conference.v2.ended');
 assert.equal(googlePlan.actions.find((row) => row.action === 'insert_annotation').client_method, 'insertAnnotation');
 assert.equal(googlePlan.actions.find((row) => row.action === 'observe_platform_candidates').client_method, 'observePlatformCandidates');
+assert.equal(googlePlan.actions.find((row) => row.action === 'run_manifest').client_method, 'runManifest');
+assert.equal(googlePlan.actions.find((row) => row.action === 'run_handoff_readiness').client_method, 'runHandoffReadiness');
 assert.equal(googlePlan.actions.find((row) => row.action === 'provider_event').realtime_role, 'reconcile_and_backfill_only');
 assert.equal(googlePlan.examples.insert_annotation.action, 'insert_annotation');
 assert.equal(googlePlan.examples.observe_platform_candidates.action, 'observe_platform_candidates');
+assert.equal(googlePlan.examples.run_manifest.action, 'run_manifest');
+assert.equal(googlePlan.examples.run_handoff_readiness.action, 'run_handoff_readiness');
 assert.equal(googlePlan.examples.insert_annotation.annotation.captured_at_ms, now + 15_000);
 assert.equal(googlePlan.examples.observe_meeting_app.snapshot.url, 'https://meet.google.com/abc-defg-hij');
 
@@ -183,6 +230,8 @@ assert.equal(runtimePlanMatrix.realtime_provider_dependency_count, 0);
 assert.equal(runtimePlanMatrix.transcript_realtime_dependency_count, 0);
 assert.equal(runtimePlanMatrix.rows.some((row) => row.platform === 'microsoft_teams' && row.action === 'speaker_track'), true);
 assert.equal(runtimePlanMatrix.rows.some((row) => row.platform === 'zoom' && row.action === 'observe_platform_candidates'), true);
+assert.equal(runtimePlanMatrix.rows.some((row) => row.platform === 'google_meet' && row.action === 'run_manifest'), true);
+assert.equal(runtimePlanMatrix.rows.some((row) => row.platform === 'zoom' && row.action === 'run_handoff_readiness'), true);
 assert.equal(runtimePlanMatrix.next_actions.includes('include_captured_at_ms_on_every_annotation'), true);
 
 let capturedRequest = null;
@@ -230,5 +279,17 @@ assert.equal(capturedRequest.body.action, 'observe_platform_candidates');
 assert.equal(capturedRequest.body.platform, undefined);
 assert.equal(capturedRequest.body.windows[0].tabs[0].url, 'https://meet.google.com/abc-defg-hij');
 assert.equal((await runtimeEventClient.manifest()).accepted.action, 'manifest');
+await runtimeEventClient.runManifest({
+  platforms: ['google-meet'],
+  requireHandoffReady: true,
+});
+assert.equal(capturedRequest.body.action, 'run_manifest');
+assert.equal(capturedRequest.body.requireHandoffReady, true);
+await runtimeEventClient.runHandoffReadiness({
+  platforms: ['zoom'],
+  target: 'production',
+});
+assert.equal(capturedRequest.body.action, 'run_handoff_readiness');
+assert.deepEqual(capturedRequest.body.platforms, ['zoom']);
 
 console.log('ok meeting platform runtime event envelope');

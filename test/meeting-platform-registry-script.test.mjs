@@ -34,7 +34,7 @@ assert.equal(report.acceptance.accepted, true);
 assert.equal(report.acceptance.blocking_count, 0);
 assert.equal(report.acceptance.manifest, undefined);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').insert_endpoint, `${baseUrl}/api/annotations`);
-assert.equal(report.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 7);
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 14);
 assert.equal(report.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 assert.equal(report.manifest.entries.length, 3);
 
@@ -43,6 +43,7 @@ assert.equal(writtenReport.rows.length, 3);
 assert.equal(writtenReport.acceptance.accepted, true);
 assert.equal(writtenReport.manifest.entries.find((entry) => entry.platform === 'microsoft_teams').provider.security_verifier, 'verifyMicrosoftGraphClientState');
 assert.equal(writtenReport.manifest.entries.find((entry) => entry.platform === 'google_meet').annotations.runtime_event_plan.supported_actions.includes('insert_annotation'), true);
+assert.equal(writtenReport.manifest.entries.find((entry) => entry.platform === 'google_meet').annotations.runtime_event_plan.supported_actions.includes('run_manifest'), true);
 assert.equal(writtenReport.manifest.entries.find((entry) => entry.platform === 'google_meet').sdk.imports.runtime_event, '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event');
 
 const { stdout: compactStdout } = await execFileAsync(process.execPath, [
@@ -66,6 +67,6 @@ const { stdout: textStdout } = await execFileAsync(process.execPath, [
 assert.match(textStdout, /meeting_platform_registry_report/);
 assert.match(textStdout, /lark: normalize=yes/);
 assert.match(textStdout, /provider=/);
-assert.match(textStdout, /runtime_actions=7/);
+assert.match(textStdout, /runtime_actions=14/);
 
 console.log('ok meeting platform registry script');

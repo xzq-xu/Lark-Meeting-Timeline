@@ -93,6 +93,8 @@ export interface MeetingPlatformRuntimeEventClient {
   manifest(manifestOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   readiness(readinessOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   handoffReadiness(readinessOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  runManifest(manifestOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  runHandoffReadiness(readinessOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
 }
 
 export interface MeetingPlatformRuntimeEventPlan {
@@ -173,6 +175,14 @@ export function buildMeetingPlatformParticipantTrackRuntimeEvent(
 ): MeetingPlatformRuntimeEvent;
 export function buildMeetingPlatformTimelineViewRuntimeEvent(
   platform: string,
+  input?: Record<string, unknown>,
+  options?: MeetingPlatformRuntimeEventOptions,
+): MeetingPlatformRuntimeEvent;
+export function buildMeetingPlatformRunManifestRuntimeEvent(
+  input?: Record<string, unknown>,
+  options?: MeetingPlatformRuntimeEventOptions,
+): MeetingPlatformRuntimeEvent;
+export function buildMeetingPlatformRunHandoffReadinessRuntimeEvent(
   input?: Record<string, unknown>,
   options?: MeetingPlatformRuntimeEventOptions,
 ): MeetingPlatformRuntimeEvent;

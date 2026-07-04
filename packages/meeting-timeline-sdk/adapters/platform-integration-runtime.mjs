@@ -865,15 +865,23 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
       });
     },
     handoffReadiness(readinessOptions = {}) {
+      const platformsForReadiness = readinessOptions.platforms ?? readinessOptions.platform_keys ?? platforms;
       return kit.platformHandoffReadinessMatrix({
         ...readinessOptions,
-        platforms: readinessOptions.platforms ?? readinessOptions.platform_keys ?? platforms,
+        platforms: platformsForReadiness,
+      }, {
+        ...readinessOptions,
+        platforms: platformsForReadiness,
       });
     },
     runHandoffReadiness(readinessOptions = {}) {
+      const platformsForReadiness = readinessOptions.platforms ?? readinessOptions.platform_keys ?? platforms;
       return kit.runPlatformHandoffReadinessMatrix({
         ...readinessOptions,
-        platforms: readinessOptions.platforms ?? readinessOptions.platform_keys ?? platforms,
+        platforms: platformsForReadiness,
+      }, {
+        ...readinessOptions,
+        platforms: platformsForReadiness,
       });
     },
     observeMeetingApp(platform, snapshot = {}, observeOptions = {}) {
@@ -909,17 +917,21 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
       const eventInput = runtimeEvent.input;
       const eventPayload = runtimeEvent.payload;
       const action = actionName(eventInput, eventOptions);
-      if (['registry', 'platform_registry'].includes(action)) return runtime.registry(eventOptions);
-      if (['manifest', 'runtime_manifest', 'integration_manifest'].includes(action)) return runtime.manifest(eventOptions);
-      if (['run_manifest', 'runtime_manifest_run', 'integration_manifest_run'].includes(action)) return runtime.runManifest(eventOptions);
-      if (['runtime_bundles', 'runtime_bundle_matrix'].includes(action)) return runtime.runtimeBundles(eventOptions);
-      if (['strategy', 'adaptation_strategy', 'adaptation_strategy_matrix'].includes(action)) return runtime.adaptationStrategyMatrix(eventOptions);
-      if (['resolve', 'resolve_platform', 'platform_resolution'].includes(action)) return runtime.resolvePlatform(eventInput, eventOptions);
-      if (['resolve_candidates', 'resolve_platform_candidates', 'platform_candidate_resolution'].includes(action)) return runtime.resolvePlatformCandidates(eventInput, eventOptions);
-      if (['observe_candidates', 'observe_platform_candidates', 'observe_meeting_environment', 'meeting_environment_snapshot'].includes(action)) return runtime.observePlatformCandidates(eventInput, eventOptions);
-      if (['readiness', 'live_readiness'].includes(action)) return runtime.readiness(eventOptions);
-      if (['handoff_readiness'].includes(action)) return runtime.handoffReadiness(eventOptions);
-      if (['run_handoff_readiness', 'handoff_readiness_run'].includes(action)) return runtime.runHandoffReadiness(eventOptions);
+      const eventRuntimeOptions = {
+        ...eventInput,
+        ...eventOptions,
+      };
+      if (['registry', 'platform_registry'].includes(action)) return runtime.registry(eventRuntimeOptions);
+      if (['manifest', 'runtime_manifest', 'integration_manifest'].includes(action)) return runtime.manifest(eventRuntimeOptions);
+      if (['run_manifest', 'runtime_manifest_run', 'integration_manifest_run'].includes(action)) return runtime.runManifest(eventRuntimeOptions);
+      if (['runtime_bundles', 'runtime_bundle_matrix'].includes(action)) return runtime.runtimeBundles(eventRuntimeOptions);
+      if (['strategy', 'adaptation_strategy', 'adaptation_strategy_matrix'].includes(action)) return runtime.adaptationStrategyMatrix(eventRuntimeOptions);
+      if (['resolve', 'resolve_platform', 'platform_resolution'].includes(action)) return runtime.resolvePlatform(eventInput, eventRuntimeOptions);
+      if (['resolve_candidates', 'resolve_platform_candidates', 'platform_candidate_resolution'].includes(action)) return runtime.resolvePlatformCandidates(eventInput, eventRuntimeOptions);
+      if (['observe_candidates', 'observe_platform_candidates', 'observe_meeting_environment', 'meeting_environment_snapshot'].includes(action)) return runtime.observePlatformCandidates(eventInput, eventRuntimeOptions);
+      if (['readiness', 'live_readiness'].includes(action)) return runtime.readiness(eventRuntimeOptions);
+      if (['handoff_readiness'].includes(action)) return runtime.handoffReadiness(eventRuntimeOptions);
+      if (['run_handoff_readiness', 'handoff_readiness_run'].includes(action)) return runtime.runHandoffReadiness(eventRuntimeOptions);
       const platform = platformFrom(eventInput, eventOptions);
       if (['observe', 'observe_app', 'observe_meeting_app', 'meeting_app_snapshot', 'snapshot'].includes(action)) {
         return runtime.observeMeetingApp(platform, snapshotFrom(eventInput), eventOptions);

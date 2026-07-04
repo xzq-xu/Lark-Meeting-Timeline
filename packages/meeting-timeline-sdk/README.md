@@ -270,7 +270,7 @@ installMeetingPlatformIntegrationContentScriptBridge({
 
 `runtime.manifest()` 只证明 SDK 接线、runtime bundle、候选会议观察、speaker/participant 位置轨、`captured_at_ms`、provider/transcript 非阻塞策略已经满足 host handoff；真实会议页 DOM 和官方事件证据仍然要用 `platform-real-intake` / `platform-handoff-readiness` 验收，不能用静态 runtime manifest 冒充 production ready。正式交付给另一个项目时用 `await runtime.runManifest({ requireHandoffReady: true, ...evidenceByPlatform })` 或 `runMeetingPlatformIntegrationRuntimeManifest()`：它会运行 handoff readiness 和 runtime host replay，只有每个平台的 `runtime_host_replay_accepted=true` 且 `handoff_ready=true` 时才会让 `host_integration_ready=true`。manifest 会带上 `speaker_track_matrix`、`participant_track_matrix` 和 `handoff_readiness_matrix`，并在任一平台的发言人轨、参会人轨或 runtime replay 不满足交付要求时直接报错。
 
-跨项目投递到 host 的统一 HTTP envelope 用 `platform-runtime-event`。Google Meet 扩展、Teams WebView preload、Zoom native helper 都可以只构造同一类事件包，再发到 `/api/meeting-platform/runtime-events`；host 侧 `handleRuntimeEvent()` 会分发到 observe、candidate observation、provider ingest、insert annotation、speaker/participant track 或 timeline view：
+跨项目投递到 host 的统一 HTTP envelope 用 `platform-runtime-event`。Google Meet 扩展、Teams WebView preload、Zoom native helper 都可以只构造同一类事件包，再发到 `/api/meeting-platform/runtime-events`；host 侧 `handleRuntimeEvent()` 会分发到 observe、candidate observation、provider ingest、insert annotation、speaker/participant track、timeline view 或可执行 handoff gate：
 
 ```js
 import {
@@ -281,7 +281,7 @@ import {
 const googleRuntimePlan = buildMeetingPlatformRuntimeEventPlan('google-meet', {
   baseUrl: 'https://timeline.example.com',
 });
-// googleRuntimePlan.actions 明确列出 observe/candidate-observe/provider/annotation/speaker/participant/view 各 action 的 producer、必填字段和 client method。
+// googleRuntimePlan.actions 明确列出 observe/candidate-observe/provider/annotation/speaker/participant/view/run gate 各 action 的 producer、必填字段和 client method。
 // googleRuntimePlan.realtime_contract.provider_events_required_for_realtime === false。
 // googleRuntimePlan.realtime_contract.transcript_required_for_realtime === false。
 
@@ -302,6 +302,9 @@ await runtimeEvents.insertAnnotation('google-meet', {
   },
   current_meeting: currentMeeting,
 });
+
+await runtimeEvents.runManifest({ requireHandoffReady: true, google_meet: { evidencePackage } });
+await runtimeEvents.runHandoffReadiness({ platforms: ['google-meet'], target: 'production' });
 ```
 
 如果使用 SDK 生成的浏览器扩展脚手架，background worker 已内置同一条链路：向扩展发送 `meeting_timeline.observe_candidates`，它会查询当前浏览器 tabs，构造成 `observe_platform_candidates` runtime event 投递给 host。这样 Google Meet、Teams、Zoom、Webex、Lark/飞书都可以先用同一种“候选会议窗口观察”方式建轴，content script 只负责更细粒度的页面内观察。
@@ -533,7 +536,7 @@ const googlePackage = buildMeetingPlatformAdaptationPackage('google-meet', {
 // googlePackage.extension.matches 可直接给浏览器扩展 / WebView preload。
 // googlePackage.extension.permissions 与 googlePackage.candidate_observation 可直接给 background/native host 生成候选会议观察器。
 // googlePackage.annotation_pipeline.insert_endpoint 是设备端实时标注写入地址。
-// googlePackage.annotation_pipeline.runtime_event_plan 是 observe/provider/annotation/speaker/view 的动作契约。
+// googlePackage.annotation_pipeline.runtime_event_plan 是 observe/provider/annotation/speaker/view/run gate 的动作契约。
 // googlePackage.runtime_event_plan.examples.insert_annotation 是外部项目插入标注的样例 envelope。
 // googlePackage.provider_observer.required_for_realtime === false。
 // googlePackage.transcript.blocks_realtime_annotation === false。

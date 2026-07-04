@@ -35,7 +35,7 @@ assert.equal(google.runtime.candidate_observation.message_type, 'meeting_timelin
 assert.equal(google.runtime.candidate_observation.required_permission, 'tabs');
 assert.equal(google.runtime.candidate_observation.endpoint, '/api/meeting-platform/observe-candidates');
 assert.equal(google.runtime.runtime_event_plan_schema, 'meeting_platform_runtime_event_plan');
-assert.equal(google.runtime.runtime_event_action_count, 7);
+assert.equal(google.runtime.runtime_event_action_count, 14);
 assert.equal(google.provider.required_for_realtime, false);
 assert.equal(google.provider.security_verifier, 'verifyGooglePubSubOidcJwt');
 assert.equal(google.provider.start_events.includes('google.workspace.meet.conference.v2.started'), true);
@@ -43,6 +43,8 @@ assert.equal(google.annotations.insert_endpoint, `${baseUrl}/api/annotations`);
 assert.equal(google.annotations.runtime_event_endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);
 assert.equal(google.annotations.runtime_event_plan.supported_actions.includes('insert_annotation'), true);
 assert.equal(google.annotations.runtime_event_plan.supported_actions.includes('observe_platform_candidates'), true);
+assert.equal(google.annotations.runtime_event_plan.supported_actions.includes('run_manifest'), true);
+assert.equal(google.annotations.runtime_event_plan.supported_actions.includes('run_handoff_readiness'), true);
 assert.equal(google.annotations.runtime_event_plan.realtime_contract.provider_events_required_for_realtime, false);
 assert.equal(google.annotations.candidate_observation_runtime_action, 'observe_platform_candidates');
 assert.equal(google.annotations.timestamp_field, 'captured_at_ms');
@@ -84,7 +86,7 @@ assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').pro
 assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').candidate_observation_ready, true);
 assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').candidate_observer_message_type, 'meeting_timeline.observe_candidates');
 assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').candidate_observer_permission, 'tabs');
-assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 7);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 14);
 assert.equal(manifest.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 assert.equal(manifest.next_actions.includes('export_runtime_event_plan_before_wiring_external_host'), true);
 
