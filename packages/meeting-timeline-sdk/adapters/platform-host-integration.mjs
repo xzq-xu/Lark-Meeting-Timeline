@@ -675,9 +675,15 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       extension_plan: '/api/meeting-platform/extension-plan',
       integration_runtime: '/api/meeting-platform/integration-runtime',
       integration_runtime_manifest: '/api/meeting-platform/integration-runtime/manifest',
+      integration_runtime_run_manifest: '/api/meeting-platform/integration-runtime/run-manifest',
+      handoff_readiness: '/api/meeting-platform/handoff-readiness',
       runtime_events: '/api/meeting-platform/runtime-events',
     },
-    commands: handoff.commands,
+    commands: {
+      ...(handoff.commands ?? {}),
+      validate_integration_runtime_manifest: 'npm run meeting-platform:integration-runtime-run-manifest',
+      validate_handoff_readiness: 'npm run meeting-platform:handoff-readiness',
+    },
     evidence_paths: handoff.evidence_paths,
     integration_plans: Object.fromEntries(platforms.map((platform) => [
       platform,
@@ -703,6 +709,8 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       'wire_observer_plans_to_host_scheduler',
       'verify_candidate_observation_contract_for_each_target_platform',
       'verify_meeting_track_contract_for_each_target_platform',
+      'run_meeting_platform_integration_runtime_manifest_before_host_handoff',
+      'run_meeting_platform_handoff_readiness_before_host_handoff',
       'capture_real_provider_events_where_available',
     ]),
   });

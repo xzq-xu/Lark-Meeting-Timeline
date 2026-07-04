@@ -2687,6 +2687,7 @@ assertMeetingPlatformHostIntegrationScaffold(scaffold);
 // host.observePlatformCandidates(input) 和 /api/meeting-platform/observe-candidates 可把当前会议出现/消失写成实时轴事件。
 // host.integrationRuntimeSummary() 和 /api/meeting-platform/integration-runtime 可给宿主接入面板读取。
 // host.integrationRuntimeManifest() 和 /api/meeting-platform/integration-runtime/manifest 可给 CI/handoff gate 读取静态 SDK 接线状态。
+// scaffold.plan.endpoints/commands 会列出下面两个正式验收入口，方便宿主接入面板或 CI 自动发现。
 // host.runIntegrationRuntimeManifest() 和 /api/meeting-platform/integration-runtime/run-manifest 会实际运行 handoff readiness/runtime replay gate。
 // host.runHandoffReadiness() 和 /api/meeting-platform/handoff-readiness 可单独复验真实证据包是否能交给宿主上线。
 // /api/meeting-platform/runtime-events 可让扩展/WebView/native host 统一投递 observe/insert/provider 事件。

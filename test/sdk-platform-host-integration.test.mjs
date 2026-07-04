@@ -43,7 +43,11 @@ assert.equal(plan.endpoints.platform_candidate_observation, '/api/meeting-platfo
 assert.equal(plan.endpoints.extension_plan, '/api/meeting-platform/extension-plan');
 assert.equal(plan.endpoints.integration_runtime, '/api/meeting-platform/integration-runtime');
 assert.equal(plan.endpoints.integration_runtime_manifest, '/api/meeting-platform/integration-runtime/manifest');
+assert.equal(plan.endpoints.integration_runtime_run_manifest, '/api/meeting-platform/integration-runtime/run-manifest');
+assert.equal(plan.endpoints.handoff_readiness, '/api/meeting-platform/handoff-readiness');
 assert.equal(plan.endpoints.runtime_events, '/api/meeting-platform/runtime-events');
+assert.equal(plan.commands.validate_integration_runtime_manifest, 'npm run meeting-platform:integration-runtime-run-manifest');
+assert.equal(plan.commands.validate_handoff_readiness, 'npm run meeting-platform:handoff-readiness');
 assert.equal(plan.sdk.runtime_event_module, '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event');
 assert.equal(plan.handoff_bundle.platform_count, 3);
 assert.equal(plan.runtime_bundle_matrix.platform_count, 3);
@@ -87,6 +91,8 @@ assert.equal(plan.integration_plans.google_meet.provider_events.endpoint, `${bas
 assert.equal(plan.next_actions.includes('run_meeting_platform_contract_acceptance_before_enabling_new_platform'), true);
 assert.equal(plan.next_actions.includes('wire_host_routes_to_handleMeetingPlatformRequest'), true);
 assert.equal(plan.next_actions.includes('wire_observer_plans_to_host_scheduler'), true);
+assert.equal(plan.next_actions.includes('run_meeting_platform_integration_runtime_manifest_before_host_handoff'), true);
+assert.equal(plan.next_actions.includes('run_meeting_platform_handoff_readiness_before_host_handoff'), true);
 
 const scaffold = buildMeetingPlatformHostIntegrationScaffold({
   baseUrl,

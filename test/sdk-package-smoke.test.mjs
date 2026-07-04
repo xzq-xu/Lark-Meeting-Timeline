@@ -1017,11 +1017,34 @@ assert.equal(buildMeetingPlatformHostIntegrationPlan({
 assert.equal(buildMeetingPlatformHostIntegrationPlan({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
+}).endpoints.integration_runtime_run_manifest, '/api/meeting-platform/integration-runtime/run-manifest');
+assert.equal(buildMeetingPlatformHostIntegrationPlan({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).endpoints.handoff_readiness, '/api/meeting-platform/handoff-readiness');
+assert.equal(buildMeetingPlatformHostIntegrationPlan({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
 }).endpoints.runtime_events, '/api/meeting-platform/runtime-events');
+assert.equal(buildMeetingPlatformHostIntegrationPlan({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).commands.validate_integration_runtime_manifest, 'npm run meeting-platform:integration-runtime-run-manifest');
+assert.equal(buildMeetingPlatformHostIntegrationPlan({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).commands.validate_handoff_readiness, 'npm run meeting-platform:handoff-readiness');
+const smokeHostScaffold = buildMeetingPlatformHostIntegrationScaffold({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+});
 assert.equal(assertMeetingPlatformHostIntegrationScaffold(buildMeetingPlatformHostIntegrationScaffold({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 })).accepted, true);
+assert.equal(smokeHostScaffold.files.some((file) => file.path === 'scripts/run-integration-runtime-manifest.mjs'), true);
+assert.equal(smokeHostScaffold.files.some((file) => file.path === 'scripts/run-handoff-readiness.mjs'), true);
+assert.equal(smokeHostScaffold.files.find((file) => file.path === 'README.md').content.includes('runIntegrationRuntimeManifest'), true);
 assert.equal(buildMeetingPlatformProviderConnectionPack('zoom', {
   baseUrl: 'http://localhost:8787',
 }).realtime_annotation_policy.annotation_timestamp_field, 'captured_at_ms');
