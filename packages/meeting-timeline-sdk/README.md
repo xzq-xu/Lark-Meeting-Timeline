@@ -273,6 +273,16 @@ await runtimeEvents.insertAnnotation('google-meet', {
 });
 ```
 
+如果要给另一个项目批量交付动作契约，可以直接导出 runtime event plan：
+
+```bash
+npm run meeting-platform:runtime-event-plan -- \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --base-url=https://timeline.example.com \
+  --out-dir=data/meeting-platform-runtime-event-plans \
+  --report-file=data/meeting-platform-runtime-event-plan-report.json
+```
+
 多平台正式接入前，可以先用 `platform-strategy` 输出机器可读策略。它把 Google Meet、Teams、Zoom、Webex、Lark 的共性收敛成同一条原则：实时标注轴由本地观察或 host detector 先建，provider webhook 只做 reconcile/backfill，post-meeting transcript 只做会后导入，不阻塞当前标注：
 
 ```js
