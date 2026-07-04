@@ -298,6 +298,15 @@ const matrix = buildMeetingPlatformAdaptationStrategyMatrix({
 console.log(matrix.rows);
 ```
 
+也可以直接导出策略报告，给别的项目做平台选择或接入面板：
+
+```bash
+npm run meeting-platform:strategy -- \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --base-url=https://timeline.example.com \
+  --report-file=data/meeting-platform-strategy-report.json
+```
+
 宿主项目需要真正落地时，推荐再读一层 `platform-runtime-profile`。它把策略转成运行时可执行约束：谁先建轴、结束事件如何兜底、provider 事件是否阻塞实时标注、发言人位置用什么滤波参数。这个 profile 不依赖实时转写；发言人只作为时间轴 marker 写入，正文仍然等会后 transcript import：
 
 ```js

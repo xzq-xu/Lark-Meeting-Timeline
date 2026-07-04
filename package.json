@@ -25,6 +25,7 @@
     "meeting-app:evidence-gate": "node scripts/meeting-app-evidence-gate.mjs",
     "meeting-app:evidence-matrix": "node scripts/meeting-app-evidence-matrix.mjs --dir=data/meeting-app-evidence --report-file=data/meeting-app-evidence-matrix.json",
     "meeting-platform:rollout-matrix": "node scripts/meeting-platform-rollout-matrix.mjs --provider-dir=data/provider-evidence --dom-dir=data/meeting-app-evidence --report-file=data/meeting-platform-rollout-matrix.json",
+    "meeting-platform:strategy": "node scripts/meeting-platform-strategy.mjs --platforms=google-meet,teams,zoom,webex,lark --base-url=http://localhost:8787 --report-file=data/meeting-platform-strategy-report.json",
     "meeting-platform:provider-connection": "node scripts/meeting-platform-provider-connection.mjs --platforms=google-meet,teams,zoom,webex,lark --base-url=http://localhost:8787 --report-file=data/meeting-platform-provider-connection-report.json",
     "meeting-platform:subscription-handoff": "node scripts/meeting-platform-subscription-handoff.mjs --platforms=google-meet,teams,zoom,webex,lark --base-url=http://localhost:8787 --report-file=data/meeting-platform-subscription-handoff-report.json",
     "meeting-platform:speaker-track": "node scripts/meeting-platform-speaker-track.mjs --platforms=google-meet,teams,zoom,webex,lark --report-file=data/meeting-platform-speaker-track-report.json",

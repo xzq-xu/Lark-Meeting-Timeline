@@ -384,7 +384,7 @@ GET  /api/platform-events/status
 
 关键约束是：实时标注只依赖 `realtime_axis`，转写统一通过 `post_meeting_transcript` 会后导入；任何平台的实时 transcript 都不作为 P0/P1 链路前置条件。
 
-如果宿主项目只需要一个更直接的决策对象，而不是完整 setup/rollout 细节，可以调用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-strategy`。`buildMeetingPlatformAdaptationStrategyMatrix()` 会把每个平台收敛成同一组字段：实时轴主来源、provider 事件是否阻塞实时、转写是否阻塞实时、发言人位置来源、pilot gate、production gate 和 handoff package 入口。这里的策略结论固定为：Google Meet、Teams、Zoom、Webex、Lark 的 provider 事件都不能作为当前标注的唯一低延迟时钟；真实用户边写边标注时，必须优先使用本地观察或 host detector 建轴，provider 事件用于回填和审计。
+如果宿主项目只需要一个更直接的决策对象，而不是完整 setup/rollout 细节，可以调用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-strategy`，或运行 `npm run meeting-platform:strategy` 导出 `meeting_platform_adaptation_strategy_report`。`buildMeetingPlatformAdaptationStrategyMatrix()` 会把每个平台收敛成同一组字段：实时轴主来源、provider 事件是否阻塞实时、转写是否阻塞实时、发言人位置来源、pilot gate、production gate 和 handoff package 入口。这里的策略结论固定为：Google Meet、Teams、Zoom、Webex、Lark 的 provider 事件都不能作为当前标注的唯一低延迟时钟；真实用户边写边标注时，必须优先使用本地观察或 host detector 建轴，provider 事件用于回填和审计。
 
 SDK 还导出 `MEETING_PLATFORM_KEYS`、`MEETING_PLATFORM_ALIASES` 和 `normalizeMeetingPlatform()`，宿主项目应从这里读取平台列表和别名映射。新增平台时必须同时补齐 event adapter、setup manifest、capability contract、endpoint、安全配置，以及适用的 transcript normalizer，并通过 `test/sdk-platform-conformance.test.mjs`。
 

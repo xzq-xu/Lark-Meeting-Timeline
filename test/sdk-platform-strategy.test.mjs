@@ -1,4 +1,9 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { mkdtemp, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
 
 import { buildMeetingAppFixtureSnapshot } from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
 import { buildMeetingAppSnapshotRecordSet } from '../packages/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder.mjs';
@@ -10,6 +15,8 @@ import {
 } from '../packages/meeting-timeline-sdk/adapters/platform-strategy.mjs';
 import { createMeetingPlatformTimelineKit } from '../packages/meeting-timeline-sdk/adapters/platform-kit.mjs';
 
+const execFileAsync = promisify(execFile);
+const repoRoot = new URL('..', import.meta.url);
 const baseUrl = 'https://timeline.example.com';
 const observedAtMs = 1_783_356_000_000;
 
@@ -102,5 +109,42 @@ assert.equal(kit.platformAdaptationStrategy('google-meet').platform, 'google_mee
 assert.equal(kit.allPlatformAdaptationStrategies({ platforms: ['zoom'] }).length, 1);
 assert.equal(kit.platformAdaptationStrategyMatrix({ platforms: ['webex'] }).rows[0].platform, 'webex');
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_adaptation_strategy.type, 'meeting_platform_adaptation_strategy_matrix');
+
+const tmpDir = await mkdtemp(join(tmpdir(), 'meeting-platform-strategy-script-'));
+const reportFile = join(tmpDir, 'strategy-report.json');
+const { stdout } = await execFileAsync(process.execPath, [
+  'scripts/meeting-platform-strategy.mjs',
+  `--base-url=${baseUrl}`,
+  '--platforms=google-meet,zoom,local-detector',
+  `--report-file=${reportFile}`,
+  '--json=true',
+], {
+  cwd: repoRoot,
+});
+const report = JSON.parse(stdout);
+assert.equal(report.type, 'meeting_platform_adaptation_strategy_report');
+assert.equal(report.ok, true);
+assert.equal(report.strategy_count, 3);
+assert.equal(report.local_first_count, 2);
+assert.equal(report.non_blocking_provider_count, 2);
+assert.equal(report.blocking_count, 0);
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').primary_axis_source, 'local_observer');
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').provider_blocks_realtime, false);
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').transcript_blocks_realtime, false);
+assert.equal(report.matrix.strategies, undefined);
+
+const writtenReport = JSON.parse(await readFile(reportFile, 'utf8'));
+assert.equal(writtenReport.rows.find((row) => row.platform === 'zoom').recommendation, 'capture_live_local_observer_evidence_then_provider_events');
+assert.equal(writtenReport.required_platforms.includes('local-detector'), true);
+
+const { stdout: textStdout } = await execFileAsync(process.execPath, [
+  'scripts/meeting-platform-strategy.mjs',
+  '--platforms=lark',
+], {
+  cwd: repoRoot,
+});
+assert.match(textStdout, /meeting_platform_adaptation_strategy_report/);
+assert.match(textStdout, /lark: primary=local_observer/);
+assert.match(textStdout, /provider_blocks=no/);
 
 console.log('ok meeting platform adaptation strategy');
