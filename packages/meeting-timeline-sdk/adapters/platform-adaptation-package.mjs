@@ -16,6 +16,9 @@ import {
   buildMeetingPlatformRuntimeProfile,
 } from './platform-runtime-profile.mjs';
 import {
+  buildMeetingPlatformRuntimeEventPlan,
+} from './platform-runtime-event.mjs';
+import {
   buildMeetingPlatformFieldCollectorConfig,
 } from './platform-field-capture.mjs';
 import {
@@ -68,6 +71,7 @@ function commandSet(platform, options = {}) {
   const baseUrlArg = baseUrl ? ` --base-url=${baseUrl}` : '';
   return {
     print_package: `npm run meeting-platform:adaptation-package -- --platforms=${platform}${baseUrlArg}`,
+    print_runtime_event_plan: `npm run meeting-platform:runtime-event-plan -- --platforms=${platform}${baseUrlArg}`,
     verify_contract: `npm run meeting-platform:adapter-contract -- --platforms=${platform}${baseUrlArg} --fail-on-rejected=true`,
     collect_field_evidence: `npm run meeting-platform:field-evidence -- --platforms=${platform}${baseUrlArg}`,
     verify_handoff: `npm run meeting-platform:handoff-readiness -- --platforms=${platform}${baseUrlArg}`,
@@ -108,11 +112,13 @@ function localObserverSummary(collector = {}, runtimeAdapter = {}) {
   });
 }
 
-function annotationSummary(contract = {}, collector = {}) {
+function annotationSummary(contract = {}, collector = {}, runtimeEventPlan = {}) {
   return compactObject({
     insert_endpoint: contract.annotations?.endpoints?.insertMark ?? collector.timeline_ingest?.endpoints?.insertMark,
     runtime_event_endpoint: contract.annotations?.endpoints?.runtimeEvents,
     runtime_event: contract.annotations?.runtime_event,
+    runtime_event_plan: runtimeEventPlan,
+    runtime_event_actions: runtimeEventPlan.actions?.map((row) => row.action) ?? [],
     timestamp_field: 'captured_at_ms',
     realtime_policy: collector.timeline_ingest?.realtime_annotation_policy ?? contract.annotations?.realtime_policy,
     sdk_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-realtime-annotation',
@@ -140,6 +146,7 @@ function implementationSummary(capabilities = {}, contract = {}, runtimeAdapter 
       kit: '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
       live_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter',
       adaptation_package: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adaptation-package',
+      runtime_event: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event',
       platform_events: capabilities.sdk_modules?.events,
       runtime_adapter: runtimeAdapter.sdk_module,
       extension: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-extension',
@@ -148,6 +155,7 @@ function implementationSummary(capabilities = {}, contract = {}, runtimeAdapter 
       'platformAdaptationPackage',
       'platformLiveAdapter',
       'platformRuntimeProfile',
+      'platformRuntimeEventPlan',
       'platformAdapterContract',
       'meetingAppRuntimeAdapterConfig',
       'platformFieldCollectorConfig',
@@ -265,6 +273,7 @@ export function buildMeetingPlatformAdaptationPackage(platform, options = {}) {
   const collector = buildMeetingPlatformFieldCollectorConfig(key, options);
   const contract = buildMeetingPlatformAdapterContract(key, options);
   const contractAcceptance = buildMeetingPlatformAdapterContractAcceptanceReport(contract, options);
+  const runtimeEventPlan = buildMeetingPlatformRuntimeEventPlan(key, options);
   const runtimeAdapter = safeRuntimeAdapterConfig(key, options);
   const extensionMatches = safeExtensionMatches(key, options);
   const extensionPlan = safeExtensionInstallPlan(key, options);
@@ -284,7 +293,8 @@ export function buildMeetingPlatformAdaptationPackage(platform, options = {}) {
     runtime_contract: runtime.runtime_contract,
     local_observer: localObserverSummary(collector, runtimeAdapter),
     provider_observer: providerEventSummary(provider, runtime),
-    annotation_pipeline: annotationSummary(contract, collector),
+    annotation_pipeline: annotationSummary(contract, collector, runtimeEventPlan),
+    runtime_event_plan: runtimeEventPlan,
     speaker_markers: runtime.speaker_markers,
     transcript: transcriptSummary(capabilities, runtime),
     extension: {
@@ -345,6 +355,7 @@ export function buildMeetingPlatformAdaptationPackageMatrix(options = {}) {
       provider_transport: item.provider_observer?.transport,
       provider_start_event_count: item.provider_observer?.start_events?.length ?? 0,
       provider_end_event_count: item.provider_observer?.end_events?.length ?? 0,
+      runtime_event_action_count: item.annotation_pipeline?.runtime_event_actions?.length ?? 0,
       speaker_min_stable_ms: item.speaker_markers?.filter?.min_stable_ms,
       transcript_blocks_realtime: item.transcript?.blocks_realtime_annotation === true,
       missing_item_count: item.readiness.missing_items?.length ?? 0,

@@ -68,7 +68,7 @@ try {
   } else {
     console.log(`meeting_platform_registry_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | normalizers=${report.normalizer_count} | runtime_ready=${report.runtime_ready_count} | contracts=${report.contract_accepted_count} | provider_blocks=${report.provider_required_for_realtime_count} | transcript_blocks=${report.transcript_blocking_count}`);
     for (const row of report.rows) {
-      console.log(`${row.platform}: normalize=${boolLabel(row.normalize_available)} runtime=${boolLabel(row.runtime_ready)} contract=${boolLabel(row.contract_accepted)} matches=${row.browser_match_count} provider=${row.provider_transport ?? 'none'} endpoint=${row.insert_endpoint}`);
+      console.log(`${row.platform}: normalize=${boolLabel(row.normalize_available)} runtime=${boolLabel(row.runtime_ready)} contract=${boolLabel(row.contract_accepted)} matches=${row.browser_match_count} provider=${row.provider_transport ?? 'none'} runtime_actions=${row.runtime_event_action_count ?? 0} endpoint=${row.insert_endpoint}`);
     }
     if (report.next_actions.length > 0) console.log(`next_actions=${report.next_actions.join(',')}`);
   }

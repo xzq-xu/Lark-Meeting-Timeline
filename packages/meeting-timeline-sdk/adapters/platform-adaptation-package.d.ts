@@ -4,6 +4,7 @@ import type {
   MeetingPlatformAdapterContractAcceptanceReport,
 } from './platform-adapter-contract.mjs';
 import type { MeetingPlatformRuntimeProfile } from './platform-runtime-profile.mjs';
+import type { MeetingPlatformRuntimeEventPlan } from './platform-runtime-event.mjs';
 import type { MeetingPlatformLiveAdapterReadiness } from './platform-live-adapter.mjs';
 import type { MeetingPlatformHandoffReadiness } from './platform-handoff-readiness.mjs';
 
@@ -34,6 +35,7 @@ export interface MeetingPlatformAdaptationPackage {
   local_observer: Record<string, unknown>;
   provider_observer?: Record<string, unknown>;
   annotation_pipeline: Record<string, unknown>;
+  runtime_event_plan: MeetingPlatformRuntimeEventPlan;
   speaker_markers?: Record<string, unknown>;
   transcript: Record<string, unknown>;
   extension: {

@@ -475,7 +475,7 @@ npm run meeting-platform:adapter-contract -- \
 
 CLI 报告会同时输出 `acceptance`。默认 `--acceptance-target=contract` 只检查 contract 是否能被宿主项目安全接入；如果要把真实证据也纳入 gate，可以用 `--acceptance-target=production --fail-on-rejected=true`，此时缺真实 DOM / provider start-end 样本的平台会失败。
 
-如果宿主项目需要“直接接入包”而不是单独拼 contract、runtime profile、extension matches、provider setup 和 live readiness，用 `platform-adaptation-package`。它把 Google Meet / Teams / Zoom / Webex / Lark 的本地观察、provider 回填、实时标注、发言人 marker、会后转写、证据路径、SDK import 和命令行验收压成一个机器可读对象：
+如果宿主项目需要“直接接入包”而不是单独拼 contract、runtime profile、extension matches、provider setup、runtime event plan 和 live readiness，用 `platform-adaptation-package`。它把 Google Meet / Teams / Zoom / Webex / Lark 的本地观察、provider 回填、实时标注、runtime event 动作表、发言人 marker、会后转写、证据路径、SDK import 和命令行验收压成一个机器可读对象：
 
 ```js
 import {
@@ -489,6 +489,8 @@ const googlePackage = buildMeetingPlatformAdaptationPackage('google-meet', {
 
 // googlePackage.extension.matches 可直接给浏览器扩展 / WebView preload。
 // googlePackage.annotation_pipeline.insert_endpoint 是设备端实时标注写入地址。
+// googlePackage.annotation_pipeline.runtime_event_plan 是 observe/provider/annotation/speaker/view 的动作契约。
+// googlePackage.runtime_event_plan.examples.insert_annotation 是外部项目插入标注的样例 envelope。
 // googlePackage.provider_observer.required_for_realtime === false。
 // googlePackage.transcript.blocks_realtime_annotation === false。
 
@@ -1262,8 +1264,8 @@ const manifest = buildMeetingPlatformRegistryManifest({
   platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
 });
 
-// manifest.rows 是下游项目的选型表：normalizer、runtime、provider、insert endpoint、非阻塞规则。
-// manifest.entries[*] 进一步包含 SDK import、runtime bundle、provider security verifier 和 host endpoints。
+// manifest.rows 是下游项目的选型表：normalizer、runtime、provider、insert endpoint、runtime action 数和非阻塞规则。
+// manifest.entries[*] 进一步包含 SDK import、runtime bundle、runtime event plan、provider security verifier 和 host endpoints。
 assertMeetingPlatformRegistryManifest(manifest);
 ```
 

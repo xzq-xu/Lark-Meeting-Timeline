@@ -90,7 +90,7 @@ try {
   } else {
     console.log(`meeting_platform_adaptation_package_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | sdk_ready=${report.sdk_wiring_ready_count} | browser_observers=${report.browser_observer_count} | providers=${report.provider_observer_count} | production_ready=${report.production_ready_count} | realtime_ready=${report.realtime_ready_count} | written=${report.written_files.length}`);
     for (const row of report.rows) {
-      console.log(`${row.platform}: mode=${row.mode} sdk_ready=${boolLabel(row.sdk_wiring_ready)} browser_matches=${row.browser_match_count} provider=${row.provider_transport ?? 'none'} start_events=${row.provider_start_event_count} end_events=${row.provider_end_event_count} next=${row.first_next_action ?? 'none'} package=${row.package_file}`);
+      console.log(`${row.platform}: mode=${row.mode} sdk_ready=${boolLabel(row.sdk_wiring_ready)} browser_matches=${row.browser_match_count} provider=${row.provider_transport ?? 'none'} start_events=${row.provider_start_event_count} end_events=${row.provider_end_event_count} runtime_actions=${row.runtime_event_action_count ?? 0} next=${row.first_next_action ?? 'none'} package=${row.package_file}`);
     }
     if (report.next_actions.length > 0) console.log(`next_actions=${report.next_actions.join(',')}`);
   }
