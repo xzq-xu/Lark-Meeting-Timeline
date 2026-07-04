@@ -5,6 +5,12 @@ import type {
   MeetingPlatformRuntimeBundleMatrix,
 } from './platform-runtime-bundle.mjs';
 import type { MeetingPlatformAdaptationStrategyMatrix } from './platform-strategy.mjs';
+import type {
+  MeetingSessionEnvironmentSnapshot,
+  MeetingSessionDiscoverySnapshot,
+  MeetingSessionSelection,
+  NormalizedMeetingSessionCandidate,
+} from './meeting-session-discovery.mjs';
 
 export const MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA: 'meeting_platform_integration_runtime';
 export const MEETING_PLATFORM_INTEGRATION_RUNTIME_MANIFEST_SCHEMA: 'meeting_platform_integration_runtime_manifest';
@@ -122,6 +128,36 @@ export interface MeetingPlatformResolution {
   detection: MeetingPlatformBrowserDetection;
 }
 
+export interface MeetingPlatformCandidateResolutionRow {
+  selected?: boolean;
+  rank?: number;
+  score?: number;
+  supported: boolean;
+  platform?: string;
+  meeting_id?: string;
+  title?: string;
+  meeting_url?: string;
+  discovery?: Record<string, unknown>;
+  candidate: NormalizedMeetingSessionCandidate;
+  resolution: MeetingPlatformResolution;
+}
+
+export interface MeetingPlatformCandidateResolution {
+  type: 'meeting_platform_candidate_resolution';
+  detected: boolean;
+  supported: boolean;
+  platform?: string;
+  meeting?: Record<string, unknown>;
+  selected_candidate?: MeetingPlatformCandidateResolutionRow;
+  selected_resolution?: MeetingPlatformResolution;
+  candidate_count: number;
+  supported_candidate_count: number;
+  current_platforms: string[];
+  next_actions: string[];
+  candidates: MeetingPlatformCandidateResolutionRow[];
+  selection: MeetingSessionSelection;
+}
+
 export interface MeetingPlatformIntegrationRuntime {
   type: 'meeting_platform_integration_runtime';
   schema: typeof MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA;
@@ -144,6 +180,10 @@ export interface MeetingPlatformIntegrationRuntime {
   adaptationPackages(packageOptions?: Record<string, unknown>): Record<string, unknown>;
   adaptationStrategyMatrix(strategyOptions?: Record<string, unknown>): MeetingPlatformAdaptationStrategyMatrix;
   resolvePlatform(input?: Record<string, unknown>, resolveOptions?: Record<string, unknown>): MeetingPlatformResolution;
+  resolvePlatformCandidates(
+    input?: MeetingSessionEnvironmentSnapshot | MeetingSessionDiscoverySnapshot[] | Record<string, unknown>,
+    resolveOptions?: Record<string, unknown>,
+  ): MeetingPlatformCandidateResolution;
   readiness(readinessOptions?: Record<string, unknown>): Record<string, unknown>;
   handoffReadiness(readinessOptions?: Record<string, unknown>): Record<string, unknown>;
   observeMeetingApp(platform: string, snapshot?: Record<string, unknown>, observeOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -168,6 +208,10 @@ export interface MeetingPlatformIntegrationBrowserRuntime {
   integration_runtime: MeetingPlatformIntegrationRuntime;
   detect(input?: Record<string, unknown>, detectOptions?: Record<string, unknown>): MeetingPlatformBrowserDetection;
   resolvePlatform(input?: Record<string, unknown>, resolveOptions?: Record<string, unknown>): MeetingPlatformResolution;
+  resolvePlatformCandidates(
+    input?: MeetingSessionEnvironmentSnapshot | MeetingSessionDiscoverySnapshot[] | Record<string, unknown>,
+    resolveOptions?: Record<string, unknown>,
+  ): MeetingPlatformCandidateResolution;
   platformFor(input?: Record<string, unknown>, platformOptions?: Record<string, unknown>): string;
   sample(sampleOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
   tick(sampleOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -214,6 +258,11 @@ export function resolveMeetingPlatformForInput(
   input?: Record<string, unknown>,
   options?: MeetingPlatformIntegrationRuntimeOptions,
 ): MeetingPlatformResolution;
+
+export function resolveMeetingPlatformCandidates(
+  input?: MeetingSessionEnvironmentSnapshot | MeetingSessionDiscoverySnapshot[] | Record<string, unknown>,
+  options?: MeetingPlatformIntegrationRuntimeOptions,
+): MeetingPlatformCandidateResolution;
 
 export function buildMeetingPlatformIntegrationRuntimeManifest(
   options?: MeetingPlatformIntegrationRuntimeOptions,

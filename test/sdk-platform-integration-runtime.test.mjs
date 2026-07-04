@@ -11,6 +11,7 @@ import {
   createMeetingPlatformIntegrationRuntime,
   detectMeetingPlatformForBrowser,
   installMeetingPlatformIntegrationContentScriptBridge,
+  resolveMeetingPlatformCandidates,
   resolveMeetingPlatformForInput,
 } from '../packages/meeting-timeline-sdk/adapters/platform-integration-runtime.mjs';
 import { buildPlatformFixtureEvent } from '../packages/meeting-timeline-sdk/adapters/platform-fixtures.mjs';
@@ -160,6 +161,33 @@ assert.equal(resolvedZoomNative.supported, true);
 assert.equal(resolvedZoomNative.platform, 'zoom');
 assert.equal(resolvedZoomNative.meeting.meeting_id, '987654321');
 assert.equal(resolvedZoomNative.meeting.confidence, 'high');
+
+const resolvedCandidates = resolveMeetingPlatformCandidates({
+  windows: [{
+    id: 'browser-window-1',
+    application: { name: 'Google Chrome' },
+    tabs: [{
+      id: 'mail-tab',
+      active: false,
+      url: 'https://mail.google.com',
+      title: 'Inbox',
+    }, {
+      id: 'meet-tab',
+      active: true,
+      url: 'https://meet.google.com/abc-defg-hij',
+      title: 'Design review - Google Meet',
+    }],
+  }],
+}, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom'],
+});
+assert.equal(resolvedCandidates.type, 'meeting_platform_candidate_resolution');
+assert.equal(resolvedCandidates.detected, true);
+assert.equal(resolvedCandidates.supported, true);
+assert.equal(resolvedCandidates.candidate_count, 1);
+assert.equal(resolvedCandidates.selected_resolution.platform, 'google_meet');
+assert.equal(resolvedCandidates.selected_candidate.meeting_id, 'abc-defg-hij');
 
 const manifest = buildMeetingPlatformIntegrationRuntimeManifest({
   baseUrl,
@@ -334,6 +362,12 @@ assert.equal((await runtime.handleEvent({
   action: 'resolve_platform',
   url: 'https://meet.google.com/abc-defg-hij',
 })).platform, 'google_meet');
+assert.equal((await runtime.handleEvent({
+  action: 'resolve_platform_candidates',
+  windows: [{
+    tabs: [{ active: true, url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet' }],
+  }],
+})).selected_resolution.platform, 'google_meet');
 assert.equal((await runtime.handleEvent({ action: 'manifest' })).host_integration_ready, true);
 await assert.rejects(
   () => runtime.handleEvent({ action: 'insert_annotation' }),

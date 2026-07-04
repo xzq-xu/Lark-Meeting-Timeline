@@ -121,6 +121,7 @@ import {
 	  createMeetingPlatformIntegrationRuntime,
 	  detectMeetingPlatformForBrowser,
 	  installMeetingPlatformIntegrationContentScriptBridge,
+	  resolveMeetingPlatformCandidates,
 	  resolveMeetingPlatformForInput,
 	} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';
 import {
@@ -311,6 +312,14 @@ assert.equal(resolveMeetingPlatformForInput({
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],
 }).supported, true);
+assert.equal(resolveMeetingPlatformCandidates({
+  windows: [{
+    tabs: [{ active: true, url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet' }],
+  }],
+}, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+}).selected_resolution.platform, 'google_meet');
 assert.equal(createMeetingPlatformIntegrationBrowserRuntime(client, {
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],

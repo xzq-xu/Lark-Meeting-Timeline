@@ -10,6 +10,9 @@ import {
   meetingAppBrowserRuntimePreset,
 } from './meeting-app-browser-runtime.mjs';
 import { createMeetingAppContentScriptBridge } from './meeting-app-content-script.mjs';
+import {
+  selectMeetingSessionCandidate,
+} from './meeting-session-discovery.mjs';
 import { createMeetingPlatformTimelineKit } from './platform-kit.mjs';
 import {
   buildMeetingPlatformAdaptationPackageMatrix,
@@ -90,6 +93,13 @@ function rowForPlatform(matrix = {}, platform) {
   const normalized = maybeNormalizePlatform(platform);
   if (!normalized) return undefined;
   return asArray(matrix.rows).find((row) => row?.platform === normalized);
+}
+
+function meetingKey(value = {}) {
+  return [
+    value.platform ?? value.meeting?.platform,
+    value.meeting_id ?? value.meetingId ?? value.meeting?.meeting_id ?? value.meeting?.meetingId,
+  ].filter(Boolean).join('|');
 }
 
 function runtimeIssues(manifest = {}) {
@@ -380,6 +390,56 @@ export function resolveMeetingPlatformForInput(input = {}, options = {}) {
   });
 }
 
+export function resolveMeetingPlatformCandidates(input = {}, options = {}) {
+  const merged = runtimeBaseOptions(options);
+  const platforms = selectedPlatforms(merged);
+  const selection = selectMeetingSessionCandidate(input, options);
+  const selectedKey = meetingKey(selection.detectedMeeting);
+  const rankedByKey = new Map(asArray(selection.candidates).map((candidate) => [
+    meetingKey(candidate.detectedMeeting ?? candidate.snapshot),
+    candidate,
+  ]));
+  const candidates = asArray(selection.normalizedCandidates).map((candidate) => {
+    const key = meetingKey(candidate);
+    const ranked = rankedByKey.get(key);
+    const resolution = resolveMeetingPlatformForInput(candidate, {
+      ...merged,
+      platforms,
+    });
+    return compactObject({
+      selected: key !== '' && key === selectedKey,
+      rank: ranked?.rank,
+      score: ranked?.score,
+      supported: resolution.supported,
+      platform: resolution.platform ?? candidate.platform,
+      meeting_id: candidate.meeting_id,
+      title: candidate.title,
+      meeting_url: candidate.meeting_url,
+      discovery: candidate.discovery,
+      candidate,
+      resolution,
+    });
+  });
+  const selected = candidates.find((candidate) => candidate.selected) ?? null;
+  return compactObject({
+    type: 'meeting_platform_candidate_resolution',
+    detected: Boolean(selected),
+    supported: selected?.supported === true,
+    platform: selected?.platform,
+    meeting: selection.detectedMeeting,
+    selected_candidate: selected,
+    selected_resolution: selected?.resolution,
+    candidate_count: candidates.length,
+    supported_candidate_count: candidates.filter((candidate) => candidate.supported === true).length,
+    current_platforms: platforms,
+    next_actions: selected
+      ? selected.resolution?.next_actions ?? []
+      : ['provide_meeting_window_or_candidate_snapshot'],
+    candidates,
+    selection,
+  });
+}
+
 export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
   const merged = runtimeBaseOptions(options);
   const platforms = selectedPlatforms(merged);
@@ -544,6 +604,12 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
         platforms: resolveOptions.platforms ?? resolveOptions.platform_keys ?? platforms,
       }));
     },
+    resolvePlatformCandidates(input = {}, resolveOptions = {}) {
+      return resolveMeetingPlatformCandidates(input, withDefaults(defaults, {
+        ...resolveOptions,
+        platforms: resolveOptions.platforms ?? resolveOptions.platform_keys ?? platforms,
+      }));
+    },
     readiness(readinessOptions = {}) {
       return suite.readinessMatrix({
         ...readinessOptions,
@@ -594,6 +660,7 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
       if (['runtime_bundles', 'runtime_bundle_matrix'].includes(action)) return runtime.runtimeBundles(eventOptions);
       if (['strategy', 'adaptation_strategy', 'adaptation_strategy_matrix'].includes(action)) return runtime.adaptationStrategyMatrix(eventOptions);
       if (['resolve', 'resolve_platform', 'platform_resolution'].includes(action)) return runtime.resolvePlatform(eventInput, eventOptions);
+      if (['resolve_candidates', 'resolve_platform_candidates', 'platform_candidate_resolution'].includes(action)) return runtime.resolvePlatformCandidates(eventInput, eventOptions);
       if (['readiness', 'live_readiness'].includes(action)) return runtime.readiness(eventOptions);
       if (['handoff_readiness'].includes(action)) return runtime.handoffReadiness(eventOptions);
       const platform = platformFrom(eventInput, eventOptions);
@@ -627,6 +694,7 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
           'runtime_bundles',
           'adaptation_strategy_matrix',
           'resolve_platform',
+          'resolve_platform_candidates',
           'registry',
           'manifest',
           'readiness',
@@ -783,6 +851,13 @@ export function createMeetingPlatformIntegrationBrowserRuntime(clientOrOptions, 
     detect,
     resolvePlatform(input = {}, resolveOptions = {}) {
       return integrationRuntime.resolvePlatform(input, {
+        ...options,
+        ...baseInputOptions,
+        ...resolveOptions,
+      });
+    },
+    resolvePlatformCandidates(input = {}, resolveOptions = {}) {
+      return integrationRuntime.resolvePlatformCandidates(input, {
         ...options,
         ...baseInputOptions,
         ...resolveOptions,
