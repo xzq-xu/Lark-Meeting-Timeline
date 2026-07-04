@@ -44,6 +44,11 @@ export interface MeetingPlatformRuntimeEvent {
   annotations?: unknown[];
   speakerTrack?: Record<string, unknown>;
   participantTrack?: Record<string, unknown>;
+  windows?: unknown[];
+  tabs?: unknown[];
+  applications?: unknown[];
+  candidates?: unknown[];
+  environment?: unknown;
   [key: string]: unknown;
 }
 
@@ -76,6 +81,7 @@ export interface MeetingPlatformRuntimeEventClient {
   endpoint: string;
   send(eventInput?: Record<string, unknown> | MeetingPlatformRuntimeEvent, sendOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   observeMeetingApp(platform: string, snapshot?: Record<string, unknown>, observeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  observePlatformCandidates(input?: Record<string, unknown>, observeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   ingestProvider(platform: string, payload?: unknown, ingestOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   insertAnnotation(platform: string, annotationInput?: Record<string, unknown>, markOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   insertMark(platform: string, annotationInput?: Record<string, unknown>, markOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
@@ -139,6 +145,10 @@ export function assertMeetingPlatformRuntimeEvent(
 export function buildMeetingPlatformObserveRuntimeEvent(
   platform: string,
   snapshot?: Record<string, unknown>,
+  options?: MeetingPlatformRuntimeEventOptions,
+): MeetingPlatformRuntimeEvent;
+export function buildMeetingPlatformCandidateObservationRuntimeEvent(
+  input?: Record<string, unknown>,
   options?: MeetingPlatformRuntimeEventOptions,
 ): MeetingPlatformRuntimeEvent;
 export function buildMeetingPlatformProviderRuntimeEvent(

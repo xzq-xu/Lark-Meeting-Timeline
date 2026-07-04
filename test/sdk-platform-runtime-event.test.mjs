@@ -5,6 +5,7 @@ import {
   MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
   assertMeetingPlatformRuntimeEvent,
   buildMeetingPlatformAnnotationRuntimeEvent,
+  buildMeetingPlatformCandidateObservationRuntimeEvent,
   buildMeetingPlatformObserveRuntimeEvent,
   buildMeetingPlatformProviderRuntimeEvent,
   buildMeetingPlatformRuntimeEventPlan,
@@ -24,6 +25,7 @@ const baseUrl = 'https://timeline.example.com';
 const now = 1_782_614_400_000;
 
 assert.equal(normalizeMeetingPlatformRuntimeEventAction('insert-mark'), 'insert_annotation');
+assert.equal(normalizeMeetingPlatformRuntimeEventAction('observe-candidates'), 'observe_platform_candidates');
 assert.equal(meetingPlatformRuntimeEventEndpoint({ baseUrl }), `${baseUrl}${MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT}`);
 
 const observeEvent = buildMeetingPlatformObserveRuntimeEvent('google-meet', {
@@ -38,6 +40,25 @@ assert.equal(observeEvent.action, 'observe_meeting_app');
 assert.equal(observeEvent.platform, 'google_meet');
 assert.equal(observeEvent.snapshot.url, 'https://meet.google.com/abc-defg-hij');
 assert.equal(observeEvent.sent_at_ms, now + 1);
+
+const candidateObservationEvent = buildMeetingPlatformCandidateObservationRuntimeEvent({
+  windows: [{
+    id: 'browser-window-1',
+    tabs: [{
+      id: 'meet-tab',
+      active: true,
+      url: 'https://meet.google.com/abc-defg-hij',
+      title: 'Design review - Google Meet',
+    }],
+  }],
+}, {
+  now: () => now + 2,
+  source: 'native_host',
+});
+assert.equal(candidateObservationEvent.action, 'observe_platform_candidates');
+assert.equal(candidateObservationEvent.platform, undefined);
+assert.equal(candidateObservationEvent.windows[0].tabs[0].active, true);
+assert.equal(candidateObservationEvent.environment.windows[0].id, 'browser-window-1');
 
 const annotationEvent = buildMeetingPlatformAnnotationRuntimeEvent('zoom', {
   annotation: {
@@ -92,6 +113,14 @@ const runtime = createMeetingPlatformIntegrationRuntime(client, {
   verify: false,
 });
 
+const candidateObservationResult = await runtime.handleEvent(candidateObservationEvent, undefined, {
+  observedAtMs: now - 1_000,
+});
+assert.equal(candidateObservationResult.action, 'observe_platform_candidates');
+assert.equal(candidateObservationResult.platform, 'google_meet');
+assert.equal(candidateObservationResult.signals[0].type, 'meeting_started');
+assert.equal(calls.some((call) => call.method === 'startMeeting' && call.input.meeting_id === 'abc-defg-hij'), true);
+
 const payloadOnlyInsert = await runtime.handleEvent({
   action: 'insert_annotation',
   platform: 'google-meet',
@@ -136,8 +165,10 @@ assert.equal(googlePlan.realtime_contract.transcript_required_for_realtime, fals
 assert.equal(googlePlan.provider_start_event_example, 'google.workspace.meet.conference.v2.started');
 assert.equal(googlePlan.provider_end_event_example, 'google.workspace.meet.conference.v2.ended');
 assert.equal(googlePlan.actions.find((row) => row.action === 'insert_annotation').client_method, 'insertAnnotation');
+assert.equal(googlePlan.actions.find((row) => row.action === 'observe_platform_candidates').client_method, 'observePlatformCandidates');
 assert.equal(googlePlan.actions.find((row) => row.action === 'provider_event').realtime_role, 'reconcile_and_backfill_only');
 assert.equal(googlePlan.examples.insert_annotation.action, 'insert_annotation');
+assert.equal(googlePlan.examples.observe_platform_candidates.action, 'observe_platform_candidates');
 assert.equal(googlePlan.examples.insert_annotation.annotation.captured_at_ms, now + 15_000);
 assert.equal(googlePlan.examples.observe_meeting_app.snapshot.url, 'https://meet.google.com/abc-defg-hij');
 
@@ -151,6 +182,7 @@ assert.equal(runtimePlanMatrix.platform_count, 3);
 assert.equal(runtimePlanMatrix.realtime_provider_dependency_count, 0);
 assert.equal(runtimePlanMatrix.transcript_realtime_dependency_count, 0);
 assert.equal(runtimePlanMatrix.rows.some((row) => row.platform === 'microsoft_teams' && row.action === 'speaker_track'), true);
+assert.equal(runtimePlanMatrix.rows.some((row) => row.platform === 'zoom' && row.action === 'observe_platform_candidates'), true);
 assert.equal(runtimePlanMatrix.next_actions.includes('include_captured_at_ms_on_every_annotation'), true);
 
 let capturedRequest = null;
@@ -189,6 +221,14 @@ assert.equal(capturedRequest.body.schema, MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA)
 assert.equal(capturedRequest.body.action, 'insert_annotation');
 assert.equal(capturedRequest.body.platform, 'zoom');
 assert.equal(sendResult.accepted.annotation.id, 'client-note-1');
+await runtimeEventClient.observePlatformCandidates({
+  windows: [{
+    tabs: [{ active: true, url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet' }],
+  }],
+});
+assert.equal(capturedRequest.body.action, 'observe_platform_candidates');
+assert.equal(capturedRequest.body.platform, undefined);
+assert.equal(capturedRequest.body.windows[0].tabs[0].url, 'https://meet.google.com/abc-defg-hij');
 assert.equal((await runtimeEventClient.manifest()).accepted.action, 'manifest');
 
 console.log('ok meeting platform runtime event envelope');

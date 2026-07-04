@@ -31,7 +31,7 @@ assert.equal(google.runtime.runtime_ready, true);
 assert.equal(google.runtime.browser_matches.includes('https://meet.google.com/*'), true);
 assert.equal(google.runtime.sample_interval_ms, 10_000);
 assert.equal(google.runtime.runtime_event_plan_schema, 'meeting_platform_runtime_event_plan');
-assert.equal(google.runtime.runtime_event_action_count, 6);
+assert.equal(google.runtime.runtime_event_action_count, 7);
 assert.equal(google.provider.required_for_realtime, false);
 assert.equal(google.provider.security_verifier, 'verifyGooglePubSubOidcJwt');
 assert.equal(google.provider.start_events.includes('google.workspace.meet.conference.v2.started'), true);
@@ -72,7 +72,7 @@ assert.equal(manifest.contract_accepted_count, 5);
 assert.equal(manifest.provider_required_for_realtime_count, 0);
 assert.equal(manifest.transcript_blocking_count, 0);
 assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').provider_transport, 'Microsoft Graph change notifications');
-assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 6);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 7);
 assert.equal(manifest.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 assert.equal(manifest.next_actions.includes('export_runtime_event_plan_before_wiring_external_host'), true);
 

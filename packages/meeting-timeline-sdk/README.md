@@ -267,7 +267,7 @@ installMeetingPlatformIntegrationContentScriptBridge({
 
 `runtime.manifest()` 只证明 SDK 接线、runtime bundle、`captured_at_ms`、provider/transcript 非阻塞策略已经满足 host handoff；真实会议页 DOM 和官方事件证据仍然要用 `platform-real-intake` / `platform-handoff-readiness` 验收，不能用 runtime manifest 冒充 production ready。
 
-跨项目投递到 host 的统一 HTTP envelope 用 `platform-runtime-event`。Google Meet 扩展、Teams WebView preload、Zoom native helper 都可以只构造同一类事件包，再发到 `/api/meeting-platform/runtime-events`；host 侧 `handleRuntimeEvent()` 会分发到 observe、provider ingest、insert annotation、speaker/participant track 或 timeline view：
+跨项目投递到 host 的统一 HTTP envelope 用 `platform-runtime-event`。Google Meet 扩展、Teams WebView preload、Zoom native helper 都可以只构造同一类事件包，再发到 `/api/meeting-platform/runtime-events`；host 侧 `handleRuntimeEvent()` 会分发到 observe、candidate observation、provider ingest、insert annotation、speaker/participant track 或 timeline view：
 
 ```js
 import {
@@ -278,12 +278,18 @@ import {
 const googleRuntimePlan = buildMeetingPlatformRuntimeEventPlan('google-meet', {
   baseUrl: 'https://timeline.example.com',
 });
-// googleRuntimePlan.actions 明确列出 observe/provider/annotation/speaker/participant/view 各 action 的 producer、必填字段和 client method。
+// googleRuntimePlan.actions 明确列出 observe/candidate-observe/provider/annotation/speaker/participant/view 各 action 的 producer、必填字段和 client method。
 // googleRuntimePlan.realtime_contract.provider_events_required_for_realtime === false。
 // googleRuntimePlan.realtime_contract.transcript_required_for_realtime === false。
 
 const runtimeEvents = createMeetingPlatformRuntimeEventClient({
   baseUrl: 'https://timeline.example.com',
+});
+
+await runtimeEvents.observePlatformCandidates({
+  windows: [{
+    tabs: [{ url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet', active: true }],
+  }],
 });
 
 await runtimeEvents.insertAnnotation('google-meet', {

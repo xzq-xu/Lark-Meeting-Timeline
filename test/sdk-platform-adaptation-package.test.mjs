@@ -52,7 +52,7 @@ assert.equal(matrix.sdk_wiring_ready_count, 5);
 assert.equal(matrix.browser_observer_count, 5);
 assert.equal(matrix.provider_observer_count, 5);
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').provider_start_event_count, 1);
-assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 6);
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 7);
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 assert.equal(matrix.rows.find((row) => row.platform === 'webex').transcript_blocks_realtime, false);
 assert.equal(matrix.rows.find((row) => row.platform === 'lark').sdk_wiring_ready, true);

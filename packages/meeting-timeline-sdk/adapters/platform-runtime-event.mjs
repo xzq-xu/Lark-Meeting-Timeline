@@ -17,6 +17,7 @@ export const MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT = '/api/meeting-platform/ru
 
 export const MEETING_PLATFORM_RUNTIME_EVENT_ACTIONS = Object.freeze([
   'observe_meeting_app',
+  'observe_platform_candidates',
   'provider_event',
   'insert_annotation',
   'speaker_track',
@@ -35,6 +36,11 @@ const ACTION_ALIASES = new Map([
   ['observe_meeting_app', 'observe_meeting_app'],
   ['meeting_app_snapshot', 'observe_meeting_app'],
   ['snapshot', 'observe_meeting_app'],
+  ['observe_candidates', 'observe_platform_candidates'],
+  ['observe_platform_candidates', 'observe_platform_candidates'],
+  ['observe_meeting_environment', 'observe_platform_candidates'],
+  ['meeting_environment_snapshot', 'observe_platform_candidates'],
+  ['platform_candidate_observation', 'observe_platform_candidates'],
   ['provider', 'provider_event'],
   ['provider_event', 'provider_event'],
   ['ingest_provider', 'provider_event'],
@@ -246,6 +252,13 @@ function actionDefaults(event = {}, payload = undefined, input = {}) {
   if (event.action === 'observe_meeting_app' && !event.snapshot && !event.meeting_app_snapshot) {
     event.snapshot = firstNonEmpty(input.snapshot, input.meeting_app_snapshot, input.meetingAppSnapshot, input.dom, payload);
   }
+  if (event.action === 'observe_platform_candidates') {
+    event.environment = firstNonEmpty(input.environment, input.meeting_environment, input.meetingEnvironment, input.snapshot, payload);
+    event.windows = firstNonEmpty(input.windows, objectPayload.windows, event.windows);
+    event.tabs = firstNonEmpty(input.tabs, objectPayload.tabs, event.tabs);
+    event.applications = firstNonEmpty(input.applications, input.apps, objectPayload.applications, objectPayload.apps, event.applications);
+    event.candidates = firstNonEmpty(input.candidates, objectPayload.candidates, event.candidates);
+  }
   if (event.action === 'provider_event' && !event.provider_event && !event.providerEvent && !event.raw) {
     event.provider_event = payload ?? input.raw ?? objectPayload;
   }
@@ -318,6 +331,14 @@ export function buildMeetingPlatformObserveRuntimeEvent(platform, snapshot = {},
     platform,
     snapshot,
     payload: snapshot,
+  }, options);
+}
+
+export function buildMeetingPlatformCandidateObservationRuntimeEvent(input = {}, options = {}) {
+  return buildMeetingPlatformRuntimeEvent({
+    ...input,
+    action: 'observe_platform_candidates',
+    payload: input,
   }, options);
 }
 
@@ -418,6 +439,20 @@ function runtimeEventExamples(platform, options = {}) {
     occurred_at_ms: capturedAtMs,
     meeting: currentMeeting,
   };
+  const candidateEnvironment = {
+    windows: [{
+      id: `${platform}-window-1`,
+      focused: true,
+      application: { name: firstNonEmpty(options.applicationName, options.application_name, platform) },
+      tabs: [{
+        id: `${platform}-tab-1`,
+        active: true,
+        url,
+        title: currentMeeting.title,
+        observed_at_ms: capturedAtMs,
+      }],
+    }],
+  };
 
   return {
     observe_meeting_app: buildMeetingPlatformObserveRuntimeEvent(platform, {
@@ -428,6 +463,7 @@ function runtimeEventExamples(platform, options = {}) {
       in_meeting: true,
       active_speaker: speakerSignals[0].speaker,
     }, options),
+    observe_platform_candidates: buildMeetingPlatformCandidateObservationRuntimeEvent(candidateEnvironment, options),
     provider_event: buildMeetingPlatformProviderRuntimeEvent(platform, providerPayload, options),
     insert_annotation: buildMeetingPlatformAnnotationRuntimeEvent(platform, {
       annotation,
@@ -463,6 +499,17 @@ function runtimeEventActionRows(platform, endpoint) {
       realtime_role: 'open_or_keep_current_axis',
       required_fields: ['platform', 'snapshot.observed_at_ms_or_sent_at_ms'],
       recommended_fields: ['snapshot.url', 'snapshot.title', 'snapshot.active_speaker'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'observe_platform_candidates',
+      client_method: 'observePlatformCandidates',
+      producer: 'native_host_or_browser_window_detector',
+      realtime_role: 'select_current_meeting_and_open_or_close_axis',
+      required_fields: ['windows_or_tabs_or_applications_or_candidates'],
+      recommended_fields: ['windows[].focused', 'tabs[].active', 'tabs[].url', 'applications[].name'],
       provider_dependency: false,
       transcript_dependency: false,
       endpoint,
@@ -565,6 +612,7 @@ export function buildMeetingPlatformRuntimeEventPlan(platform, options = {}) {
     sequence: [
       'create runtime event client with the host baseUrl',
       'send observe_meeting_app when the host detects an active meeting window',
+      'send observe_platform_candidates when the host only has multi-window or native helper state',
       'send insert_annotation immediately when the annotation device finishes a mark',
       'send speaker_track or participant_track only after local filtering/debounce',
       'send provider_event as reconcile/backfill evidence when official events arrive',
@@ -673,6 +721,9 @@ export function createMeetingPlatformRuntimeEventClient(options = {}) {
     send,
     observeMeetingApp(platform, snapshot = {}, observeOptions = {}) {
       return send(buildMeetingPlatformObserveRuntimeEvent(platform, snapshot, observeOptions), observeOptions);
+    },
+    observePlatformCandidates(input = {}, observeOptions = {}) {
+      return send(buildMeetingPlatformCandidateObservationRuntimeEvent(input, observeOptions), observeOptions);
     },
     ingestProvider(platform, payload = {}, ingestOptions = {}) {
       return send(buildMeetingPlatformProviderRuntimeEvent(platform, payload, ingestOptions), ingestOptions);

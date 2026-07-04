@@ -127,6 +127,7 @@ import {
 import {
   MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
   buildMeetingPlatformAnnotationRuntimeEvent,
+  buildMeetingPlatformCandidateObservationRuntimeEvent,
   buildMeetingPlatformRuntimeEventPlan,
   buildMeetingPlatformRuntimeEventPlanMatrix,
   createMeetingPlatformRuntimeEventClient,
@@ -367,6 +368,13 @@ const runtimeEvent = buildMeetingPlatformAnnotationRuntimeEvent('google-meet', {
 });
 assert.equal(runtimeEvent.schema, MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA);
 assert.equal(runtimeEvent.action, 'insert_annotation');
+assert.equal(buildMeetingPlatformCandidateObservationRuntimeEvent({
+  windows: [{
+    tabs: [{ active: true, url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet' }],
+  }],
+}, {
+  now: () => 1_782_614_402_000,
+}).action, 'observe_platform_candidates');
 assert.equal(meetingPlatformRuntimeEventEndpoint({
   baseUrl: 'http://localhost:8787',
 }), 'http://localhost:8787/api/meeting-platform/runtime-events');
