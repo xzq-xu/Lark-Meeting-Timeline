@@ -43,6 +43,9 @@ import {
 import {
   buildMeetingPlatformAdapterRouteMatrix,
 } from './platform-adapter-route.mjs';
+import {
+  buildMeetingPlatformConformanceReport,
+} from './platform-conformance.mjs';
 
 export const MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA = 'meeting_platform_integration_runtime';
 export const MEETING_PLATFORM_INTEGRATION_RUNTIME_MANIFEST_SCHEMA = 'meeting_platform_integration_runtime_manifest';
@@ -121,6 +124,13 @@ function runtimeIssues(manifest = {}) {
       severity: 'error',
       code: 'registry_not_accepted',
       message: 'Platform registry must pass SDK acceptance before a reusable runtime can be handed off.',
+    });
+  }
+  if (manifest.platform_conformance_report?.accepted !== true) {
+    issues.push({
+      severity: 'error',
+      code: 'platform_conformance_not_accepted',
+      message: 'Every selected platform must pass SDK conformance before a reusable runtime can be handed off.',
     });
   }
   if (manifest.runtime_bundle_matrix?.runtime_ready_count !== manifest.platform_count) {
@@ -424,6 +434,8 @@ function summaryFromManifest(manifest = {}) {
     pilot_ready_count: manifest.handoff_readiness_matrix?.pilot_ready_count,
     production_ready_count: manifest.handoff_readiness_matrix?.production_ready_count,
     runtime_host_replay_ready_count: manifest.handoff_readiness_matrix?.runtime_host_replay_ready_count,
+    conformance_accepted_count: manifest.platform_conformance_report?.accepted_count,
+    conformance_blocking_count: manifest.platform_conformance_report?.blocking_count,
     speaker_track_ready_count: manifest.speaker_track_matrix?.realtime_ready_when_samples_available_count,
     participant_track_ready_count: manifest.participant_track_matrix?.realtime_ready_when_snapshots_available_count,
     next_actions: manifest.next_actions,
@@ -584,6 +596,10 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     platforms,
   });
   const registryAcceptance = buildMeetingPlatformRegistryAcceptanceReport(registryManifest, merged);
+  const platformConformanceReport = buildMeetingPlatformConformanceReport({
+    ...merged,
+    platforms,
+  });
   const runtimeBundleMatrix = buildMeetingPlatformRuntimeBundleMatrix({
     ...merged,
     platforms,
@@ -627,9 +643,12 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
   const speakerRows = byPlatform(speakerTrackMatrix.rows);
   const participantRows = byPlatform(participantTrackMatrix.rows);
   const handoffRows = byPlatform(handoffReadinessMatrix.rows);
+  const conformanceRows = byPlatform(platformConformanceReport.rows);
   const rows = platforms.map((platform) => compactObject({
     platform,
     display_name: runtimeRows[platform]?.display_name ?? adaptationRows[platform]?.display_name,
+    conformance_accepted: conformanceRows[platform]?.accepted === true,
+    conformance_blocking_count: conformanceRows[platform]?.blocking_count,
     runtime_ready: runtimeRows[platform]?.runtime_ready === true,
     sdk_wiring_ready: runtimeRows[platform]?.sdk_wiring_ready === true && adaptationRows[platform]?.sdk_wiring_ready === true,
     browser_match_count: runtimeRows[platform]?.browser_match_count,
@@ -678,6 +697,7 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     platform_count: platforms.length,
     platforms,
     registry_acceptance: registryAcceptance,
+    platform_conformance_report: platformConformanceReport,
     runtime_bundle_matrix: runtimeBundleMatrix,
     adaptation_strategy_matrix: adaptationStrategyMatrix,
     adapter_route_matrix: adapterRouteMatrix,
@@ -697,6 +717,7 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     issues,
     next_actions: unique([
       ...issues.map((item) => item.code),
+      ...(platformConformanceReport.next_actions ?? []),
       ...(speakerTrackMatrix.next_actions ?? []),
       ...(participantTrackMatrix.next_actions ?? []),
       ...handoffReadinessMatrix.rows.flatMap((row) => row.next_actions ?? []),
@@ -746,6 +767,7 @@ export function assertMeetingPlatformIntegrationRuntimeManifest(manifestOrOption
     issues,
     next_actions: unique([
       ...issues.map((item) => item.code),
+      ...(rawManifest.platform_conformance_report?.next_actions ?? []),
       ...(rawManifest.speaker_track_matrix?.next_actions ?? []),
       ...(rawManifest.participant_track_matrix?.next_actions ?? []),
       ...asArray(rawManifest.handoff_readiness_matrix?.rows).flatMap((row) => row.next_actions ?? []),
@@ -805,6 +827,18 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
         manifest,
         acceptance: kit.platformRegistryAcceptance(manifest, registryOptions),
       };
+    },
+    conformance(conformanceOptions = {}) {
+      return kit.platformConformance({
+        ...conformanceOptions,
+        platforms: conformanceOptions.platforms ?? conformanceOptions.platform_keys ?? platforms,
+      });
+    },
+    assertConformance(conformanceOptions = {}) {
+      return kit.assertPlatformConformance({
+        ...conformanceOptions,
+        platforms: conformanceOptions.platforms ?? conformanceOptions.platform_keys ?? platforms,
+      });
     },
     runtimeBundle(platform, bundleOptions = {}) {
       return kit.platformRuntimeBundle(platform, bundleOptions);
@@ -963,6 +997,8 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
         ...eventOptions,
       };
       if (['registry', 'platform_registry'].includes(action)) return runtime.registry(eventRuntimeOptions);
+      if (['conformance', 'platform_conformance', 'conformance_report'].includes(action)) return runtime.conformance(eventRuntimeOptions);
+      if (['assert_conformance', 'assert_platform_conformance'].includes(action)) return runtime.assertConformance(eventRuntimeOptions);
       if (['manifest', 'runtime_manifest', 'integration_manifest'].includes(action)) return runtime.manifest(eventRuntimeOptions);
       if (['run_manifest', 'runtime_manifest_run', 'integration_manifest_run'].includes(action)) return runtime.runManifest(eventRuntimeOptions);
       if (['runtime_bundles', 'runtime_bundle_matrix'].includes(action)) return runtime.runtimeBundles(eventRuntimeOptions);
@@ -1013,6 +1049,8 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
           'resolve_platform_candidates',
           'observe_platform_candidates',
           'registry',
+          'conformance',
+          'assert_conformance',
           'manifest',
           'run_manifest',
           'readiness',

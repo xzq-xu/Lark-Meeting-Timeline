@@ -394,6 +394,7 @@ const integrationRuntimeManifest = buildMeetingPlatformIntegrationRuntimeManifes
   platforms: ['google-meet', 'zoom'],
 });
 assert.equal(integrationRuntimeManifest.host_integration_ready, true);
+assert.equal(integrationRuntimeManifest.platform_conformance_report.accepted, true);
 assert.equal(assertMeetingPlatformIntegrationRuntimeManifest(integrationRuntimeManifest).platform_count, 2);
 const integrationRuntimeRunManifest = await runMeetingPlatformIntegrationRuntimeManifest({
   baseUrl: 'http://localhost:8787',
@@ -406,6 +407,8 @@ const integrationRuntime = createMeetingPlatformIntegrationRuntime(client, {
   platforms: ['google-meet'],
 });
 assert.equal(integrationRuntime.manifest().host_integration_ready, true);
+assert.equal(integrationRuntime.conformance().accepted, true);
+assert.equal(integrationRuntime.assertConformance().accepted_count, 1);
 assert.equal(integrationRuntime.manifest().adapter_route_matrix.platform_count, 1);
 assert.equal((await integrationRuntime.runManifest()).host_integration_ready, true);
 assert.equal(integrationRuntime.runtimeBundles().platform_count, 1);
@@ -1052,6 +1055,10 @@ assert.equal(buildMeetingPlatformHostIntegrationPlan({
 assert.equal(buildMeetingPlatformHostIntegrationPlan({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
+}).endpoints.platform_conformance, '/api/meeting-platform/conformance');
+assert.equal(buildMeetingPlatformHostIntegrationPlan({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
 }).endpoints.runtime_bundles, '/api/meeting-platform/runtime-bundles');
 assert.equal(buildMeetingPlatformHostIntegrationPlan({
   baseUrl: 'http://localhost:8787',
@@ -1076,6 +1083,10 @@ assert.equal(buildMeetingPlatformHostIntegrationPlan({
 assert.equal(buildMeetingPlatformHostIntegrationPlan({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
+}).commands.validate_platform_conformance, 'npm run meeting-platform:conformance');
+assert.equal(buildMeetingPlatformHostIntegrationPlan({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
 }).commands.validate_integration_runtime_manifest, 'npm run meeting-platform:integration-runtime-run-manifest');
 assert.equal(buildMeetingPlatformHostIntegrationPlan({
   baseUrl: 'http://localhost:8787',
@@ -1090,6 +1101,7 @@ assert.equal(assertMeetingPlatformHostIntegrationScaffold(buildMeetingPlatformHo
   platforms: ['zoom'],
 })).accepted, true);
 assert.equal(smokeHostScaffold.files.some((file) => file.path === 'scripts/run-integration-runtime-manifest.mjs'), true);
+assert.equal(smokeHostScaffold.files.some((file) => file.path === 'scripts/verify-conformance.mjs'), true);
 assert.equal(smokeHostScaffold.files.some((file) => file.path === 'scripts/run-handoff-readiness.mjs'), true);
 assert.equal(smokeHostScaffold.files.find((file) => file.path === 'README.md').content.includes('runIntegrationRuntimeManifest'), true);
 assert.equal(buildMeetingPlatformProviderConnectionPack('zoom', {

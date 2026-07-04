@@ -17,6 +17,10 @@ import type {
   MeetingSessionSelection,
   NormalizedMeetingSessionCandidate,
 } from './meeting-session-discovery.mjs';
+import type {
+  MeetingPlatformConformanceOptions,
+  MeetingPlatformConformanceReport,
+} from './platform-conformance.mjs';
 
 export const MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA: 'meeting_platform_integration_runtime';
 export const MEETING_PLATFORM_INTEGRATION_RUNTIME_MANIFEST_SCHEMA: 'meeting_platform_integration_runtime_manifest';
@@ -49,6 +53,8 @@ export interface MeetingPlatformIntegrationRuntimeIssue {
 export interface MeetingPlatformIntegrationRuntimeRow {
   platform: string;
   display_name?: string;
+  conformance_accepted?: boolean;
+  conformance_blocking_count?: number;
   runtime_ready: boolean;
   sdk_wiring_ready: boolean;
   browser_match_count?: number;
@@ -96,6 +102,7 @@ export interface MeetingPlatformIntegrationRuntimeManifest {
   next_actions: string[];
   rows: MeetingPlatformIntegrationRuntimeRow[];
   registry_acceptance: Record<string, unknown>;
+  platform_conformance_report: MeetingPlatformConformanceReport;
   runtime_bundle_matrix: MeetingPlatformRuntimeBundleMatrix;
   adaptation_strategy_matrix: MeetingPlatformAdaptationStrategyMatrix;
   adapter_route_matrix: MeetingPlatformAdapterRouteMatrix;
@@ -230,6 +237,8 @@ export interface MeetingPlatformIntegrationRuntime {
     manifest: Record<string, unknown>;
     acceptance: Record<string, unknown>;
   };
+  conformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
+  assertConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
   runtimeBundle(platform: string, bundleOptions?: Record<string, unknown>): MeetingPlatformRuntimeBundle;
   runtimeBundles(bundleOptions?: Record<string, unknown>): MeetingPlatformRuntimeBundleMatrix;
   adapterRoute(platform: string, routeOptions?: Record<string, unknown>): MeetingPlatformAdapterRoute;

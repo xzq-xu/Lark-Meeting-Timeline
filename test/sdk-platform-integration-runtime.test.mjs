@@ -274,6 +274,10 @@ assert.equal(manifest.host_integration_ready, true);
 assert.equal(manifest.blocking_count, 0);
 assert.equal(manifest.warning_count, 1);
 assert.equal(manifest.registry_acceptance.accepted, true);
+assert.equal(manifest.platform_conformance_report.accepted, true);
+assert.equal(manifest.platform_conformance_report.accepted_count, 2);
+assert.equal(manifest.platform_conformance_report.adapter_route_ready_count, 2);
+assert.equal(manifest.platform_conformance_report.candidate_observer_count, 2);
 assert.equal(manifest.runtime_bundle_matrix.runtime_ready_count, 2);
 assert.equal(manifest.runtime_bundle_matrix.candidate_observer_count, 2);
 assert.equal(manifest.runtime_bundle_matrix.provider_required_for_realtime_count, 0);
@@ -289,6 +293,8 @@ assert.equal(manifest.participant_track_matrix.realtime_ready_when_snapshots_ava
 assert.equal(manifest.participant_track_matrix.provider_blocking_count, 0);
 assert.equal(manifest.participant_track_matrix.transcript_blocking_count, 0);
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').browser_match_count, 1);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').conformance_accepted, true);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').conformance_blocking_count, 0);
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').candidate_observation_ready, true);
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').candidate_observer_message_type, 'meeting_timeline.observe_candidates');
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').candidate_observer_permission, 'tabs');
@@ -402,9 +408,12 @@ const runtime = createMeetingPlatformIntegrationRuntime(client, {
 assert.equal(runtime.schema, MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA);
 assert.deepEqual(runtime.platforms, ['google_meet', 'zoom']);
 assert.equal(runtime.manifest().host_integration_ready, true);
+assert.equal(runtime.manifest().platform_conformance_report.accepted, true);
 assert.equal(runtime.manifest().adapter_route_matrix.platform_count, 2);
 assert.equal(runtime.manifest().rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');
 assert.equal(runtime.summary().host_integration_ready, true);
+assert.equal(runtime.summary().conformance_accepted_count, 2);
+assert.equal(runtime.summary().conformance_blocking_count, 0);
 assert.equal(runtime.summary().speaker_track_ready_count, 2);
 assert.equal(runtime.summary().participant_track_ready_count, 2);
 const runtimeRunManifest = await runtime.runManifest({
@@ -443,6 +452,8 @@ assert.equal((await runtime.runAndAssertManifest({
   },
 })).host_integration_ready, true);
 assert.equal(runtime.registry().acceptance.accepted, true);
+assert.equal(runtime.conformance().accepted, true);
+assert.equal(runtime.assertConformance().accepted_count, 2);
 assert.equal(runtime.runtimeBundle('google-meet').browser.matches.includes('https://meet.google.com/*'), true);
 assert.equal(runtime.runtimeBundles().platform_count, 2);
 assert.equal(runtime.adapterRoute('google-meet').routes[0].route, 'local_observer_axis');
@@ -588,6 +599,8 @@ const view = runtime.timelineView('zoom', {
 assert.equal(view.diagnostics.marker_count, 2);
 assert.equal(view.markers.some((marker) => marker.rail === 'speaker'), true);
 assert.equal((await runtime.handleEvent({ action: 'runtime_bundles' })).platform_count, 2);
+assert.equal((await runtime.handleEvent({ action: 'conformance' })).accepted_count, 2);
+assert.equal((await runtime.handleEvent({ action: 'assert_conformance' })).accepted, true);
 assert.equal((await runtime.handleEvent({ action: 'adapter_routes' })).platform_count, 2);
 assert.equal((await runtime.handleEvent({ action: 'adapter_route', platform: 'zoom' })).routes[0].route, 'local_observer_axis');
 assert.equal((await runtime.handleEvent({ action: 'adaptation_strategy_matrix' })).strategy_count, 2);

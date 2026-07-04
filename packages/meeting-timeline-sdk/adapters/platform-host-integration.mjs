@@ -35,6 +35,9 @@ import {
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
   buildMeetingPlatformAdapterContractMatrix,
 } from './platform-adapter-contract.mjs';
+import {
+  buildMeetingPlatformConformanceReport,
+} from './platform-conformance.mjs';
 
 export const MEETING_PLATFORM_HOST_INTEGRATION_SCHEMA = 'meeting_platform_host_integration';
 export const MEETING_PLATFORM_HOST_INTEGRATION_SCHEMA_VERSION = 1;
@@ -153,6 +156,18 @@ export function createMeetingPlatformHost(options = {}) {
       return kit.platformAdapterContractAcceptanceMatrix({
         ...acceptanceOptions,
         platforms: acceptanceOptions.platforms ?? acceptanceOptions.platform_keys ?? platforms,
+      });
+    },
+    platformConformance(conformanceOptions = {}) {
+      return integrationRuntime.conformance({
+        ...conformanceOptions,
+        platforms: conformanceOptions.platforms ?? conformanceOptions.platform_keys ?? platforms,
+      });
+    },
+    assertPlatformConformance(conformanceOptions = {}) {
+      return integrationRuntime.assertConformance({
+        ...conformanceOptions,
+        platforms: conformanceOptions.platforms ?? conformanceOptions.platform_keys ?? platforms,
       });
     },
     runtimeBundles(bundleOptions = {}) {
@@ -310,6 +325,9 @@ function routesSource(options = {}) {
   if (url.pathname === '/api/meeting-platform/contract-acceptance') {
     return Response.json(host.adapterContractAcceptance(options));
   }
+  if (url.pathname === '/api/meeting-platform/conformance') {
+    return Response.json(host.platformConformance(options));
+  }
   if (url.pathname === '/api/meeting-platform/runtime-bundles') {
     return Response.json(host.runtimeBundles(options));
   }
@@ -390,6 +408,7 @@ Runtime rule:
 - Observer plans standardize the local DOM/AX observation loop, throttling, speaker follow-up, and meeting-end grace windows for each meeting app surface.
 - Adapter routes describe each platform's implementation path: local observer realtime axis first, provider reconciliation second, transcript/artifact import last.
 - Speaker and participant position tracks are required realtime contracts. They use local samples/snapshots first and must not wait for provider events or transcript export.
+- Platform conformance is the static SDK handoff gate before real evidence replay: normalizer, setup, contract, route, runtime bundle, registry, candidate observation, captured_at_ms, and provider/transcript non-blocking rules must all pass.
 
 Supported platforms in this scaffold:
 
@@ -422,6 +441,12 @@ Meeting track contract:
 
 ${trackRows.map((row) => `- ${row.platform}: speaker=${row.speaker_track_ready ? 'ready' : 'missing'}, participant=${row.participant_track_ready ? 'ready' : 'missing'}`).join('\n')}
 
+Platform conformance:
+
+- accepted: ${plan.platform_conformance_report?.accepted === true ? 'true' : 'false'}
+- accepted count: ${plan.platform_conformance_report?.accepted_count ?? 0}
+- blocking count: ${plan.platform_conformance_report?.blocking_count ?? 0}
+
 Minimal usage:
 
 \`\`\`js
@@ -437,6 +462,7 @@ await host.insertAnnotation('google_meet', {
 });
 
 const handoff = host.handoffBundle();
+const conformance = host.platformConformance();
 const strategy = host.adaptationStrategyMatrix();
 const platformResolution = host.resolvePlatform({
   url: 'https://meet.google.com/abc-defg-hij',
@@ -478,6 +504,7 @@ npm run meeting-platform:rollout-matrix
 npm run meeting-platform:live-readiness
 npm run meeting-platform:contracts
 npm run meeting-platform:contract-acceptance
+npm run meeting-platform:conformance
 npm run meeting-platform:runtime-bundles
 npm run meeting-platform:observer-plans
 npm run meeting-platform:runtime-event-plans
@@ -609,6 +636,12 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     baseUrl,
     basePath,
   });
+  const platformConformanceReport = buildMeetingPlatformConformanceReport({
+    ...options,
+    platforms,
+    baseUrl,
+    basePath,
+  });
   const runtimeBundleMatrix = buildMeetingPlatformRuntimeBundleMatrix({
     ...options,
     platforms,
@@ -667,6 +700,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       runtime_event_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event',
       live_adapter_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter',
       host_integration_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-host-integration',
+      platform_conformance_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-conformance',
     },
     runtime_contract: {
       annotation_timestamp_field: 'captured_at_ms',
@@ -685,6 +719,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       handoff: '/api/meeting-platform/handoff',
       adapter_contracts: '/api/meeting-platform/contracts',
       adapter_contract_acceptance: '/api/meeting-platform/contract-acceptance',
+      platform_conformance: '/api/meeting-platform/conformance',
       runtime_bundles: '/api/meeting-platform/runtime-bundles',
       observer_plans: '/api/meeting-platform/observer-plans',
       runtime_event_plans: '/api/meeting-platform/runtime-event-plans',
@@ -702,6 +737,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     },
     commands: {
       ...(handoff.commands ?? {}),
+      validate_platform_conformance: 'npm run meeting-platform:conformance',
       validate_integration_runtime_manifest: 'npm run meeting-platform:integration-runtime-run-manifest',
       validate_handoff_readiness: 'npm run meeting-platform:handoff-readiness',
     },
@@ -723,8 +759,10 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     handoff_bundle: handoff,
     adapter_contract_matrix: adapterContractMatrix,
     adapter_contract_acceptance_matrix: adapterContractAcceptanceMatrix,
+    platform_conformance_report: platformConformanceReport,
     next_actions: unique([
       ...(handoff.next_actions ?? []),
+      'run_meeting_platform_conformance_before_host_handoff',
       'run_meeting_platform_contract_acceptance_before_enabling_new_platform',
       'wire_host_routes_to_handleMeetingPlatformRequest',
       'capture_real_meeting_app_snapshots_for_each_target_platform',
@@ -751,6 +789,7 @@ export function buildMeetingPlatformHostIntegrationScaffold(options = {}) {
       'meeting-platform:readiness': 'node ./scripts/print-readiness.mjs',
       'meeting-platform:contracts': 'node ./scripts/print-contracts.mjs',
       'meeting-platform:contract-acceptance': 'node ./scripts/verify-contracts.mjs',
+      'meeting-platform:conformance': 'node ./scripts/verify-conformance.mjs',
       'meeting-platform:runtime-bundles': 'node ./scripts/print-runtime-bundles.mjs',
       'meeting-platform:observer-plans': 'node ./scripts/print-observer-plans.mjs',
       'meeting-platform:runtime-event-plans': 'node ./scripts/print-runtime-event-plans.mjs',
@@ -865,6 +904,20 @@ const report = host.adapterContractAcceptance({
 console.log(JSON.stringify(report, null, 2));
 
 if (report.rejected_count > 0) {
+  process.exitCode = 1;
+}
+`;
+  const conformanceScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+const report = host.platformConformance();
+
+console.log(JSON.stringify(report, null, 2));
+
+if (report.accepted !== true) {
   process.exitCode = 1;
 }
 `;
@@ -984,6 +1037,7 @@ if (
       sourceFile('scripts/print-readiness.mjs', readinessScript, 'readiness_script', 'text/javascript'),
       sourceFile('scripts/print-contracts.mjs', contractsScript, 'adapter_contract_script', 'text/javascript'),
       sourceFile('scripts/verify-contracts.mjs', contractAcceptanceScript, 'adapter_contract_acceptance_script', 'text/javascript'),
+      sourceFile('scripts/verify-conformance.mjs', conformanceScript, 'platform_conformance_script', 'text/javascript'),
       sourceFile('scripts/print-runtime-bundles.mjs', runtimeBundlesScript, 'runtime_bundle_script', 'text/javascript'),
       sourceFile('scripts/print-observer-plans.mjs', observerPlansScript, 'observer_plan_script', 'text/javascript'),
       sourceFile('scripts/print-runtime-event-plans.mjs', runtimeEventPlansScript, 'runtime_event_plan_script', 'text/javascript'),
@@ -1016,6 +1070,7 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     'scripts/print-readiness.mjs',
     'scripts/print-contracts.mjs',
     'scripts/verify-contracts.mjs',
+    'scripts/verify-conformance.mjs',
     'scripts/print-runtime-bundles.mjs',
     'scripts/print-observer-plans.mjs',
     'scripts/print-runtime-event-plans.mjs',
@@ -1062,6 +1117,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!host.includes('platformAdapterContractAcceptanceMatrix')) {
     issues.push(issue('error', 'missing_adapter_contract_acceptance_matrix', 'Host source must expose the adapter contract acceptance matrix.'));
   }
+  if (!host.includes('platformConformance')) {
+    issues.push(issue('error', 'missing_platform_conformance', 'Host source must expose the platform conformance report.'));
+  }
   if (!host.includes('platformRuntimeBundleMatrix')) {
     issues.push(issue('error', 'missing_runtime_bundle_matrix', 'Host source must expose the runtime bundle matrix.'));
   }
@@ -1103,6 +1161,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!routes.includes('/api/meeting-platform/contracts')) {
     issues.push(issue('error', 'missing_contract_route', 'Route source must expose the adapter contract matrix endpoint.'));
+  }
+  if (!routes.includes('/api/meeting-platform/conformance')) {
+    issues.push(issue('error', 'missing_platform_conformance_route', 'Route source must expose the platform conformance endpoint.'));
   }
   if (!routes.includes('/api/meeting-platform/runtime-bundles')) {
     issues.push(issue('error', 'missing_runtime_bundle_route', 'Route source must expose the runtime bundle matrix endpoint.'));
@@ -1154,6 +1215,19 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!readme.includes('Observer plan contract')) {
     issues.push(issue('warning', 'readme_missing_observer_plan_contract', 'README should state the observer plan contract.'));
+  }
+  if (!readme.includes('Platform conformance')) {
+    issues.push(issue('warning', 'readme_missing_platform_conformance', 'README should state the platform conformance gate.'));
+  }
+  const platformConformanceReport = scaffold.plan?.platform_conformance_report;
+  if (!platformConformanceReport) {
+    issues.push(issue('error', 'missing_platform_conformance_report', 'Scaffold plan must include the platform conformance report.'));
+  } else if (platformConformanceReport.accepted !== true) {
+    issues.push(issue('error', 'platform_conformance_not_accepted', 'Every selected platform must pass SDK conformance before host handoff.', {
+      accepted_count: platformConformanceReport.accepted_count,
+      platform_count: platformConformanceReport.platform_count,
+      blocking_count: platformConformanceReport.blocking_count,
+    }));
   }
   const candidateObservationContract = scaffold.plan?.candidate_observation_contract;
   if (!candidateObservationContract) {
@@ -1216,6 +1290,10 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     candidate_observer_count: candidateObservationContract?.ready_count ?? runtimeCandidateObserverCount ?? 0,
     candidate_observer_missing_count: candidateObservationContract?.missing_count,
     candidate_observation_contract: candidateObservationContract,
+    platform_conformance_ready: platformConformanceReport?.accepted === true,
+    platform_conformance_accepted_count: platformConformanceReport?.accepted_count ?? 0,
+    platform_conformance_blocking_count: platformConformanceReport?.blocking_count ?? 0,
+    platform_conformance_report: platformConformanceReport,
     observer_plan_ready: observerPlanMatrix
       ? observerPlanMatrix.sdk_ready_count === observerPlanMatrix.platform_count
       : false,

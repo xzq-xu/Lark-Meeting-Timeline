@@ -1,4 +1,5 @@
 import type { MeetingPlatformAdapterRouteMatrix } from './platform-adapter-route.mjs';
+import type { MeetingPlatformConformanceReport } from './platform-conformance.mjs';
 
 export const MEETING_PLATFORM_HOST_INTEGRATION_SCHEMA: string;
 export const MEETING_PLATFORM_HOST_INTEGRATION_SCHEMA_VERSION: number;
@@ -45,6 +46,7 @@ export interface MeetingPlatformHostIntegrationPlan {
   handoff_bundle: Record<string, unknown>;
   adapter_contract_matrix: Record<string, unknown>;
   adapter_contract_acceptance_matrix: Record<string, unknown>;
+  platform_conformance_report: MeetingPlatformConformanceReport;
   next_actions: string[];
 }
 
@@ -75,6 +77,10 @@ export interface MeetingPlatformHostIntegrationScaffoldAcceptanceReport {
   candidate_observer_count: number;
   candidate_observer_missing_count?: number;
   candidate_observation_contract?: Record<string, unknown>;
+  platform_conformance_ready: boolean;
+  platform_conformance_accepted_count: number;
+  platform_conformance_blocking_count: number;
+  platform_conformance_report?: MeetingPlatformConformanceReport;
   observer_plan_ready: boolean;
   observer_plan_ready_count: number;
   observer_plan_preflight_accepted_count: number;
