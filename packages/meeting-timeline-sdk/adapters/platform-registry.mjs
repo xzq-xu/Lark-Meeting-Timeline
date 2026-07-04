@@ -106,6 +106,9 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
   const contractAcceptance = buildMeetingPlatformAdapterContractAcceptanceReport(contract, options);
   const runtimeBundle = buildMeetingPlatformRuntimeBundle(key, options);
   const runtimeEventPlan = buildMeetingPlatformRuntimeEventPlan(key, options);
+  const candidateObservation = runtimeBundle.messaging?.candidate_observation ?? runtimeBundle.browser?.candidate_observation;
+  const candidateObservationReady = candidateObservation?.runtime_event_action === 'observe_platform_candidates'
+    && runtimeEventPlan.supported_actions?.includes?.('observe_platform_candidates');
   const hostBasePath = firstNonEmpty(options.basePath, options.base_path, '/api/platform-events');
 
   return compactObject({
@@ -132,6 +135,15 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
       sample_interval_ms: runtimeBundle.runtime?.start_options?.sampleIntervalMs,
       mutation_debounce_ms: runtimeBundle.runtime?.mutation_observer?.debounce_ms,
       speaker_min_stable_ms: runtimeBundle.runtime?.speaker_filter?.min_stable_ms,
+      candidate_observation: compactObject({
+        ready: candidateObservationReady,
+        message_type: candidateObservation?.message_type,
+        required_permission: candidateObservation?.required_permission,
+        runtime_event_action: candidateObservation?.runtime_event_action,
+        runtime_event_client_method: candidateObservation?.runtime_event_client_method,
+        endpoint: '/api/meeting-platform/observe-candidates',
+        producer: candidateObservation?.producer,
+      }),
       runtime_event_plan_schema: runtimeEventPlan.schema,
       runtime_event_action_count: runtimeEventPlan.actions?.length ?? 0,
     },
@@ -160,6 +172,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
         action_count: runtimeEventPlan.actions?.length ?? 0,
         realtime_contract: runtimeEventPlan.realtime_contract,
       },
+      candidate_observation_runtime_action: 'observe_platform_candidates',
       timestamp_field: 'captured_at_ms',
       provider_events_block_realtime: contract.timebase?.provider_events_block_realtime === true,
       transcript_blocks_realtime: contract.timebase?.transcript_blocks_realtime === true,
@@ -181,6 +194,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
         runtime_bundles: '/api/meeting-platform/runtime-bundles',
         runtime_event_plans: '/api/meeting-platform/runtime-event-plans',
         runtime_events: '/api/meeting-platform/runtime-events',
+        platform_candidate_observation: '/api/meeting-platform/observe-candidates',
         readiness: '/api/meeting-platform/readiness',
         handoff: '/api/meeting-platform/handoff',
         adapter_contracts: '/api/meeting-platform/contracts',
@@ -204,9 +218,11 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
       provider_required_for_realtime: runtimeBundle.readiness?.provider_required_for_realtime === true,
       transcript_blocks_realtime: runtimeBundle.readiness?.transcript_blocks_realtime === true,
       runtime_ready: runtimeBundle.readiness?.runtime_ready === true,
+      candidate_observation_ready: candidateObservationReady,
       missing_items: unique([
         ...(contract.readiness?.missing_items ?? []),
         ...(runtimeBundle.readiness?.missing_items ?? []),
+        ...(candidateObservationReady ? [] : ['candidate_observation_not_ready']),
       ]),
     },
     commands: {
@@ -223,6 +239,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
       'choose_platform_from_registry_manifest',
       'wire_host_runtime_bundles_endpoint_before_building_extension',
       'export_runtime_event_plan_before_wiring_external_host',
+      'verify_candidate_observation_before_host_handoff',
     ]),
   });
 }
@@ -241,6 +258,7 @@ export function buildMeetingPlatformRegistryManifest(options = {}) {
     normalizer_count: entries.filter((entry) => entry.event_adapter?.normalize_available).length,
     runtime_ready_count: entries.filter((entry) => entry.readiness?.runtime_ready).length,
     contract_accepted_count: entries.filter((entry) => entry.readiness?.contract_accepted).length,
+    candidate_observer_count: entries.filter((entry) => entry.readiness?.candidate_observation_ready).length,
     provider_required_for_realtime_count: entries.filter((entry) => entry.readiness?.provider_required_for_realtime).length,
     transcript_blocking_count: entries.filter((entry) => entry.readiness?.transcript_blocks_realtime).length,
     platforms: entries.map((entry) => entry.platform),
@@ -252,6 +270,10 @@ export function buildMeetingPlatformRegistryManifest(options = {}) {
       runtime_ready: entry.readiness?.runtime_ready === true,
       contract_accepted: entry.readiness?.contract_accepted === true,
       browser_match_count: entry.runtime?.browser_matches?.length ?? 0,
+      candidate_observation_ready: entry.readiness?.candidate_observation_ready === true,
+      candidate_observer_message_type: entry.runtime?.candidate_observation?.message_type,
+      candidate_observer_permission: entry.runtime?.candidate_observation?.required_permission,
+      candidate_observer_endpoint: entry.runtime?.candidate_observation?.endpoint,
       runtime_event_action_count: entry.runtime?.runtime_event_action_count ?? entry.annotations?.runtime_event_plan?.action_count ?? 0,
       provider_transport: entry.provider?.transport,
       provider_ready: entry.provider?.ready === true,
@@ -276,6 +298,7 @@ function registryManifestFrom(input = {}, options = {}) {
       normalizer_count: input.event_adapter?.normalize_available === true ? 1 : 0,
       runtime_ready_count: input.readiness?.runtime_ready === true ? 1 : 0,
       contract_accepted_count: input.readiness?.contract_accepted === true ? 1 : 0,
+      candidate_observer_count: input.readiness?.candidate_observation_ready === true ? 1 : 0,
       provider_required_for_realtime_count: input.readiness?.provider_required_for_realtime === true ? 1 : 0,
       transcript_blocking_count: input.readiness?.transcript_blocks_realtime === true ? 1 : 0,
       platforms: [input.platform],
@@ -287,6 +310,10 @@ function registryManifestFrom(input = {}, options = {}) {
         runtime_ready: input.readiness?.runtime_ready === true,
         contract_accepted: input.readiness?.contract_accepted === true,
         browser_match_count: input.runtime?.browser_matches?.length ?? 0,
+        candidate_observation_ready: input.readiness?.candidate_observation_ready === true,
+        candidate_observer_message_type: input.runtime?.candidate_observation?.message_type,
+        candidate_observer_permission: input.runtime?.candidate_observation?.required_permission,
+        candidate_observer_endpoint: input.runtime?.candidate_observation?.endpoint,
         runtime_event_action_count: input.runtime?.runtime_event_action_count ?? input.annotations?.runtime_event_plan?.action_count ?? 0,
         provider_transport: input.provider?.transport,
         provider_ready: input.provider?.ready === true,
@@ -332,6 +359,12 @@ function registryAcceptanceIssues(manifest = {}, options = {}) {
       platform_count: manifest.platform_count,
     }));
   }
+  if (manifest.candidate_observer_count !== manifest.platform_count) {
+    issues.push(issue('error', 'candidate_observer_not_ready', 'Every selected platform must expose candidate observation for host-level axis binding.', {
+      candidate_observer_count: manifest.candidate_observer_count,
+      platform_count: manifest.platform_count,
+    }));
+  }
   if ((manifest.provider_required_for_realtime_count ?? 0) > 0) {
     issues.push(issue('error', 'provider_blocks_realtime', 'Provider events must not be required for realtime annotation insertion.', {
       provider_required_for_realtime_count: manifest.provider_required_for_realtime_count,
@@ -365,6 +398,9 @@ function registryAcceptanceIssues(manifest = {}, options = {}) {
     if (!entry.annotations?.runtime_event_endpoint) {
       issues.push(issue('error', 'entry_missing_runtime_event_endpoint', 'Registry entry must include the runtime event endpoint.', { platform }));
     }
+    if (!entry.host?.endpoints?.platform_candidate_observation) {
+      issues.push(issue('error', 'entry_missing_candidate_observation_endpoint', 'Registry entry must include the host candidate observation endpoint.', { platform }));
+    }
     if (!entry.host?.endpoints?.runtime_event_plans) {
       issues.push(issue('error', 'entry_missing_runtime_event_plan_endpoint', 'Registry entry must include the host runtime event plan endpoint.', { platform }));
     }
@@ -373,6 +409,24 @@ function registryAcceptanceIssues(manifest = {}, options = {}) {
     }
     if (!entry.annotations?.runtime_event_plan?.supported_actions?.includes?.('insert_annotation')) {
       issues.push(issue('error', 'entry_missing_runtime_insert_action', 'Registry entry runtime event plan must include insert_annotation.', { platform }));
+    }
+    if (!entry.annotations?.runtime_event_plan?.supported_actions?.includes?.('observe_platform_candidates')) {
+      issues.push(issue('error', 'entry_missing_candidate_observation_action', 'Registry entry runtime event plan must include observe_platform_candidates.', { platform }));
+    }
+    if (entry.readiness?.candidate_observation_ready !== true) {
+      issues.push(issue('error', 'entry_candidate_observation_not_ready', 'Registry entry must expose candidate observation for host-level axis binding.', { platform }));
+    }
+    if (entry.runtime?.candidate_observation?.message_type !== 'meeting_timeline.observe_candidates') {
+      issues.push(issue('error', 'entry_invalid_candidate_observation_message_type', 'Registry entry must use meeting_timeline.observe_candidates for candidate observation.', {
+        platform,
+        message_type: entry.runtime?.candidate_observation?.message_type,
+      }));
+    }
+    if (entry.runtime?.candidate_observation?.required_permission !== 'tabs') {
+      issues.push(issue('error', 'entry_invalid_candidate_observation_permission', 'Registry entry must declare tabs permission for browser candidate observation.', {
+        platform,
+        required_permission: entry.runtime?.candidate_observation?.required_permission,
+      }));
     }
     if (entry.annotations?.provider_events_block_realtime === true) {
       issues.push(issue('error', 'entry_provider_blocks_realtime', 'Registry entry must keep provider events non-blocking for realtime annotations.', { platform }));
@@ -412,6 +466,7 @@ export function buildMeetingPlatformRegistryAcceptanceReport(manifestOrOptions =
     normalizer_count: manifest.normalizer_count ?? 0,
     runtime_ready_count: manifest.runtime_ready_count ?? 0,
     contract_accepted_count: manifest.contract_accepted_count ?? 0,
+    candidate_observer_count: manifest.candidate_observer_count ?? 0,
     provider_required_for_realtime_count: manifest.provider_required_for_realtime_count ?? 0,
     transcript_blocking_count: manifest.transcript_blocking_count ?? 0,
     blocking_count: blocking.length,

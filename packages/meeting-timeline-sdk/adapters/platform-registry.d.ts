@@ -54,6 +54,7 @@ export interface MeetingPlatformRegistryManifest {
   normalizer_count: number;
   runtime_ready_count: number;
   contract_accepted_count: number;
+  candidate_observer_count: number;
   provider_required_for_realtime_count: number;
   transcript_blocking_count: number;
   platforms: string[];
@@ -71,6 +72,7 @@ export interface MeetingPlatformRegistryAcceptanceReport {
   normalizer_count: number;
   runtime_ready_count: number;
   contract_accepted_count: number;
+  candidate_observer_count: number;
   provider_required_for_realtime_count: number;
   transcript_blocking_count: number;
   blocking_count: number;

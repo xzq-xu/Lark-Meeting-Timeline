@@ -1310,7 +1310,8 @@ const manifest = buildMeetingPlatformRegistryManifest({
   platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
 });
 
-// manifest.rows 是下游项目的选型表：normalizer、runtime、provider、insert endpoint、runtime action 数和非阻塞规则。
+// manifest.rows 是下游项目的选型表：normalizer、runtime、candidate observation、provider、insert endpoint、runtime action 数和非阻塞规则。
+// manifest.candidate_observer_count 必须等于 manifest.platform_count，才表示每个平台都能用 observe-candidates 做 host-level 建轴。
 // manifest.entries[*] 进一步包含 SDK import、runtime bundle、runtime event plan、provider security verifier 和 host endpoints。
 assertMeetingPlatformRegistryManifest(manifest);
 ```
