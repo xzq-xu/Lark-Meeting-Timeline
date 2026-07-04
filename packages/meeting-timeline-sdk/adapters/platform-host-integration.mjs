@@ -17,6 +17,12 @@ import {
   buildMeetingPlatformRuntimeEventPlanMatrix,
 } from './platform-runtime-event.mjs';
 import {
+  buildMeetingPlatformParticipantTrackMatrix,
+} from './platform-participant-track.mjs';
+import {
+  buildMeetingPlatformSpeakerTrackMatrix,
+} from './platform-speaker-track.mjs';
+import {
   buildMeetingPlatformAdaptationStrategyMatrix,
 } from './platform-strategy.mjs';
 import {
@@ -220,6 +226,12 @@ export function createMeetingPlatformHost(options = {}) {
         capturedAtMs: input.capturedAtMs ?? input.captured_at_ms ?? Date.now(),
       }, markOptions);
     },
+    speakerTrack(platform, input = {}, trackOptions = {}) {
+      return integrationRuntime.speakerTrack(platform, input, trackOptions);
+    },
+    participantTrack(platform, input = {}, trackOptions = {}) {
+      return integrationRuntime.participantTrack(platform, input, trackOptions);
+    },
     verifyReadiness(readinessOptions = {}) {
       return liveAdapters.assertReadinessMatrix({
         ...readinessOptions,
@@ -304,6 +316,7 @@ function routesSource(options = {}) {
 function readmeSource(plan = {}) {
   const platforms = plan.platforms ?? [];
   const candidateRows = plan.candidate_observation_contract?.rows ?? [];
+  const trackRows = plan.meeting_track_contract?.rows ?? [];
   return `# Meeting Platform Timeline Host
 
 This scaffold wires a host project to @ai-annotation/meeting-timeline-sdk.
@@ -316,6 +329,7 @@ Runtime rule:
 - Transcript and artifact import are post-meeting work.
 - Each meeting keeps an isolated annotation set.
 - Candidate observation is a required host-axis binding contract: browser extensions or native hosts send active meeting windows through meeting_timeline.observe_candidates or /api/meeting-platform/observe-candidates before realtime marks are inserted.
+- Speaker and participant position tracks are required realtime contracts. They use local samples/snapshots first and must not wait for provider events or transcript export.
 
 Supported platforms in this scaffold:
 
@@ -329,6 +343,16 @@ Candidate observation contract:
 - all ready: ${plan.candidate_observation_contract?.all_ready === true ? 'true' : 'false'}
 
 ${candidateRows.map((row) => `- ${row.platform}: ${row.ready ? 'ready' : 'missing'} via ${row.message_type ?? 'meeting_timeline.observe_candidates'} (${row.required_permission ?? 'tabs'})`).join('\n')}
+
+Meeting track contract:
+
+- all ready: ${plan.meeting_track_contract?.all_ready === true ? 'true' : 'false'}
+- speaker ready count: ${plan.meeting_track_contract?.speaker_ready_count ?? 0}
+- participant ready count: ${plan.meeting_track_contract?.participant_ready_count ?? 0}
+- provider blocking count: ${plan.meeting_track_contract?.provider_blocking_count ?? 0}
+- transcript blocking count: ${plan.meeting_track_contract?.transcript_blocking_count ?? 0}
+
+${trackRows.map((row) => `- ${row.platform}: speaker=${row.speaker_track_ready ? 'ready' : 'missing'}, participant=${row.participant_track_ready ? 'ready' : 'missing'}`).join('\n')}
 
 Minimal usage:
 
@@ -366,6 +390,8 @@ const integrationRuntime = host.integrationRuntimeSummary();
 const candidateContract = host.integrationRuntimeManifest().rows.map((row) => ({
   platform: row.platform,
   candidate_observation_ready: row.candidate_observation_ready,
+  speaker_track_ready: row.speaker_track_ready,
+  participant_track_ready: row.participant_track_ready,
 }));
 \`\`\`
 
@@ -425,6 +451,66 @@ function buildCandidateObservationContract(platforms = [], runtimeBundleMatrix =
   };
 }
 
+function buildMeetingTrackContract(platforms = [], speakerTrackMatrix = {}, participantTrackMatrix = {}) {
+  const speakerRows = Object.fromEntries(asArray(speakerTrackMatrix.rows).map((row) => [row.platform, row]));
+  const participantRows = Object.fromEntries(asArray(participantTrackMatrix.rows).map((row) => [row.platform, row]));
+  const rows = platforms.map((platform) => {
+    const speaker = speakerRows[platform] ?? {};
+    const participant = participantRows[platform] ?? {};
+    const speakerReady = Boolean(speakerRows[platform])
+      && speaker.provider_events_block_realtime !== true
+      && speaker.transcript_blocks_realtime !== true;
+    const participantReady = Boolean(participantRows[platform])
+      && participant.provider_events_block_realtime !== true
+      && participant.transcript_blocks_realtime !== true;
+    const missingItems = [
+      !speakerReady ? 'speaker_track_realtime_contract' : null,
+      !participantReady ? 'participant_track_realtime_contract' : null,
+    ].filter(Boolean);
+    return compactObject({
+      platform,
+      ready: speakerReady && participantReady,
+      speaker_track_ready: speakerReady,
+      participant_track_ready: participantReady,
+      speaker_min_stable_ms: speaker.min_stable_ms,
+      speaker_switch_stable_ms: speaker.switch_stable_ms,
+      speaker_end_idle_ms: speaker.end_idle_ms,
+      participant_duplicate_window_ms: participant.duplicate_window_ms,
+      participant_leave_stable_ms: participant.leave_stable_ms,
+      speaker_provider_blocks_realtime: speaker.provider_events_block_realtime === true,
+      speaker_transcript_blocks_realtime: speaker.transcript_blocks_realtime === true,
+      participant_provider_blocks_realtime: participant.provider_events_block_realtime === true,
+      participant_transcript_blocks_realtime: participant.transcript_blocks_realtime === true,
+      output_intents: ['speaker_track', 'participant_track'],
+      runtime_event_actions: ['speaker_track', 'participant_track'],
+      missing_items: missingItems,
+    });
+  });
+  const speakerReadyCount = rows.filter((row) => row.speaker_track_ready === true).length;
+  const participantReadyCount = rows.filter((row) => row.participant_track_ready === true).length;
+  const providerBlockingCount = (speakerTrackMatrix.provider_blocking_count ?? 0)
+    + (participantTrackMatrix.provider_blocking_count ?? 0);
+  const transcriptBlockingCount = (speakerTrackMatrix.transcript_blocking_count ?? 0)
+    + (participantTrackMatrix.transcript_blocking_count ?? 0);
+  return {
+    type: 'meeting_platform_meeting_track_contract',
+    platform_count: platforms.length,
+    speaker_ready_count: speakerReadyCount,
+    participant_ready_count: participantReadyCount,
+    ready_count: rows.filter((row) => row.ready === true).length,
+    missing_count: rows.filter((row) => row.ready !== true).length,
+    provider_blocking_count: providerBlockingCount,
+    transcript_blocking_count: transcriptBlockingCount,
+    all_ready: speakerReadyCount === platforms.length
+      && participantReadyCount === platforms.length
+      && providerBlockingCount === 0
+      && transcriptBlockingCount === 0,
+    acceptance_gate: 'all_selected_platforms_must_support_realtime_speaker_and_participant_tracks',
+    rationale: 'Host projects need speaker and participant position markers on the realtime timeline without waiting for provider events or transcript export.',
+    rows,
+  };
+}
+
 export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
   const platforms = selectedPlatforms(options);
   const baseUrl = firstNonEmpty(options.baseUrl, options.base_url, 'http://localhost:8787');
@@ -453,6 +539,17 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     baseUrl,
   });
   const candidateObservationContract = buildCandidateObservationContract(platforms, runtimeBundleMatrix);
+  const speakerTrackMatrix = buildMeetingPlatformSpeakerTrackMatrix({
+    ...options,
+    platforms,
+    baseUrl,
+  });
+  const participantTrackMatrix = buildMeetingPlatformParticipantTrackMatrix({
+    ...options,
+    platforms,
+    baseUrl,
+  });
+  const meetingTrackContract = buildMeetingTrackContract(platforms, speakerTrackMatrix, participantTrackMatrix);
   const runtimeEventPlanMatrix = buildMeetingPlatformRuntimeEventPlanMatrix({
     ...options,
     platforms,
@@ -492,6 +589,8 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       per_meeting_annotation_isolation_required: true,
       local_observer_may_start_axis: true,
       candidate_observation_required_for_host_axis_binding: true,
+      speaker_track_required_for_realtime_timeline: true,
+      participant_track_required_for_realtime_timeline: true,
     },
     endpoints: {
       platform_events: basePath,
@@ -522,6 +621,9 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     runtime_event_plan_matrix: runtimeEventPlanMatrix,
     runtime_bundle_matrix: runtimeBundleMatrix,
     candidate_observation_contract: candidateObservationContract,
+    speaker_track_matrix: speakerTrackMatrix,
+    participant_track_matrix: participantTrackMatrix,
+    meeting_track_contract: meetingTrackContract,
     handoff_bundle: handoff,
     adapter_contract_matrix: adapterContractMatrix,
     adapter_contract_acceptance_matrix: adapterContractAcceptanceMatrix,
@@ -531,6 +633,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       'wire_host_routes_to_handleMeetingPlatformRequest',
       'capture_real_meeting_app_snapshots_for_each_target_platform',
       'verify_candidate_observation_contract_for_each_target_platform',
+      'verify_meeting_track_contract_for_each_target_platform',
       'capture_real_provider_events_where_available',
     ]),
   });
@@ -806,6 +909,12 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!host.includes('capturedAtMs')) {
     issues.push(issue('error', 'missing_captured_at_ms_write', 'Host source must write annotations with capturedAtMs.'));
   }
+  if (!host.includes('speakerTrack')) {
+    issues.push(issue('error', 'missing_speaker_track_method', 'Host source must expose speakerTrack for realtime speaker-position markers.'));
+  }
+  if (!host.includes('participantTrack')) {
+    issues.push(issue('error', 'missing_participant_track_method', 'Host source must expose participantTrack for realtime participant-position markers.'));
+  }
   if (!routes.includes('handleFetchRequest')) {
     issues.push(issue('error', 'missing_provider_route_handler', 'Route source must forward provider webhooks to the SDK handler.'));
   }
@@ -845,6 +954,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!readme.includes('meeting_timeline.observe_candidates')) {
     issues.push(issue('warning', 'readme_missing_candidate_observation_contract', 'README should state the candidate observation contract.'));
   }
+  if (!readme.includes('Meeting track contract')) {
+    issues.push(issue('warning', 'readme_missing_meeting_track_contract', 'README should state the speaker/participant track contract.'));
+  }
   const candidateObservationContract = scaffold.plan?.candidate_observation_contract;
   if (!candidateObservationContract) {
     issues.push(issue('error', 'missing_candidate_observation_contract', 'Scaffold plan must include the candidate observation contract.'));
@@ -858,6 +970,18 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     issues.push(issue('error', 'runtime_bundle_candidate_observer_not_ready', 'Runtime bundle matrix must expose candidate observation for every selected platform.', {
       candidate_observer_count: runtimeCandidateObserverCount,
       platform_count: scaffold.platforms?.length ?? 0,
+    }));
+  }
+  const meetingTrackContract = scaffold.plan?.meeting_track_contract;
+  if (!meetingTrackContract) {
+    issues.push(issue('error', 'missing_meeting_track_contract', 'Scaffold plan must include the speaker/participant meeting track contract.'));
+  } else if (meetingTrackContract.all_ready !== true) {
+    issues.push(issue('error', 'meeting_track_contract_not_ready', 'Every selected platform must support realtime speaker and participant tracks before host handoff.', {
+      missing_count: meetingTrackContract.missing_count,
+      speaker_ready_count: meetingTrackContract.speaker_ready_count,
+      participant_ready_count: meetingTrackContract.participant_ready_count,
+      provider_blocking_count: meetingTrackContract.provider_blocking_count,
+      transcript_blocking_count: meetingTrackContract.transcript_blocking_count,
     }));
   }
   const packageJsonFile = fileByPath(scaffold, 'package.json');
@@ -885,6 +1009,10 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     candidate_observer_count: candidateObservationContract?.ready_count ?? runtimeCandidateObserverCount ?? 0,
     candidate_observer_missing_count: candidateObservationContract?.missing_count,
     candidate_observation_contract: candidateObservationContract,
+    meeting_track_ready: meetingTrackContract?.all_ready === true,
+    speaker_track_ready_count: meetingTrackContract?.speaker_ready_count ?? 0,
+    participant_track_ready_count: meetingTrackContract?.participant_ready_count ?? 0,
+    meeting_track_contract: meetingTrackContract,
     required_files: requiredFiles,
     blocking_count: blocking.length,
     warning_count: issues.length - blocking.length,

@@ -29,6 +29,8 @@ assert.deepEqual(plan.platforms, ['google_meet', 'microsoft_teams', 'zoom']);
 assert.equal(plan.runtime_contract.annotation_timestamp_field, 'captured_at_ms');
 assert.equal(plan.runtime_contract.provider_events_block_realtime, false);
 assert.equal(plan.runtime_contract.candidate_observation_required_for_host_axis_binding, true);
+assert.equal(plan.runtime_contract.speaker_track_required_for_realtime_timeline, true);
+assert.equal(plan.runtime_contract.participant_track_required_for_realtime_timeline, true);
 assert.equal(plan.endpoints.platform_events, '/api/platform-events');
 assert.equal(plan.endpoints.adapter_contracts, '/api/meeting-platform/contracts');
 assert.equal(plan.endpoints.runtime_bundles, '/api/meeting-platform/runtime-bundles');
@@ -54,6 +56,19 @@ assert.equal(plan.candidate_observation_contract.runtime_event_action, 'observe_
 assert.deepEqual(plan.candidate_observation_contract.required_permissions, ['tabs']);
 assert.equal(plan.candidate_observation_contract.rows.every((row) => row.ready === true), true);
 assert.equal(plan.candidate_observation_contract.rows.some((row) => row.platform === 'google_meet'), true);
+assert.equal(plan.speaker_track_matrix.platform_count, 3);
+assert.equal(plan.speaker_track_matrix.provider_blocking_count, 0);
+assert.equal(plan.speaker_track_matrix.transcript_blocking_count, 0);
+assert.equal(plan.participant_track_matrix.platform_count, 3);
+assert.equal(plan.participant_track_matrix.provider_blocking_count, 0);
+assert.equal(plan.participant_track_matrix.transcript_blocking_count, 0);
+assert.equal(plan.meeting_track_contract.platform_count, 3);
+assert.equal(plan.meeting_track_contract.speaker_ready_count, 3);
+assert.equal(plan.meeting_track_contract.participant_ready_count, 3);
+assert.equal(plan.meeting_track_contract.provider_blocking_count, 0);
+assert.equal(plan.meeting_track_contract.transcript_blocking_count, 0);
+assert.equal(plan.meeting_track_contract.all_ready, true);
+assert.equal(plan.meeting_track_contract.rows.every((row) => row.ready === true), true);
 assert.equal(plan.runtime_event_plan_matrix.platform_count, 3);
 assert.equal(plan.runtime_event_plan_matrix.realtime_provider_dependency_count, 0);
 assert.equal(plan.runtime_event_plan_matrix.transcript_realtime_dependency_count, 0);
@@ -103,6 +118,8 @@ assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('r
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('observePlatformCandidates'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('meetingAppExtensionInstallPlan'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('capturedAtMs'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('speakerTrack'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('participantTrack'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('handleFetchRequest'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/contracts'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/runtime-bundles'), true);
@@ -138,6 +155,8 @@ assert.equal(file(scaffold, 'README.md').content.includes('resolvePlatformCandid
 assert.equal(file(scaffold, 'README.md').content.includes('observePlatformCandidates'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('meeting_timeline.observe_candidates'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('Candidate observation contract'), true);
+assert.equal(file(scaffold, 'README.md').content.includes('Meeting track contract'), true);
+assert.equal(file(scaffold, 'README.md').content.includes('speaker_track_ready'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('extensionInstallPlan'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('integrationRuntimeSummary'), true);
 
@@ -149,6 +168,10 @@ assert.equal(acceptance.candidate_observation_ready, true);
 assert.equal(acceptance.candidate_observer_count, 3);
 assert.equal(acceptance.candidate_observer_missing_count, 0);
 assert.equal(acceptance.candidate_observation_contract.all_ready, true);
+assert.equal(acceptance.meeting_track_ready, true);
+assert.equal(acceptance.speaker_track_ready_count, 3);
+assert.equal(acceptance.participant_track_ready_count, 3);
+assert.equal(acceptance.meeting_track_contract.all_ready, true);
 assert.equal(acceptance.required_files.includes('src/http-routes.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-strategy.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/verify-contracts.mjs'), true);
@@ -198,6 +221,25 @@ const missingCandidateObservationContractAcceptance = buildMeetingPlatformHostIn
 assert.equal(missingCandidateObservationContractAcceptance.accepted, false);
 assert.equal(
   missingCandidateObservationContractAcceptance.issues.some((item) => item.code === 'candidate_observation_contract_not_ready'),
+  true,
+);
+
+const missingMeetingTrackContract = {
+  ...scaffold,
+  plan: {
+    ...scaffold.plan,
+    meeting_track_contract: {
+      ...scaffold.plan.meeting_track_contract,
+      speaker_ready_count: 2,
+      missing_count: 1,
+      all_ready: false,
+    },
+  },
+};
+const missingMeetingTrackContractAcceptance = buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(missingMeetingTrackContract);
+assert.equal(missingMeetingTrackContractAcceptance.accepted, false);
+assert.equal(
+  missingMeetingTrackContractAcceptance.issues.some((item) => item.code === 'meeting_track_contract_not_ready'),
   true,
 );
 

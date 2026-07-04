@@ -35,6 +35,9 @@ export interface MeetingPlatformHostIntegrationPlan {
   runtime_event_plan_matrix: Record<string, unknown>;
   runtime_bundle_matrix: Record<string, unknown>;
   candidate_observation_contract: Record<string, unknown>;
+  speaker_track_matrix: Record<string, unknown>;
+  participant_track_matrix: Record<string, unknown>;
+  meeting_track_contract: Record<string, unknown>;
   handoff_bundle: Record<string, unknown>;
   adapter_contract_matrix: Record<string, unknown>;
   adapter_contract_acceptance_matrix: Record<string, unknown>;
@@ -68,6 +71,10 @@ export interface MeetingPlatformHostIntegrationScaffoldAcceptanceReport {
   candidate_observer_count: number;
   candidate_observer_missing_count?: number;
   candidate_observation_contract?: Record<string, unknown>;
+  meeting_track_ready: boolean;
+  speaker_track_ready_count: number;
+  participant_track_ready_count: number;
+  meeting_track_contract?: Record<string, unknown>;
   required_files: string[];
   blocking_count: number;
   warning_count: number;
