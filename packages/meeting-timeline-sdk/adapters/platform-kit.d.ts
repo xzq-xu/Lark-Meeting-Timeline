@@ -142,6 +142,11 @@ import type {
   MeetingPlatformRuntimeBundleOptions,
 } from './platform-runtime-bundle.mjs';
 import type {
+  MeetingPlatformRuntimeEventClientOptions,
+  MeetingPlatformRuntimeEventPlan,
+  MeetingPlatformRuntimeEventPlanMatrix,
+} from './platform-runtime-event.mjs';
+import type {
   MeetingPlatformAdapterContract,
   MeetingPlatformAdapterContractAcceptanceMatrix,
   MeetingPlatformAdapterContractAcceptanceReport,
@@ -369,6 +374,8 @@ export interface MeetingPlatformTimelineKit {
   platformAdaptationPackageMatrix(packageOptions?: MeetingPlatformAdaptationPackageOptions): MeetingPlatformAdaptationPackageMatrix;
   platformRuntimeBundle(platform: string, bundleOptions?: MeetingPlatformRuntimeBundleOptions): MeetingPlatformRuntimeBundle;
   platformRuntimeBundleMatrix(bundleOptions?: MeetingPlatformRuntimeBundleOptions): MeetingPlatformRuntimeBundleMatrix;
+  platformRuntimeEventPlan(platform: string, planOptions?: MeetingPlatformRuntimeEventClientOptions): MeetingPlatformRuntimeEventPlan;
+  platformRuntimeEventPlanMatrix(planOptions?: MeetingPlatformRuntimeEventClientOptions): MeetingPlatformRuntimeEventPlanMatrix;
   platformRegistryEntry(platform: string, registryOptions?: MeetingPlatformRegistryOptions): MeetingPlatformRegistryEntry;
   platformRegistryManifest(registryOptions?: MeetingPlatformRegistryOptions): MeetingPlatformRegistryManifest;
   platformRegistryAcceptance(

@@ -125,6 +125,8 @@ import {
 import {
   MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
   buildMeetingPlatformAnnotationRuntimeEvent,
+  buildMeetingPlatformRuntimeEventPlan,
+  buildMeetingPlatformRuntimeEventPlanMatrix,
   createMeetingPlatformRuntimeEventClient,
   meetingPlatformRuntimeEventEndpoint,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event';
@@ -533,11 +535,24 @@ assert.equal(kit.platformRuntimeBundle('google-meet').schema, 'meeting_platform_
 assert.equal(kit.platformRuntimeBundleMatrix({
   platforms: ['google-meet'],
 }).platform_count, 1);
+assert.equal(kit.platformRuntimeEventPlan('google-meet').schema, 'meeting_platform_runtime_event_plan');
+assert.equal(kit.platformRuntimeEventPlan('google-meet').realtime_contract.provider_events_required_for_realtime, false);
+assert.equal(kit.platformRuntimeEventPlanMatrix({
+  platforms: ['google-meet', 'zoom'],
+}).platform_count, 2);
+assert.equal(buildMeetingPlatformRuntimeEventPlan('zoom', {
+  baseUrl: 'http://localhost:8787',
+}).examples.insert_annotation.action, 'insert_annotation');
+assert.equal(buildMeetingPlatformRuntimeEventPlanMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).transcript_realtime_dependency_count, 0);
 const smokeGoogleRuntimeBundle = buildMeetingPlatformRuntimeBundle('google-meet', {
   baseUrl: 'http://localhost:8787',
 });
 assert.equal(smokeGoogleRuntimeBundle.browser.matches.includes('https://meet.google.com/*'), true);
 assert.equal(smokeGoogleRuntimeBundle.runtime.content_script_bridge.install_function, 'installMeetingPlatformIntegrationContentScriptBridge');
+assert.equal(smokeGoogleRuntimeBundle.messaging.runtime_event.plan.realtime_contract.transcript_required_for_realtime, false);
 assert.equal(smokeGoogleRuntimeBundle.messaging.examples.content_script_insert_annotation.type, 'meeting_timeline.insert_mark');
 assert.equal(buildMeetingPlatformRuntimeBundleMatrix({
   baseUrl: 'http://localhost:8787',

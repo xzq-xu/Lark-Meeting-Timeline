@@ -35,6 +35,10 @@ assert.equal(google.messaging.accepted_methods.includes('runtimeEvents'), true);
 assert.equal(google.messaging.runtime_event.schema, 'meeting_platform_runtime_event');
 assert.equal(google.messaging.runtime_event.endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);
 assert.equal(google.messaging.runtime_event.client_factory, 'createMeetingPlatformRuntimeEventClient');
+assert.equal(google.messaging.runtime_event.plan_schema, 'meeting_platform_runtime_event_plan');
+assert.equal(google.messaging.runtime_event.plan.platform, 'google_meet');
+assert.equal(google.messaging.runtime_event.plan.realtime_contract.provider_events_required_for_realtime, false);
+assert.equal(google.messaging.runtime_event.plan.actions.find((row) => row.action === 'speaker_track').client_method, 'speakerTrack');
 assert.equal(google.messaging.examples.insert_annotation.method, 'insertMark');
 assert.equal(google.messaging.examples.insert_annotation.input.captured_at_ms, 1_782_614_400_000);
 assert.equal(google.messaging.examples.content_script_insert_annotation.type, 'meeting_timeline.insert_mark');
@@ -89,6 +93,9 @@ const kit = createMeetingPlatformTimelineKit(client, {
 });
 assert.equal(kit.platformRuntimeBundle('google-meet').browser.matches[0], 'https://meet.google.com/*');
 assert.equal(kit.platformRuntimeBundleMatrix().platform_count, 2);
+assert.equal(kit.platformRuntimeEventPlan('google-meet').examples.insert_annotation.annotation.label, 'why?');
+assert.equal(kit.platformRuntimeEventPlanMatrix().platform_count, 2);
 assert.equal(kit.report().platform_runtime_bundle_matrix.provider_required_for_realtime_count, 0);
+assert.equal(kit.report().platform_runtime_event_plan_matrix.realtime_provider_dependency_count, 0);
 
 console.log('ok meeting platform runtime bundle');

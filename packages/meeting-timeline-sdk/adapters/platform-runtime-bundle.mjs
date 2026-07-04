@@ -20,6 +20,7 @@ import {
 import {
   MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT,
   MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
+  buildMeetingPlatformRuntimeEventPlan,
 } from './platform-runtime-event.mjs';
 
 export const MEETING_PLATFORM_RUNTIME_BUNDLE_SCHEMA = 'meeting_platform_runtime_bundle';
@@ -206,6 +207,7 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
   const manifest = contentScriptManifest(key, options, js);
   const start = startOptions(key, adaptationPackage, preset ?? {}, options);
   const endpoints = hostEndpoints(adaptationPackage, options);
+  const runtimeEventPlan = buildMeetingPlatformRuntimeEventPlan(key, options);
   const messages = messageExamples(key, {
     ...options,
     url: firstNonEmpty(options.url, options.href, extension.matches?.[0]?.replace('*', '')),
@@ -269,6 +271,8 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
         endpoint: endpoints.runtimeEvents,
         build_function: 'buildMeetingPlatformRuntimeEvent',
         client_factory: 'createMeetingPlatformRuntimeEventClient',
+        plan_schema: runtimeEventPlan.schema,
+        plan: runtimeEventPlan,
       },
       examples: messages,
     },

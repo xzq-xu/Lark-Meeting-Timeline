@@ -1,4 +1,5 @@
 import type { MeetingPlatformAdaptationPackage, MeetingPlatformAdaptationPackageOptions } from './platform-adaptation-package.mjs';
+import type { MeetingPlatformRuntimeEventPlan } from './platform-runtime-event.mjs';
 
 export const MEETING_PLATFORM_RUNTIME_BUNDLE_SCHEMA: 'meeting_platform_runtime_bundle';
 export const MEETING_PLATFORM_RUNTIME_BUNDLE_MATRIX_SCHEMA: 'meeting_platform_runtime_bundle_matrix';
@@ -65,6 +66,8 @@ export interface MeetingPlatformRuntimeBundle {
       endpoint?: string;
       build_function: string;
       client_factory: string;
+      plan_schema?: string;
+      plan?: MeetingPlatformRuntimeEventPlan;
     };
     examples: Record<string, unknown>;
   };

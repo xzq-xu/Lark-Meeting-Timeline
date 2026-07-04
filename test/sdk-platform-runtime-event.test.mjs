@@ -7,6 +7,8 @@ import {
   buildMeetingPlatformAnnotationRuntimeEvent,
   buildMeetingPlatformObserveRuntimeEvent,
   buildMeetingPlatformProviderRuntimeEvent,
+  buildMeetingPlatformRuntimeEventPlan,
+  buildMeetingPlatformRuntimeEventPlanMatrix,
   createMeetingPlatformRuntimeEventClient,
   meetingPlatformRuntimeEventEndpoint,
   normalizeMeetingPlatformRuntimeEventAction,
@@ -120,10 +122,41 @@ const providerResult = await runtime.handleEvent(providerEvent);
 assert.equal(providerResult.action, 'ingest_provider');
 assert.equal(providerResult.live_evidence.provider_record_count, 1);
 
+const googlePlan = buildMeetingPlatformRuntimeEventPlan('google-meet', {
+  baseUrl,
+  now: () => now + 6,
+});
+assert.equal(googlePlan.schema, 'meeting_platform_runtime_event_plan');
+assert.equal(googlePlan.platform, 'google_meet');
+assert.equal(googlePlan.endpoint, `${baseUrl}${MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT}`);
+assert.equal(googlePlan.client_factory, 'createMeetingPlatformRuntimeEventClient');
+assert.equal(googlePlan.realtime_contract.primary_clock_field, 'captured_at_ms');
+assert.equal(googlePlan.realtime_contract.provider_events_required_for_realtime, false);
+assert.equal(googlePlan.realtime_contract.transcript_required_for_realtime, false);
+assert.equal(googlePlan.provider_start_event_example, 'google.workspace.meet.conference.v2.started');
+assert.equal(googlePlan.provider_end_event_example, 'google.workspace.meet.conference.v2.ended');
+assert.equal(googlePlan.actions.find((row) => row.action === 'insert_annotation').client_method, 'insertAnnotation');
+assert.equal(googlePlan.actions.find((row) => row.action === 'provider_event').realtime_role, 'reconcile_and_backfill_only');
+assert.equal(googlePlan.examples.insert_annotation.action, 'insert_annotation');
+assert.equal(googlePlan.examples.insert_annotation.annotation.captured_at_ms, now + 15_000);
+assert.equal(googlePlan.examples.observe_meeting_app.snapshot.url, 'https://meet.google.com/abc-defg-hij');
+
+const runtimePlanMatrix = buildMeetingPlatformRuntimeEventPlanMatrix({
+  baseUrl,
+  platforms: ['google-meet', 'teams', 'zoom'],
+  now: () => now + 7,
+});
+assert.equal(runtimePlanMatrix.schema, 'meeting_platform_runtime_event_plan_matrix');
+assert.equal(runtimePlanMatrix.platform_count, 3);
+assert.equal(runtimePlanMatrix.realtime_provider_dependency_count, 0);
+assert.equal(runtimePlanMatrix.transcript_realtime_dependency_count, 0);
+assert.equal(runtimePlanMatrix.rows.some((row) => row.platform === 'microsoft_teams' && row.action === 'speaker_track'), true);
+assert.equal(runtimePlanMatrix.next_actions.includes('include_captured_at_ms_on_every_annotation'), true);
+
 let capturedRequest = null;
 const runtimeEventClient = createMeetingPlatformRuntimeEventClient({
   baseUrl,
-  now: () => now + 6,
+  now: () => now + 8,
   fetch: async (url, init) => {
     capturedRequest = {
       url,

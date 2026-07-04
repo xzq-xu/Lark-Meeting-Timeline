@@ -162,6 +162,10 @@ import {
   buildMeetingPlatformRuntimeBundleMatrix,
 } from './platform-runtime-bundle.mjs';
 import {
+  buildMeetingPlatformRuntimeEventPlan,
+  buildMeetingPlatformRuntimeEventPlanMatrix,
+} from './platform-runtime-event.mjs';
+import {
   assertMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
   buildMeetingPlatformAdapterContractAcceptanceReport,
@@ -390,6 +394,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_artifact_handoff_matrix: buildMeetingPlatformArtifactHandoffMatrix(options),
     platform_runtime_profile_matrix: buildMeetingPlatformRuntimeProfileMatrix(options),
     platform_adaptation_package_matrix: buildMeetingPlatformAdaptationPackageMatrix(options),
+    platform_runtime_event_plan_matrix: buildMeetingPlatformRuntimeEventPlanMatrix(options),
     platform_runtime_bundle_matrix: buildMeetingPlatformRuntimeBundleMatrix(options),
     platform_adapter_contract_matrix: buildMeetingPlatformAdapterContractMatrix(options),
     platform_adapter_contract_acceptance_matrix: buildMeetingPlatformAdapterContractAcceptanceMatrix(options),
@@ -707,6 +712,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformRuntimeBundleMatrix(bundleOptions = {}) {
       return buildMeetingPlatformRuntimeBundleMatrix(withDefaults(defaults, bundleOptions));
+    },
+    platformRuntimeEventPlan(platform, planOptions = {}) {
+      return buildMeetingPlatformRuntimeEventPlan(platform, withDefaults(defaults, planOptions));
+    },
+    platformRuntimeEventPlanMatrix(planOptions = {}) {
+      return buildMeetingPlatformRuntimeEventPlanMatrix(withDefaults(defaults, planOptions));
     },
     platformAdapterContract(platform, contractOptions = {}) {
       return buildMeetingPlatformAdapterContract(platform, withDefaults(defaults, contractOptions));

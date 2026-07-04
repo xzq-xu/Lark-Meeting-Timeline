@@ -1,4 +1,6 @@
 export const MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA: 'meeting_platform_runtime_event';
+export const MEETING_PLATFORM_RUNTIME_EVENT_PLAN_SCHEMA: 'meeting_platform_runtime_event_plan';
+export const MEETING_PLATFORM_RUNTIME_EVENT_PLAN_MATRIX_SCHEMA: 'meeting_platform_runtime_event_plan_matrix';
 export const MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA_VERSION: 1;
 export const MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT: '/api/meeting-platform/runtime-events';
 export const MEETING_PLATFORM_RUNTIME_EVENT_ACTIONS: readonly string[];
@@ -48,6 +50,8 @@ export interface MeetingPlatformRuntimeEvent {
 export interface MeetingPlatformRuntimeEventClientOptions extends MeetingPlatformRuntimeEventOptions {
   baseUrl?: string;
   base_url?: string;
+  platforms?: string[];
+  platform_keys?: string[];
   endpoint?: string;
   path?: string;
   runtimeEventEndpoint?: string;
@@ -83,6 +87,44 @@ export interface MeetingPlatformRuntimeEventClient {
   manifest(manifestOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   readiness(readinessOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   handoffReadiness(readinessOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+}
+
+export interface MeetingPlatformRuntimeEventPlan {
+  type: 'meeting_platform_runtime_event_plan';
+  schema: typeof MEETING_PLATFORM_RUNTIME_EVENT_PLAN_SCHEMA;
+  schema_version: typeof MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA_VERSION;
+  platform: string;
+  endpoint: string;
+  client_factory: string;
+  event_schema: typeof MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA;
+  supported_actions: readonly string[];
+  provider_start_event_example?: string;
+  provider_end_event_example?: string;
+  realtime_contract: {
+    primary_clock_field: string;
+    provider_events_required_for_realtime: boolean;
+    transcript_required_for_realtime: boolean;
+    local_observer_required_for_reliable_start_end: boolean;
+    annotation_should_use_device_capture_time: boolean;
+  };
+  imports: Record<string, string>;
+  sequence: string[];
+  actions: Record<string, unknown>[];
+  examples: Record<string, MeetingPlatformRuntimeEvent>;
+  next_actions: string[];
+}
+
+export interface MeetingPlatformRuntimeEventPlanMatrix {
+  type: 'meeting_platform_runtime_event_plan_matrix';
+  schema: typeof MEETING_PLATFORM_RUNTIME_EVENT_PLAN_MATRIX_SCHEMA;
+  schema_version: typeof MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA_VERSION;
+  platform_count: number;
+  platforms: string[];
+  realtime_provider_dependency_count: number;
+  transcript_realtime_dependency_count: number;
+  rows: Record<string, unknown>[];
+  plans: MeetingPlatformRuntimeEventPlan[];
+  next_actions: string[];
 }
 
 export function normalizeMeetingPlatformRuntimeEventAction(action: string): string;
@@ -124,6 +166,13 @@ export function buildMeetingPlatformTimelineViewRuntimeEvent(
   input?: Record<string, unknown>,
   options?: MeetingPlatformRuntimeEventOptions,
 ): MeetingPlatformRuntimeEvent;
+export function buildMeetingPlatformRuntimeEventPlan(
+  platform: string,
+  options?: MeetingPlatformRuntimeEventClientOptions,
+): MeetingPlatformRuntimeEventPlan;
+export function buildMeetingPlatformRuntimeEventPlanMatrix(
+  options?: MeetingPlatformRuntimeEventClientOptions,
+): MeetingPlatformRuntimeEventPlanMatrix;
 export function meetingPlatformRuntimeEventEndpoint(options?: MeetingPlatformRuntimeEventClientOptions): string;
 export function createMeetingPlatformRuntimeEventClient(
   options?: MeetingPlatformRuntimeEventClientOptions,

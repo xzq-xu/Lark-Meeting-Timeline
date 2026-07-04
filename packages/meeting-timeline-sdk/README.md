@@ -249,8 +249,16 @@ installMeetingPlatformIntegrationContentScriptBridge({
 
 ```js
 import {
+  buildMeetingPlatformRuntimeEventPlan,
   createMeetingPlatformRuntimeEventClient,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event';
+
+const googleRuntimePlan = buildMeetingPlatformRuntimeEventPlan('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+});
+// googleRuntimePlan.actions 明确列出 observe/provider/annotation/speaker/participant/view 各 action 的 producer、必填字段和 client method。
+// googleRuntimePlan.realtime_contract.provider_events_required_for_realtime === false。
+// googleRuntimePlan.realtime_contract.transcript_required_for_realtime === false。
 
 const runtimeEvents = createMeetingPlatformRuntimeEventClient({
   baseUrl: 'https://timeline.example.com',
@@ -512,6 +520,7 @@ const googleRuntime = buildMeetingPlatformRuntimeBundle('google-meet', {
 // googleRuntime.host.endpoints.insertMark 是实时标注写入地址。
 // googleRuntime.host.endpoints.runtimeEvents 是统一 runtime event envelope 写入地址。
 // googleRuntime.messaging.runtime_event.client_factory 指向 createMeetingPlatformRuntimeEventClient。
+// googleRuntime.messaging.runtime_event.plan 是外部宿主接入 observe/provider/annotation/speaker/participant/view 的动作表。
 // googleRuntime.readiness.provider_required_for_realtime === false。
 // googleRuntime.readiness.transcript_blocks_realtime === false。
 

@@ -5,10 +5,13 @@ import {
   normalizeAbsoluteMs,
 } from '../index.mjs';
 import {
+  MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
 
 export const MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA = 'meeting_platform_runtime_event';
+export const MEETING_PLATFORM_RUNTIME_EVENT_PLAN_SCHEMA = 'meeting_platform_runtime_event_plan';
+export const MEETING_PLATFORM_RUNTIME_EVENT_PLAN_MATRIX_SCHEMA = 'meeting_platform_runtime_event_plan_matrix';
 export const MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA_VERSION = 1;
 export const MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT = '/api/meeting-platform/runtime-events';
 
@@ -71,6 +74,21 @@ function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
 }
 
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value !== 'string' && typeof value[Symbol.iterator] === 'function') return Array.from(value);
+  return value == null ? [] : [value];
+}
+
+function unique(values = []) {
+  return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
+}
+
+function selectedPlatforms(options = {}) {
+  return unique(asArray(firstNonEmpty(options.platforms, options.platform_keys, MEETING_PLATFORM_KEYS))
+    .map((platform) => normalizeMeetingPlatform(platform)));
+}
+
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
 }
@@ -84,6 +102,45 @@ function nowMs(options = {}) {
   const now = firstNonEmpty(options.now, options.clock);
   if (typeof now === 'function') return maybeAbsoluteMs(now(), 'sent_at_ms');
   return Date.now();
+}
+
+function sampleUrlFor(platform, options = {}) {
+  return firstNonEmpty(
+    options.url,
+    options.href,
+    options.meeting_url,
+    options.meetingUrl,
+    {
+      google_meet: 'https://meet.google.com/abc-defg-hij',
+      microsoft_teams: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+      zoom: 'https://zoom.us/j/987654321',
+      webex: 'https://example.webex.com/meet/sample',
+      lark: 'https://vc.feishu.cn/j/123456789',
+      local_detector: 'local://meeting-window/sample',
+    }[platform],
+  );
+}
+
+function providerStartEventFor(platform) {
+  return {
+    google_meet: 'google.workspace.meet.conference.v2.started',
+    microsoft_teams: 'microsoft.graph.callStarted',
+    zoom: 'meeting.started',
+    webex: 'meeting.started',
+    lark: 'vc.meeting.meeting_started_v1',
+    local_detector: 'local.meeting.started',
+  }[platform] ?? 'meeting.started';
+}
+
+function providerEndEventFor(platform) {
+  return {
+    google_meet: 'google.workspace.meet.conference.v2.ended',
+    microsoft_teams: 'microsoft.graph.callEnded',
+    zoom: 'meeting.ended',
+    webex: 'meeting.ended',
+    lark: 'vc.meeting.meeting_ended_v1',
+    local_detector: 'local.meeting.ended',
+  }[platform] ?? 'meeting.ended';
 }
 
 function valuePlatform(value) {
@@ -309,6 +366,247 @@ export function buildMeetingPlatformTimelineViewRuntimeEvent(platform, input = {
     platform,
     payload: input,
   }, options);
+}
+
+function runtimeEventExamples(platform, options = {}) {
+  const capturedAtMs = maybeAbsoluteMs(firstNonEmpty(
+    options.capturedAtMs,
+    options.captured_at_ms,
+    options.sample_at_ms,
+    1_782_614_400_000,
+  ), 'captured_at_ms');
+  const url = sampleUrlFor(platform, options);
+  const currentMeeting = compactObject({
+    platform,
+    meeting_id: firstNonEmpty(options.meeting_id, options.meetingId, `${platform}-sample-meeting`),
+    external_meeting_id: firstNonEmpty(options.external_meeting_id, options.externalMeetingId, `${platform}-external-sample`),
+    meeting_url: url,
+    title: firstNonEmpty(options.title, 'Sample meeting'),
+    start_time_ms: capturedAtMs,
+  });
+  const annotation = {
+    id: 'note-001',
+    label: 'why?',
+    kind: 'question',
+    captured_at_ms: capturedAtMs + 15_000,
+    source: 'annotation_device',
+  };
+  const speakerSignals = [{
+    type: 'speaker_started',
+    platform,
+    speaker: {
+      id: 'speaker-001',
+      display_name: 'Alex',
+    },
+    occurred_at_ms: capturedAtMs + 20_000,
+    confidence: 0.82,
+    source: 'local_observer',
+  }];
+  const participantSignals = [{
+    type: 'participant_joined',
+    platform,
+    participant: {
+      id: 'participant-001',
+      display_name: 'Alex',
+    },
+    occurred_at_ms: capturedAtMs + 5_000,
+    source: 'local_observer',
+  }];
+  const providerPayload = {
+    event_type: providerStartEventFor(platform),
+    event_ts: capturedAtMs,
+    occurred_at_ms: capturedAtMs,
+    meeting: currentMeeting,
+  };
+
+  return {
+    observe_meeting_app: buildMeetingPlatformObserveRuntimeEvent(platform, {
+      platform,
+      url,
+      title: currentMeeting.title,
+      observed_at_ms: capturedAtMs,
+      in_meeting: true,
+      active_speaker: speakerSignals[0].speaker,
+    }, options),
+    provider_event: buildMeetingPlatformProviderRuntimeEvent(platform, providerPayload, options),
+    insert_annotation: buildMeetingPlatformAnnotationRuntimeEvent(platform, {
+      annotation,
+      current_meeting: currentMeeting,
+    }, options),
+    speaker_track: buildMeetingPlatformSpeakerTrackRuntimeEvent(platform, {
+      current_meeting: currentMeeting,
+      signals: speakerSignals,
+    }, options),
+    participant_track: buildMeetingPlatformParticipantTrackRuntimeEvent(platform, {
+      current_meeting: currentMeeting,
+      signals: participantSignals,
+    }, options),
+    timeline_view: buildMeetingPlatformTimelineViewRuntimeEvent(platform, {
+      meeting: currentMeeting,
+      annotations: [annotation],
+      speakerTrack: {
+        marks: speakerSignals,
+      },
+      participantTrack: {
+        marks: participantSignals,
+      },
+    }, options),
+  };
+}
+
+function runtimeEventActionRows(platform, endpoint) {
+  return [
+    {
+      action: 'observe_meeting_app',
+      client_method: 'observeMeetingApp',
+      producer: 'browser_extension_or_native_observer',
+      realtime_role: 'open_or_keep_current_axis',
+      required_fields: ['platform', 'snapshot.observed_at_ms_or_sent_at_ms'],
+      recommended_fields: ['snapshot.url', 'snapshot.title', 'snapshot.active_speaker'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'insert_annotation',
+      client_method: 'insertAnnotation',
+      producer: 'annotation_device_or_companion_app',
+      realtime_role: 'primary_realtime_mark_write',
+      required_fields: ['platform', 'annotation.captured_at_ms'],
+      recommended_fields: ['annotation.id', 'annotation.label', 'current_meeting.meeting_id_or_url'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'speaker_track',
+      client_method: 'speakerTrack',
+      producer: 'local_active_speaker_observer',
+      realtime_role: 'speaker_position_marks_without_transcript',
+      required_fields: ['platform', 'signals[].occurred_at_ms', 'signals[].speaker'],
+      recommended_fields: ['signals[].confidence', 'current_meeting.meeting_id_or_url'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'participant_track',
+      client_method: 'participantTrack',
+      producer: 'local_roster_observer_or_provider_reconcile',
+      realtime_role: 'participant_join_leave_marks',
+      required_fields: ['platform', 'signals[].occurred_at_ms', 'signals[].participant'],
+      recommended_fields: ['signals[].source', 'current_meeting.meeting_id_or_url'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'provider_event',
+      client_method: 'ingestProvider',
+      producer: 'official_webhook_or_event_subscription',
+      realtime_role: 'reconcile_and_backfill_only',
+      required_fields: ['platform', 'provider_event'],
+      recommended_fields: ['provider_event.event_ts_or_occurred_at_ms', 'provider_event.meeting'],
+      provider_dependency: true,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'timeline_view',
+      client_method: 'timelineView',
+      producer: 'host_ui',
+      realtime_role: 'render_view_model_request',
+      required_fields: ['platform', 'meeting'],
+      recommended_fields: ['annotations', 'speakerTrack', 'participantTrack'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+  ].map((row) => ({
+    platform,
+    ...row,
+  }));
+}
+
+export function buildMeetingPlatformRuntimeEventPlan(platform, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  const endpoint = meetingPlatformRuntimeEventEndpoint(options);
+  const examples = runtimeEventExamples(key, {
+    ...options,
+    source: firstNonEmpty(options.source, 'runtime_event_plan'),
+  });
+  const actionRows = runtimeEventActionRows(key, endpoint);
+  return {
+    type: 'meeting_platform_runtime_event_plan',
+    schema: MEETING_PLATFORM_RUNTIME_EVENT_PLAN_SCHEMA,
+    schema_version: MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA_VERSION,
+    platform: key,
+    endpoint,
+    client_factory: 'createMeetingPlatformRuntimeEventClient',
+    event_schema: MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
+    supported_actions: MEETING_PLATFORM_RUNTIME_EVENT_ACTIONS,
+    provider_start_event_example: providerStartEventFor(key),
+    provider_end_event_example: providerEndEventFor(key),
+    realtime_contract: {
+      primary_clock_field: 'captured_at_ms',
+      provider_events_required_for_realtime: false,
+      transcript_required_for_realtime: false,
+      local_observer_required_for_reliable_start_end: true,
+      annotation_should_use_device_capture_time: true,
+    },
+    imports: {
+      runtime_event: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event',
+      integration_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime',
+      realtime_annotation: '@ai-annotation/meeting-timeline-sdk/adapters/platform-realtime-annotation',
+      speaker_track: '@ai-annotation/meeting-timeline-sdk/adapters/platform-speaker-track',
+      participant_track: '@ai-annotation/meeting-timeline-sdk/adapters/platform-participant-track',
+      timeline_view: '@ai-annotation/meeting-timeline-sdk/adapters/platform-timeline-view',
+    },
+    sequence: [
+      'create runtime event client with the host baseUrl',
+      'send observe_meeting_app when the host detects an active meeting window',
+      'send insert_annotation immediately when the annotation device finishes a mark',
+      'send speaker_track or participant_track only after local filtering/debounce',
+      'send provider_event as reconcile/backfill evidence when official events arrive',
+      'request timeline_view from the host UI instead of duplicating SVG positioning logic',
+    ],
+    actions: actionRows,
+    examples,
+    next_actions: [
+      'wire_runtime_event_endpoint_in_host_project',
+      'forward_local_observer_snapshots_before_waiting_for_provider_events',
+      'include_captured_at_ms_on_every_annotation',
+      'keep_transcript_import_post_meeting_only',
+    ],
+  };
+}
+
+export function buildMeetingPlatformRuntimeEventPlanMatrix(options = {}) {
+  const plans = selectedPlatforms(options).map((platform) => buildMeetingPlatformRuntimeEventPlan(platform, {
+    ...options,
+    platforms: undefined,
+    platform_keys: undefined,
+  }));
+  return {
+    type: 'meeting_platform_runtime_event_plan_matrix',
+    schema: MEETING_PLATFORM_RUNTIME_EVENT_PLAN_MATRIX_SCHEMA,
+    schema_version: MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA_VERSION,
+    platform_count: plans.length,
+    platforms: plans.map((plan) => plan.platform),
+    realtime_provider_dependency_count: plans.filter((plan) => plan.realtime_contract.provider_events_required_for_realtime).length,
+    transcript_realtime_dependency_count: plans.filter((plan) => plan.realtime_contract.transcript_required_for_realtime).length,
+    rows: plans.flatMap((plan) => plan.actions.map((action) => ({
+      platform: plan.platform,
+      action: action.action,
+      client_method: action.client_method,
+      producer: action.producer,
+      realtime_role: action.realtime_role,
+      provider_dependency: action.provider_dependency,
+      transcript_dependency: action.transcript_dependency,
+    }))),
+    plans,
+    next_actions: unique(plans.flatMap((plan) => plan.next_actions ?? [])),
+  };
 }
 
 export function meetingPlatformRuntimeEventEndpoint(options = {}) {
