@@ -111,6 +111,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixture-tracks`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-track-pipeline`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-source`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
@@ -979,6 +980,28 @@ import {
 
 const trackReport = buildMeetingAppFixtureTrackReadinessReport();
 // trackReport.accepted === true 表示 fixture 级轨道连通性通过
+```
+
+真实网页或 WebView 已经能持续采样时，用 `meeting-app-track-pipeline` 把快照序列直接转换成发言人轨、参会人轨和可插入时间轴的 marks。它只依赖本地页面观察结果，不要求 provider webhook，也不要求实时转写：
+
+```js
+import {
+  buildMeetingAppTrackPipeline,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-track-pipeline';
+
+const pipeline = buildMeetingAppTrackPipeline(domSnapshots, {
+  speakerTrackOptions: {
+    minStableMs: 250,
+    endIdleMs: 500,
+  },
+  participantTrackOptions: {
+    leaveStableMs: 500,
+  },
+});
+
+// pipeline.marks 可以批量插到当前会议轴；mark.intent 会是 speaker_track / participant_track
+// pipeline.coverage.transcript_required === false
+// pipeline.coverage.provider_event_required === false
 ```
 
 正式接入 Google Meet / Teams Web / Zoom Web / Webex Web / Lark Web 前，建议再跑 `meeting-app-gate`。它不检查官方 webhook 权限，而是检查本地会议 App 路径是否满足实时标注：browser runtime preset、DOM capture profile、MutationObserver track/ignore selectors、建轴、发言人位置和结束信号。fixture-only 只能证明 SDK wiring；要证明生产可用，需要用 `meeting-app-snapshot-recorder` 记录真实采集到的 DOM snapshots：

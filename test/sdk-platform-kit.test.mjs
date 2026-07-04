@@ -342,6 +342,31 @@ assert.equal(kit.platformParticipantTrack('google-meet', {
     },
   ],
 }).marks[0].intent, 'participant_track');
+assert.equal(kit.meetingAppTrackPipeline([
+  {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+    observedAtMs: 1_782_614_400_000,
+    activeSpeaker: { id: 'ada', name: 'Ada', speaking: true },
+    participants: [{ id: 'ada', name: 'Ada', speaking: true }],
+  },
+  {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+    observedAtMs: 1_782_614_400_400,
+    activeSpeaker: { id: 'ada', name: 'Ada', speaking: true },
+    participants: [{ id: 'ada', name: 'Ada', speaking: true }],
+  },
+], {
+  speakerTrackOptions: {
+    minStableMs: 250,
+    minSegmentMs: 0,
+    closeOpenSegmentsAtMs: 1_782_614_401_000,
+  },
+}).marks[0].intent, 'speaker_track');
+assert.equal(kit.createMeetingAppTrackPipeline().getSnapshots().length, 0);
 assert.equal(kit.platformTimelineViewPlan('google-meet').schema, 'meeting_platform_timeline_view_plan');
 assert.equal(kit.platformTimelineViewMatrix({ platforms: ['google-meet', 'zoom'] }).platform_count, 2);
 assert.equal(kit.platformTimelineView('google-meet', {

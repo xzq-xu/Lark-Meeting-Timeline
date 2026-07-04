@@ -222,6 +222,12 @@ import type {
   MeetingAppFixtureOptions,
   MeetingAppFixturePlatform,
 } from './meeting-app-fixtures.mjs';
+import type {
+  MeetingAppTrackPipeline,
+  MeetingAppTrackPipelineAccumulator,
+  MeetingAppTrackPipelineInput,
+  MeetingAppTrackPipelineOptions,
+} from './meeting-app-track-pipeline.mjs';
 
 export interface MeetingPlatformTimelineKitOptions extends MeetingTimelineBridgeOptions, PlatformWebhookRouterOptions {
   baseUrl?: string;
@@ -320,6 +326,11 @@ export interface MeetingPlatformTimelineKit {
     input?: MeetingPlatformParticipantTrackInput | Record<string, unknown>[],
     trackOptions?: MeetingPlatformParticipantTrackOptions,
   ): MeetingPlatformParticipantTrack;
+  meetingAppTrackPipeline(
+    input?: MeetingAppTrackPipelineInput | Record<string, unknown>[],
+    trackOptions?: MeetingAppTrackPipelineOptions,
+  ): MeetingAppTrackPipeline;
+  createMeetingAppTrackPipeline(trackOptions?: MeetingAppTrackPipelineOptions): MeetingAppTrackPipelineAccumulator;
   platformTimelineViewPlan(platform: string, viewOptions?: MeetingPlatformTimelineViewOptions): MeetingPlatformTimelineViewPlan;
   platformTimelineViewMatrix(viewOptions?: MeetingPlatformTimelineViewOptions): MeetingPlatformTimelineViewMatrix;
   platformTimelineView(

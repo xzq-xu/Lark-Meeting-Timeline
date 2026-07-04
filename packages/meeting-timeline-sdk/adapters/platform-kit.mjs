@@ -15,6 +15,10 @@ import {
   diagnoseMeetingAppFixture,
   diagnoseMeetingAppFixtureLifecycle,
 } from './meeting-app-fixtures.mjs';
+import {
+  buildMeetingAppTrackPipeline,
+  createMeetingAppTrackPipeline,
+} from './meeting-app-track-pipeline.mjs';
 import { diagnosePlatformEvent } from './platform-ingest.mjs';
 import { buildMeetingPlatformOnboardingReport, buildMeetingPlatformOnboardingSummary } from './platform-onboarding.mjs';
 import {
@@ -638,6 +642,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformParticipantTrack(platform, input = {}, trackOptions = {}) {
       return buildMeetingPlatformParticipantTrack(platform, input, withDefaults(defaults, trackOptions));
+    },
+    meetingAppTrackPipeline(input = {}, trackOptions = {}) {
+      return buildMeetingAppTrackPipeline(input, withDefaults(defaults, trackOptions));
+    },
+    createMeetingAppTrackPipeline(trackOptions = {}) {
+      return createMeetingAppTrackPipeline(withDefaults(defaults, trackOptions));
     },
     platformTimelineViewPlan(platform, viewOptions = {}) {
       return buildMeetingPlatformTimelineViewPlan(platform, withDefaults(defaults, viewOptions));
