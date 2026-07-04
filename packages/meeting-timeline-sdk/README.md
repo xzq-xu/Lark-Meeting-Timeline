@@ -618,10 +618,10 @@ npm run meeting-platform:field-intake -- \
 
 ```js
 import {
-  buildMeetingPlatformHandoffReadinessMatrix,
+  runMeetingPlatformHandoffReadinessMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-handoff-readiness';
 
-const matrix = buildMeetingPlatformHandoffReadinessMatrix({
+const matrix = await runMeetingPlatformHandoffReadinessMatrix({
   platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
   google_meet: {
     evidencePackage: googleEvidencePackage,
@@ -633,7 +633,8 @@ const matrix = buildMeetingPlatformHandoffReadinessMatrix({
 });
 
 // matrix.rows 每行都有 handoff_ready / pilot_ready / production_ready，
-// 以及 candidate_observation_ready、provider_missing_env、dom_record_count、next_actions。
+// 以及 candidate_observation_ready、runtime_host_replay_accepted、
+// provider_missing_env、dom_record_count、next_actions。
 ```
 
 CLI 入口：

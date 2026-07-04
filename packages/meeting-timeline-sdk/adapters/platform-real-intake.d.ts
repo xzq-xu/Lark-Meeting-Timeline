@@ -59,6 +59,8 @@ export interface MeetingPlatformRealEvidenceIntakeReport {
   summary: Record<string, unknown>;
   verification: Record<string, unknown>;
   readiness: Record<string, unknown>;
+  runtime_host_replay?: Record<string, unknown>;
+  runtime_host_replay_accepted?: boolean;
   plan: MeetingPlatformRealEvidenceIntakePlan;
   evidence_package?: Record<string, unknown>;
   issues: Array<Record<string, unknown>>;
@@ -74,6 +76,7 @@ export interface MeetingPlatformRealEvidenceIntakeMatrix {
   rejected_count: number;
   production_ready_count: number;
   realtime_ready_count: number;
+  runtime_host_replay_ready_count?: number;
   platforms: string[];
   rows: Array<Record<string, unknown>>;
   reports: MeetingPlatformRealEvidenceIntakeReport[];
@@ -94,6 +97,17 @@ export function buildMeetingPlatformRealEvidenceIntakeMatrix(
   input?: Record<string, unknown>,
   options?: MeetingPlatformRealEvidenceIntakeOptions,
 ): MeetingPlatformRealEvidenceIntakeMatrix;
+
+export function runMeetingPlatformRealEvidenceIntakeReport(
+  platform: string,
+  input?: Record<string, unknown>,
+  options?: MeetingPlatformRealEvidenceIntakeOptions,
+): Promise<MeetingPlatformRealEvidenceIntakeReport>;
+
+export function runMeetingPlatformRealEvidenceIntakeMatrix(
+  input?: Record<string, unknown>,
+  options?: MeetingPlatformRealEvidenceIntakeOptions,
+): Promise<MeetingPlatformRealEvidenceIntakeMatrix>;
 
 export function assertMeetingPlatformRealEvidenceIntake(
   platform: string,

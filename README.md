@@ -99,6 +99,14 @@ npm run meeting-platform:runtime-host-replay -- --input=data/meeting-platform-ev
 
 它会从 `meeting_app_record_set`、`meeting_app_snapshot_records`、`snapshots/items/records` 或 evidence package 里抽取会中与结束快照，按 `captured_at_ms/observedAtMs` 回放到 `createMeetingPlatformRuntimeHost()`，并检查 `startMeeting`、发言人 `insertMark`、`endMeeting` 是否真实写出且时间戳对齐。默认脚本会扫描 `data/meeting-platform-evidence-packages/` 并写出 `data/meeting-platform-runtime-host-replay-report.json`；没有结束态快照时会失败，不用 fixture 兜底。
 
+交给其他项目接入前，最后跑 handoff readiness。这个入口现在会内置 runtime host replay gate，确认 evidence package 不只是字段完整，而是真的能驱动 SDK 写会议开始、发言人标记和会议结束：
+
+```bash
+npm run meeting-platform:handoff-readiness
+```
+
+报告里的 `runtime_host_replay_ready_count` 必须等于 `platform_count`，每行的 `runtime_host_replay_accepted=true` 才代表该平台可以作为可复用 SDK 接入单元交付。
+
 SDK 包级交付前再跑一次 package smoke：
 
 ```bash

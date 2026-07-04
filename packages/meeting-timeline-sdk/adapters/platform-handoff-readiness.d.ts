@@ -39,6 +39,16 @@ export interface MeetingPlatformHandoffReadinessOptions {
   snapshots?: unknown[] | Record<string, unknown>;
   domSnapshots?: unknown[] | Record<string, unknown>;
   dom_snapshots?: unknown[] | Record<string, unknown>;
+  runtimeHostReplay?: Record<string, unknown>;
+  runtime_host_replay?: Record<string, unknown>;
+  runtimeHostReplayReport?: Record<string, unknown>;
+  runtime_host_replay_report?: Record<string, unknown>;
+  runtimeHostReplayInput?: Record<string, unknown>;
+  runtime_host_replay_input?: Record<string, unknown>;
+  runtimeHostReplayOptions?: Record<string, unknown>;
+  runtime_host_replay_options?: Record<string, unknown>;
+  requireRuntimeHostReplay?: boolean;
+  require_runtime_host_replay?: boolean;
   [key: string]: unknown;
 }
 
@@ -60,6 +70,8 @@ export interface MeetingPlatformHandoffReadiness {
   candidate_observer_endpoint?: string;
   adapter_contract_accepted: boolean;
   real_intake_accepted: boolean;
+  runtime_host_replay_required?: boolean;
+  runtime_host_replay_accepted?: boolean;
   evidence_counts: Record<string, number>;
   missing: Record<string, unknown>;
   commands: Record<string, string | undefined>;
@@ -79,6 +91,7 @@ export interface MeetingPlatformHandoffReadinessMatrix {
   production_ready_count: number;
   local_observer_ready_count: number;
   candidate_observer_count: number;
+  runtime_host_replay_ready_count?: number;
   provider_reconcile_ready_count: number;
   provider_setup_needed_count: number;
   local_evidence_needed_count: number;
@@ -98,6 +111,17 @@ export function buildMeetingPlatformHandoffReadinessMatrix(
   input?: MeetingPlatformHandoffReadinessOptions,
   options?: MeetingPlatformHandoffReadinessOptions,
 ): MeetingPlatformHandoffReadinessMatrix;
+
+export function runMeetingPlatformHandoffReadiness(
+  platformOrInput?: string | MeetingPlatformHandoffReadinessOptions,
+  input?: MeetingPlatformHandoffReadinessOptions,
+  options?: MeetingPlatformHandoffReadinessOptions,
+): Promise<MeetingPlatformHandoffReadiness>;
+
+export function runMeetingPlatformHandoffReadinessMatrix(
+  input?: MeetingPlatformHandoffReadinessOptions,
+  options?: MeetingPlatformHandoffReadinessOptions,
+): Promise<MeetingPlatformHandoffReadinessMatrix>;
 
 export function assertMeetingPlatformHandoffReadiness(
   platformOrInput?: string | MeetingPlatformHandoffReadinessOptions,

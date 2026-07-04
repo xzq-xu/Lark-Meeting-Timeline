@@ -9,6 +9,8 @@ import {
   buildMeetingPlatformRealEvidenceIntakeMatrix,
   buildMeetingPlatformRealEvidenceIntakePlan,
   buildMeetingPlatformRealEvidenceIntakeReport,
+  runMeetingPlatformRealEvidenceIntakeMatrix,
+  runMeetingPlatformRealEvidenceIntakeReport,
 } from '../packages/meeting-timeline-sdk/adapters/platform-real-intake.mjs';
 import { createMeetingPlatformTimelineKit } from '../packages/meeting-timeline-sdk/adapters/platform-kit.mjs';
 
@@ -104,6 +106,15 @@ assert.equal(googleReport.verification.passed, true);
 assert.equal(googleReport.readiness.status, 'ready');
 assert.equal(googleReport.next_actions.includes('handoff_evidence_package_to_host_project'), true);
 
+const googleRuntimeReport = await runMeetingPlatformRealEvidenceIntakeReport('google-meet', realInput('google-meet'), {
+  baseUrl,
+  env: productionEnv,
+});
+assert.equal(googleRuntimeReport.accepted, true);
+assert.equal(googleRuntimeReport.runtime_host_replay_accepted, true);
+assert.equal(googleRuntimeReport.runtime_host_replay.actions.includes('endMeeting'), true);
+assert.equal(googleRuntimeReport.blocking_checks.some((check) => check.code === 'runtime_host_replay_accepted'), false);
+
 const fixtureRejected = buildMeetingPlatformRealEvidenceIntakeReport('google-meet', {
   providerRecords: [realProviderRecord('google-meet', 'meeting_start', startMs)],
   meetingAppRecords: [buildMeetingAppFixtureSnapshot('google-meet', { state: 'active', observedAtMs: startMs })],
@@ -129,6 +140,17 @@ assert.equal(matrix.schema, 'meeting_platform_real_evidence_intake_matrix');
 assert.equal(matrix.platform_count, 2);
 assert.equal(matrix.accepted_count, 2);
 assert.equal(matrix.rejected_count, 0);
+const runtimeMatrix = await runMeetingPlatformRealEvidenceIntakeMatrix({
+  platforms: ['google-meet', 'zoom'],
+  google_meet: realInput('google-meet'),
+  zoom: realInput('zoom'),
+}, {
+  baseUrl,
+  env: productionEnv,
+});
+assert.equal(runtimeMatrix.accepted_count, 2);
+assert.equal(runtimeMatrix.runtime_host_replay_ready_count, 2);
+assert.equal(runtimeMatrix.rows.every((row) => row.runtime_host_replay_accepted === true), true);
 assert.equal(assertMeetingPlatformRealEvidenceIntakeMatrix({
   platforms: ['webex'],
   webex: realInput('webex'),
@@ -151,10 +173,15 @@ const kit = createMeetingPlatformTimelineKit(client, {
 
 assert.equal(kit.platformRealEvidenceIntakePlan('google-meet').platform, 'google_meet');
 assert.equal(kit.platformRealEvidenceIntake('google-meet', realInput('google-meet')).accepted, true);
+assert.equal((await kit.runPlatformRealEvidenceIntake('google-meet', realInput('google-meet'))).runtime_host_replay_accepted, true);
 assert.equal(kit.platformRealEvidenceIntakeMatrix({
   platforms: ['lark'],
   lark: realInput('lark'),
 }).accepted_count, 1);
+assert.equal((await kit.runPlatformRealEvidenceIntakeMatrix({
+  platforms: ['lark'],
+  lark: realInput('lark'),
+})).runtime_host_replay_ready_count, 1);
 assert.equal(kit.assertPlatformRealEvidenceIntake('teams', realInput('teams')).accepted, true);
 assert.equal(kit.assertPlatformRealEvidenceIntakeMatrix({
   platforms: ['zoom'],

@@ -211,6 +211,8 @@ import {
   buildMeetingPlatformRealEvidenceIntakeMatrix,
   buildMeetingPlatformRealEvidenceIntakePlan,
   buildMeetingPlatformRealEvidenceIntakeReport,
+  runMeetingPlatformRealEvidenceIntakeMatrix,
+  runMeetingPlatformRealEvidenceIntakeReport,
 } from './platform-real-intake.mjs';
 import {
   buildMeetingPlatformFieldCaptureManifest,
@@ -231,6 +233,8 @@ import {
   assertMeetingPlatformHandoffReadinessMatrix,
   buildMeetingPlatformHandoffReadiness,
   buildMeetingPlatformHandoffReadinessMatrix,
+  runMeetingPlatformHandoffReadiness,
+  runMeetingPlatformHandoffReadinessMatrix,
 } from './platform-handoff-readiness.mjs';
 import {
   assertAllMeetingAppLaunchGates,
@@ -859,6 +863,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     platformRealEvidenceIntakeMatrix(input = {}, intakeOptions = {}) {
       return buildMeetingPlatformRealEvidenceIntakeMatrix(input, withDefaults(defaults, intakeOptions));
     },
+    async runPlatformRealEvidenceIntake(platform, input = {}, intakeOptions = {}) {
+      return runMeetingPlatformRealEvidenceIntakeReport(platform, input, withDefaults(defaults, intakeOptions));
+    },
+    async runPlatformRealEvidenceIntakeMatrix(input = {}, intakeOptions = {}) {
+      return runMeetingPlatformRealEvidenceIntakeMatrix(input, withDefaults(defaults, intakeOptions));
+    },
     assertPlatformRealEvidenceIntake(platform, input = {}, intakeOptions = {}) {
       return assertMeetingPlatformRealEvidenceIntake(platform, input, withDefaults(defaults, intakeOptions));
     },
@@ -900,6 +910,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformHandoffReadinessMatrix(input = {}, readinessOptions = {}) {
       return buildMeetingPlatformHandoffReadinessMatrix(input, withDefaults(defaults, readinessOptions));
+    },
+    async runPlatformHandoffReadiness(platform, input = {}, readinessOptions = {}) {
+      return runMeetingPlatformHandoffReadiness(platform, input, withDefaults(defaults, readinessOptions));
+    },
+    async runPlatformHandoffReadinessMatrix(input = {}, readinessOptions = {}) {
+      return runMeetingPlatformHandoffReadinessMatrix(input, withDefaults(defaults, readinessOptions));
     },
     assertPlatformHandoffReadiness(platform, input = {}, readinessOptions = {}) {
       return assertMeetingPlatformHandoffReadiness(platform, input, withDefaults(defaults, readinessOptions));

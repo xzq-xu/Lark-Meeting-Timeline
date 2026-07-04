@@ -192,12 +192,14 @@ assert.equal(report.accepted_count, 2);
 assert.equal(report.rejected_count, 0);
 assert.equal(report.production_ready_count, 2);
 assert.equal(report.realtime_ready_count, 2);
+assert.equal(report.runtime_host_replay_ready_count, 2);
 assert.equal(report.provider_evaluated_file_count, 1);
 assert.equal(report.dom_evaluated_file_count, 1);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').accepted, true);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').fixture_evidence_count, 0);
 assert.equal(report.rows.find((row) => row.platform === 'zoom').provider_record_count, 4);
 assert.equal(report.rows.find((row) => row.platform === 'zoom').meeting_app_record_count, 2);
+assert.equal(report.rows.find((row) => row.platform === 'zoom').runtime_host_replay_accepted, true);
 
 const writtenReport = JSON.parse(await readFile(reportFile, 'utf8'));
 assert.equal(writtenReport.rows.length, 2);
@@ -215,5 +217,6 @@ const { stdout: textStdout } = await execFileAsync(process.execPath, [
 });
 assert.match(textStdout, /meeting_platform_real_intake_report/);
 assert.match(textStdout, /accepted=2\/2/);
+assert.match(textStdout, /runtime_replay=2\/2/);
 
 console.log('ok meeting platform real intake script');

@@ -493,6 +493,15 @@ export interface MeetingPlatformTimelineKit {
     input?: Record<string, unknown>,
     intakeOptions?: MeetingPlatformRealEvidenceIntakeOptions,
   ): MeetingPlatformRealEvidenceIntakeMatrix;
+  runPlatformRealEvidenceIntake(
+    platform: string,
+    input?: Record<string, unknown>,
+    intakeOptions?: MeetingPlatformRealEvidenceIntakeOptions,
+  ): Promise<MeetingPlatformRealEvidenceIntakeReport>;
+  runPlatformRealEvidenceIntakeMatrix(
+    input?: Record<string, unknown>,
+    intakeOptions?: MeetingPlatformRealEvidenceIntakeOptions,
+  ): Promise<MeetingPlatformRealEvidenceIntakeMatrix>;
   assertPlatformRealEvidenceIntake(
     platform: string,
     input?: Record<string, unknown>,
@@ -514,6 +523,8 @@ export interface MeetingPlatformTimelineKit {
   platformFieldIntakeMatrix(intakeOptions?: MeetingPlatformFieldIntakeOptions): MeetingPlatformFieldIntakeMatrix;
   platformHandoffReadiness(platform: string, input?: MeetingPlatformHandoffReadinessOptions, readinessOptions?: MeetingPlatformHandoffReadinessOptions): MeetingPlatformHandoffReadiness;
   platformHandoffReadinessMatrix(input?: MeetingPlatformHandoffReadinessOptions, readinessOptions?: MeetingPlatformHandoffReadinessOptions): MeetingPlatformHandoffReadinessMatrix;
+  runPlatformHandoffReadiness(platform: string, input?: MeetingPlatformHandoffReadinessOptions, readinessOptions?: MeetingPlatformHandoffReadinessOptions): Promise<MeetingPlatformHandoffReadiness>;
+  runPlatformHandoffReadinessMatrix(input?: MeetingPlatformHandoffReadinessOptions, readinessOptions?: MeetingPlatformHandoffReadinessOptions): Promise<MeetingPlatformHandoffReadinessMatrix>;
   assertPlatformHandoffReadiness(platform: string, input?: MeetingPlatformHandoffReadinessOptions, readinessOptions?: MeetingPlatformHandoffReadinessOptions): MeetingPlatformHandoffReadiness;
   assertPlatformHandoffReadinessMatrix(input?: MeetingPlatformHandoffReadinessOptions, readinessOptions?: MeetingPlatformHandoffReadinessOptions): MeetingPlatformHandoffReadinessMatrix;
   meetingAppSnapshotRecorder(recorderOptions?: MeetingAppSnapshotRecordOptions): MeetingAppSnapshotRecorder;

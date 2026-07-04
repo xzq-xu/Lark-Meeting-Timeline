@@ -6,7 +6,7 @@ import {
   MEETING_PLATFORM_EVIDENCE_PACKAGE_SCHEMA,
 } from '../packages/meeting-timeline-sdk/adapters/platform-evidence-package.mjs';
 import {
-  buildMeetingPlatformHandoffReadinessMatrix,
+  runMeetingPlatformHandoffReadinessMatrix,
 } from '../packages/meeting-timeline-sdk/adapters/platform-handoff-readiness.mjs';
 import {
   normalizeMeetingPlatform,
@@ -145,6 +145,8 @@ function summarizeRow(row = {}, loaded) {
     handoff_ready: row.handoff_ready,
     pilot_ready: row.pilot_ready,
     production_ready: row.production_ready,
+    runtime_host_replay_accepted: row.runtime_host_replay_accepted,
+    runtime_host_replay_missing: row.runtime_host_replay_missing ?? [],
     local_observer_ready: row.local_observer_ready,
     provider_reconcile_ready: row.provider_reconcile_ready,
     provider_missing_env: row.provider_missing_env ?? [],
@@ -168,7 +170,7 @@ function reportFileFor(platform) {
 async function buildReport() {
   const loaded = await loadPackages();
   const matrixInput = buildMatrixInput(loaded);
-  const matrix = buildMeetingPlatformHandoffReadinessMatrix(matrixInput, {
+  const matrix = await runMeetingPlatformHandoffReadinessMatrix(matrixInput, {
     baseUrl,
     env: process.env,
   });
@@ -198,6 +200,7 @@ async function buildReport() {
     handoff_ready_count: matrix.handoff_ready_count,
     pilot_ready_count: matrix.pilot_ready_count,
     production_ready_count: matrix.production_ready_count,
+    runtime_host_replay_ready_count: matrix.runtime_host_replay_ready_count,
     local_observer_ready_count: matrix.local_observer_ready_count,
     provider_reconcile_ready_count: matrix.provider_reconcile_ready_count,
     provider_setup_needed_count: matrix.provider_setup_needed_count,
@@ -216,9 +219,9 @@ try {
   if (jsonOutput) {
     console.log(JSON.stringify(report, null, 2));
   } else {
-    console.log(`meeting_platform_handoff_readiness_report | ok=${boolLabel(report.ok)} | handoff_ready=${report.handoff_ready_count}/${report.platform_count} | pilot_ready=${report.pilot_ready_count} | production_ready=${report.production_ready_count} | packages=${report.loaded_package_count}`);
+    console.log(`meeting_platform_handoff_readiness_report | ok=${boolLabel(report.ok)} | handoff_ready=${report.handoff_ready_count}/${report.platform_count} | pilot_ready=${report.pilot_ready_count} | production_ready=${report.production_ready_count} | runtime_replay=${report.runtime_host_replay_ready_count}/${report.platform_count} | packages=${report.loaded_package_count}`);
     for (const row of report.rows) {
-      console.log(`${row.platform}: status=${row.status} handoff=${boolLabel(row.handoff_ready)} pilot=${boolLabel(row.pilot_ready)} production=${boolLabel(row.production_ready)} local=${boolLabel(row.local_observer_ready)} provider=${boolLabel(row.provider_reconcile_ready)} package=${row.evidence_package_file ?? '-'}`);
+      console.log(`${row.platform}: status=${row.status} handoff=${boolLabel(row.handoff_ready)} pilot=${boolLabel(row.pilot_ready)} production=${boolLabel(row.production_ready)} runtime_replay=${boolLabel(row.runtime_host_replay_accepted)} local=${boolLabel(row.local_observer_ready)} provider=${boolLabel(row.provider_reconcile_ready)} package=${row.evidence_package_file ?? '-'}`);
     }
     if (report.next_actions.length > 0) console.log(`next_actions=${report.next_actions.join(',')}`);
     for (const error of report.errors) console.error(`error ${error.file}: ${error.error}`);

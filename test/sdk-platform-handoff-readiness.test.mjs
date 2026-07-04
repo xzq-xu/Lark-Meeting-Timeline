@@ -10,6 +10,8 @@ import {
   assertMeetingPlatformHandoffReadinessMatrix,
   buildMeetingPlatformHandoffReadiness,
   buildMeetingPlatformHandoffReadinessMatrix,
+  runMeetingPlatformHandoffReadiness,
+  runMeetingPlatformHandoffReadinessMatrix,
 } from '../packages/meeting-timeline-sdk/adapters/platform-handoff-readiness.mjs';
 import { buildPlatformFixtureEvent } from '../packages/meeting-timeline-sdk/adapters/platform-fixtures.mjs';
 import { createMeetingPlatformTimelineKit } from '../packages/meeting-timeline-sdk/adapters/platform-kit.mjs';
@@ -134,6 +136,39 @@ assert.equal(assertMeetingPlatformHandoffReadiness('google-meet', {
   target: 'production',
 }).production_ready, true);
 
+const runtimeProductionGoogle = await runMeetingPlatformHandoffReadiness('google-meet', {
+  evidencePackage: googlePackage,
+}, {
+  baseUrl,
+  env: productionEnv,
+  target: 'production',
+});
+assert.equal(runtimeProductionGoogle.status, 'production_ready');
+assert.equal(runtimeProductionGoogle.handoff_ready, true);
+assert.equal(runtimeProductionGoogle.runtime_host_replay_required, true);
+assert.equal(runtimeProductionGoogle.runtime_host_replay_accepted, true);
+assert.equal(runtimeProductionGoogle.reports.runtime_host_replay.actions.includes('endMeeting'), true);
+assert.equal(runtimeProductionGoogle.missing.runtime_host_replay_missing.length, 0);
+
+const runtimeReplayBlocked = buildMeetingPlatformHandoffReadiness('google-meet', {
+  evidencePackage: googlePackage,
+  runtimeHostReplay: {
+    schema: 'meeting_platform_runtime_host_replay',
+    platform: 'google_meet',
+    accepted: false,
+    missing: ['end_meeting_written'],
+    next_actions: ['capture_ended_snapshot'],
+  },
+}, {
+  baseUrl,
+  env: productionEnv,
+  target: 'production',
+});
+assert.equal(runtimeReplayBlocked.status, 'needs_runtime_host_replay');
+assert.equal(runtimeReplayBlocked.handoff_ready, false);
+assert.equal(runtimeReplayBlocked.runtime_host_replay_accepted, false);
+assert.equal(runtimeReplayBlocked.next_actions.includes('fix_runtime_host_replay_before_sdk_handoff'), true);
+
 const brokenCandidateObservation = buildMeetingPlatformHandoffReadiness('google-meet', {
   evidencePackage: googlePackage,
 }, {
@@ -189,6 +224,26 @@ assert.equal(matrix.candidate_observer_count, 2);
 assert.equal(matrix.provider_setup_needed_count, 0);
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').production_ready, true);
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').candidate_observation_ready, true);
+const runtimeMatrix = await runMeetingPlatformHandoffReadinessMatrix({
+  platforms: ['google-meet', 'zoom'],
+  google_meet: {
+    evidencePackage: googlePackage,
+  },
+  zoom: {
+    evidencePackage: buildMeetingPlatformEvidencePackage('zoom', realInput('zoom'), {
+      baseUrl,
+      env: productionEnv,
+      includeRunbook: false,
+    }),
+  },
+}, {
+  baseUrl,
+  env: productionEnv,
+  target: 'production',
+});
+assert.equal(runtimeMatrix.handoff_ready_count, 2);
+assert.equal(runtimeMatrix.runtime_host_replay_ready_count, 2);
+assert.equal(runtimeMatrix.rows.every((row) => row.runtime_host_replay_accepted === true), true);
 assert.equal(assertMeetingPlatformHandoffReadinessMatrix({
   platforms: ['google-meet'],
   google_meet: {
@@ -216,6 +271,11 @@ assert.equal(kit.platformHandoffReadiness('google-meet', {
 }, {
   target: 'production',
 }).production_ready, true);
+assert.equal((await kit.runPlatformHandoffReadiness('google-meet', {
+  evidencePackage: googlePackage,
+}, {
+  target: 'production',
+})).runtime_host_replay_accepted, true);
 assert.equal(kit.platformHandoffReadinessMatrix({
   platforms: ['google-meet'],
   google_meet: {
@@ -224,6 +284,14 @@ assert.equal(kit.platformHandoffReadinessMatrix({
 }, {
   target: 'production',
 }).handoff_ready_count, 1);
+assert.equal((await kit.runPlatformHandoffReadinessMatrix({
+  platforms: ['google-meet'],
+  google_meet: {
+    evidencePackage: googlePackage,
+  },
+}, {
+  target: 'production',
+})).runtime_host_replay_ready_count, 1);
 assert.equal(kit.report({
   platforms: ['google-meet'],
 }).platform_handoff_readiness_matrix.platform_count, 1);

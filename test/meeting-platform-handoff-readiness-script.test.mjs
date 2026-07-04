@@ -98,13 +98,16 @@ const { stdout } = await execFileAsync(process.execPath, [
 assert.match(stdout, /meeting_platform_handoff_readiness_report/);
 assert.match(stdout, /handoff_ready=1\/1/);
 assert.match(stdout, /production_ready=1/);
+assert.match(stdout, /runtime_replay=1\/1/);
 
 const report = JSON.parse(await readFile(reportFile, 'utf8'));
 assert.equal(report.ok, true);
 assert.equal(report.platform_count, 1);
 assert.equal(report.handoff_ready_count, 1);
 assert.equal(report.production_ready_count, 1);
+assert.equal(report.runtime_host_replay_ready_count, 1);
 assert.equal(report.rows[0].status, 'production_ready');
+assert.equal(report.rows[0].runtime_host_replay_accepted, true);
 assert.equal(report.rows[0].evidence_package_file.endsWith('google_meet.json'), true);
 
 console.log('ok meeting platform handoff readiness script');

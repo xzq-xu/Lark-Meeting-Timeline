@@ -2,6 +2,9 @@ import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
 import { buildMeetingAppDomAdaptationDiagnosis } from './meeting-app-profile.mjs';
 import { meetingAppSnapshotRecords } from './meeting-app-snapshot-recorder.mjs';
 import {
+  runMeetingPlatformRuntimeHostReplay,
+} from './meeting-platform-runtime-host-verifier.mjs';
+import {
   buildMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceReport,
 } from './platform-adapter-contract.mjs';
@@ -153,6 +156,68 @@ function evidenceFor(platform, input = {}, options = {}) {
   });
 }
 
+function replayReportFrom(input = {}, options = {}) {
+  const explicit = firstNonEmpty(
+    input.runtimeHostReplayReport,
+    input.runtime_host_replay_report,
+    input.runtimeHostReplay,
+    input.runtime_host_replay,
+    options.runtimeHostReplayReport,
+    options.runtime_host_replay_report,
+    options.runtimeHostReplay,
+    options.runtime_host_replay,
+  );
+  return explicit?.schema === 'meeting_platform_runtime_host_replay' ? explicit : undefined;
+}
+
+function replayInputFrom(input = {}, evidence = {}, options = {}) {
+  return firstNonEmpty(
+    options.runtimeHostReplayInput,
+    options.runtime_host_replay_input,
+    input.runtimeHostReplayInput,
+    input.runtime_host_replay_input,
+    input.replayInput,
+    input.replay_input,
+    evidence.evidencePackage,
+    compactObject({
+      records: evidence.records,
+      snapshots: evidence.snapshots,
+      meetingAppRecords: evidence.meetingAppRecords,
+      meeting_app_records: evidence.meetingAppRecords,
+      meetingAppRecordSet: evidence.recordSet,
+      meeting_app_record_set: evidence.recordSet,
+    }),
+    input,
+  );
+}
+
+function replayErrorReport(platform, error) {
+  return {
+    type: 'meeting_platform_runtime_host_replay',
+    schema: 'meeting_platform_runtime_host_replay',
+    version: 1,
+    platform,
+    accepted: false,
+    input_record_count: 0,
+    replay_row_count: 0,
+    call_count: 0,
+    actions: [],
+    signal_types: [],
+    result_actions: [],
+    coverage: {
+      runtime_host_replay_error_free: false,
+    },
+    missing: ['runtime_host_replay_error_free'],
+    error: String(error?.message ?? error),
+    next_actions: ['fix_runtime_host_replay_input_or_adapter_error'],
+  };
+}
+
+function runtimeReplayRequired(options = {}, runtimeHostReplay = undefined) {
+  return firstNonEmpty(options.requireRuntimeHostReplay, options.require_runtime_host_replay, false) === true
+    || Boolean(runtimeHostReplay);
+}
+
 function blockingCodes(items = []) {
   return unique(asArray(items).map((item) => item.code).filter(Boolean));
 }
@@ -166,8 +231,11 @@ function statusFor({
   candidateObservationReady,
   domAccepted,
   realAccepted,
+  runtimeHostReplayRequired,
+  runtimeHostReplayAccepted,
 } = {}) {
   if (productionReady) return 'production_ready';
+  if (runtimeHostReplayRequired && !runtimeHostReplayAccepted && realAccepted) return 'needs_runtime_host_replay';
   if (pilotReady && providerReady) return 'pilot_ready_provider_reconcile_pending';
   if (pilotReady) return 'pilot_ready_provider_setup_pending';
   if (!candidateObservationReady) return 'needs_candidate_observation_contract';
@@ -175,6 +243,7 @@ function statusFor({
   if (!domAccepted) return 'needs_local_observer_evidence';
   if (providerMissingEnv.length > 0) return 'needs_provider_credentials';
   if (!realAccepted) return 'needs_provider_or_package_evidence';
+  if (runtimeHostReplayRequired && !runtimeHostReplayAccepted) return 'needs_runtime_host_replay';
   return 'needs_field_validation';
 }
 
@@ -200,6 +269,7 @@ function nextActions({
   realIntake,
   liveReadiness,
   candidateObservation,
+  runtimeHostReplay,
 } = {}) {
   const statusAction = {
     production_ready: 'handoff_to_host_project_with_monitoring',
@@ -210,6 +280,7 @@ function nextActions({
     needs_local_observer_evidence: 'capture_real_meeting_app_snapshots',
     needs_provider_credentials: 'configure_provider_security_env',
     needs_provider_or_package_evidence: 'capture_real_provider_events_and_build_evidence_package',
+    needs_runtime_host_replay: 'fix_runtime_host_replay_before_sdk_handoff',
     needs_field_validation: 'run_field_validation_commands',
   }[status];
   return unique([
@@ -220,6 +291,7 @@ function nextActions({
     ...(fieldPlan?.next_actions ?? []),
     ...(realIntake?.next_actions ?? []),
     ...(liveReadiness?.next_actions ?? []),
+    ...(runtimeHostReplay?.next_actions ?? []),
     ...(candidateObservation?.ready === false ? ['verify_candidate_observation_before_host_handoff'] : []),
     ...((candidateObservation?.issues ?? []).map((code) => `candidate_observation:${code}`)),
   ]);
@@ -272,11 +344,15 @@ export function buildMeetingPlatformHandoffReadiness(platformOrInput = {}, input
   const contractAccepted = contractReport.accepted === true;
   const domAccepted = domDiagnosis.accepted === true;
   const realAccepted = realIntake.accepted === true;
+  const runtimeHostReplay = replayReportFrom(rawInput, mergedOptions);
+  const requireRuntimeReplay = runtimeReplayRequired(mergedOptions, runtimeHostReplay);
+  const runtimeReplayAccepted = runtimeHostReplay?.accepted === true;
+  const runtimeReplayGatePassed = !requireRuntimeReplay || runtimeReplayAccepted;
   const candidateObservation = liveReadiness.candidate_observation ?? liveHandoff.candidate_observation_contract ?? {};
   const candidateObservationReady = candidateObservation.ready === true;
   const pilotReady = contractAccepted && candidateObservationReady && domAccepted;
-  const productionReady = pilotReady && realAccepted && liveReadiness.production_ready === true;
-  const handoffReady = contractAccepted && candidateObservationReady && (pilotReady || liveReadiness.passed === true);
+  const productionReady = pilotReady && realAccepted && liveReadiness.production_ready === true && runtimeReplayGatePassed;
+  const handoffReady = contractAccepted && candidateObservationReady && (pilotReady || liveReadiness.passed === true) && runtimeReplayGatePassed;
   const status = statusFor({
     productionReady,
     pilotReady,
@@ -286,6 +362,8 @@ export function buildMeetingPlatformHandoffReadiness(platformOrInput = {}, input
     candidateObservationReady,
     domAccepted,
     realAccepted,
+    runtimeHostReplayRequired: requireRuntimeReplay,
+    runtimeHostReplayAccepted: runtimeReplayAccepted,
   });
 
   return compactObject({
@@ -306,6 +384,8 @@ export function buildMeetingPlatformHandoffReadiness(platformOrInput = {}, input
     candidate_observer_endpoint: candidateObservation.endpoint,
     adapter_contract_accepted: contractAccepted,
     real_intake_accepted: realAccepted,
+    runtime_host_replay_required: requireRuntimeReplay,
+    runtime_host_replay_accepted: runtimeHostReplay ? runtimeReplayAccepted : undefined,
     evidence_counts: {
       provider_records: realIntake.provider_record_count,
       meeting_app_records: realIntake.meeting_app_record_count,
@@ -319,6 +399,7 @@ export function buildMeetingPlatformHandoffReadiness(platformOrInput = {}, input
       live_readiness_blocking_codes: blockingCodes(liveReadiness.blocking_checks),
       contract_issue_codes: blockingCodes(contractReport.issues),
       candidate_observation_issue_codes: candidateObservation.issues ?? [],
+      runtime_host_replay_missing: runtimeHostReplay?.missing ?? [],
     },
     commands: handoffCommands(platform, fieldPlan),
     required_host_contract: {
@@ -333,14 +414,18 @@ export function buildMeetingPlatformHandoffReadiness(platformOrInput = {}, input
       candidate_observation_endpoint: candidateObservation.endpoint,
       candidate_observation_runtime_event_endpoint: candidateObservation.runtime_event_endpoint,
       candidate_observation_required_permission: candidateObservation.required_permission,
+      runtime_host_replay_required_for_external_sdk_handoff: true,
     },
     sdk_methods: [
       'platformHandoffReadiness',
       'platformHandoffReadinessMatrix',
+      'runPlatformHandoffReadiness',
+      'runPlatformHandoffReadinessMatrix',
       'platformLiveAdapterHandoff',
       'platformFieldIntakePlan',
       'meetingAppDomAdaptationDiagnosis',
       'platformRealEvidenceIntake',
+      'replayPlatformRuntimeHost',
     ],
     reports: {
       contract_acceptance: contractReport,
@@ -351,6 +436,7 @@ export function buildMeetingPlatformHandoffReadiness(platformOrInput = {}, input
       real_intake: realIntake,
       live_readiness: liveReadiness,
       live_handoff: liveHandoff,
+      runtime_host_replay: runtimeHostReplay,
     },
     next_actions: nextActions({
       status,
@@ -361,21 +447,12 @@ export function buildMeetingPlatformHandoffReadiness(platformOrInput = {}, input
       realIntake,
       liveReadiness,
       candidateObservation,
+      runtimeHostReplay,
     }),
   });
 }
 
-export function buildMeetingPlatformHandoffReadinessMatrix(input = {}, options = {}) {
-  const platforms = selectedPlatforms({ ...input, ...options });
-  const reports = platforms.map((platform) => buildMeetingPlatformHandoffReadiness(
-    platform,
-    platformInput(input, platform),
-    {
-      ...options,
-      platforms: undefined,
-      platform_keys: undefined,
-    },
-  ));
+function matrixFromReports(reports = [], platforms = reports.map((report) => report.platform)) {
   return {
     type: 'meeting_platform_handoff_readiness_matrix',
     schema: MEETING_PLATFORM_HANDOFF_READINESS_MATRIX_SCHEMA,
@@ -386,6 +463,7 @@ export function buildMeetingPlatformHandoffReadinessMatrix(input = {}, options =
     production_ready_count: reports.filter((report) => report.production_ready).length,
     local_observer_ready_count: reports.filter((report) => report.local_observer_ready).length,
     candidate_observer_count: reports.filter((report) => report.candidate_observation_ready).length,
+    runtime_host_replay_ready_count: reports.filter((report) => report.runtime_host_replay_accepted === true).length,
     provider_reconcile_ready_count: reports.filter((report) => report.provider_reconcile_ready).length,
     provider_setup_needed_count: reports.filter((report) => (report.missing?.provider_env?.length ?? 0) > 0).length,
     local_evidence_needed_count: reports.filter((report) => report.local_observer_ready !== true).length,
@@ -402,6 +480,9 @@ export function buildMeetingPlatformHandoffReadinessMatrix(input = {}, options =
       candidate_observer_message_type: report.candidate_observer_message_type,
       candidate_observer_permission: report.candidate_observer_permission,
       candidate_observer_endpoint: report.candidate_observer_endpoint,
+      runtime_host_replay_required: report.runtime_host_replay_required,
+      runtime_host_replay_accepted: report.runtime_host_replay_accepted,
+      runtime_host_replay_missing: report.missing?.runtime_host_replay_missing ?? [],
       provider_reconcile_ready: report.provider_reconcile_ready,
       provider_missing_env: report.missing?.provider_env ?? [],
       provider_record_count: report.evidence_counts?.provider_records ?? 0,
@@ -413,6 +494,68 @@ export function buildMeetingPlatformHandoffReadinessMatrix(input = {}, options =
     reports,
     next_actions: unique(reports.flatMap((report) => report.next_actions ?? [])),
   };
+}
+
+export function buildMeetingPlatformHandoffReadinessMatrix(input = {}, options = {}) {
+  const platforms = selectedPlatforms({ ...input, ...options });
+  const reports = platforms.map((platform) => buildMeetingPlatformHandoffReadiness(
+    platform,
+    platformInput(input, platform),
+    {
+      ...options,
+      platforms: undefined,
+      platform_keys: undefined,
+    },
+  ));
+  return matrixFromReports(reports, platforms);
+}
+
+export async function runMeetingPlatformHandoffReadiness(platformOrInput = {}, input = {}, options = {}) {
+  const objectInput = platformOrInput && typeof platformOrInput === 'object' && !Array.isArray(platformOrInput);
+  const rawPlatform = objectInput
+    ? firstNonEmpty(platformOrInput.platform, platformOrInput.provider, platformOrInput.key, platformOrInput.name)
+    : platformOrInput;
+  const platform = normalizeMeetingPlatform(rawPlatform);
+  const rawInput = objectInput ? platformOrInput : input;
+  const mergedOptions = objectInput ? { ...input, ...options } : { ...input, ...options };
+  const evidence = evidenceFor(platform, rawInput, mergedOptions);
+  const explicitReplay = replayReportFrom(rawInput, mergedOptions);
+  let runtimeHostReplay = explicitReplay;
+  if (!runtimeHostReplay) {
+    try {
+      runtimeHostReplay = await runMeetingPlatformRuntimeHostReplay(
+        platform,
+        replayInputFrom(rawInput, evidence, mergedOptions),
+        mergedOptions.runtimeHostReplayOptions ?? mergedOptions.runtime_host_replay_options ?? mergedOptions,
+      );
+    } catch (error) {
+      runtimeHostReplay = replayErrorReport(platform, error);
+    }
+  }
+  return buildMeetingPlatformHandoffReadiness(platform, rawInput, {
+    ...mergedOptions,
+    runtimeHostReplay,
+    runtime_host_replay: runtimeHostReplay,
+    requireRuntimeHostReplay: true,
+    require_runtime_host_replay: true,
+  });
+}
+
+export async function runMeetingPlatformHandoffReadinessMatrix(input = {}, options = {}) {
+  const platforms = selectedPlatforms({ ...input, ...options });
+  const reports = [];
+  for (const platform of platforms) {
+    reports.push(await runMeetingPlatformHandoffReadiness(
+      platform,
+      platformInput(input, platform),
+      {
+        ...options,
+        platforms: undefined,
+        platform_keys: undefined,
+      },
+    ));
+  }
+  return matrixFromReports(reports, platforms);
 }
 
 export function assertMeetingPlatformHandoffReadiness(platformOrInput = {}, input = {}, options = {}) {

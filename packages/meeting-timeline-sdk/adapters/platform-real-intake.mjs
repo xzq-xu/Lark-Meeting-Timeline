@@ -5,6 +5,9 @@ import {
   verifyMeetingPlatformEvidencePackage,
 } from './platform-evidence-package.mjs';
 import {
+  runMeetingPlatformRuntimeHostReplay,
+} from './meeting-platform-runtime-host-verifier.mjs';
+import {
   buildMeetingPlatformLiveAdapterReadiness,
 } from './platform-live-adapter.mjs';
 import {
@@ -267,13 +270,114 @@ export function buildMeetingPlatformRealEvidenceIntakeReport(platform, input = {
   });
 }
 
-export function buildMeetingPlatformRealEvidenceIntakeMatrix(input = {}, options = {}) {
-  const platforms = selectedPlatforms({ ...input, ...options });
-  const reports = platforms.map((platform) => buildMeetingPlatformRealEvidenceIntakeReport(
+function replayReportFrom(input = {}, options = {}) {
+  const explicit = firstNonEmpty(
+    input.runtimeHostReplayReport,
+    input.runtime_host_replay_report,
+    input.runtimeHostReplay,
+    input.runtime_host_replay,
+    options.runtimeHostReplayReport,
+    options.runtime_host_replay_report,
+    options.runtimeHostReplay,
+    options.runtime_host_replay,
+  );
+  return explicit?.schema === 'meeting_platform_runtime_host_replay' ? explicit : undefined;
+}
+
+function replayInputFrom(input = {}, evidencePackage = undefined, options = {}) {
+  return firstNonEmpty(
+    options.runtimeHostReplayInput,
+    options.runtime_host_replay_input,
+    input.runtimeHostReplayInput,
+    input.runtime_host_replay_input,
+    input.replayInput,
+    input.replay_input,
+    evidencePackage,
+    input,
+  );
+}
+
+function replayErrorReport(platform, error) {
+  return {
+    type: 'meeting_platform_runtime_host_replay',
+    schema: 'meeting_platform_runtime_host_replay',
+    version: 1,
     platform,
-    platformInput(input, platform),
-    options,
-  ));
+    accepted: false,
+    input_record_count: 0,
+    replay_row_count: 0,
+    call_count: 0,
+    actions: [],
+    signal_types: [],
+    result_actions: [],
+    coverage: {
+      runtime_host_replay_error_free: false,
+    },
+    missing: ['runtime_host_replay_error_free'],
+    error: String(error?.message ?? error),
+    next_actions: ['fix_runtime_host_replay_input_or_adapter_error'],
+  };
+}
+
+function mergeRuntimeReplay(report = {}, runtimeHostReplay = {}, options = {}) {
+  const includeEvidencePackage = options.includeEvidencePackage === true || options.include_evidence_package === true;
+  const replayCheck = check(
+    'runtime_host_replay_accepted',
+    runtimeHostReplay.accepted === true,
+    'error',
+    'Runtime host replay must write start, speaker mark, and end into the timeline from captured meeting app snapshots.',
+    {
+      replay_missing: runtimeHostReplay.missing ?? [],
+      replay_row_count: runtimeHostReplay.replay_row_count ?? 0,
+    },
+  );
+  const checks = [...(report.checks ?? []), replayCheck];
+  const blocking = checks.filter((item) => item.passed !== true && item.severity === 'error');
+  return compactObject({
+    ...report,
+    accepted: blocking.length === 0,
+    blocking_count: blocking.length,
+    checks,
+    blocking_checks: blocking,
+    runtime_host_replay: runtimeHostReplay,
+    runtime_host_replay_accepted: runtimeHostReplay.accepted === true,
+    evidence_package: includeEvidencePackage ? report.evidence_package : undefined,
+    issues: [
+      ...blocking.map((item) => issue('error', item.code, item.message, item)),
+    ],
+    next_actions: blocking.length > 0
+      ? unique([
+        ...blocking.map((item) => item.code),
+        ...(runtimeHostReplay.next_actions ?? []),
+      ])
+      : ['handoff_evidence_package_to_host_project', 'enable_pilot_with_monitoring'],
+  });
+}
+
+export async function runMeetingPlatformRealEvidenceIntakeReport(platform, input = {}, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  const report = buildMeetingPlatformRealEvidenceIntakeReport(key, input, {
+    ...options,
+    includeEvidencePackage: true,
+    include_evidence_package: true,
+  });
+  const explicitReplay = replayReportFrom(input, options);
+  let runtimeHostReplay = explicitReplay;
+  if (!runtimeHostReplay) {
+    try {
+      runtimeHostReplay = await runMeetingPlatformRuntimeHostReplay(
+        key,
+        replayInputFrom(input, report.evidence_package, options),
+        options.runtimeHostReplayOptions ?? options.runtime_host_replay_options ?? options,
+      );
+    } catch (error) {
+      runtimeHostReplay = replayErrorReport(key, error);
+    }
+  }
+  return mergeRuntimeReplay(report, runtimeHostReplay, options);
+}
+
+function matrixFromReports(reports = []) {
   return {
     type: 'meeting_platform_real_evidence_intake_matrix',
     schema: MEETING_PLATFORM_REAL_INTAKE_MATRIX_SCHEMA,
@@ -283,19 +387,51 @@ export function buildMeetingPlatformRealEvidenceIntakeMatrix(input = {}, options
     rejected_count: reports.filter((report) => !report.accepted).length,
     production_ready_count: reports.filter((report) => report.readiness?.production_ready === true).length,
     realtime_ready_count: reports.filter((report) => report.readiness?.ready_for_realtime_annotations === true).length,
-    platforms,
+    runtime_host_replay_ready_count: reports.filter((report) => report.runtime_host_replay_accepted === true).length,
+    platforms: reports.map((report) => report.platform),
     rows: reports.map((report) => ({
       platform: report.platform,
       accepted: report.accepted,
       provider_record_count: report.provider_record_count,
       meeting_app_record_count: report.meeting_app_record_count,
       fixture_evidence_count: report.fixture_evidence_count,
+      runtime_host_replay_accepted: report.runtime_host_replay_accepted,
+      runtime_host_replay_missing: report.runtime_host_replay?.missing ?? [],
       readiness_status: report.readiness?.status,
       verification_passed: report.verification?.passed,
       blocking_count: report.blocking_count,
       next_actions: report.next_actions,
     })),
     reports,
+  };
+}
+
+export function buildMeetingPlatformRealEvidenceIntakeMatrix(input = {}, options = {}) {
+  const platforms = selectedPlatforms({ ...input, ...options });
+  const reports = platforms.map((platform) => buildMeetingPlatformRealEvidenceIntakeReport(
+    platform,
+    platformInput(input, platform),
+    options,
+  ));
+  return {
+    ...matrixFromReports(reports),
+    platforms,
+  };
+}
+
+export async function runMeetingPlatformRealEvidenceIntakeMatrix(input = {}, options = {}) {
+  const platforms = selectedPlatforms({ ...input, ...options });
+  const reports = [];
+  for (const platform of platforms) {
+    reports.push(await runMeetingPlatformRealEvidenceIntakeReport(
+      platform,
+      platformInput(input, platform),
+      options,
+    ));
+  }
+  return {
+    ...matrixFromReports(reports),
+    platforms,
   };
 }
 

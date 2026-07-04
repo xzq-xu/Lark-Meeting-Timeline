@@ -13,7 +13,7 @@ import {
   meetingAppSnapshotRecords,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder.mjs';
 import {
-  buildMeetingPlatformRealEvidenceIntakeMatrix,
+  runMeetingPlatformRealEvidenceIntakeMatrix,
 } from '../packages/meeting-timeline-sdk/adapters/platform-real-intake.mjs';
 import {
   normalizeMeetingPlatform,
@@ -265,6 +265,8 @@ function summarizeRow(row = {}, aggregate) {
     accepted: row.accepted,
     readiness_status: row.readiness?.status,
     verification_passed: row.verification?.passed,
+    runtime_host_replay_accepted: row.runtime_host_replay_accepted,
+    runtime_host_replay_missing: row.runtime_host_replay?.missing ?? [],
     provider_record_count: row.provider_record_count,
     meeting_app_record_count: row.meeting_app_record_count,
     fixture_evidence_count: row.fixture_evidence_count,
@@ -277,14 +279,14 @@ function summarizeRow(row = {}, aggregate) {
   };
 }
 
-function buildReport(loaded) {
+async function buildReport(loaded) {
   const aggregate = aggregateEvidence([
     ...loaded.providerEvaluations,
     ...loaded.domEvaluations,
     ...loaded.packageEvaluations,
   ]);
   const matrixInput = buildMatrixInput(aggregate);
-  const matrix = buildMeetingPlatformRealEvidenceIntakeMatrix(matrixInput, {
+  const matrix = await runMeetingPlatformRealEvidenceIntakeMatrix(matrixInput, {
     baseUrl,
     env: process.env,
     requireProductionReady,
@@ -318,6 +320,7 @@ function buildReport(loaded) {
     rejected_count: matrix.rejected_count,
     production_ready_count: matrix.production_ready_count,
     realtime_ready_count: matrix.realtime_ready_count,
+    runtime_host_replay_ready_count: matrix.runtime_host_replay_ready_count,
     rows,
     matrix: includeMatrix ? matrix : undefined,
     next_actions: unique(rows.flatMap((row) => row.next_actions)),
@@ -327,7 +330,7 @@ function buildReport(loaded) {
 
 try {
   const loaded = await loadEvidence();
-  const report = buildReport(loaded);
+  const report = await buildReport(loaded);
   if (loaded.errors.length > 0 && loaded.providerEvaluations.length === 0 && loaded.domEvaluations.length === 0 && loaded.packageEvaluations.length === 0) {
     report.ok = false;
   }
@@ -339,9 +342,9 @@ try {
   if (jsonOutput) {
     console.log(JSON.stringify(report, null, 2));
   } else {
-    console.log(`meeting_platform_real_intake_report | ok=${boolLabel(report.ok)} | accepted=${report.accepted_count}/${report.platform_count} | production_ready=${report.production_ready_count} | realtime_ready=${report.realtime_ready_count} | provider_files=${report.provider_evaluated_file_count}/${report.provider_file_count} | dom_files=${report.dom_evaluated_file_count}/${report.dom_file_count} | package_files=${report.package_evaluated_file_count}/${report.package_file_count}`);
+    console.log(`meeting_platform_real_intake_report | ok=${boolLabel(report.ok)} | accepted=${report.accepted_count}/${report.platform_count} | production_ready=${report.production_ready_count} | realtime_ready=${report.realtime_ready_count} | runtime_replay=${report.runtime_host_replay_ready_count}/${report.platform_count} | provider_files=${report.provider_evaluated_file_count}/${report.provider_file_count} | dom_files=${report.dom_evaluated_file_count}/${report.dom_file_count} | package_files=${report.package_evaluated_file_count}/${report.package_file_count}`);
     for (const row of report.rows) {
-      console.log(`${row.platform}: accepted=${boolLabel(row.accepted)} readiness=${row.readiness_status} verification=${boolLabel(row.verification_passed)} provider_records=${row.provider_record_count} dom_records=${row.meeting_app_record_count} fixture=${row.fixture_evidence_count} blocking=${row.blocking_count}`);
+      console.log(`${row.platform}: accepted=${boolLabel(row.accepted)} readiness=${row.readiness_status} verification=${boolLabel(row.verification_passed)} runtime_replay=${boolLabel(row.runtime_host_replay_accepted)} provider_records=${row.provider_record_count} dom_records=${row.meeting_app_record_count} fixture=${row.fixture_evidence_count} blocking=${row.blocking_count}`);
     }
     if (report.next_actions.length > 0) console.log(`next_actions=${report.next_actions.join(',')}`);
     for (const error of report.errors) console.error(`error ${error.kind} ${error.file}: ${error.error}`);
