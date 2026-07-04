@@ -72,6 +72,9 @@ const blockedReadiness = buildMeetingPlatformLiveAdapterReadiness('google-meet',
 });
 assert.equal(blockedReadiness.schema, 'meeting_platform_live_adapter_readiness');
 assert.equal(blockedReadiness.status, 'blocked');
+assert.equal(blockedReadiness.candidate_observation_ready, true);
+assert.equal(blockedReadiness.candidate_observation.message_type, 'meeting_timeline.observe_candidates');
+assert.equal(blockedReadiness.candidate_observation.runtime_event_action, 'observe_platform_candidates');
 assert.equal(blockedReadiness.blocking_checks.some((item) => item.code === 'pilot_realtime_axis_ready'), true);
 assert.equal(blockedReadiness.warnings.some((item) => item.code === 'evidence_package_available'), true);
 assert.throws(
@@ -257,8 +260,10 @@ const productionReadiness = buildMeetingPlatformLiveAdapterReadiness('google-mee
 assert.equal(productionReadiness.status, 'ready');
 assert.equal(productionReadiness.passed, true);
 assert.equal(productionReadiness.production_ready, true);
+assert.equal(productionReadiness.candidate_observation_ready, true);
 assert.equal(productionReadiness.verification.passed, true);
 assert.equal(productionReadiness.checks.some((item) => item.code === 'adapter_methods_available' && item.passed), true);
+assert.equal(productionReadiness.checks.some((item) => item.code === 'candidate_observation_contract_ready' && item.passed), true);
 assert.equal(assertMeetingPlatformLiveAdapterReadiness('google-meet', {
   baseUrl,
   env: googleEnv,
@@ -277,7 +282,9 @@ const readinessMatrix = buildMeetingPlatformLiveAdapterReadinessMatrix({
 assert.equal(readinessMatrix.schema, 'meeting_platform_live_adapter_readiness_matrix');
 assert.equal(readinessMatrix.platform_count, 1);
 assert.equal(readinessMatrix.ready_count, 1);
+assert.equal(readinessMatrix.candidate_observer_count, 1);
 assert.equal(readinessMatrix.rows[0].status, 'ready');
+assert.equal(readinessMatrix.rows[0].candidate_observer_message_type, 'meeting_timeline.observe_candidates');
 assert.equal(assertMeetingPlatformLiveAdapterReadinessMatrix({
   baseUrl,
   env: googleEnv,
@@ -307,6 +314,20 @@ assert.equal(suite.assertReadinessMatrix({
   evidencePackage: { google_meet: adapter.exportPackage() },
 }).passed_count, 1);
 
+const brokenCandidateReadiness = buildMeetingPlatformLiveAdapterReadiness('google-meet', {
+  baseUrl,
+  env: googleEnv,
+  target: 'production',
+  adapter,
+  evidencePackage: adapter.exportPackage(),
+  candidateObservation: {
+    runtime_event_action: 'observe_meeting_app',
+  },
+});
+assert.equal(brokenCandidateReadiness.passed, false);
+assert.equal(brokenCandidateReadiness.candidate_observation_ready, false);
+assert.equal(brokenCandidateReadiness.blocking_checks.some((item) => item.code === 'candidate_observation_contract_ready'), true);
+
 const googleHandoff = buildMeetingPlatformLiveAdapterHandoff('google-meet', {
   baseUrl,
   env: googleEnv,
@@ -319,6 +340,9 @@ assert.equal(googleHandoff.platform, 'google_meet');
 assert.equal(googleHandoff.passed, true);
 assert.equal(googleHandoff.host_contract.annotation_timestamp_field, 'captured_at_ms');
 assert.equal(googleHandoff.host_contract.can_insert_before_provider_event, true);
+assert.equal(googleHandoff.candidate_observation_ready, true);
+assert.equal(googleHandoff.candidate_observation_contract.endpoint, '/api/meeting-platform/observe-candidates');
+assert.equal(googleHandoff.host_contract.candidate_observation_runtime_action, 'observe_platform_candidates');
 assert.equal(googleHandoff.sdk.factory, 'createMeetingPlatformLiveAdapter');
 assert.equal(googleHandoff.sdk.kit_methods.includes('platformLiveAdapterHandoffBundle'), true);
 assert.equal(googleHandoff.commands.validate_live_readiness, 'npm run meeting-platform:live-readiness');
@@ -338,7 +362,9 @@ assert.deepEqual(handoffBundle.platforms, ['google_meet', 'zoom']);
 assert.equal(handoffBundle.platform_count, 2);
 assert.equal(handoffBundle.ready_count, 1);
 assert.equal(handoffBundle.blocked_count, 1);
+assert.equal(handoffBundle.candidate_observer_count, 2);
 assert.equal(handoffBundle.host_contract.provider_events_block_realtime, false);
+assert.equal(handoffBundle.host_contract.candidate_observation_message_type, 'meeting_timeline.observe_candidates');
 assert.equal(handoffBundle.handoffs[0].schema, 'meeting_platform_live_adapter_handoff');
 assert.equal(handoffBundle.readiness_matrix.platform_count, 2);
 assert.equal(handoffBundle.live_adapter_matrix.platform_count, 2);

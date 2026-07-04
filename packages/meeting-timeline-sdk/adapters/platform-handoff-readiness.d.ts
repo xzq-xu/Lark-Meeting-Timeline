@@ -54,6 +54,10 @@ export interface MeetingPlatformHandoffReadiness {
   production_ready: boolean;
   provider_reconcile_ready: boolean;
   local_observer_ready: boolean;
+  candidate_observation_ready: boolean;
+  candidate_observer_message_type?: string;
+  candidate_observer_permission?: string;
+  candidate_observer_endpoint?: string;
   adapter_contract_accepted: boolean;
   real_intake_accepted: boolean;
   evidence_counts: Record<string, number>;
@@ -74,6 +78,7 @@ export interface MeetingPlatformHandoffReadinessMatrix {
   pilot_ready_count: number;
   production_ready_count: number;
   local_observer_ready_count: number;
+  candidate_observer_count: number;
   provider_reconcile_ready_count: number;
   provider_setup_needed_count: number;
   local_evidence_needed_count: number;

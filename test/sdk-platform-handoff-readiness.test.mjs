@@ -120,6 +120,12 @@ assert.equal(productionGoogle.provider_reconcile_ready, true);
 assert.equal(productionGoogle.evidence_counts.provider_records, 5);
 assert.equal(productionGoogle.evidence_counts.dom_records, 2);
 assert.equal(productionGoogle.required_host_contract.annotation_timestamp_field, 'captured_at_ms');
+assert.equal(productionGoogle.candidate_observation_ready, true);
+assert.equal(productionGoogle.candidate_observer_message_type, 'meeting_timeline.observe_candidates');
+assert.equal(productionGoogle.candidate_observer_permission, 'tabs');
+assert.equal(productionGoogle.candidate_observer_endpoint, '/api/meeting-platform/observe-candidates');
+assert.equal(productionGoogle.required_host_contract.candidate_observation_runtime_action, 'observe_platform_candidates');
+assert.equal(productionGoogle.commands.validate_candidate_observation.includes('meeting-platform:runtime-event-plan'), true);
 assert.equal(assertMeetingPlatformHandoffReadiness('google-meet', {
   evidencePackage: googlePackage,
 }, {
@@ -127,6 +133,36 @@ assert.equal(assertMeetingPlatformHandoffReadiness('google-meet', {
   env: productionEnv,
   target: 'production',
 }).production_ready, true);
+
+const brokenCandidateObservation = buildMeetingPlatformHandoffReadiness('google-meet', {
+  evidencePackage: googlePackage,
+}, {
+  baseUrl,
+  env: productionEnv,
+  target: 'production',
+  candidateObservation: {
+    runtime_event_action: 'observe_meeting_app',
+  },
+});
+assert.equal(brokenCandidateObservation.status, 'needs_candidate_observation_contract');
+assert.equal(brokenCandidateObservation.handoff_ready, false);
+assert.equal(brokenCandidateObservation.candidate_observation_ready, false);
+assert.equal(brokenCandidateObservation.missing.candidate_observation_issue_codes.includes('invalid_runtime_event_action'), true);
+assert.equal(brokenCandidateObservation.next_actions.includes('verify_candidate_observation_before_host_handoff'), true);
+assert.throws(
+  () => assertMeetingPlatformHandoffReadiness('google-meet', {
+    evidencePackage: googlePackage,
+  }, {
+    baseUrl,
+    env: productionEnv,
+    target: 'production',
+    candidateObservation: {
+      runtime_event_action: 'observe_meeting_app',
+    },
+  }),
+  (error) => error.name === 'MeetingTimelineSdkError'
+    && error.details.status === 'needs_candidate_observation_contract',
+);
 
 const matrix = buildMeetingPlatformHandoffReadinessMatrix({
   platforms: ['google-meet', 'zoom'],
@@ -149,8 +185,10 @@ assert.equal(matrix.schema, 'meeting_platform_handoff_readiness_matrix');
 assert.equal(matrix.platform_count, 2);
 assert.equal(matrix.handoff_ready_count, 2);
 assert.equal(matrix.production_ready_count, 2);
+assert.equal(matrix.candidate_observer_count, 2);
 assert.equal(matrix.provider_setup_needed_count, 0);
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').production_ready, true);
+assert.equal(matrix.rows.find((row) => row.platform === 'zoom').candidate_observation_ready, true);
 assert.equal(assertMeetingPlatformHandoffReadinessMatrix({
   platforms: ['google-meet'],
   google_meet: {

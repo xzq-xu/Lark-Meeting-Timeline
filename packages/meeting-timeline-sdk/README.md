@@ -610,7 +610,7 @@ npm run meeting-platform:field-intake -- \
 
 这一步输出的是“采样前执行单”，不是生产验收；最终仍要跑 `meeting-platform:real-intake` 或 `platform-live-adapter` readiness。
 
-给其他项目交付时，建议在 evidence package 生成后再跑一层 `platform-handoff-readiness`。它把 adapter contract、provider connection、DOM 诊断、field intake、real-intake gate 和 live adapter readiness 合成一个状态：`needs_local_observer_evidence`、`pilot_ready_provider_setup_pending`、`pilot_ready_provider_reconcile_pending` 或 `production_ready`。这个对象适合给宿主项目做接入面板：它不要求读完整 runbook，但能直接回答“Google Meet / Teams / Zoom / Webex / Lark 现在能不能接入，缺什么，下一条命令是什么”。
+给其他项目交付时，建议在 evidence package 生成后再跑一层 `platform-handoff-readiness`。它把 adapter contract、provider connection、candidate observation、DOM 诊断、field intake、real-intake gate 和 live adapter readiness 合成一个状态：`needs_candidate_observation_contract`、`needs_local_observer_evidence`、`pilot_ready_provider_setup_pending`、`pilot_ready_provider_reconcile_pending` 或 `production_ready`。这个对象适合给宿主项目做接入面板：它不要求读完整 runbook，但能直接回答“Google Meet / Teams / Zoom / Webex / Lark 现在能不能接入，缺什么，下一条命令是什么”。其中 `candidate_observation_ready` 是硬门槛：必须能通过 `meeting_timeline.observe_candidates` / `observe_platform_candidates` / `/api/meeting-platform/observe-candidates` 把当前会议窗口候选送进 host，才能声明 handoff ready；provider event 和 transcript 仍然只做回填或会后处理。
 
 ```js
 import {
@@ -629,7 +629,7 @@ const matrix = buildMeetingPlatformHandoffReadinessMatrix({
 });
 
 // matrix.rows 每行都有 handoff_ready / pilot_ready / production_ready，
-// 以及 provider_missing_env、dom_record_count、next_actions。
+// 以及 candidate_observation_ready、provider_missing_env、dom_record_count、next_actions。
 ```
 
 CLI 入口：
@@ -2281,7 +2281,7 @@ evidence.addMeetingAppRecord(endedSnapshotRecord);
 const handoff = evidence.exportPackage();
 ```
 
-如果要把会议时间轴能力交给另一个项目接入，优先生成 `platform-live-adapter` 的 handoff bundle。它不是一份纯文档，而是机器可读的接入契约：包含 SDK import、宿主必须提供的输入、实时标注时间字段、证据路径、CI 命令、单平台 readiness 和多平台矩阵。
+如果要把会议时间轴能力交给另一个项目接入，优先生成 `platform-live-adapter` 的 handoff bundle。它不是一份纯文档，而是机器可读的接入契约：包含 SDK import、宿主必须提供的输入、候选会议观察合同、实时标注时间字段、证据路径、CI 命令、单平台 readiness 和多平台矩阵。
 
 ```js
 import {
@@ -2295,6 +2295,7 @@ const googleHandoff = buildMeetingPlatformLiveAdapterHandoff('google-meet', {
 });
 
 // googleHandoff.host_contract.annotation_timestamp_field === 'captured_at_ms'
+// googleHandoff.candidate_observation_contract.runtime_event_action === 'observe_platform_candidates'
 // googleHandoff.commands.validate_live_readiness === 'npm run meeting-platform:live-readiness'
 // googleHandoff.evidence_paths.evidence_package 指向可复验的 provider + DOM 证据包。
 
@@ -2304,6 +2305,7 @@ const bundle = buildMeetingPlatformLiveAdapterHandoffBundle({
 });
 
 // bundle.handoffs 可以直接交给外部项目生成接入 checklist。
+// bundle.candidate_observer_count 必须等于 bundle.platform_count。
 // bundle.readiness_matrix 可以作为 CI gate，保证实时标注不依赖会后转写或 provider 事件。
 ```
 

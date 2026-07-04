@@ -10,6 +10,11 @@ import {
 import { buildMeetingPlatformRealtimeAnnotation } from './platform-realtime-annotation.mjs';
 import { buildMeetingPlatformAdaptationRunbook } from './platform-rollout.mjs';
 import { buildMeetingPlatformAdaptationStrategy } from './platform-strategy.mjs';
+import { MEETING_APP_EXTENSION_MESSAGE_TYPES } from './meeting-app-extension.mjs';
+import {
+  MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT,
+  buildMeetingPlatformRuntimeEventPlan,
+} from './platform-runtime-event.mjs';
 
 export const MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA = 'meeting_platform_live_adapter';
 export const MEETING_PLATFORM_LIVE_ADAPTER_SCHEMA_VERSION = 1;
@@ -19,6 +24,7 @@ export const MEETING_PLATFORM_LIVE_ADAPTER_READINESS_SCHEMA = 'meeting_platform_
 export const MEETING_PLATFORM_LIVE_ADAPTER_READINESS_MATRIX_SCHEMA = 'meeting_platform_live_adapter_readiness_matrix';
 export const MEETING_PLATFORM_LIVE_ADAPTER_HANDOFF_SCHEMA = 'meeting_platform_live_adapter_handoff';
 export const MEETING_PLATFORM_LIVE_ADAPTER_HANDOFF_BUNDLE_SCHEMA = 'meeting_platform_live_adapter_handoff_bundle';
+export const MEETING_PLATFORM_CANDIDATE_OBSERVATION_ENDPOINT = '/api/meeting-platform/observe-candidates';
 export const MEETING_PLATFORM_LIVE_ADAPTER_REQUIRED_METHODS = Object.freeze([
   'observeMeetingApp',
   'ingestProvider',
@@ -397,7 +403,7 @@ function liveAdapterEvidencePaths(platform) {
   };
 }
 
-function hostContract(plan = {}) {
+function hostContract(plan = {}, candidateObservation = {}) {
   return {
     annotation_timestamp_field: plan.live_adapter?.timestamp_field ?? 'captured_at_ms',
     realtime_source_order: plan.source_priority ?? [],
@@ -407,7 +413,99 @@ function hostContract(plan = {}) {
     must_keep_annotations_per_meeting: true,
     must_use_absolute_capture_time_ms: true,
     can_insert_before_provider_event: plan.realtime_axis?.provider_events_block_realtime === false,
+    candidate_observation_required_for_host_axis_binding: true,
+    candidate_observation_message_type: candidateObservation.message_type,
+    candidate_observation_runtime_action: candidateObservation.runtime_event_action,
+    candidate_observation_runtime_event_endpoint: candidateObservation.runtime_event_endpoint,
+    candidate_observation_endpoint: candidateObservation.endpoint,
+    candidate_observation_required_permission: candidateObservation.required_permission,
+    candidate_observation: compactObject({
+      ready: candidateObservation.ready,
+      message_type: candidateObservation.message_type,
+      runtime_event_action: candidateObservation.runtime_event_action,
+      runtime_event_endpoint: candidateObservation.runtime_event_endpoint,
+      endpoint: candidateObservation.endpoint,
+      required_permission: candidateObservation.required_permission,
+      runtime_event_client_method: candidateObservation.runtime_event_client_method,
+    }),
   };
+}
+
+function candidateObservationOverride(options = {}) {
+  return firstNonEmpty(
+    options.candidateObservation,
+    options.candidate_observation,
+    options.candidateObserver,
+    options.candidate_observer,
+    {},
+  ) ?? {};
+}
+
+function buildCandidateObservationContract(platform, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  const runtimeEventPlan = buildMeetingPlatformRuntimeEventPlan(key, options);
+  const override = candidateObservationOverride(options);
+  const action = firstNonEmpty(
+    override.runtime_event_action,
+    override.runtimeEventAction,
+    override.action,
+    'observe_platform_candidates',
+  );
+  const messageType = firstNonEmpty(
+    override.message_type,
+    override.messageType,
+    MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+  );
+  const requiredPermission = firstNonEmpty(
+    override.required_permission,
+    override.requiredPermission,
+    override.permission,
+    'tabs',
+  );
+  const endpoint = firstNonEmpty(
+    override.endpoint,
+    MEETING_PLATFORM_CANDIDATE_OBSERVATION_ENDPOINT,
+  );
+  const runtimeEventEndpoint = firstNonEmpty(
+    override.runtime_event_endpoint,
+    override.runtimeEventEndpoint,
+    runtimeEventPlan.endpoint,
+    MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT,
+  );
+  const clientMethod = firstNonEmpty(
+    override.runtime_event_client_method,
+    override.runtimeEventClientMethod,
+    override.client_method,
+    override.clientMethod,
+    'observePlatformCandidates',
+  );
+  const actionSupported = runtimeEventPlan.supported_actions?.includes?.('observe_platform_candidates')
+    || runtimeEventPlan.actions?.some?.((row) => row.action === 'observe_platform_candidates');
+  const issues = [
+    action !== 'observe_platform_candidates' ? 'invalid_runtime_event_action' : undefined,
+    messageType !== MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates ? 'invalid_message_type' : undefined,
+    requiredPermission !== 'tabs' ? 'missing_tabs_permission' : undefined,
+    endpoint !== MEETING_PLATFORM_CANDIDATE_OBSERVATION_ENDPOINT ? 'invalid_candidate_observation_endpoint' : undefined,
+    runtimeEventEndpoint !== runtimeEventPlan.endpoint ? 'invalid_runtime_event_endpoint' : undefined,
+    clientMethod !== 'observePlatformCandidates' ? 'invalid_runtime_event_client_method' : undefined,
+    actionSupported !== true ? 'runtime_event_plan_missing_candidate_action' : undefined,
+  ].filter(Boolean);
+  return compactObject({
+    type: 'meeting_platform_candidate_observation_contract',
+    platform: key,
+    ready: issues.length === 0,
+    message_type: messageType,
+    required_permission: requiredPermission,
+    runtime_event_action: action,
+    runtime_event_endpoint: runtimeEventEndpoint,
+    endpoint,
+    producer: firstNonEmpty(override.producer, 'browser_extension_background_or_native_host'),
+    runtime_event_client_method: clientMethod,
+    required_snapshot_fields: ['url', 'title', 'active', 'captured_at_ms'],
+    action_supported: actionSupported,
+    runtime_event_plan_schema: runtimeEventPlan.schema,
+    issues,
+  });
 }
 
 function selectedEvidencePackage(platform, options = {}) {
@@ -577,6 +675,7 @@ export function buildMeetingPlatformLiveAdapterReadiness(platform, options = {})
   });
   const rollout = verification?.verified_package?.rollout_plan ?? strategy.rollout_plan ?? {};
   const plan = planWithRollout(buildMeetingPlatformLiveAdapterPlan(key, options), rollout);
+  const candidateObservation = buildCandidateObservationContract(key, options);
   const requiredMethods = asArray(firstNonEmpty(options.requiredMethods, options.required_methods, MEETING_PLATFORM_LIVE_ADAPTER_REQUIRED_METHODS));
   const checks = [
     check(
@@ -602,6 +701,20 @@ export function buildMeetingPlatformLiveAdapterReadiness(platform, options = {})
       plan.realtime_axis?.provider_events_block_realtime === false,
       'error',
       'Provider events must not block realtime annotation insertion.',
+    ),
+    check(
+      'candidate_observation_contract_ready',
+      candidateObservation.ready === true,
+      'error',
+      'Host handoff must expose candidate observation so active meeting windows can create and maintain current axes.',
+      {
+        message_type: candidateObservation.message_type,
+        required_permission: candidateObservation.required_permission,
+        runtime_event_action: candidateObservation.runtime_event_action,
+        endpoint: candidateObservation.endpoint,
+        runtime_event_endpoint: candidateObservation.runtime_event_endpoint,
+        issues: candidateObservation.issues,
+      },
     ),
     check(
       'post_meeting_transcript_non_blocking',
@@ -654,6 +767,8 @@ export function buildMeetingPlatformLiveAdapterReadiness(platform, options = {})
     passed: blockingChecks.length === 0,
     ready_for_realtime_annotations: plan.ready_for_realtime_annotations,
     production_ready: plan.production_ready,
+    candidate_observation_ready: candidateObservation.ready === true,
+    candidate_observation: candidateObservation,
     rollout_status: plan.rollout_status,
     recommended_mode: plan.recommended_mode,
     blocking_count: blockingChecks.length,
@@ -685,6 +800,7 @@ export function buildMeetingPlatformLiveAdapterReadinessMatrix(options = {}) {
     blocked_count: rows.filter((row) => row.status === 'blocked').length,
     realtime_ready_count: rows.filter((row) => row.ready_for_realtime_annotations).length,
     production_ready_count: rows.filter((row) => row.production_ready).length,
+    candidate_observer_count: rows.filter((row) => row.candidate_observation_ready).length,
     platforms: rows.map((row) => row.platform),
     rows: rows.map((row) => ({
       platform: row.platform,
@@ -695,6 +811,10 @@ export function buildMeetingPlatformLiveAdapterReadinessMatrix(options = {}) {
       rollout_status: row.rollout_status,
       ready_for_realtime_annotations: row.ready_for_realtime_annotations,
       production_ready: row.production_ready,
+      candidate_observation_ready: row.candidate_observation_ready,
+      candidate_observer_message_type: row.candidate_observation?.message_type,
+      candidate_observer_permission: row.candidate_observation?.required_permission,
+      candidate_observer_endpoint: row.candidate_observation?.endpoint,
       blocking_count: row.blocking_count,
       warning_count: row.warning_count,
       next_actions: row.next_actions,
@@ -746,6 +866,7 @@ export function buildMeetingPlatformLiveAdapterHandoff(platform, options = {}) {
   const key = normalizeMeetingPlatform(platform);
   const plan = buildMeetingPlatformLiveAdapterPlan(key, options);
   const readiness = buildMeetingPlatformLiveAdapterReadiness(key, options);
+  const candidateObservation = readiness.candidate_observation ?? buildCandidateObservationContract(key, options);
   const integration = buildPlatformIntegrationPlan(key, options);
   const runbook = buildMeetingPlatformAdaptationRunbook(key, options);
   return compactObject({
@@ -761,12 +882,15 @@ export function buildMeetingPlatformLiveAdapterHandoff(platform, options = {}) {
     recommended_mode: plan.recommended_mode,
     production_ready: readiness.production_ready,
     ready_for_realtime_annotations: readiness.ready_for_realtime_annotations,
+    candidate_observation_ready: candidateObservation.ready === true,
+    candidate_observation_contract: candidateObservation,
     sdk: liveAdapterSdkContract(),
-    host_contract: hostContract(plan),
+    host_contract: hostContract(plan, candidateObservation),
     commands: liveAdapterCommands(key),
     evidence_paths: liveAdapterEvidencePaths(key),
     required_host_inputs: [
       'timeline client implementing startMeeting/endMeeting/insertMark/insertMarks/importTranscript',
+      'candidate meeting window snapshots delivered through meeting_timeline.observe_candidates or observe_platform_candidates',
       'local meeting app observer snapshots with captured_at_ms',
       'annotation packets with captured_at_ms from the writing device or host app',
       'provider webhook records for later reconcile when the platform exposes them',
@@ -774,6 +898,7 @@ export function buildMeetingPlatformLiveAdapterHandoff(platform, options = {}) {
     ],
     realtime_flow: [
       'observe local meeting app state',
+      'observe active meeting window candidates before relying on provider events',
       'create or update the current meeting axis immediately',
       'insert annotation marks with captured_at_ms onto the active axis',
       'ingest provider events asynchronously for reconciliation',
@@ -822,6 +947,7 @@ export function buildMeetingPlatformLiveAdapterHandoffBundle(options = {}) {
     blocked_count: readinessMatrix.blocked_count,
     realtime_ready_count: readinessMatrix.realtime_ready_count,
     production_ready_count: readinessMatrix.production_ready_count,
+    candidate_observer_count: readinessMatrix.candidate_observer_count,
     platforms,
     sdk: liveAdapterSdkContract(),
     commands: {
@@ -843,6 +969,10 @@ export function buildMeetingPlatformLiveAdapterHandoffBundle(options = {}) {
       transcript_blocks_realtime: false,
       per_meeting_annotation_isolation_required: true,
       realtime_marks_do_not_wait_for_transcript: true,
+      candidate_observation_required_for_host_axis_binding: true,
+      candidate_observation_endpoint: MEETING_PLATFORM_CANDIDATE_OBSERVATION_ENDPOINT,
+      candidate_observation_message_type: MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+      candidate_observation_runtime_action: 'observe_platform_candidates',
     },
     rows: handoffs.map((handoff) => ({
       platform: handoff.platform,
@@ -853,6 +983,10 @@ export function buildMeetingPlatformLiveAdapterHandoffBundle(options = {}) {
       recommended_mode: handoff.recommended_mode,
       ready_for_realtime_annotations: handoff.ready_for_realtime_annotations,
       production_ready: handoff.production_ready,
+      candidate_observation_ready: handoff.candidate_observation_ready,
+      candidate_observer_message_type: handoff.candidate_observation_contract?.message_type,
+      candidate_observer_permission: handoff.candidate_observation_contract?.required_permission,
+      candidate_observer_endpoint: handoff.candidate_observation_contract?.endpoint,
       next_actions: handoff.next_actions,
     })),
     handoffs,

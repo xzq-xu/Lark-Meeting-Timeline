@@ -31,6 +31,7 @@ export const MEETING_PLATFORM_LIVE_ADAPTER_READINESS_SCHEMA: string;
 export const MEETING_PLATFORM_LIVE_ADAPTER_READINESS_MATRIX_SCHEMA: string;
 export const MEETING_PLATFORM_LIVE_ADAPTER_HANDOFF_SCHEMA: string;
 export const MEETING_PLATFORM_LIVE_ADAPTER_HANDOFF_BUNDLE_SCHEMA: string;
+export const MEETING_PLATFORM_CANDIDATE_OBSERVATION_ENDPOINT: '/api/meeting-platform/observe-candidates';
 export const MEETING_PLATFORM_LIVE_ADAPTER_REQUIRED_METHODS: readonly string[];
 
 export interface MeetingPlatformLiveAdapterOptions extends MeetingSourceAggregatorOptions, MeetingPlatformEvidenceSessionOptions, MeetingPlatformEvidencePackageOptions {
@@ -66,6 +67,10 @@ export interface MeetingPlatformLiveAdapterReadinessOptions extends MeetingPlatf
   required_methods?: Iterable<string> | string[];
   adapterOptions?: MeetingPlatformLiveAdapterOptions;
   adapter_options?: MeetingPlatformLiveAdapterOptions;
+  candidateObservation?: Record<string, unknown>;
+  candidate_observation?: Record<string, unknown>;
+  candidateObserver?: Record<string, unknown>;
+  candidate_observer?: Record<string, unknown>;
 }
 
 export interface MeetingPlatformLiveAdapterResult<T = unknown> {
@@ -172,6 +177,8 @@ export interface MeetingPlatformLiveAdapterReadiness {
   passed: boolean;
   ready_for_realtime_annotations: boolean;
   production_ready: boolean;
+  candidate_observation_ready: boolean;
+  candidate_observation: Record<string, unknown>;
   rollout_status?: string;
   recommended_mode?: string;
   blocking_count: number;
@@ -195,6 +202,7 @@ export interface MeetingPlatformLiveAdapterReadinessMatrix {
   blocked_count: number;
   realtime_ready_count: number;
   production_ready_count: number;
+  candidate_observer_count: number;
   platforms: string[];
   rows: Record<string, unknown>[];
   reports: MeetingPlatformLiveAdapterReadiness[];
@@ -213,6 +221,8 @@ export interface MeetingPlatformLiveAdapterHandoff {
   recommended_mode?: string;
   production_ready: boolean;
   ready_for_realtime_annotations: boolean;
+  candidate_observation_ready: boolean;
+  candidate_observation_contract: Record<string, unknown>;
   sdk: Record<string, unknown>;
   host_contract: Record<string, unknown>;
   commands: Record<string, string>;
@@ -237,6 +247,7 @@ export interface MeetingPlatformLiveAdapterHandoffBundle {
   blocked_count: number;
   realtime_ready_count: number;
   production_ready_count: number;
+  candidate_observer_count: number;
   platforms: string[];
   sdk: Record<string, unknown>;
   commands: Record<string, string>;
