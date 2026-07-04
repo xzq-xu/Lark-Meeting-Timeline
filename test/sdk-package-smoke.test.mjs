@@ -320,6 +320,13 @@ assert.equal(resolveMeetingPlatformCandidates({
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],
 }).selected_resolution.platform, 'google_meet');
+assert.equal((await integrationRuntime.observePlatformCandidates({
+  windows: [{
+    tabs: [{ active: true, url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet' }],
+  }],
+}, {
+  observedAtMs: 1_782_614_400_000,
+})).signals[0].type, 'meeting_started');
 assert.equal(createMeetingPlatformIntegrationBrowserRuntime(client, {
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],

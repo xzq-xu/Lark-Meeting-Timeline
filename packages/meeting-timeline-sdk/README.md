@@ -204,6 +204,13 @@ const candidateResolution = runtime.resolvePlatformCandidates({
 });
 // candidateResolution.selected_resolution.platform === 'google_meet'
 
+await runtime.observePlatformCandidates({
+  windows: [{
+    tabs: [{ url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet', active: true }],
+  }],
+});
+// observes the selected supported platform and emits meeting_started / meeting_ended signals.
+
 await runtime.observeMeetingApp('google-meet', domSnapshot);
 await runtime.ingestProvider('google-meet', workspaceEvent);
 await runtime.insertAnnotation('google-meet', {
@@ -2399,6 +2406,7 @@ assertMeetingPlatformHostIntegrationScaffold(scaffold);
 // host.adaptationStrategyMatrix() 和 /api/meeting-platform/strategy 可给宿主先做平台适配决策。
 // host.resolvePlatform(input) 和 /api/meeting-platform/resolve 可用会议 URL/window/title 判断当前应启用哪个平台适配器。
 // host.resolvePlatformCandidates(input) 和 /api/meeting-platform/resolve-candidates 可从多窗口/多标签页快照中选择当前会议。
+// host.observePlatformCandidates(input) 和 /api/meeting-platform/observe-candidates 可把当前会议出现/消失写成实时轴事件。
 // host.integrationRuntimeSummary() 和 /api/meeting-platform/integration-runtime 可给宿主接入面板读取。
 // host.integrationRuntimeManifest() 和 /api/meeting-platform/integration-runtime/manifest 可给 CI/handoff gate 读取。
 // /api/meeting-platform/runtime-events 可让扩展/WebView/native host 统一投递 observe/insert/provider 事件。

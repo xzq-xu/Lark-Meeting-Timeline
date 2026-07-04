@@ -96,6 +96,7 @@ function rowForPlatform(matrix = {}, platform) {
 }
 
 function meetingKey(value = {}) {
+  if (!value || typeof value !== 'object') return '';
   return [
     value.platform ?? value.meeting?.platform,
     value.meeting_id ?? value.meetingId ?? value.meeting?.meeting_id ?? value.meeting?.meetingId,
@@ -292,6 +293,10 @@ function emptyObservationResult(reason, details = {}) {
     },
     ...details,
   };
+}
+
+function flattenedObservationRows(platformResults = [], field) {
+  return platformResults.flatMap((row) => asArray(row.result?.[field]));
 }
 
 export function detectMeetingPlatformForBrowser(input = {}, options = {}) {
@@ -610,6 +615,57 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
         platforms: resolveOptions.platforms ?? resolveOptions.platform_keys ?? platforms,
       }));
     },
+    async observePlatformCandidates(input = {}, observeOptions = {}) {
+      const resolution = runtime.resolvePlatformCandidates(input, observeOptions);
+      const candidateRows = asArray(resolution.candidates);
+      const platformResults = [];
+      for (const platform of platforms) {
+        const platformCandidates = candidateRows
+          .filter((row) => row.supported === true && row.platform === platform)
+          .map((row) => row.candidate);
+        const result = await adapter(platform, observeOptions.adapterOptions ?? observeOptions.adapter_options ?? {})
+          .observeLocalCandidates(platformCandidates, {
+            ...observeOptions,
+            source: observeOptions.source ?? 'platform_candidate_observer',
+          });
+        platformResults.push(compactObject({
+          platform,
+          candidate_count: platformCandidates.length,
+          selected: resolution.platform === platform,
+          result,
+        }));
+      }
+      const signals = flattenedObservationRows(platformResults, 'signals');
+      const rawSignals = flattenedObservationRows(platformResults, 'rawSignals');
+      const appliedResults = flattenedObservationRows(platformResults, 'results');
+      const selectedResult = platformResults.find((row) => row.selected) ?? null;
+      return compactObject({
+        type: 'meeting_platform_candidate_observation',
+        action: 'observe_platform_candidates',
+        source: 'platform_candidates',
+        platform: resolution.platform,
+        supported: resolution.supported,
+        detected: resolution.detected,
+        selected_candidate: resolution.selected_candidate,
+        selected_resolution: resolution.selected_resolution,
+        platform_candidate_resolution: resolution,
+        signals,
+        rawSignals,
+        raw_signals: rawSignals,
+        results: appliedResults,
+        platform_results: platformResults,
+        selected_result: selectedResult?.result,
+        diagnostic: {
+          source: 'platform_candidates',
+          platform_count: platforms.length,
+          candidate_count: resolution.candidate_count,
+          supported_candidate_count: resolution.supported_candidate_count,
+          raw_signal_count: rawSignals.length,
+          applied_signal_count: signals.length,
+          result_count: appliedResults.length,
+        },
+      });
+    },
     readiness(readinessOptions = {}) {
       return suite.readinessMatrix({
         ...readinessOptions,
@@ -661,6 +717,7 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
       if (['strategy', 'adaptation_strategy', 'adaptation_strategy_matrix'].includes(action)) return runtime.adaptationStrategyMatrix(eventOptions);
       if (['resolve', 'resolve_platform', 'platform_resolution'].includes(action)) return runtime.resolvePlatform(eventInput, eventOptions);
       if (['resolve_candidates', 'resolve_platform_candidates', 'platform_candidate_resolution'].includes(action)) return runtime.resolvePlatformCandidates(eventInput, eventOptions);
+      if (['observe_candidates', 'observe_platform_candidates', 'observe_meeting_environment', 'meeting_environment_snapshot'].includes(action)) return runtime.observePlatformCandidates(eventInput, eventOptions);
       if (['readiness', 'live_readiness'].includes(action)) return runtime.readiness(eventOptions);
       if (['handoff_readiness'].includes(action)) return runtime.handoffReadiness(eventOptions);
       const platform = platformFrom(eventInput, eventOptions);
@@ -695,6 +752,7 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
           'adaptation_strategy_matrix',
           'resolve_platform',
           'resolve_platform_candidates',
+          'observe_platform_candidates',
           'registry',
           'manifest',
           'readiness',
@@ -861,6 +919,13 @@ export function createMeetingPlatformIntegrationBrowserRuntime(clientOrOptions, 
         ...options,
         ...baseInputOptions,
         ...resolveOptions,
+      });
+    },
+    observePlatformCandidates(input = {}, observeOptions = {}) {
+      return integrationRuntime.observePlatformCandidates(input, {
+        ...options,
+        ...baseInputOptions,
+        ...observeOptions,
       });
     },
     platformFor,

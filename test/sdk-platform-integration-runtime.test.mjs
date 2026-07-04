@@ -253,6 +253,36 @@ assert.equal(runtimeResolution.strategy.provider_blocks_realtime, false);
 assert.equal(runtime.adaptationPackages().sdk_wiring_ready_count, 2);
 assert.equal(runtime.adapter('google-meet').platform, 'google_meet');
 
+const candidateObservation = await runtime.observePlatformCandidates({
+  windows: [{
+    id: 'runtime-browser-window',
+    focused: true,
+    tabs: [{
+      id: 'meet-tab',
+      active: true,
+      url: 'https://meet.google.com/abc-defg-hij',
+      title: 'Design review - Google Meet',
+    }],
+  }],
+}, { observedAtMs: 1_782_614_399_000 });
+assert.equal(candidateObservation.type, 'meeting_platform_candidate_observation');
+assert.equal(candidateObservation.platform, 'google_meet');
+assert.equal(candidateObservation.signals[0].type, 'meeting_started');
+assert.equal(candidateObservation.selected_candidate.meeting_id, 'abc-defg-hij');
+assert.equal(candidateObservation.diagnostic.platform_count, 2);
+assert.equal(calls.some((call) => call.method === 'startMeeting' && call.input.meeting_id === 'abc-defg-hij'), true);
+
+const candidateEndObservation = await runtime.observePlatformCandidates({
+  windows: [{
+    id: 'runtime-browser-window',
+    focused: true,
+    tabs: [{ id: 'mail-tab', active: true, url: 'https://mail.google.com', title: 'Inbox' }],
+  }],
+}, { observedAtMs: 1_782_614_399_500 });
+assert.equal(candidateEndObservation.detected, false);
+assert.equal(candidateEndObservation.signals[0].type, 'meeting_ended');
+assert.equal(calls.some((call) => call.method === 'endMeeting' && call.input.meeting_id === 'abc-defg-hij'), true);
+
 const googleSnapshot = buildMeetingAppFixtureSnapshot('google-meet', {
   state: 'active',
   observedAtMs: 1_782_614_400_000,
@@ -368,6 +398,12 @@ assert.equal((await runtime.handleEvent({
     tabs: [{ active: true, url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet' }],
   }],
 })).selected_resolution.platform, 'google_meet');
+assert.equal((await runtime.handleEvent({
+  action: 'observe_platform_candidates',
+  windows: [{
+    tabs: [{ active: true, url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet' }],
+  }],
+}, undefined, { observedAtMs: 1_782_614_399_750 })).platform, 'google_meet');
 assert.equal((await runtime.handleEvent({ action: 'manifest' })).host_integration_ready, true);
 await assert.rejects(
   () => runtime.handleEvent({ action: 'insert_annotation' }),
@@ -386,6 +422,11 @@ const browserRuntime = createMeetingPlatformIntegrationBrowserRuntime(client, {
 });
 assert.equal(browserRuntime.detect().platform, 'google_meet');
 assert.equal(browserRuntime.resolvePlatform().platform, 'google_meet');
+assert.equal((await browserRuntime.observePlatformCandidates({
+  windows: [{
+    tabs: [{ active: true, url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet' }],
+  }],
+}, { observedAtMs: browserStartMs - 1_000 })).platform, 'google_meet');
 assert.equal(browserRuntime.platformFor(), 'google_meet');
 const browserSample = await browserRuntime.sample();
 assert.equal(browserSample.emitted, true);

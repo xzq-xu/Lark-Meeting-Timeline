@@ -158,6 +158,30 @@ export interface MeetingPlatformCandidateResolution {
   selection: MeetingSessionSelection;
 }
 
+export interface MeetingPlatformCandidateObservation {
+  type: 'meeting_platform_candidate_observation';
+  action: 'observe_platform_candidates';
+  source: 'platform_candidates';
+  platform?: string;
+  supported: boolean;
+  detected: boolean;
+  selected_candidate?: MeetingPlatformCandidateResolutionRow;
+  selected_resolution?: MeetingPlatformResolution;
+  platform_candidate_resolution: MeetingPlatformCandidateResolution;
+  signals: Array<Record<string, unknown>>;
+  rawSignals: Array<Record<string, unknown>>;
+  raw_signals: Array<Record<string, unknown>>;
+  results: Array<Record<string, unknown>>;
+  platform_results: Array<{
+    platform: string;
+    candidate_count: number;
+    selected?: boolean;
+    result: Record<string, unknown>;
+  }>;
+  selected_result?: Record<string, unknown>;
+  diagnostic: Record<string, unknown>;
+}
+
 export interface MeetingPlatformIntegrationRuntime {
   type: 'meeting_platform_integration_runtime';
   schema: typeof MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA;
@@ -184,6 +208,10 @@ export interface MeetingPlatformIntegrationRuntime {
     input?: MeetingSessionEnvironmentSnapshot | MeetingSessionDiscoverySnapshot[] | Record<string, unknown>,
     resolveOptions?: Record<string, unknown>,
   ): MeetingPlatformCandidateResolution;
+  observePlatformCandidates(
+    input?: MeetingSessionEnvironmentSnapshot | MeetingSessionDiscoverySnapshot[] | Record<string, unknown>,
+    observeOptions?: Record<string, unknown>,
+  ): Promise<MeetingPlatformCandidateObservation>;
   readiness(readinessOptions?: Record<string, unknown>): Record<string, unknown>;
   handoffReadiness(readinessOptions?: Record<string, unknown>): Record<string, unknown>;
   observeMeetingApp(platform: string, snapshot?: Record<string, unknown>, observeOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -212,6 +240,10 @@ export interface MeetingPlatformIntegrationBrowserRuntime {
     input?: MeetingSessionEnvironmentSnapshot | MeetingSessionDiscoverySnapshot[] | Record<string, unknown>,
     resolveOptions?: Record<string, unknown>,
   ): MeetingPlatformCandidateResolution;
+  observePlatformCandidates(
+    input?: MeetingSessionEnvironmentSnapshot | MeetingSessionDiscoverySnapshot[] | Record<string, unknown>,
+    observeOptions?: Record<string, unknown>,
+  ): Promise<MeetingPlatformCandidateObservation>;
   platformFor(input?: Record<string, unknown>, platformOptions?: Record<string, unknown>): string;
   sample(sampleOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
   tick(sampleOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;

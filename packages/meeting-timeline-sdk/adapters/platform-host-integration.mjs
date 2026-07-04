@@ -173,6 +173,12 @@ export function createMeetingPlatformHost(options = {}) {
         platforms: resolveOptions.platforms ?? resolveOptions.platform_keys ?? platforms,
       });
     },
+    observePlatformCandidates(input = {}, observeOptions = {}) {
+      return integrationRuntime.observePlatformCandidates(input, {
+        ...observeOptions,
+        platforms: observeOptions.platforms ?? observeOptions.platform_keys ?? platforms,
+      });
+    },
     runtimeBundle(platform, bundleOptions = {}) {
       return kit.platformRuntimeBundle(platform, bundleOptions);
     },
@@ -271,6 +277,11 @@ function routesSource(options = {}) {
     const payload = await request.json();
     return Response.json(host.resolvePlatformCandidates(payload, options));
   }
+  if (url.pathname === '/api/meeting-platform/observe-candidates' && request.method === 'POST') {
+    const payload = await request.json();
+    const result = await host.observePlatformCandidates(payload, options);
+    return Response.json(result);
+  }
   if (url.pathname === '/api/meeting-platform/extension-plan') {
     return Response.json(host.extensionInstallPlan(options));
   }
@@ -332,6 +343,11 @@ const candidateResolution = host.resolvePlatformCandidates({
     tabs: [{ url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet', active: true }],
   }],
 });
+const candidateObservation = await host.observePlatformCandidates({
+  windows: [{
+    tabs: [{ url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet', active: true }],
+  }],
+});
 const runtimeBundles = host.runtimeBundles();
 const runtimeEventPlans = host.runtimeEventPlans();
 const extensionPlan = host.extensionInstallPlan();
@@ -352,6 +368,7 @@ npm run meeting-platform:runtime-bundles
 npm run meeting-platform:runtime-event-plans
 npm run meeting-platform:resolve
 npm run meeting-platform:resolve-candidates
+npm run meeting-platform:observe-candidates
 npm run meeting-platform:extension-plan
 npm run meeting-platform:integration-runtime
 npm run meeting-platform:integration-runtime-manifest
@@ -438,6 +455,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       strategy: '/api/meeting-platform/strategy',
       platform_resolution: '/api/meeting-platform/resolve',
       platform_candidate_resolution: '/api/meeting-platform/resolve-candidates',
+      platform_candidate_observation: '/api/meeting-platform/observe-candidates',
       extension_plan: '/api/meeting-platform/extension-plan',
       integration_runtime: '/api/meeting-platform/integration-runtime',
       integration_runtime_manifest: '/api/meeting-platform/integration-runtime/manifest',
@@ -484,6 +502,7 @@ export function buildMeetingPlatformHostIntegrationScaffold(options = {}) {
       'meeting-platform:extension-plan': 'node ./scripts/print-extension-plan.mjs',
       'meeting-platform:resolve': 'node ./scripts/resolve-platform.mjs',
       'meeting-platform:resolve-candidates': 'node ./scripts/resolve-platform-candidates.mjs',
+      'meeting-platform:observe-candidates': 'node ./scripts/observe-platform-candidates.mjs',
       'meeting-platform:integration-runtime': 'node ./scripts/print-integration-runtime.mjs',
       'meeting-platform:integration-runtime-manifest': 'node ./scripts/print-integration-runtime-manifest.mjs',
     },
@@ -538,6 +557,26 @@ const payload = process.env.MEETING_PLATFORM_CANDIDATES_JSON
   };
 
 console.log(JSON.stringify(host.resolvePlatformCandidates(payload), null, 2));
+`;
+  const platformCandidateObservationScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+const payload = process.env.MEETING_PLATFORM_CANDIDATES_JSON
+  ? JSON.parse(process.env.MEETING_PLATFORM_CANDIDATES_JSON)
+  : {
+    windows: [{
+      tabs: [{
+        url: process.env.MEETING_PLATFORM_URL,
+        title: process.env.MEETING_PLATFORM_TITLE,
+        active: true,
+      }],
+    }],
+  };
+
+console.log(JSON.stringify(await host.observePlatformCandidates(payload), null, 2));
 `;
   const readinessScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
 
@@ -632,6 +671,7 @@ console.log(JSON.stringify(host.integrationRuntimeManifest(), null, 2));
       sourceFile('scripts/print-extension-plan.mjs', extensionPlanScript, 'extension_plan_script', 'text/javascript'),
       sourceFile('scripts/resolve-platform.mjs', platformResolutionScript, 'platform_resolution_script', 'text/javascript'),
       sourceFile('scripts/resolve-platform-candidates.mjs', platformCandidateResolutionScript, 'platform_candidate_resolution_script', 'text/javascript'),
+      sourceFile('scripts/observe-platform-candidates.mjs', platformCandidateObservationScript, 'platform_candidate_observation_script', 'text/javascript'),
       sourceFile('scripts/print-integration-runtime.mjs', integrationRuntimeScript, 'integration_runtime_script', 'text/javascript'),
       sourceFile('scripts/print-integration-runtime-manifest.mjs', integrationRuntimeManifestScript, 'integration_runtime_manifest_script', 'text/javascript'),
       sourceFile('README.md', readmeSource(plan), 'readme', 'text/markdown'),
@@ -658,6 +698,7 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     'scripts/print-runtime-event-plans.mjs',
     'scripts/resolve-platform.mjs',
     'scripts/resolve-platform-candidates.mjs',
+    'scripts/observe-platform-candidates.mjs',
     'scripts/print-extension-plan.mjs',
     'scripts/print-integration-runtime.mjs',
     'scripts/print-integration-runtime-manifest.mjs',
@@ -704,6 +745,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!host.includes('resolvePlatformCandidates')) {
     issues.push(issue('error', 'missing_platform_candidate_resolution', 'Host source must expose platform candidate resolution for desktop/window snapshots.'));
   }
+  if (!host.includes('observePlatformCandidates')) {
+    issues.push(issue('error', 'missing_platform_candidate_observation', 'Host source must observe platform candidates and apply current-axis signals.'));
+  }
   if (!host.includes('meetingAppExtensionInstallPlan')) {
     issues.push(issue('error', 'missing_extension_install_plan', 'Host source must expose the extension install plan.'));
   }
@@ -730,6 +774,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!routes.includes('/api/meeting-platform/resolve-candidates')) {
     issues.push(issue('error', 'missing_platform_candidate_resolution_route', 'Route source must expose the platform candidate resolution endpoint.'));
+  }
+  if (!routes.includes('/api/meeting-platform/observe-candidates')) {
+    issues.push(issue('error', 'missing_platform_candidate_observation_route', 'Route source must expose the platform candidate observation endpoint.'));
   }
   if (!routes.includes('/api/meeting-platform/extension-plan')) {
     issues.push(issue('error', 'missing_extension_plan_route', 'Route source must expose the extension install plan endpoint.'));
