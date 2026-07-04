@@ -967,6 +967,26 @@ npm run meeting-platform:runtime-host-handoff
 
 默认会为 Google Meet / Teams / Zoom / Webex / Lark 生成总报告和每个平台的 handoff JSON。
 
+接入前可以用 `meeting-platform-runtime-host-verifier` 做 SDK 闭环验收。它用平台 fixture 构造一个可切换的 browser runtime 环境，驱动真实 runtime host 写入 `meeting_started`、`speaker_started` 和 `meeting_ended`，确认 timestamp 没有漂移，并且默认把 speaker track 写成标记：
+
+```js
+import { runMeetingPlatformRuntimeHostVerificationMatrix } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-runtime-host-verifier';
+
+const matrix = await runMeetingPlatformRuntimeHostVerificationMatrix({
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+// matrix.accepted_count === matrix.platform_count 表示 SDK 接入 contract 闭环通过。
+```
+
+也可以直接导出报告：
+
+```bash
+npm run meeting-platform:runtime-host-verify
+```
+
+这个验证器不替代真实会议软件的现场 evidence capture；它的作用是证明外部项目拿到 SDK 后，runtime host、browser runtime、observer scheduler、speaker marker 和 timeline client 的最小链路没有断。
+
 浏览器扩展或 WebView 里可以再往前接一层 `meeting-app-capture`。它只读取 DOM 文本、按钮、`aria-label`、participant tile、常见 `data-participant-*` / `data-user-*` / `data-person-*` 属性和音量/发言状态，输出 `meeting-apps` 可识别的快照；不截图、不 OCR、不读取转写正文：
 
 ```js

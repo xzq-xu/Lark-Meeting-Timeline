@@ -180,6 +180,12 @@ import {
   createMeetingPlatformRuntimeHost,
 } from './meeting-platform-runtime-host.mjs';
 import {
+  createMeetingPlatformRuntimeHostFixtureEnvironment,
+  createMeetingPlatformRuntimeHostVerificationClient,
+  runMeetingPlatformRuntimeHostVerification,
+  runMeetingPlatformRuntimeHostVerificationMatrix,
+} from './meeting-platform-runtime-host-verifier.mjs';
+import {
   buildMeetingPlatformRuntimeEventPlan,
   buildMeetingPlatformRuntimeEventPlanMatrix,
 } from './platform-runtime-event.mjs';
@@ -778,6 +784,18 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformRuntimeHostHandoffMatrix(handoffOptions = {}) {
       return buildMeetingPlatformRuntimeHostHandoffMatrix(withDefaults(defaults, handoffOptions));
+    },
+    createPlatformRuntimeHostVerificationClient(clientOptions = {}) {
+      return createMeetingPlatformRuntimeHostVerificationClient(withDefaults(defaults, clientOptions));
+    },
+    createPlatformRuntimeHostFixtureEnvironment(platform, envOptions = {}) {
+      return createMeetingPlatformRuntimeHostFixtureEnvironment(platform, withDefaults(defaults, envOptions));
+    },
+    async verifyPlatformRuntimeHost(platform, verifyOptions = {}) {
+      return runMeetingPlatformRuntimeHostVerification(platform, withDefaults(defaults, verifyOptions));
+    },
+    async verifyPlatformRuntimeHostMatrix(verifyOptions = {}) {
+      return runMeetingPlatformRuntimeHostVerificationMatrix(withDefaults(defaults, verifyOptions));
     },
     createPlatformRuntimeHost(clientOrRuntime = bridge.client, platformOrConfig = {}, hostOptions = {}) {
       const hostInput = typeof platformOrConfig === 'string' || platformOrConfig?.schema

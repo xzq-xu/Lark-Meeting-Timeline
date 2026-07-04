@@ -150,6 +150,12 @@ import type {
   MeetingPlatformRuntimeHostOptions,
 } from './meeting-platform-runtime-host.mjs';
 import type {
+  MeetingPlatformRuntimeHostFixtureEnvironment,
+  MeetingPlatformRuntimeHostVerificationClient,
+  MeetingPlatformRuntimeHostVerificationMatrix,
+  MeetingPlatformRuntimeHostVerificationReport,
+} from './meeting-platform-runtime-host-verifier.mjs';
+import type {
   MeetingPlatformRuntimeEventClientOptions,
   MeetingPlatformRuntimeEventPlan,
   MeetingPlatformRuntimeEventPlanMatrix,
@@ -433,6 +439,10 @@ export interface MeetingPlatformTimelineKit {
     handoffOptions?: MeetingPlatformRuntimeHostOptions,
   ): MeetingPlatformRuntimeHostHandoff;
   platformRuntimeHostHandoffMatrix(handoffOptions?: MeetingPlatformRuntimeHostOptions): MeetingPlatformRuntimeHostHandoffMatrix;
+  createPlatformRuntimeHostVerificationClient(clientOptions?: Record<string, unknown>): MeetingPlatformRuntimeHostVerificationClient;
+  createPlatformRuntimeHostFixtureEnvironment(platform: string, envOptions?: Record<string, unknown>): MeetingPlatformRuntimeHostFixtureEnvironment;
+  verifyPlatformRuntimeHost(platform: string, verifyOptions?: Record<string, unknown>): Promise<MeetingPlatformRuntimeHostVerificationReport>;
+  verifyPlatformRuntimeHostMatrix(verifyOptions?: Record<string, unknown>): Promise<MeetingPlatformRuntimeHostVerificationMatrix>;
   createPlatformRuntimeHost(
     clientOrRuntime?: MeetingTimelineClient | Record<string, unknown>,
     platformOrConfig?: string | MeetingPlatformRuntimeBundle | MeetingPlatformRuntimeHostConfig | Record<string, unknown>,

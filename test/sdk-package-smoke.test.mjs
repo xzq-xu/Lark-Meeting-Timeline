@@ -93,6 +93,8 @@ assert.equal(packedFiles.includes('adapters/meeting-app-observer-scheduler.mjs')
 assert.equal(packedFiles.includes('adapters/meeting-app-observer-scheduler.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-platform-runtime-host.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-platform-runtime-host.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-platform-runtime-host-verifier.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-platform-runtime-host-verifier.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-pipeline.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-pipeline.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-runtime.mjs'), true);
@@ -323,6 +325,12 @@ import {
   buildMeetingPlatformRuntimeHostHandoffMatrix,
   createMeetingPlatformRuntimeHost,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-runtime-host';
+import {
+  createMeetingPlatformRuntimeHostFixtureEnvironment,
+  createMeetingPlatformRuntimeHostVerificationClient,
+  runMeetingPlatformRuntimeHostVerification,
+  runMeetingPlatformRuntimeHostVerificationMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-runtime-host-verifier';
 
 assert.equal(SDK_VERSION, '0.1.0');
 const client = createMeetingTimelineClient({
@@ -717,6 +725,10 @@ assert.equal(buildMeetingPlatformRuntimeHostConfig('google-meet').schema, 'meeti
 assert.equal(buildMeetingPlatformRuntimeHostConfigMatrix({ platforms: ['google-meet'] }).schema, 'meeting_platform_runtime_host_config_matrix');
 assert.equal(buildMeetingPlatformRuntimeHostHandoff('google-meet').schema, 'meeting_platform_runtime_host_handoff');
 assert.equal(buildMeetingPlatformRuntimeHostHandoffMatrix({ platforms: ['google-meet'] }).schema, 'meeting_platform_runtime_host_handoff_matrix');
+assert.equal(createMeetingPlatformRuntimeHostFixtureEnvironment('google-meet').platform, 'google_meet');
+assert.equal(createMeetingPlatformRuntimeHostVerificationClient().getState().call_count, 0);
+assert.equal((await runMeetingPlatformRuntimeHostVerification('google-meet')).accepted, true);
+assert.equal((await runMeetingPlatformRuntimeHostVerificationMatrix({ platforms: ['google-meet', 'zoom'] })).accepted_count, 2);
 assert.equal(typeof createMeetingPlatformRuntimeHost({
   async sample() {
     return { ok: true };
