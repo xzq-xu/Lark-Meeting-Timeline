@@ -106,6 +106,11 @@ export function createMeetingPlatformHost(options = {}) {
   });
   const liveAdapters = kit.platformLiveAdapterSuite({ platforms });
 
+  function extensionPlatforms(value = platforms) {
+    const rows = Array.isArray(value) ? value : [value].filter(Boolean);
+    return rows.filter((platform) => platform !== 'local_detector');
+  }
+
   return {
     client,
     kit,
@@ -137,6 +142,13 @@ export function createMeetingPlatformHost(options = {}) {
     },
     runtimeBundle(platform, bundleOptions = {}) {
       return kit.platformRuntimeBundle(platform, bundleOptions);
+    },
+    extensionInstallPlan(extensionOptions = {}) {
+      return kit.meetingAppExtensionInstallPlan({
+        ...extensionOptions,
+        baseUrl: extensionOptions.baseUrl ?? extensionOptions.base_url ?? ${JSON.stringify(defaultBaseUrl)},
+        platforms: extensionOptions.platforms ?? extensionOptions.platform_keys ?? extensionPlatforms(platforms),
+      });
     },
     adapter(platform, adapterOptions = {}) {
       return liveAdapters.adapter(platform, adapterOptions);
@@ -193,6 +205,9 @@ function routesSource(options = {}) {
   if (url.pathname === '/api/meeting-platform/runtime-bundles') {
     return Response.json(host.runtimeBundles(options));
   }
+  if (url.pathname === '/api/meeting-platform/extension-plan') {
+    return Response.json(host.extensionInstallPlan(options));
+  }
   return Response.json({ ok: false, error: 'not_found' }, { status: 404 });
 }
 `;
@@ -232,6 +247,7 @@ await host.insertAnnotation('google_meet', {
 
 const handoff = host.handoffBundle();
 const runtimeBundles = host.runtimeBundles();
+const extensionPlan = host.extensionInstallPlan();
 \`\`\`
 
 Verification:
@@ -244,6 +260,7 @@ npm run meeting-platform:live-readiness
 npm run meeting-platform:contracts
 npm run meeting-platform:contract-acceptance
 npm run meeting-platform:runtime-bundles
+npm run meeting-platform:extension-plan
 npm run sdk:package-smoke
 \`\`\`
 `;
@@ -310,6 +327,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       adapter_contracts: '/api/meeting-platform/contracts',
       adapter_contract_acceptance: '/api/meeting-platform/contract-acceptance',
       runtime_bundles: '/api/meeting-platform/runtime-bundles',
+      extension_plan: '/api/meeting-platform/extension-plan',
     },
     commands: handoff.commands,
     evidence_paths: handoff.evidence_paths,
@@ -345,6 +363,7 @@ export function buildMeetingPlatformHostIntegrationScaffold(options = {}) {
       'meeting-platform:contracts': 'node ./scripts/print-contracts.mjs',
       'meeting-platform:contract-acceptance': 'node ./scripts/verify-contracts.mjs',
       'meeting-platform:runtime-bundles': 'node ./scripts/print-runtime-bundles.mjs',
+      'meeting-platform:extension-plan': 'node ./scripts/print-extension-plan.mjs',
     },
     dependencies: {
       '@ai-annotation/meeting-timeline-sdk': '^0.1.0',
@@ -398,6 +417,14 @@ const host = createMeetingPlatformHost({
 
 console.log(JSON.stringify(host.runtimeBundles(), null, 2));
 `;
+  const extensionPlanScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+console.log(JSON.stringify(host.extensionInstallPlan(), null, 2));
+`;
   return {
     type: 'meeting_platform_host_integration_scaffold',
     schema: MEETING_PLATFORM_HOST_INTEGRATION_SCAFFOLD_SCHEMA,
@@ -414,6 +441,7 @@ console.log(JSON.stringify(host.runtimeBundles(), null, 2));
       sourceFile('scripts/print-contracts.mjs', contractsScript, 'adapter_contract_script', 'text/javascript'),
       sourceFile('scripts/verify-contracts.mjs', contractAcceptanceScript, 'adapter_contract_acceptance_script', 'text/javascript'),
       sourceFile('scripts/print-runtime-bundles.mjs', runtimeBundlesScript, 'runtime_bundle_script', 'text/javascript'),
+      sourceFile('scripts/print-extension-plan.mjs', extensionPlanScript, 'extension_plan_script', 'text/javascript'),
       sourceFile('README.md', readmeSource(plan), 'readme', 'text/markdown'),
     ],
   };
@@ -434,6 +462,7 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     'scripts/print-contracts.mjs',
     'scripts/verify-contracts.mjs',
     'scripts/print-runtime-bundles.mjs',
+    'scripts/print-extension-plan.mjs',
     'README.md',
   ];
   for (const path of requiredFiles) {
@@ -459,6 +488,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!host.includes('platformRuntimeBundleMatrix')) {
     issues.push(issue('error', 'missing_runtime_bundle_matrix', 'Host source must expose the runtime bundle matrix.'));
   }
+  if (!host.includes('meetingAppExtensionInstallPlan')) {
+    issues.push(issue('error', 'missing_extension_install_plan', 'Host source must expose the extension install plan.'));
+  }
   if (!host.includes('capturedAtMs')) {
     issues.push(issue('error', 'missing_captured_at_ms_write', 'Host source must write annotations with capturedAtMs.'));
   }
@@ -470,6 +502,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!routes.includes('/api/meeting-platform/runtime-bundles')) {
     issues.push(issue('error', 'missing_runtime_bundle_route', 'Route source must expose the runtime bundle matrix endpoint.'));
+  }
+  if (!routes.includes('/api/meeting-platform/extension-plan')) {
+    issues.push(issue('error', 'missing_extension_plan_route', 'Route source must expose the extension install plan endpoint.'));
   }
   if (!readme.includes('captured_at_ms')) {
     issues.push(issue('warning', 'readme_missing_timestamp_contract', 'README should state the captured_at_ms contract.'));

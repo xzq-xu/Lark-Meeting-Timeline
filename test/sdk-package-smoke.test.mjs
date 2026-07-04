@@ -588,6 +588,10 @@ assert.equal(buildMeetingPlatformHostIntegrationPlan({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).endpoints.runtime_bundles, '/api/meeting-platform/runtime-bundles');
+assert.equal(buildMeetingPlatformHostIntegrationPlan({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).endpoints.extension_plan, '/api/meeting-platform/extension-plan');
 assert.equal(assertMeetingPlatformHostIntegrationScaffold(buildMeetingPlatformHostIntegrationScaffold({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
