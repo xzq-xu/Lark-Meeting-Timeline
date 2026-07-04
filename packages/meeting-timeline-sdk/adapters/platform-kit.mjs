@@ -279,6 +279,10 @@ import {
   meetingAppExtensionTimelineEndpoint,
   normalizeMeetingAppExtensionMessageType,
 } from './meeting-app-extension.mjs';
+import {
+  buildMeetingAppObserverSchedulerConfig,
+  buildMeetingAppObserverSchedulerConfigMatrix,
+} from './meeting-app-observer-scheduler.mjs';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -395,6 +399,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_runtime_adapter_configs: buildAllMeetingAppRuntimeAdapterConfigs(options),
     meeting_app_runtime_adapter_acceptance: buildAllMeetingAppRuntimeAdapterAcceptanceReports(options),
     meeting_app_runtime_observer_plan_matrix: buildMeetingAppRuntimeObserverPlanMatrix(options),
+    meeting_app_observer_scheduler_config_matrix: buildMeetingAppObserverSchedulerConfigMatrix(options),
     meeting_app_live_snapshot_capture_plans: buildAllMeetingAppLiveSnapshotCapturePlans(options),
     meeting_app_runtime_adapter_validation: buildAllMeetingAppRuntimeAdapterValidationReports(options),
     meeting_app_fixture_acceptance: meetingAppFixtureAcceptance,
@@ -908,6 +913,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppRuntimeObserverPlanMatrix(planOptions = {}) {
       return buildMeetingAppRuntimeObserverPlanMatrix(withDefaults(defaults, planOptions));
+    },
+    meetingAppObserverSchedulerConfig(planOrPlatform = {}, schedulerOptions = {}) {
+      return buildMeetingAppObserverSchedulerConfig(planOrPlatform, withDefaults(defaults, schedulerOptions));
+    },
+    meetingAppObserverSchedulerConfigMatrix(schedulerOptions = {}) {
+      return buildMeetingAppObserverSchedulerConfigMatrix(withDefaults(defaults, schedulerOptions));
     },
     selectMeetingAppRuntimeAdapter(input = {}, selectionOptions = {}) {
       return selectMeetingAppRuntimeAdapter(input, withDefaults(defaults, selectionOptions));

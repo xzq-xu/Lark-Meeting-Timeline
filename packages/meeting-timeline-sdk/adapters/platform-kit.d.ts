@@ -225,6 +225,11 @@ import type {
   MeetingAppExtensionScaffold,
   MeetingAppExtensionScaffoldAcceptanceReport,
 } from './meeting-app-extension.mjs';
+import type {
+  MeetingAppObserverSchedulerConfig,
+  MeetingAppObserverSchedulerConfigMatrix,
+  MeetingAppObserverSchedulerOptions,
+} from './meeting-app-observer-scheduler.mjs';
 import type { PlatformEventDiagnosticResult, PlatformEventIngestInput, PlatformEventIngestOptions, ReconciledPlatformEventIngestResult } from './platform-ingest.mjs';
 import type {
   MeetingAppFixtureDiagnosis,
@@ -498,6 +503,8 @@ export interface MeetingPlatformTimelineKit {
   meetingAppRuntimeAdapterProfileMatrix(profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterProfileMatrix;
   meetingAppRuntimeObserverPlan(platformOrInput?: string | Record<string, unknown>, planOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeObserverPlan;
   meetingAppRuntimeObserverPlanMatrix(planOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeObserverPlanMatrix;
+  meetingAppObserverSchedulerConfig(planOrPlatform?: string | Record<string, unknown> | MeetingAppRuntimeObserverPlan, schedulerOptions?: MeetingAppObserverSchedulerOptions): MeetingAppObserverSchedulerConfig;
+  meetingAppObserverSchedulerConfigMatrix(schedulerOptions?: MeetingAppObserverSchedulerOptions): MeetingAppObserverSchedulerConfigMatrix;
   selectMeetingAppRuntimeAdapter(input?: string | Record<string, unknown>, selectionOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterSelection;
   meetingAppRuntimeAdapterHandoff(selectionOrInput?: string | Record<string, unknown> | MeetingAppRuntimeAdapterSelection, handoffOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterHandoff;
   meetingAppRuntimeAdapterHandoffMatrix(handoffOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterHandoffMatrix;

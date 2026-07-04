@@ -22,6 +22,9 @@ import {
   buildMeetingAppRuntimeObserverPlan,
 } from './meeting-app-profile.mjs';
 import {
+  buildMeetingAppObserverSchedulerConfig,
+} from './meeting-app-observer-scheduler.mjs';
+import {
   MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT,
   MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
   buildMeetingPlatformRuntimeEventPlan,
@@ -231,6 +234,9 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
   const endpoints = hostEndpoints(adaptationPackage, options);
   const runtimeEventPlan = buildMeetingPlatformRuntimeEventPlan(key, options);
   const observerPlan = runtimeObserverPlan(key, options);
+  const observerSchedulerConfig = observerPlan
+    ? buildMeetingAppObserverSchedulerConfig(observerPlan, options)
+    : null;
   const messages = messageExamples(key, {
     ...options,
     url: firstNonEmpty(options.url, options.href, extension.matches?.[0]?.replace('*', '')),
@@ -255,6 +261,7 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
       live_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter',
       adaptation_package: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adaptation-package',
       observer_plan: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-profile',
+      observer_scheduler: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-observer-scheduler',
     },
     browser: {
       matches: extension.matches ?? [],
@@ -289,6 +296,11 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
         timestamp_field: observerPlan.signal_contract?.timestamp_field,
         cadence: observerPlan.cadence,
         trigger_policy: observerPlan.trigger_policy,
+      } : null,
+      observer_scheduler: observerSchedulerConfig ? {
+        module: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-observer-scheduler',
+        create_function: 'createMeetingAppObserverScheduler',
+        config: observerSchedulerConfig,
       } : null,
     },
     messaging: {
@@ -325,6 +337,7 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
       sdk_wiring_ready: adaptationPackage.readiness?.sdk_wiring_ready === true,
       runtime_ready: (extension.matches ?? []).length > 0 || key === 'local_detector',
       observer_plan_ready: observerPlan?.sdk_ready === true,
+      observer_scheduler_ready: observerSchedulerConfig?.sdk_ready === true,
       observer_preflight_status: observerPlan?.preflight_status,
       provider_required_for_realtime: adaptationPackage.provider_observer?.required_for_realtime === true,
       transcript_blocks_realtime: adaptationPackage.transcript?.blocks_realtime_annotation === true,
@@ -374,6 +387,7 @@ export function buildMeetingPlatformRuntimeBundleMatrix(options = {}) {
       observer_plan_ready: bundle.readiness.observer_plan_ready === true,
       observer_preflight_status: bundle.readiness.observer_preflight_status,
       observer_factory: bundle.runtime?.observation_loop?.factory,
+      observer_scheduler_ready: bundle.readiness.observer_scheduler_ready === true,
       observer_fallback_poll_interval_ms: bundle.runtime?.observation_loop?.cadence?.fallback_poll_interval_ms,
       observer_changed_debounce_ms: bundle.runtime?.observation_loop?.cadence?.changed_observe_every_ms,
       observer_meeting_end_grace_ms: bundle.runtime?.observation_loop?.cadence?.meeting_missing_end_grace_ms,

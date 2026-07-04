@@ -89,6 +89,8 @@ assert.equal(packedFiles.includes('adapters/meeting-app-runtime.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-profile.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-profile.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-observer-scheduler.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-observer-scheduler.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-pipeline.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-pipeline.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-runtime.mjs'), true);
@@ -307,6 +309,11 @@ import {
 import {
   createMeetingAppTimelineRuntime,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime';
+import {
+  buildMeetingAppObserverSchedulerConfig,
+  buildMeetingAppObserverSchedulerConfigMatrix,
+  createMeetingAppObserverScheduler,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-observer-scheduler';
 
 assert.equal(SDK_VERSION, '0.1.0');
 const client = createMeetingTimelineClient({
@@ -341,6 +348,8 @@ assert.equal(kit.meetingAppRuntimeObserverPlan({
     participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
   },
 }, { platform: 'google-meet' }).observer_runtime.factory, 'createMeetingAppBrowserRuntime');
+assert.equal(kit.meetingAppObserverSchedulerConfig('google-meet').schema, 'meeting_app_observer_scheduler_config');
+assert.equal(kit.meetingAppObserverSchedulerConfigMatrix({ platforms: ['google-meet'] }).platform_count, 1);
 assert.equal(kit.selectMeetingAppRuntimeAdapter('https://meet.google.com/abc-defg-hij').launch.runtime_options.runtimePreset, 'google_meet');
 assert.equal(kit.meetingAppRuntimeAdapterHandoff('https://meet.google.com/abc-defg-hij').readiness.ready_to_start, true);
 assert.equal(kit.meetingAppRuntimeAdapterHandoffMatrix({ platforms: ['google-meet', 'teams'], surfaces: ['browser-extension'] }).handoff_count, 2);
@@ -688,6 +697,13 @@ assert.equal(buildMeetingAppRuntimeObserverPlanMatrix({
     },
   },
 }).schema, 'meeting_app_runtime_observer_plan_matrix');
+assert.equal(buildMeetingAppObserverSchedulerConfig('google-meet').schema, 'meeting_app_observer_scheduler_config');
+assert.equal(buildMeetingAppObserverSchedulerConfigMatrix({ platforms: ['google-meet'] }).schema, 'meeting_app_observer_scheduler_config_matrix');
+assert.equal(typeof createMeetingAppObserverScheduler({
+  async sample() {
+    return { ok: true };
+  },
+}, 'google-meet').handleTrigger, 'function');
 assert.equal(resolveMeetingAppRuntimeAdapterProfile('https://example.com/not-a-meeting').detected, false);
 assert.equal(selectMeetingAppRuntimeAdapter('https://meet.google.com/abc-defg-hij').selected, true);
 assert.equal(buildMeetingAppRuntimeAdapterHandoff('https://meet.google.com/abc-defg-hij').surface, 'browser_extension');

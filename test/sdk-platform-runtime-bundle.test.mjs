@@ -22,6 +22,7 @@ assert.equal(google.modules.platform_integration_runtime, '@ai-annotation/meetin
 assert.equal(google.modules.content_script_bridge, '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime');
 assert.equal(google.modules.runtime_event, '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event');
 assert.equal(google.modules.observer_plan, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-profile');
+assert.equal(google.modules.observer_scheduler, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-observer-scheduler');
 assert.equal(google.runtime.preset, 'google_meet');
 assert.equal(google.runtime.start_options.runtimePreset, 'google_meet');
 assert.equal(google.runtime.start_options.captureOptions.captureProfile, 'google_meet');
@@ -38,6 +39,9 @@ assert.equal(google.runtime.observation_loop.factory, 'createMeetingAppBrowserRu
 assert.equal(google.runtime.observation_loop.timestamp_field, 'captured_at_ms');
 assert.equal(google.runtime.observation_loop.cadence.fallback_poll_interval_ms, 10000);
 assert.equal(google.runtime.observation_loop.trigger_policy.some((item) => item.trigger === 'dom_mutation'), true);
+assert.equal(google.runtime.observer_scheduler.create_function, 'createMeetingAppObserverScheduler');
+assert.equal(google.runtime.observer_scheduler.config.schema, 'meeting_app_observer_scheduler_config');
+assert.equal(google.runtime.observer_scheduler.config.platform, 'google_meet');
 assert.equal(google.messaging.message_types.client_call, 'meeting_timeline.client_call');
 assert.equal(google.messaging.bridge_message_types.includes('meeting_timeline.insert_mark'), true);
 assert.equal(google.messaging.background_message_types.includes('meeting_timeline.observe_candidates'), true);
@@ -64,6 +68,7 @@ assert.equal(google.provider_reconcile.required_for_realtime, false);
 assert.equal(google.transcript.blocks_realtime_annotation, false);
 assert.equal(google.readiness.runtime_ready, true);
 assert.equal(google.readiness.observer_plan_ready, true);
+assert.equal(google.readiness.observer_scheduler_ready, true);
 assert.equal(google.readiness.observer_preflight_status, 'not_run');
 assert.equal(google.readiness.provider_required_for_realtime, false);
 assert.equal(google.readiness.transcript_blocks_realtime, false);
@@ -95,6 +100,7 @@ assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').candi
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').candidate_observer_message_type, 'meeting_timeline.observe_candidates');
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').candidate_observer_permission, 'tabs');
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').observer_plan_ready, true);
+assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').observer_scheduler_ready, true);
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').observer_preflight_status, 'not_run');
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').observer_factory, 'createMeetingAppBrowserRuntime');
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').observer_meeting_end_grace_ms, 4000);

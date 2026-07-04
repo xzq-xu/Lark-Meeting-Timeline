@@ -1,5 +1,6 @@
 import type { MeetingPlatformAdaptationPackage, MeetingPlatformAdaptationPackageOptions } from './platform-adaptation-package.mjs';
 import type { MeetingAppRuntimeObserverPlan } from './meeting-app-profile.mjs';
+import type { MeetingAppObserverSchedulerConfig } from './meeting-app-observer-scheduler.mjs';
 import type { MeetingPlatformRuntimeEventPlan } from './platform-runtime-event.mjs';
 
 export const MEETING_PLATFORM_RUNTIME_BUNDLE_SCHEMA: 'meeting_platform_runtime_bundle';
@@ -59,6 +60,11 @@ export interface MeetingPlatformRuntimeBundle {
     };
     observer_plan?: MeetingAppRuntimeObserverPlan | null;
     observation_loop?: Record<string, unknown> | null;
+    observer_scheduler?: {
+      module: string;
+      create_function: string;
+      config: MeetingAppObserverSchedulerConfig;
+    } | null;
   };
   messaging: {
     message_types: Record<string, string>;
@@ -85,6 +91,7 @@ export interface MeetingPlatformRuntimeBundle {
     sdk_wiring_ready: boolean;
     runtime_ready: boolean;
     observer_plan_ready?: boolean;
+    observer_scheduler_ready?: boolean;
     observer_preflight_status?: string;
     provider_required_for_realtime: boolean;
     transcript_blocks_realtime: boolean;

@@ -912,6 +912,24 @@ const observerPlan = kit.meetingAppRuntimeObserverPlan({
 
 `meetingAppRuntimeObserverPlanMatrix()` 可以一次生成多平台计划。浏览器扩展和 WebView 默认用 mutation observer + 低频 keep-alive；native detector 默认按窗口/Accessibility/音频快照变化触发。它仍然不替代真实 DOM 证据，只是把外部项目的观察循环和节流参数标准化，避免每个宿主自己猜采样频率。
 
+如果宿主不想自己解释 `trigger_policy`，可以直接用 `meeting-app-observer-scheduler`。它消费 observer plan 和现有 runtime，把 DOM mutation、native snapshot change、keep-alive、active speaker follow-up、candidate missing end grace 统一映射为 `runtime.sample()` / `runtime.sampleTracks()` 调用：
+
+```js
+import { createMeetingAppBrowserRuntime } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime';
+import { createMeetingAppObserverScheduler } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-observer-scheduler';
+
+const runtime = createMeetingAppBrowserRuntime(timeline, {
+  window,
+  runtimePreset: 'google_meet',
+});
+const scheduler = createMeetingAppObserverScheduler(runtime, observerPlan, {
+  runtimeInputMode: 'provider',
+});
+
+await scheduler.triggerChanged();
+scheduler.triggerCandidateMissing(undefined, { schedule: true });
+```
+
 浏览器扩展或 WebView 里可以再往前接一层 `meeting-app-capture`。它只读取 DOM 文本、按钮、`aria-label`、participant tile、常见 `data-participant-*` / `data-user-*` / `data-person-*` 属性和音量/发言状态，输出 `meeting-apps` 可识别的快照；不截图、不 OCR、不读取转写正文：
 
 ```js
