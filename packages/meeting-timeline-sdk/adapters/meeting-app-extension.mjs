@@ -429,7 +429,9 @@ export function buildMeetingAppExtensionInstallPlan(options = {}) {
     host_permissions: patterns.host_permissions,
     content_scripts: patterns.content_scripts,
     manifest,
-    content_script_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script',
+    content_script_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime',
+    meeting_app_content_script_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script',
+    platform_integration_runtime_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime',
     browser_runtime_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime',
     snapshot_recorder_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder',
     launch_gate_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate',
@@ -444,7 +446,7 @@ export function buildMeetingAppExtensionInstallPlan(options = {}) {
       timestamp_field: 'captured_at_ms',
     },
     next_steps: [
-      'Bundle meeting-app-content-script into the js file declared in content_scripts.',
+      'Bundle platform-integration-runtime content script bridge into the js file declared in content_scripts.',
       'Install the generated manifest as a Chrome/Edge compatible MV3 extension or map the same matches into an Electron WebView preload bridge.',
       'Use window.__meetingTimelineLiveCapture.captureActive(), captureEnded(), and diagnose() to collect and validate live DOM evidence for the launch gate.',
       'Record real meeting app snapshots with meeting-app-snapshot-recorder and validate them with meeting-app-gate before production rollout.',
@@ -469,7 +471,7 @@ export function buildMeetingAppExtensionContentScriptSource(options = {}) {
     MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call,
   );
   return [
-    "import { installMeetingAppContentScriptBridge } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script';",
+    "import { installMeetingPlatformIntegrationContentScriptBridge } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';",
     '',
     `const PLATFORM_HOSTS = ${json(platformMap)};`,
     `const CLIENT_CALL_TYPE = ${JSON.stringify(messagePrefix)};`,
@@ -515,12 +517,17 @@ export function buildMeetingAppExtensionContentScriptSource(options = {}) {
     '  importTranscript: (input) => callTimeline("importTranscript", input),',
     '};',
     '',
-    'const bridge = installMeetingAppContentScriptBridge(client, {',
-    '  browser_runtime_preset: inferPlatform(),',
+    'const detectedPlatform = inferPlatform();',
+    'const bridge = installMeetingPlatformIntegrationContentScriptBridge(client, {',
+    '  platform: detectedPlatform === "unknown" ? undefined : detectedPlatform,',
+    '  platforms: Object.keys(PLATFORM_HOSTS),',
+    '  runtimePreset: detectedPlatform === "unknown" ? undefined : detectedPlatform,',
+    '  browser_runtime_preset: detectedPlatform === "unknown" ? undefined : detectedPlatform,',
     '  source: "meeting_app_extension",',
     '  extensionMessaging: true,',
     '  windowMessaging: true,',
     '  startRuntime: true,',
+    '  startOptions: { startRuntime: true },',
     '});',
     '',
     'globalThis.__meetingTimelineBridge = bridge;',
@@ -1156,7 +1163,7 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
   }
 
   const contentEntryContent = contentEntry?.content ?? '';
-  if (!contentEntryContent.includes('installMeetingAppContentScriptBridge')) {
+  if (!contentEntryContent.includes('installMeetingPlatformIntegrationContentScriptBridge')) {
     issues.push(issue('error', 'content_entry_missing_bridge', 'Content script entry does not install the SDK bridge.'));
   }
   if (!contentEntryContent.includes('startRuntime: true')) {

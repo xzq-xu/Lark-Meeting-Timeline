@@ -111,13 +111,16 @@ function installGeneratedContentScript(source, options = {}) {
     },
   };
   const runnableSource = source.replace(/^import .+;\n\n?/, '');
-  const installMeetingAppContentScriptBridge = (client, bridgeOptions) => {
+  const installMeetingPlatformIntegrationContentScriptBridge = (client, bridgeOptions) => {
     const bridge = { client, options: bridgeOptions, installed: true };
     bridgeInstalls.push(bridge);
     return bridge;
   };
   try {
-    Function('installMeetingAppContentScriptBridge', runnableSource)(installMeetingAppContentScriptBridge);
+    Function(
+      'installMeetingPlatformIntegrationContentScriptBridge',
+      runnableSource,
+    )(installMeetingPlatformIntegrationContentScriptBridge);
   } catch (error) {
     globalThis.chrome = originalChrome;
     globalThis.location = originalLocation;
@@ -341,7 +344,9 @@ const plan = buildMeetingAppExtensionInstallPlan({
 });
 assert.equal(plan.type, 'meeting_app_extension_install_plan');
 assert.deepEqual(plan.platforms, ['google_meet', 'microsoft_teams']);
-assert.equal(plan.content_script_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script');
+assert.equal(plan.content_script_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime');
+assert.equal(plan.meeting_app_content_script_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script');
+assert.equal(plan.platform_integration_runtime_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime');
 assert.equal(plan.browser_runtime_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime');
 assert.equal(plan.snapshot_recorder_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder');
 assert.equal(plan.launch_gate_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate');
@@ -362,16 +367,22 @@ assert.deepEqual(plan.manifest.content_scripts[0].js, ['content.js']);
 const contentScriptSource = buildMeetingAppExtensionContentScriptSource({
   platforms: ['google_meet', 'microsoft_teams'],
 });
-assert.match(contentScriptSource, /installMeetingAppContentScriptBridge/);
+assert.match(contentScriptSource, /installMeetingPlatformIntegrationContentScriptBridge/);
+assert.match(contentScriptSource, /platform-integration-runtime/);
 assert.match(contentScriptSource, /meet\.google\.com/);
 assert.match(contentScriptSource, /teams\.microsoft\.com/);
 assert.match(contentScriptSource, /startRuntime: true/);
+assert.match(contentScriptSource, /startOptions: \{ startRuntime: true \}/);
 
 const contentScriptRuntime = installGeneratedContentScript(contentScriptSource);
 try {
+  assert.equal(contentScriptRuntime.bridge.options.platform, 'google_meet');
+  assert.deepEqual(contentScriptRuntime.bridge.options.platforms, ['google_meet', 'microsoft_teams']);
+  assert.equal(contentScriptRuntime.bridge.options.runtimePreset, 'google_meet');
   assert.equal(contentScriptRuntime.bridge.options.browser_runtime_preset, 'google_meet');
   assert.equal(contentScriptRuntime.bridge.options.source, 'meeting_app_extension');
   assert.equal(contentScriptRuntime.bridge.options.startRuntime, true);
+  assert.deepEqual(contentScriptRuntime.bridge.options.startOptions, { startRuntime: true });
   assert.equal(globalThis.__meetingTimelineBridge, contentScriptRuntime.bridge);
   assert.equal(contentScriptRuntime.sentMessages.length, 1);
   assert.equal(contentScriptRuntime.sentMessages[0].type, MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached);
@@ -395,6 +406,8 @@ const teamsContentScriptRuntime = installGeneratedContentScript(contentScriptSou
   href: 'https://teams.microsoft.com/l/meetup-join/demo',
 });
 try {
+  assert.equal(teamsContentScriptRuntime.bridge.options.platform, 'microsoft_teams');
+  assert.equal(teamsContentScriptRuntime.bridge.options.runtimePreset, 'microsoft_teams');
   assert.equal(teamsContentScriptRuntime.bridge.options.browser_runtime_preset, 'microsoft_teams');
   assert.equal(teamsContentScriptRuntime.sentMessages[0].platform, 'microsoft_teams');
 } finally {
@@ -558,7 +571,8 @@ assert.match(scaffold.files.find((file) => file.path === 'package.json').content
 assert.match(scaffold.files.find((file) => file.path === 'build.mjs').content, /content-script\.js/);
 assert.match(scaffold.files.find((file) => file.path === 'build.mjs').content, /live-capture\.js/);
 assert.equal(scaffold.files.find((file) => file.path === 'manifest.json').mime, 'application/json');
-assert.match(scaffold.files.find((file) => file.path === 'src/content-script.entry.mjs').content, /meeting-app-content-script/);
+assert.match(scaffold.files.find((file) => file.path === 'src/content-script.entry.mjs').content, /platform-integration-runtime/);
+assert.match(scaffold.files.find((file) => file.path === 'src/content-script.entry.mjs').content, /installMeetingPlatformIntegrationContentScriptBridge/);
 assert.match(scaffold.files.find((file) => file.path === 'src/live-capture.entry.mjs').content, /__meetingTimelineLiveCapture/);
 assert.match(scaffold.files.find((file) => file.path === 'src/live-capture.entry.mjs').content, /evidencePackage/);
 assert.match(scaffold.files.find((file) => file.path === 'src/live-capture.entry.mjs').content, /diagnose/);

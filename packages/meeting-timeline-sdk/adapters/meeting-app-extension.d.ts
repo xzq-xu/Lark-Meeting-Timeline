@@ -111,6 +111,8 @@ export interface MeetingAppExtensionInstallPlan extends Omit<MeetingAppExtension
   type: 'meeting_app_extension_install_plan';
   manifest?: Record<string, unknown>;
   content_script_adapter: string;
+  meeting_app_content_script_adapter?: string;
+  platform_integration_runtime_adapter?: string;
   browser_runtime_adapter: string;
   snapshot_recorder_adapter: string;
   launch_gate_adapter: string;

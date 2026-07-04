@@ -1095,6 +1095,7 @@ const extensionPlan = meetingKit.meetingAppExtensionInstallPlan({
   js: ['meeting-app-content-script.bundle.js'],
 });
 // extensionPlan.manifest.content_scripts[0].matches 是 Google Meet / Teams 的白名单注入规则。
+// extensionPlan.content_script_adapter 指向 platform-integration-runtime，低层 meeting-app-content-script 仍作为内部兼容模块保留。
 // 默认也支持 Zoom、Lark/Feishu、Webex，且不会生成 <all_urls> 这种过宽权限。
 
 const extensionScaffold = meetingKit.meetingAppExtensionScaffold({
@@ -1102,7 +1103,7 @@ const extensionScaffold = meetingKit.meetingAppExtensionScaffold({
   baseUrl: 'https://timeline.example.com',
 });
 // extensionScaffold.files 包含 package.json、build.mjs、manifest.json、src/content-script.entry.mjs、src/background.entry.mjs 和 README.md。
-// content script 入口用 SDK bridge 监听会议网页；background worker 把 start/end/mark 调用转发到 timeline 服务。
+// content script 入口用平台级 SDK bridge 监听会议网页；background worker 把 start/end/mark 调用转发到 timeline 服务。
 // content script 注入后会发送 meeting_timeline.extension_attached；background 可用 meeting_timeline.extension_status 查询最近注入状态。
 // scaffold 默认还会生成 src/live-capture.entry.mjs，在页面上暴露 window.__meetingTimelineLiveCapture。
 // 现场验证时可在真实 Google Meet / Teams / Zoom 页面调用 captureActive()、captureEnded()、evidencePackage()、diagnose()。
