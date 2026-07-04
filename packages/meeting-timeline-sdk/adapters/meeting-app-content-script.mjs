@@ -56,6 +56,12 @@ const DEFAULT_DIRECT_MESSAGE_TYPES = Object.freeze([
   'ingest_provider',
   'stop',
   'flush_mutations',
+  'sample_tracks',
+  'track_sample',
+  'start_tracks',
+  'stop_tracks',
+  'observe_tracks',
+  'preview_tracks',
 ]);
 
 function messagePrefixes(options = {}) {

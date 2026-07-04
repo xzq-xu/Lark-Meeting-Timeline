@@ -119,6 +119,10 @@ const directResponse = await bridge.dispatchMessage({ type: 'insert_mark', paylo
 assert.equal(directResponse.handled, true);
 assert.equal(runtime.calls.at(-1).message.type, 'insert_mark');
 
+const directTrackResponse = await bridge.dispatchMessage({ type: 'sample_tracks' });
+assert.equal(directTrackResponse.handled, true);
+assert.equal(runtime.calls.at(-1).message.type, 'sample_tracks');
+
 const removedExtension = bridge.removeMessaging('extension');
 assert.equal(removedExtension.removed, 1);
 assert.equal(extensionRuntime.listenerCount(), 0);

@@ -202,6 +202,7 @@ import type {
   MeetingAppLiveSnapshotCapturePlan,
   MeetingAppRuntimeAdapterAcceptanceReport,
   MeetingAppRuntimeAdapterConfig,
+  MeetingAppRuntimeAdapterProfileResolution,
   MeetingAppRuntimeAdapterValidationReport,
 } from './meeting-app-profile.mjs';
 import type {
@@ -471,6 +472,7 @@ export interface MeetingPlatformTimelineKit {
   allMeetingAppDomAdaptationDiagnoses(diagnosisOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppDomAdaptationDiagnosis>>;
   meetingAppDomAdaptationDiagnosisMatrix(diagnosisOptions?: MeetingAppIntegrationProfileOptions): MeetingAppDomAdaptationDiagnosisMatrix;
   meetingAppRuntimeAdapterConfig(platform: string, configOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterConfig;
+  meetingAppRuntimeAdapterProfile(input?: string | Record<string, unknown>, profileOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterProfileResolution;
   meetingAppLiveSnapshotCapturePlan(platform: string, planOptions?: MeetingAppIntegrationProfileOptions): MeetingAppLiveSnapshotCapturePlan;
   allMeetingAppLiveSnapshotCapturePlans(planOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppLiveSnapshotCapturePlan>>;
   allMeetingAppRuntimeAdapterConfigs(configOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppRuntimeAdapterConfig>>;

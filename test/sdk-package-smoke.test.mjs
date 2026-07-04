@@ -311,6 +311,7 @@ assert.equal(kit.platformRolloutPlan('google-meet').platform, 'google_meet');
 assert.equal(kit.platformAdaptationRunbook('zoom').platform, 'zoom');
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_rollout.type, 'meeting_platform_rollout_summary');
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_registry_manifest.platform_count, 1);
+assert.equal(kit.meetingAppRuntimeAdapterProfile('https://meet.google.com/abc-defg-hij').platform, 'google_meet');
 const integrationRuntimeManifest = buildMeetingPlatformIntegrationRuntimeManifest({
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet', 'zoom'],
