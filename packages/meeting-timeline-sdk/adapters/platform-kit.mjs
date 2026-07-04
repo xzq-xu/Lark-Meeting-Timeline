@@ -182,6 +182,8 @@ import {
 import {
   createMeetingPlatformRuntimeHostFixtureEnvironment,
   createMeetingPlatformRuntimeHostVerificationClient,
+  runMeetingPlatformRuntimeHostReplay,
+  runMeetingPlatformRuntimeHostReplayMatrix,
   runMeetingPlatformRuntimeHostVerification,
   runMeetingPlatformRuntimeHostVerificationMatrix,
 } from './meeting-platform-runtime-host-verifier.mjs';
@@ -796,6 +798,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     async verifyPlatformRuntimeHostMatrix(verifyOptions = {}) {
       return runMeetingPlatformRuntimeHostVerificationMatrix(withDefaults(defaults, verifyOptions));
+    },
+    async replayPlatformRuntimeHost(platform, input = {}, replayOptions = {}) {
+      return runMeetingPlatformRuntimeHostReplay(platform, input, withDefaults(defaults, replayOptions));
+    },
+    async replayPlatformRuntimeHostMatrix(replayOptions = {}) {
+      return runMeetingPlatformRuntimeHostReplayMatrix(withDefaults(defaults, replayOptions));
     },
     createPlatformRuntimeHost(clientOrRuntime = bridge.client, platformOrConfig = {}, hostOptions = {}) {
       const hostInput = typeof platformOrConfig === 'string' || platformOrConfig?.schema

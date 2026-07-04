@@ -17,6 +17,7 @@
 - SDK live adapter，可把本地会议 App 观察、provider webhook 回填和实时标注插入封成同一个跨平台入口
 - SDK live evidence session，可在真实会议进行中持续收集本地 DOM / provider 样本，实时判断能否把当前标注落到会议轴，并在采样完成后导出 handoff 包
 - SDK evidence package，可把单场真实会议的 provider webhook 记录、本地 DOM 记录、rollout plan 和 handoff 摘要封成可复验交接包
+- SDK runtime host replay，可把现场采集的会议 App 快照或 evidence package 回放到 runtime host，验收 start / speaker / end 是否能按真实时间戳写入时间轴
 - 本地手动开始/结束实时会议，用作没有公网 webhook 时的 fallback
 - 会中实时写入外部标注事件，并通过 SSE 自动刷新页面
 - 开放标注接口 `POST /api/annotations`，供后续墨水屏/手写设备接入
@@ -90,13 +91,21 @@ npm run meeting-platform:evidence-package
 
 它会写出 `data/meeting-platform-evidence-package-report.json`，重新计算包里的 rollout plan，而不是信任包内旧结论。默认要求 `production_ready`；只验收“可实时落标注、provider 可后补”的 pilot 状态时用 `-- --require-production-ready=false`。
 
+如果要验证采到的现场快照是否真的能驱动 SDK runtime host 写入实时会议轴，用 replay gate：
+
+```bash
+npm run meeting-platform:runtime-host-replay -- --input=data/meeting-platform-evidence-packages/google-meet-live.json --platforms=google-meet --include-reports=true
+```
+
+它会从 `meeting_app_record_set`、`meeting_app_snapshot_records`、`snapshots/items/records` 或 evidence package 里抽取会中与结束快照，按 `captured_at_ms/observedAtMs` 回放到 `createMeetingPlatformRuntimeHost()`，并检查 `startMeeting`、发言人 `insertMark`、`endMeeting` 是否真实写出且时间戳对齐。默认脚本会扫描 `data/meeting-platform-evidence-packages/` 并写出 `data/meeting-platform-runtime-host-replay-report.json`；没有结束态快照时会失败，不用 fixture 兜底。
+
 SDK 包级交付前再跑一次 package smoke：
 
 ```bash
 npm run sdk:package-smoke
 ```
 
-它会对 `packages/meeting-timeline-sdk` 执行 `npm pack`，并在临时 consumer 项目里按包名导入 core、`platform-kit`、`platform-rollout`、`platform-strategy`、`platform-adaptation-package`、`platform-runtime-bundle`、`platform-evidence-correlation`、`platform-evidence-session`、`platform-live-adapter` 的 suite/readiness、Google Meet adapter、meeting app gate、`meeting-app-track-pipeline` 和 `meeting-app-track-runtime`，确认外部项目不是依赖仓库内部相对路径。
+它会对 `packages/meeting-timeline-sdk` 执行 `npm pack`，并在临时 consumer 项目里按包名导入 core、`platform-kit`、`platform-rollout`、`platform-strategy`、`platform-adaptation-package`、`platform-runtime-bundle`、`meeting-platform-runtime-host-verifier`、`platform-evidence-correlation`、`platform-evidence-session`、`platform-live-adapter` 的 suite/readiness、Google Meet adapter、meeting app gate、`meeting-app-track-pipeline` 和 `meeting-app-track-runtime`，确认外部项目不是依赖仓库内部相对路径。
 
 ## 启动
 

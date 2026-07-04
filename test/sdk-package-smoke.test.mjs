@@ -328,6 +328,8 @@ import {
 import {
   createMeetingPlatformRuntimeHostFixtureEnvironment,
   createMeetingPlatformRuntimeHostVerificationClient,
+  runMeetingPlatformRuntimeHostReplay,
+  runMeetingPlatformRuntimeHostReplayMatrix,
   runMeetingPlatformRuntimeHostVerification,
   runMeetingPlatformRuntimeHostVerificationMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-runtime-host-verifier';
@@ -729,6 +731,31 @@ assert.equal(createMeetingPlatformRuntimeHostFixtureEnvironment('google-meet').p
 assert.equal(createMeetingPlatformRuntimeHostVerificationClient().getState().call_count, 0);
 assert.equal((await runMeetingPlatformRuntimeHostVerification('google-meet')).accepted, true);
 assert.equal((await runMeetingPlatformRuntimeHostVerificationMatrix({ platforms: ['google-meet', 'zoom'] })).accepted_count, 2);
+const replayInput = {
+  records: [
+    {
+      platform: 'google_meet',
+      phase: 'active',
+      captured_at_ms: 1_783_356_000_000,
+      url: 'https://meet.google.com/abc-defg-hij',
+      page: {
+        controls: [{ label: 'Leave call' }],
+        participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+      },
+    },
+    {
+      platform: 'google_meet',
+      phase: 'ended',
+      captured_at_ms: 1_783_356_002_000,
+      url: 'https://meet.google.com/abc-defg-hij',
+      page: {
+        controls: [{ label: 'Join now' }],
+      },
+    },
+  ],
+};
+assert.equal((await runMeetingPlatformRuntimeHostReplay('google-meet', replayInput)).accepted, true);
+assert.equal((await runMeetingPlatformRuntimeHostReplayMatrix({ platforms: ['google-meet'], input: replayInput })).accepted_count, 1);
 assert.equal(typeof createMeetingPlatformRuntimeHost({
   async sample() {
     return { ok: true };
@@ -864,6 +891,11 @@ assert.equal(kit.platformRuntimeHostHandoff('google-meet').acceptance.accepted, 
 assert.equal(kit.platformRuntimeHostHandoffMatrix({
   platforms: ['google-meet'],
 }).accepted_count, 1);
+assert.equal((await kit.replayPlatformRuntimeHost('google-meet', replayInput)).accepted, true);
+assert.equal((await kit.replayPlatformRuntimeHostMatrix({
+  platforms: ['google-meet'],
+  input: replayInput,
+})).accepted_count, 1);
 assert.equal(kit.platformRuntimeEventPlan('google-meet').schema, 'meeting_platform_runtime_event_plan');
 assert.equal(kit.platformRuntimeEventPlan('google-meet').realtime_contract.provider_events_required_for_realtime, false);
 assert.equal(kit.platformRuntimeEventPlanMatrix({

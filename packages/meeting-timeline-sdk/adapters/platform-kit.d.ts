@@ -151,6 +151,8 @@ import type {
 } from './meeting-platform-runtime-host.mjs';
 import type {
   MeetingPlatformRuntimeHostFixtureEnvironment,
+  MeetingPlatformRuntimeHostReplayMatrix,
+  MeetingPlatformRuntimeHostReplayReport,
   MeetingPlatformRuntimeHostVerificationClient,
   MeetingPlatformRuntimeHostVerificationMatrix,
   MeetingPlatformRuntimeHostVerificationReport,
@@ -443,6 +445,8 @@ export interface MeetingPlatformTimelineKit {
   createPlatformRuntimeHostFixtureEnvironment(platform: string, envOptions?: Record<string, unknown>): MeetingPlatformRuntimeHostFixtureEnvironment;
   verifyPlatformRuntimeHost(platform: string, verifyOptions?: Record<string, unknown>): Promise<MeetingPlatformRuntimeHostVerificationReport>;
   verifyPlatformRuntimeHostMatrix(verifyOptions?: Record<string, unknown>): Promise<MeetingPlatformRuntimeHostVerificationMatrix>;
+  replayPlatformRuntimeHost(platform: string, input?: Record<string, unknown> | unknown[], replayOptions?: Record<string, unknown>): Promise<MeetingPlatformRuntimeHostReplayReport>;
+  replayPlatformRuntimeHostMatrix(replayOptions?: Record<string, unknown>): Promise<MeetingPlatformRuntimeHostReplayMatrix>;
   createPlatformRuntimeHost(
     clientOrRuntime?: MeetingTimelineClient | Record<string, unknown>,
     platformOrConfig?: string | MeetingPlatformRuntimeBundle | MeetingPlatformRuntimeHostConfig | Record<string, unknown>,
