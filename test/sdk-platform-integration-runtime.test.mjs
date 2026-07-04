@@ -149,6 +149,18 @@ assert.equal(resolvedTeamsUnsupported.strategy.primary_axis_source, 'local_obser
 assert.equal(resolvedTeamsUnsupported.runtime.runtime_ready, true);
 assert.equal(resolvedTeamsUnsupported.next_actions.includes('enable_detected_platform_in_runtime_platforms'), true);
 
+const resolvedZoomNative = resolveMeetingPlatformForInput({
+  url: 'zoommtg://zoom.us/join?confno=987654321&pwd=secret',
+  title: 'Zoom Meeting',
+}, {
+  baseUrl,
+  platforms: ['zoom'],
+});
+assert.equal(resolvedZoomNative.supported, true);
+assert.equal(resolvedZoomNative.platform, 'zoom');
+assert.equal(resolvedZoomNative.meeting.meeting_id, '987654321');
+assert.equal(resolvedZoomNative.meeting.confidence, 'high');
+
 const manifest = buildMeetingPlatformIntegrationRuntimeManifest({
   baseUrl,
   platforms: ['google-meet', 'zoom'],

@@ -67,9 +67,18 @@ function pathSegments(parsed) {
     .filter(Boolean);
 }
 
+function firstSearchParam(parsed, names = []) {
+  return firstNonEmpty(...names.map((name) => parsed.searchParams.get(name)));
+}
+
 function hostMatches(hostname, ...suffixes) {
   const host = String(hostname || '').toLowerCase();
   return suffixes.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
+}
+
+function protocolIs(parsed, ...protocols) {
+  const protocol = String(parsed.protocol || '').replace(/:$/, '').toLowerCase();
+  return protocols.includes(protocol);
 }
 
 function stableIdFromUrl(parsed, fallback) {
@@ -98,8 +107,12 @@ function zoom(parsed) {
   const segments = pathSegments(parsed);
   let meetingId = null;
   if (segments[0] === 'j' && segments[1]) meetingId = segments[1];
-  if (segments[0] === 'wc' && segments[1]) meetingId = segments[1];
+  if (segments[0] === 'wc' && segments[1]) meetingId = segments[1] === 'join' ? segments[2] : segments[1];
   if (segments[0] === 'my' && segments[1]) meetingId = `my-${segments[1]}`;
+  meetingId = firstNonEmpty(
+    firstSearchParam(parsed, ['confno', 'meetingid', 'meetingId', 'mn']),
+    meetingId,
+  );
   return {
     platform: 'zoom',
     meeting_id: cleanId(meetingId) || stableIdFromUrl(parsed),
@@ -115,8 +128,7 @@ function microsoftTeams(parsed) {
   if (segments[0] === 'l' && segments[1] === 'meetup-join' && segments[2]) meetingId = segments[2];
   if (segments[0] === 'meet' && segments[1]) meetingId = segments[1];
   meetingId = firstNonEmpty(
-    parsed.searchParams.get('meetingId'),
-    parsed.searchParams.get('threadId'),
+    firstSearchParam(parsed, ['meetingId', 'meetingid', 'threadId', 'threadid', 'conferenceId', 'conversationId']),
     meetingId,
   );
   return {
@@ -128,11 +140,15 @@ function microsoftTeams(parsed) {
 }
 
 function lark(parsed) {
-  if (!hostMatches(parsed.hostname, 'vc.feishu.cn', 'vc.larksuite.com', 'larksuite.com')) return null;
+  if (!hostMatches(parsed.hostname, 'vc.feishu.cn', 'vc.larksuite.com', 'larksuite.com', 'feishu.cn') && !protocolIs(parsed, 'lark', 'feishu')) return null;
   const segments = pathSegments(parsed);
   let meetingId = null;
   if (segments[0] === 'j' && segments[1]) meetingId = segments[1];
   if (segments[0] === 'meeting' && segments[1]) meetingId = segments[1];
+  meetingId = firstNonEmpty(
+    firstSearchParam(parsed, ['meeting_id', 'meetingId', 'meeting_no', 'meetingNo', 'meetingNumber', 'conference_id']),
+    meetingId,
+  );
   return {
     platform: 'lark',
     meeting_id: cleanId(meetingId) || stableIdFromUrl(parsed),
@@ -142,11 +158,17 @@ function lark(parsed) {
 }
 
 function webex(parsed) {
-  if (!hostMatches(parsed.hostname, 'webex.com')) return null;
+  if (!hostMatches(parsed.hostname, 'webex.com') && !protocolIs(parsed, 'webex')) return null;
   const segments = pathSegments(parsed);
   let meetingId = null;
   if (segments[0] === 'meet' && segments[1]) meetingId = `meet-${segments[1]}`;
   if (segments[0] === 'join' && segments[1]) meetingId = segments[1];
+  if (protocolIs(parsed, 'webex') && parsed.hostname === 'meet' && segments[0]) meetingId = `meet-${segments[0]}`;
+  if (protocolIs(parsed, 'webex') && parsed.hostname === 'join' && segments[0]) meetingId = segments[0];
+  meetingId = firstNonEmpty(
+    firstSearchParam(parsed, ['meeting_id', 'meetingId', 'meetingNumber', 'meeting_number']),
+    meetingId,
+  );
   return {
     platform: 'webex',
     meeting_id: cleanId(meetingId) || stableIdFromUrl(parsed),

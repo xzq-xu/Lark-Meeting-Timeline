@@ -192,7 +192,7 @@ const runtime = createMeetingPlatformIntegrationRuntime({
 });
 
 const resolution = runtime.resolvePlatform({
-  url: 'https://meet.google.com/abc-defg-hij',
+  url: 'https://meet.google.com/abc-defg-hij', // also accepts zoommtg://, msteams://, lark://, webex://
   title: 'Google Meet',
 });
 // resolution.platform === 'google_meet'; resolution.strategy.primary_axis_source === 'local_observer'
