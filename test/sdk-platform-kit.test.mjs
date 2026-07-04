@@ -184,6 +184,13 @@ assert.equal(runtimeAdapterSelection.selected, true);
 assert.equal(runtimeAdapterSelection.platform, 'google_meet');
 assert.equal(runtimeAdapterSelection.launch.runtime_options.runtimePreset, 'google_meet');
 assert.equal(runtimeAdapterSelection.supported_candidate_count, 2);
+const runtimeAdapterHandoff = kit.meetingAppRuntimeAdapterHandoff(runtimeAdapterSelection, {
+  surface: 'native-detector',
+});
+assert.equal(runtimeAdapterHandoff.selected, true);
+assert.equal(runtimeAdapterHandoff.surface, 'native_detector');
+assert.equal(runtimeAdapterHandoff.install.required_capabilities.includes('capture_window_snapshot'), true);
+assert.equal(runtimeAdapterHandoff.tracks.options.platform, 'google_meet');
 const capturePlan = kit.meetingAppLiveSnapshotCapturePlan('google-meet');
 assert.equal(capturePlan.platform, 'google_meet');
 assert.equal(capturePlan.required_snapshots.some((item) => item.id === 'active_speaker'), true);

@@ -247,6 +247,7 @@ import {
   buildMeetingAppLiveSnapshotCapturePlan,
   buildMeetingAppRuntimeAdapterAcceptanceReport,
   buildMeetingAppRuntimeAdapterConfig,
+  buildMeetingAppRuntimeAdapterHandoff,
   buildMeetingAppRuntimeAdapterProfileMatrix,
   buildMeetingAppRuntimeAdapterValidationReport,
   selectMeetingAppRuntimeAdapter,
@@ -885,6 +886,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     selectMeetingAppRuntimeAdapter(input = {}, selectionOptions = {}) {
       return selectMeetingAppRuntimeAdapter(input, withDefaults(defaults, selectionOptions));
+    },
+    meetingAppRuntimeAdapterHandoff(selectionOrInput = {}, handoffOptions = {}) {
+      return buildMeetingAppRuntimeAdapterHandoff(selectionOrInput, withDefaults(defaults, handoffOptions));
     },
     meetingAppLiveSnapshotCapturePlan(platform, planOptions = {}) {
       return buildMeetingAppLiveSnapshotCapturePlan(platform, withDefaults(defaults, planOptions));

@@ -29,6 +29,7 @@ export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA = 'meeting_app_runtime_ad
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA = 'meeting_app_runtime_adapter_profile_resolution';
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA = 'meeting_app_runtime_adapter_profile_matrix';
 export const MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA = 'meeting_app_runtime_adapter_selection';
+export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_SCHEMA = 'meeting_app_runtime_adapter_handoff';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA = 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA = 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA = 'meeting_app_live_evidence_package';
@@ -372,6 +373,112 @@ function candidateRowsFromSelection(selection = {}, supportedPlatforms = [], opt
   });
 }
 
+function handoffSelectionFrom(input = {}, options = {}) {
+  if (input?.schema === MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA || input?.type === 'meeting_app_runtime_adapter_selection') {
+    return input;
+  }
+  return selectMeetingAppRuntimeAdapter(input, options);
+}
+
+function normalizeHandoffSurface(value = 'browser_extension') {
+  const key = String(value || 'browser_extension').trim().toLowerCase().replace(/[-\s]+/g, '_');
+  const aliases = {
+    chrome_extension: 'browser_extension',
+    edge_extension: 'browser_extension',
+    firefox_extension: 'browser_extension',
+    extension: 'browser_extension',
+    electron: 'electron_webview',
+    electron_preload: 'electron_webview',
+    embedded_webview: 'webview',
+    native: 'native_detector',
+    local_detector: 'native_detector',
+    desktop_detector: 'native_detector',
+  };
+  const normalized = aliases[key] ?? key;
+  return [
+    'browser_extension',
+    'electron_webview',
+    'webview',
+    'native_detector',
+    'custom_host',
+  ].includes(normalized) ? normalized : 'custom_host';
+}
+
+function endpointUrl(path, options = {}) {
+  const baseUrl = firstNonEmpty(options.baseUrl, options.base_url);
+  if (!baseUrl || !path || /^https?:\/\//i.test(String(path))) return path;
+  try {
+    return new URL(path, baseUrl).toString();
+  } catch {
+    return path;
+  }
+}
+
+function handoffInstallPlan(surface, selection = {}, options = {}) {
+  const permissions = selection.profile?.runtime_config?.extension?.permissions ?? [];
+  const hostPermissions = selection.adapter?.host_permissions
+    ?? selection.profile?.runtime_config?.extension?.host_permissions
+    ?? [];
+  const matches = selection.adapter?.extension_matches
+    ?? selection.profile?.runtime_config?.extension?.matches
+    ?? [];
+  const common = compactObject({
+    surface,
+    platform: selection.platform,
+    matches,
+    host_permissions: hostPermissions,
+    timeline_endpoints: selection.launch?.timeline_endpoints,
+    message_types: selection.profile?.runtime_config?.extension?.message_types,
+  });
+  if (surface === 'browser_extension') {
+    return {
+      ...common,
+      install_target: 'manifest_v3_content_script',
+      required_permissions: uniqueList([...permissions, 'storage', 'tabs']),
+      content_script_bridge: 'installMeetingAppContentScriptBridge',
+      background_to_content_messages: ['meeting_timeline.insert_mark', 'meeting_timeline.observe_candidates'],
+      start_mode: 'content_script_auto_start',
+    };
+  }
+  if (surface === 'electron_webview') {
+    return {
+      ...common,
+      install_target: 'electron_preload_or_webview_injection',
+      required_capabilities: ['inject_preload_script', 'read_location_and_document_title', 'forward_window_messages'],
+      bridge_factory: 'createMeetingAppContentScriptBridge',
+      extension_messaging: false,
+      window_messaging: true,
+      start_mode: 'host_injected_runtime',
+    };
+  }
+  if (surface === 'webview') {
+    return {
+      ...common,
+      install_target: 'embedded_webview_script_bridge',
+      required_capabilities: ['inject_page_script', 'forward_window_messages', 'read_location_and_document_title'],
+      bridge_factory: 'createMeetingAppContentScriptBridge',
+      extension_messaging: false,
+      window_messaging: true,
+      start_mode: 'host_injected_runtime',
+    };
+  }
+  if (surface === 'native_detector') {
+    return {
+      ...common,
+      install_target: 'native_window_or_accessibility_snapshot_detector',
+      required_capabilities: ['capture_window_snapshot', 'capture_active_tab_or_app_metadata', 'forward_annotation_events'],
+      runtime_factory: 'createMeetingAppTrackRuntime',
+      start_mode: 'host_supplies_snapshots',
+    };
+  }
+  return {
+    ...common,
+    install_target: 'custom_host_adapter',
+    required_capabilities: ['select_meeting_app_adapter', 'supply_runtime_snapshots', 'forward_annotation_events'],
+    start_mode: 'host_defined',
+  };
+}
+
 function readinessFor(gate = {}, runtimePreset = {}, captureProfile = {}) {
   const nextActions = [];
   if (gate.production_ready !== true) nextActions.push('capture_live_dom_snapshots_for_this_platform');
@@ -636,6 +743,93 @@ export function selectMeetingAppRuntimeAdapter(input = {}, options = {}) {
       ...(supported ? [] : ['enable_detected_platform_in_runtime_platforms']),
       ...(runtimeReady ? [] : ['verify_runtime_adapter_config']),
       ...(profile.next_actions ?? []),
+    ]),
+  });
+}
+
+export function buildMeetingAppRuntimeAdapterHandoff(selectionOrInput = {}, options = {}) {
+  const selection = handoffSelectionFrom(selectionOrInput, options);
+  const surface = normalizeHandoffSurface(firstNonEmpty(
+    options.surface,
+    options.targetSurface,
+    options.target_surface,
+    options.runtimeSurface,
+    options.runtime_surface,
+    'browser_extension',
+  ));
+  const launch = selection.launch ?? {};
+  const timelineEndpoints = Object.fromEntries(Object.entries(launch.timeline_endpoints ?? {}).map(([key, value]) => [
+    key,
+    endpointUrl(value, options),
+  ]));
+  const selected = selection.selected === true;
+  const runtimeReady = selection.readiness?.runtime_ready === true;
+  const issues = [
+    ...(selection.issues ?? []),
+    ...(selected ? [] : [issue('error', 'adapter_not_selected', 'No meeting app runtime adapter is selected for handoff.')]),
+    ...(runtimeReady ? [] : [issue('error', 'adapter_runtime_not_ready', 'Selected adapter is not runtime-ready.')]),
+  ];
+  return compactObject({
+    type: 'meeting_app_runtime_adapter_handoff',
+    schema: MEETING_APP_RUNTIME_ADAPTER_HANDOFF_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    selected,
+    platform: selection.platform,
+    display_name: selection.display_name,
+    surface,
+    meeting: selection.selected_meeting,
+    adapter: selection.adapter,
+    install: handoffInstallPlan(surface, selection, options),
+    runtime: launch.runtime_options ? {
+      factory: 'createMeetingAppBrowserRuntime',
+      options: launch.runtime_options,
+      capture_options: launch.capture_options,
+      bridge_options: {
+        ...launch.bridge_options,
+        extensionMessaging: surface === 'browser_extension',
+        extension_messaging: surface === 'browser_extension',
+        windowMessaging: surface !== 'native_detector',
+        window_messaging: surface !== 'native_detector',
+      },
+      startup: launch.startup,
+      supported_client_methods: launch.supported_client_methods,
+    } : undefined,
+    tracks: launch.track_runtime_options ? {
+      factory: 'createMeetingAppTrackRuntime',
+      options: launch.track_runtime_options,
+      output_intents: selection.adapter?.track_output_intents,
+      content_policy: selection.adapter?.content_policy,
+    } : undefined,
+    annotations: {
+      timestamp_field: 'captured_at_ms',
+      endpoints: timelineEndpoints,
+      realtime_ready: selected,
+      provider_events_block_realtime: false,
+      transcript_blocks_realtime: false,
+    },
+    host_contract: {
+      input_shapes: ['url', 'tab', 'tabs[]', 'windows[]', 'application_snapshot', 'meeting_app_snapshot'],
+      required_annotation_timebase: 'absolute_captured_at_ms',
+      realtime_axis_source: 'local_meeting_app_observer_first',
+      provider_event_role: 'reconcile_and_backfill_only',
+      transcript_role: 'post_meeting_backfill_only',
+    },
+    readiness: {
+      ready_to_start: selected && runtimeReady,
+      adapter_selected: selected,
+      runtime_ready: runtimeReady,
+      realtime_annotation_ready: selection.readiness?.realtime_annotation_ready === true,
+      speaker_track_ready: selection.readiness?.speaker_track_ready === true,
+      participant_track_ready: selection.readiness?.participant_track_ready === true,
+      production_requires_live_snapshot: selection.readiness?.production_requires_live_snapshot === true,
+    },
+    selection,
+    issues,
+    next_actions: uniqueList([
+      ...(selected && runtimeReady ? ['start_runtime_with_handoff.runtime.options'] : []),
+      ...(selection.next_actions ?? []),
+      surface === 'native_detector' ? 'feed_meeting_app_snapshots_into_handoff.tracks.factory' : 'install_handoff.install_into_target_surface',
+      'insert_annotations_with_captured_at_ms',
     ]),
   });
 }

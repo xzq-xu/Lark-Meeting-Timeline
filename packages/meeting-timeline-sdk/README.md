@@ -944,17 +944,24 @@ const selection = kit.selectMeetingAppRuntimeAdapter({
   platforms: ['google-meet', 'teams', 'zoom'],
 });
 
-if (selection.selected) {
+const handoff = kit.meetingAppRuntimeAdapterHandoff(selection, {
+  surface: 'browser-extension',
+  baseUrl: 'http://localhost:8787',
+});
+
+if (handoff.readiness.ready_to_start) {
   const runtime = createMeetingAppTimelineRuntime({
     baseUrl: 'http://localhost:8787',
-    ...selection.launch.runtime_options,
+    ...handoff.runtime.options,
   }, {
-    captureOptions: selection.launch.capture_options,
-    trackRuntimeOptions: selection.launch.track_runtime_options,
+    captureOptions: handoff.runtime.capture_options,
+    trackRuntimeOptions: handoff.tracks.options,
   });
   runtime.start(() => ({ document, location, window }));
 }
 ```
+
+`meetingAppRuntimeAdapterHandoff()` 是推荐给宿主项目保存/传递的边界对象：`surface` 可选 `browser-extension`、`electron-webview`、`webview`、`native-detector`，输出包含安装目标、权限、runtime options、capture options、speaker/participant track options、时间戳字段和非阻塞规则。
 
 如果是在浏览器扩展 content script、内嵌浏览器或 Electron WebView 里运行，可以用 `meeting-app-content-script` 直接安装浏览器侧 bridge。它会创建 `meeting-app-browser-runtime`，自动读取当前 `document/location/window`，安装扩展消息监听，并把 background script 或宿主转发来的标注消息写入时间轴：
 

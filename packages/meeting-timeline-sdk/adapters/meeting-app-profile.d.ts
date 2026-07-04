@@ -8,6 +8,7 @@ export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA: 'meeting_app_runtime_ada
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA: 'meeting_app_runtime_adapter_profile_resolution';
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA: 'meeting_app_runtime_adapter_profile_matrix';
 export const MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA: 'meeting_app_runtime_adapter_selection';
+export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_SCHEMA: 'meeting_app_runtime_adapter_handoff';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA: 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA: 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA: 'meeting_app_live_evidence_package';
@@ -128,6 +129,27 @@ export interface MeetingAppRuntimeAdapterSelection {
   profile: MeetingAppRuntimeAdapterProfileResolution;
   candidates: Array<Record<string, unknown>>;
   selection: Record<string, unknown>;
+  issues: Array<Record<string, unknown>>;
+  next_actions: string[];
+}
+
+export interface MeetingAppRuntimeAdapterHandoff {
+  type: 'meeting_app_runtime_adapter_handoff';
+  schema: 'meeting_app_runtime_adapter_handoff';
+  version: number;
+  selected: boolean;
+  platform?: MeetingAppDomCaptureProfilePlatform | null;
+  display_name?: string;
+  surface: 'browser_extension' | 'electron_webview' | 'webview' | 'native_detector' | 'custom_host' | string;
+  meeting?: Record<string, unknown> | null;
+  adapter?: Record<string, unknown>;
+  install: Record<string, unknown>;
+  runtime?: Record<string, unknown>;
+  tracks?: Record<string, unknown>;
+  annotations: Record<string, unknown>;
+  host_contract: Record<string, unknown>;
+  readiness: Record<string, unknown>;
+  selection: MeetingAppRuntimeAdapterSelection;
   issues: Array<Record<string, unknown>>;
   next_actions: string[];
 }
@@ -320,6 +342,11 @@ export function selectMeetingAppRuntimeAdapter(
   input?: string | Record<string, unknown>,
   options?: MeetingAppIntegrationProfileOptions,
 ): MeetingAppRuntimeAdapterSelection;
+
+export function buildMeetingAppRuntimeAdapterHandoff(
+  selectionOrInput?: string | Record<string, unknown> | MeetingAppRuntimeAdapterSelection,
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppRuntimeAdapterHandoff;
 
 export function buildAllMeetingAppRuntimeAdapterConfigs(
   options?: MeetingAppIntegrationProfileOptions,
