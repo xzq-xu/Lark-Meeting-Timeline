@@ -2418,6 +2418,7 @@ const scaffold = buildMeetingPlatformHostIntegrationScaffold({
 
 assertMeetingPlatformHostIntegrationScaffold(scaffold);
 // scaffold.files 里包含 src/meeting-platform-host.mjs 和 src/http-routes.mjs。
+// scaffold.plan.candidate_observation_contract 会列出每个平台的 observe-candidates 覆盖率、tabs 权限和 message type。
 // host.adaptationStrategyMatrix() 和 /api/meeting-platform/strategy 可给宿主先做平台适配决策。
 // host.resolvePlatform(input) 和 /api/meeting-platform/resolve 可用会议 URL/window/title 判断当前应启用哪个平台适配器。
 // host.resolvePlatformCandidates(input) 和 /api/meeting-platform/resolve-candidates 可从多窗口/多标签页快照中选择当前会议。

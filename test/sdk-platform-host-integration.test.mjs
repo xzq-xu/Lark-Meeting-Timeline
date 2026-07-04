@@ -28,6 +28,7 @@ assert.equal(plan.schema, MEETING_PLATFORM_HOST_INTEGRATION_SCHEMA);
 assert.deepEqual(plan.platforms, ['google_meet', 'microsoft_teams', 'zoom']);
 assert.equal(plan.runtime_contract.annotation_timestamp_field, 'captured_at_ms');
 assert.equal(plan.runtime_contract.provider_events_block_realtime, false);
+assert.equal(plan.runtime_contract.candidate_observation_required_for_host_axis_binding, true);
 assert.equal(plan.endpoints.platform_events, '/api/platform-events');
 assert.equal(plan.endpoints.adapter_contracts, '/api/meeting-platform/contracts');
 assert.equal(plan.endpoints.runtime_bundles, '/api/meeting-platform/runtime-bundles');
@@ -44,6 +45,15 @@ assert.equal(plan.sdk.runtime_event_module, '@ai-annotation/meeting-timeline-sdk
 assert.equal(plan.handoff_bundle.platform_count, 3);
 assert.equal(plan.runtime_bundle_matrix.platform_count, 3);
 assert.equal(plan.runtime_bundle_matrix.provider_required_for_realtime_count, 0);
+assert.equal(plan.runtime_bundle_matrix.candidate_observer_count, 3);
+assert.equal(plan.candidate_observation_contract.platform_count, 3);
+assert.equal(plan.candidate_observation_contract.ready_count, 3);
+assert.equal(plan.candidate_observation_contract.all_ready, true);
+assert.equal(plan.candidate_observation_contract.endpoint, '/api/meeting-platform/observe-candidates');
+assert.equal(plan.candidate_observation_contract.runtime_event_action, 'observe_platform_candidates');
+assert.deepEqual(plan.candidate_observation_contract.required_permissions, ['tabs']);
+assert.equal(plan.candidate_observation_contract.rows.every((row) => row.ready === true), true);
+assert.equal(plan.candidate_observation_contract.rows.some((row) => row.platform === 'google_meet'), true);
 assert.equal(plan.runtime_event_plan_matrix.platform_count, 3);
 assert.equal(plan.runtime_event_plan_matrix.realtime_provider_dependency_count, 0);
 assert.equal(plan.runtime_event_plan_matrix.transcript_realtime_dependency_count, 0);
@@ -126,6 +136,8 @@ assert.equal(file(scaffold, 'README.md').content.includes('runtimeEventPlans'), 
 assert.equal(file(scaffold, 'README.md').content.includes('resolvePlatform'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('resolvePlatformCandidates'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('observePlatformCandidates'), true);
+assert.equal(file(scaffold, 'README.md').content.includes('meeting_timeline.observe_candidates'), true);
+assert.equal(file(scaffold, 'README.md').content.includes('Candidate observation contract'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('extensionInstallPlan'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('integrationRuntimeSummary'), true);
 
@@ -133,6 +145,10 @@ const acceptance = buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(s
 assert.equal(acceptance.schema, MEETING_PLATFORM_HOST_INTEGRATION_ACCEPTANCE_SCHEMA);
 assert.equal(acceptance.accepted, true);
 assert.equal(acceptance.blocking_count, 0);
+assert.equal(acceptance.candidate_observation_ready, true);
+assert.equal(acceptance.candidate_observer_count, 3);
+assert.equal(acceptance.candidate_observer_missing_count, 0);
+assert.equal(acceptance.candidate_observation_contract.all_ready, true);
 assert.equal(acceptance.required_files.includes('src/http-routes.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-strategy.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/verify-contracts.mjs'), true);
@@ -165,6 +181,25 @@ const missingContractGate = {
 const missingContractGateAcceptance = buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(missingContractGate);
 assert.equal(missingContractGateAcceptance.accepted, false);
 assert.equal(missingContractGateAcceptance.issues.some((item) => item.path === 'scripts/verify-contracts.mjs'), true);
+
+const missingCandidateObservationContract = {
+  ...scaffold,
+  plan: {
+    ...scaffold.plan,
+    candidate_observation_contract: {
+      ...scaffold.plan.candidate_observation_contract,
+      ready_count: 2,
+      missing_count: 1,
+      all_ready: false,
+    },
+  },
+};
+const missingCandidateObservationContractAcceptance = buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(missingCandidateObservationContract);
+assert.equal(missingCandidateObservationContractAcceptance.accepted, false);
+assert.equal(
+  missingCandidateObservationContractAcceptance.issues.some((item) => item.code === 'candidate_observation_contract_not_ready'),
+  true,
+);
 
 const client = {
   async startMeeting(input) { return { ok: true, input }; },

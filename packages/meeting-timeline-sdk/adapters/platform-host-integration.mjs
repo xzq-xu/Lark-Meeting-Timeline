@@ -303,6 +303,7 @@ function routesSource(options = {}) {
 
 function readmeSource(plan = {}) {
   const platforms = plan.platforms ?? [];
+  const candidateRows = plan.candidate_observation_contract?.rows ?? [];
   return `# Meeting Platform Timeline Host
 
 This scaffold wires a host project to @ai-annotation/meeting-timeline-sdk.
@@ -314,10 +315,20 @@ Runtime rule:
 - Provider webhooks reconcile or backfill the axis; they do not block realtime annotation.
 - Transcript and artifact import are post-meeting work.
 - Each meeting keeps an isolated annotation set.
+- Candidate observation is a required host-axis binding contract: browser extensions or native hosts send active meeting windows through meeting_timeline.observe_candidates or /api/meeting-platform/observe-candidates before realtime marks are inserted.
 
 Supported platforms in this scaffold:
 
 ${platforms.map((platform) => `- ${platform}`).join('\n')}
+
+Candidate observation contract:
+
+- endpoint: ${plan.candidate_observation_contract?.endpoint ?? '/api/meeting-platform/observe-candidates'}
+- runtime event action: ${plan.candidate_observation_contract?.runtime_event_action ?? 'observe_platform_candidates'}
+- required permissions: ${(plan.candidate_observation_contract?.required_permissions ?? ['tabs']).join(', ')}
+- all ready: ${plan.candidate_observation_contract?.all_ready === true ? 'true' : 'false'}
+
+${candidateRows.map((row) => `- ${row.platform}: ${row.ready ? 'ready' : 'missing'} via ${row.message_type ?? 'meeting_timeline.observe_candidates'} (${row.required_permission ?? 'tabs'})`).join('\n')}
 
 Minimal usage:
 
@@ -352,6 +363,10 @@ const runtimeBundles = host.runtimeBundles();
 const runtimeEventPlans = host.runtimeEventPlans();
 const extensionPlan = host.extensionInstallPlan();
 const integrationRuntime = host.integrationRuntimeSummary();
+const candidateContract = host.integrationRuntimeManifest().rows.map((row) => ({
+  platform: row.platform,
+  candidate_observation_ready: row.candidate_observation_ready,
+}));
 \`\`\`
 
 Verification:
@@ -375,6 +390,39 @@ npm run meeting-platform:integration-runtime-manifest
 npm run sdk:package-smoke
 \`\`\`
 `;
+}
+
+function buildCandidateObservationContract(platforms = [], runtimeBundleMatrix = {}) {
+  const rowsByPlatform = Object.fromEntries(asArray(runtimeBundleMatrix.rows).map((row) => [row.platform, row]));
+  const rows = platforms.map((platform) => {
+    const row = rowsByPlatform[platform] ?? {};
+    const ready = row.candidate_observation_ready === true;
+    return compactObject({
+      platform,
+      ready,
+      message_type: row.candidate_observer_message_type ?? 'meeting_timeline.observe_candidates',
+      required_permission: row.candidate_observer_permission ?? 'tabs',
+      endpoint: '/api/meeting-platform/observe-candidates',
+      runtime_event_action: 'observe_platform_candidates',
+      producer: 'browser_extension_background_or_native_host',
+      missing_items: ready ? [] : ['candidate_observation_runtime_bundle'],
+    });
+  });
+  const readyCount = rows.filter((row) => row.ready === true).length;
+  return {
+    type: 'meeting_platform_candidate_observation_contract',
+    platform_count: platforms.length,
+    ready_count: readyCount,
+    missing_count: platforms.length - readyCount,
+    all_ready: readyCount === platforms.length,
+    endpoint: '/api/meeting-platform/observe-candidates',
+    runtime_event_action: 'observe_platform_candidates',
+    message_types: unique(rows.map((row) => row.message_type)),
+    required_permissions: unique(rows.map((row) => row.required_permission)),
+    acceptance_gate: 'all_selected_platforms_must_support_candidate_observation',
+    rationale: 'Host projects need low-latency meeting-window candidate observation to bind realtime annotations to the current meeting axis before provider events arrive.',
+    rows,
+  };
 }
 
 export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
@@ -404,6 +452,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     platforms,
     baseUrl,
   });
+  const candidateObservationContract = buildCandidateObservationContract(platforms, runtimeBundleMatrix);
   const runtimeEventPlanMatrix = buildMeetingPlatformRuntimeEventPlanMatrix({
     ...options,
     platforms,
@@ -442,6 +491,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       transcript_blocks_realtime: false,
       per_meeting_annotation_isolation_required: true,
       local_observer_may_start_axis: true,
+      candidate_observation_required_for_host_axis_binding: true,
     },
     endpoints: {
       platform_events: basePath,
@@ -471,6 +521,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     adaptation_strategy_matrix: adaptationStrategyMatrix,
     runtime_event_plan_matrix: runtimeEventPlanMatrix,
     runtime_bundle_matrix: runtimeBundleMatrix,
+    candidate_observation_contract: candidateObservationContract,
     handoff_bundle: handoff,
     adapter_contract_matrix: adapterContractMatrix,
     adapter_contract_acceptance_matrix: adapterContractAcceptanceMatrix,
@@ -479,6 +530,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       'run_meeting_platform_contract_acceptance_before_enabling_new_platform',
       'wire_host_routes_to_handleMeetingPlatformRequest',
       'capture_real_meeting_app_snapshots_for_each_target_platform',
+      'verify_candidate_observation_contract_for_each_target_platform',
       'capture_real_provider_events_where_available',
     ]),
   });
@@ -790,6 +842,24 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!readme.includes('captured_at_ms')) {
     issues.push(issue('warning', 'readme_missing_timestamp_contract', 'README should state the captured_at_ms contract.'));
   }
+  if (!readme.includes('meeting_timeline.observe_candidates')) {
+    issues.push(issue('warning', 'readme_missing_candidate_observation_contract', 'README should state the candidate observation contract.'));
+  }
+  const candidateObservationContract = scaffold.plan?.candidate_observation_contract;
+  if (!candidateObservationContract) {
+    issues.push(issue('error', 'missing_candidate_observation_contract', 'Scaffold plan must include the candidate observation contract.'));
+  } else if (candidateObservationContract.all_ready !== true) {
+    issues.push(issue('error', 'candidate_observation_contract_not_ready', 'Every selected platform must support candidate observation before host handoff.', {
+      missing_count: candidateObservationContract.missing_count,
+    }));
+  }
+  const runtimeCandidateObserverCount = scaffold.plan?.runtime_bundle_matrix?.candidate_observer_count;
+  if (runtimeCandidateObserverCount != null && runtimeCandidateObserverCount !== scaffold.platforms?.length) {
+    issues.push(issue('error', 'runtime_bundle_candidate_observer_not_ready', 'Runtime bundle matrix must expose candidate observation for every selected platform.', {
+      candidate_observer_count: runtimeCandidateObserverCount,
+      platform_count: scaffold.platforms?.length ?? 0,
+    }));
+  }
   const packageJsonFile = fileByPath(scaffold, 'package.json');
   if (packageJsonFile) {
     try {
@@ -811,6 +881,10 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     accepted: blocking.length === 0,
     platform_count: scaffold.platforms?.length ?? 0,
     file_count: scaffold.files?.length ?? 0,
+    candidate_observation_ready: candidateObservationContract?.all_ready === true,
+    candidate_observer_count: candidateObservationContract?.ready_count ?? runtimeCandidateObserverCount ?? 0,
+    candidate_observer_missing_count: candidateObservationContract?.missing_count,
+    candidate_observation_contract: candidateObservationContract,
     required_files: requiredFiles,
     blocking_count: blocking.length,
     warning_count: issues.length - blocking.length,
