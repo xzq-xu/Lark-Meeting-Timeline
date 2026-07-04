@@ -539,6 +539,7 @@ const packageMatrix = buildMeetingPlatformAdaptationPackageMatrix({
   platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
 });
 
+// packageMatrix.candidate_observer_count 表示多少平台已经暴露 observe_platform_candidates 候选观察契约。
 console.log(packageMatrix.rows);
 ```
 
@@ -582,6 +583,7 @@ const runtimeMatrix = buildMeetingPlatformRuntimeBundleMatrix({
   baseUrl: 'https://timeline.example.com',
   platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
 });
+// runtimeMatrix.rows[*].candidate_observation_ready 可直接用于下游适配看板。
 ```
 
 `platform-kit` 同样暴露 `kit.platformRuntimeBundle('google-meet')` 和 `kit.platformRuntimeBundleMatrix()`。CLI 可批量导出每个平台的 runtime bundle：

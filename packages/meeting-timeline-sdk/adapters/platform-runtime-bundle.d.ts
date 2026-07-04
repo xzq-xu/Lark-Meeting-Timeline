@@ -96,6 +96,7 @@ export interface MeetingPlatformRuntimeBundleMatrix {
   platform_count: number;
   runtime_ready_count: number;
   sdk_wiring_ready_count: number;
+  candidate_observer_count: number;
   provider_required_for_realtime_count: number;
   transcript_blocking_count: number;
   platforms: string[];

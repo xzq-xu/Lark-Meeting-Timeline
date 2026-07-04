@@ -76,6 +76,7 @@ export interface MeetingPlatformAdaptationPackageMatrix {
   platform_count: number;
   sdk_wiring_ready_count: number;
   browser_observer_count: number;
+  candidate_observer_count: number;
   provider_observer_count: number;
   production_ready_count: number;
   realtime_ready_count: number;
