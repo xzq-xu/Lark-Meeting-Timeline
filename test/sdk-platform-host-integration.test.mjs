@@ -35,6 +35,7 @@ assert.equal(plan.endpoints.extension_plan, '/api/meeting-platform/extension-pla
 assert.equal(plan.endpoints.integration_runtime, '/api/meeting-platform/integration-runtime');
 assert.equal(plan.endpoints.integration_runtime_manifest, '/api/meeting-platform/integration-runtime/manifest');
 assert.equal(plan.endpoints.runtime_events, '/api/meeting-platform/runtime-events');
+assert.equal(plan.sdk.runtime_event_module, '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event');
 assert.equal(plan.handoff_bundle.platform_count, 3);
 assert.equal(plan.runtime_bundle_matrix.platform_count, 3);
 assert.equal(plan.runtime_bundle_matrix.provider_required_for_realtime_count, 0);

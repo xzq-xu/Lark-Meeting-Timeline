@@ -342,6 +342,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       package: '@ai-annotation/meeting-timeline-sdk',
       kit_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
       integration_runtime_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime',
+      runtime_event_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event',
       live_adapter_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter',
       host_integration_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-host-integration',
     },

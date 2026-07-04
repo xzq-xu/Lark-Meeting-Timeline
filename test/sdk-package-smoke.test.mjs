@@ -31,6 +31,8 @@ assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-integration-runtime.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-integration-runtime.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-runtime-event.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-runtime-event.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-registry.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-registry.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
@@ -120,6 +122,12 @@ import {
   detectMeetingPlatformForBrowser,
   installMeetingPlatformIntegrationContentScriptBridge,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';
+import {
+  MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
+  buildMeetingPlatformAnnotationRuntimeEvent,
+  createMeetingPlatformRuntimeEventClient,
+  meetingPlatformRuntimeEventEndpoint,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event';
 import {
   assertMeetingPlatformRegistryManifest,
   buildMeetingPlatformRegistryAcceptanceReport,
@@ -314,6 +322,29 @@ assert.equal(integrationRuntime.timelineView('google-meet', {
     captured_at_ms: 1_782_614_401_000,
   }],
 }).diagnostics.marker_count, 1);
+const runtimeEvent = buildMeetingPlatformAnnotationRuntimeEvent('google-meet', {
+  annotation: {
+    id: 'package-runtime-event-note-1',
+    label: 'why?',
+    captured_at_ms: 1_782_614_401_000,
+  },
+  current_meeting: {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    start_time_ms: 1_782_614_400_000,
+  },
+}, {
+  now: () => 1_782_614_402_000,
+});
+assert.equal(runtimeEvent.schema, MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA);
+assert.equal(runtimeEvent.action, 'insert_annotation');
+assert.equal(meetingPlatformRuntimeEventEndpoint({
+  baseUrl: 'http://localhost:8787',
+}), 'http://localhost:8787/api/meeting-platform/runtime-events');
+assert.equal(typeof createMeetingPlatformRuntimeEventClient({
+  baseUrl: 'http://localhost:8787',
+  fetch: async () => new Response('{}'),
+}).send, 'function');
 assert.equal(kit.platformRegistryEntry('google-meet').annotations.timestamp_field, 'captured_at_ms');
 assert.equal(kit.platformRegistryManifest({ platforms: ['zoom'] }).rows[0].platform, 'zoom');
 assert.equal(meetingPlatformEventAdapterFor('teams').key, 'microsoft_teams');

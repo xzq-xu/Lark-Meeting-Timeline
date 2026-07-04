@@ -42,6 +42,10 @@ function asArray(value) {
   return value == null ? [] : [value];
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
+}
+
 function unique(values = []) {
   return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
 }
@@ -163,6 +167,57 @@ function snapshotFrom(input = {}) {
 
 function providerInputFrom(input = {}, payload) {
   return firstNonEmpty(input.request, input.provider_event, input.providerEvent, input.event, input.raw, input, payload);
+}
+
+function runtimeEventPayloadFrom(input = {}, payload) {
+  return payload === undefined
+    ? firstNonEmpty(input.payload, input.provider_event, input.providerEvent, input.snapshot, input.annotation, input.mark, input.raw)
+    : payload;
+}
+
+function runtimeEventInputFrom(input = {}, payload) {
+  const eventPayload = runtimeEventPayloadFrom(input, payload);
+  if (!isPlainObject(eventPayload)) {
+    return {
+      input,
+      payload: eventPayload,
+    };
+  }
+  return {
+    input: compactObject({
+      ...eventPayload,
+      ...input,
+      payload: input.payload ?? eventPayload,
+      snapshot: firstNonEmpty(
+        input.snapshot,
+        input.meeting_app_snapshot,
+        input.meetingAppSnapshot,
+        eventPayload.snapshot,
+        eventPayload.meeting_app_snapshot,
+        eventPayload.meetingAppSnapshot,
+      ),
+      provider_event: firstNonEmpty(
+        input.provider_event,
+        input.providerEvent,
+        eventPayload.provider_event,
+        eventPayload.providerEvent,
+        input.raw,
+        eventPayload.raw,
+        eventPayload,
+      ),
+      annotation: firstNonEmpty(input.annotation, input.mark, eventPayload.annotation, eventPayload.mark),
+      current_meeting: firstNonEmpty(
+        input.current_meeting,
+        input.currentMeeting,
+        eventPayload.current_meeting,
+        eventPayload.currentMeeting,
+      ),
+      signals: firstNonEmpty(input.signals, eventPayload.signals),
+      meeting: firstNonEmpty(input.meeting, eventPayload.meeting),
+      annotations: firstNonEmpty(input.annotations, eventPayload.annotations),
+    }),
+    payload: eventPayload,
+  };
 }
 
 function maybeNormalizePlatform(platform) {
@@ -424,30 +479,33 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
       return kit.platformTimelineView(platform, input, viewOptions);
     },
     async handleEvent(input = {}, payload, eventOptions = {}) {
-      const action = actionName(input, eventOptions);
+      const runtimeEvent = runtimeEventInputFrom(input, payload);
+      const eventInput = runtimeEvent.input;
+      const eventPayload = runtimeEvent.payload;
+      const action = actionName(eventInput, eventOptions);
       if (['registry', 'platform_registry'].includes(action)) return runtime.registry(eventOptions);
       if (['manifest', 'runtime_manifest', 'integration_manifest'].includes(action)) return runtime.manifest(eventOptions);
       if (['runtime_bundles', 'runtime_bundle_matrix'].includes(action)) return runtime.runtimeBundles(eventOptions);
       if (['readiness', 'live_readiness'].includes(action)) return runtime.readiness(eventOptions);
       if (['handoff_readiness'].includes(action)) return runtime.handoffReadiness(eventOptions);
-      const platform = platformFrom(input, eventOptions);
+      const platform = platformFrom(eventInput, eventOptions);
       if (['observe', 'observe_app', 'observe_meeting_app', 'meeting_app_snapshot', 'snapshot'].includes(action)) {
-        return runtime.observeMeetingApp(platform, snapshotFrom(input), eventOptions);
+        return runtime.observeMeetingApp(platform, snapshotFrom(eventInput), eventOptions);
       }
       if (['provider', 'provider_event', 'ingest_provider', 'webhook'].includes(action)) {
-        return runtime.ingestProvider(platform, providerInputFrom(input, payload), payload, eventOptions);
+        return runtime.ingestProvider(platform, providerInputFrom(eventInput, eventPayload), eventPayload, eventOptions);
       }
       if (['annotation', 'mark', 'insert_annotation', 'insert_mark'].includes(action)) {
-        return runtime.insertAnnotation(platform, input, eventOptions);
+        return runtime.insertAnnotation(platform, eventInput, eventOptions);
       }
       if (['speaker_track', 'speaker'].includes(action)) {
-        return runtime.speakerTrack(platform, input, eventOptions);
+        return runtime.speakerTrack(platform, eventInput, eventOptions);
       }
       if (['participant_track', 'participant'].includes(action)) {
-        return runtime.participantTrack(platform, input, eventOptions);
+        return runtime.participantTrack(platform, eventInput, eventOptions);
       }
       if (['timeline_view', 'view'].includes(action)) {
-        return runtime.timelineView(platform, input, eventOptions);
+        return runtime.timelineView(platform, eventInput, eventOptions);
       }
       throw new MeetingTimelineSdkError('unsupported meeting platform runtime event action', {
         action,

@@ -60,6 +60,12 @@ export interface MeetingPlatformRuntimeBundle {
     message_types: Record<string, string>;
     bridge_message_types?: string[];
     accepted_methods: string[];
+    runtime_event?: {
+      schema: string;
+      endpoint?: string;
+      build_function: string;
+      client_factory: string;
+    };
     examples: Record<string, unknown>;
   };
   host: {

@@ -17,6 +17,10 @@ import {
   buildMeetingAppExtensionClientCallMessage,
   buildMeetingAppExtensionStatusMessage,
 } from './meeting-app-extension.mjs';
+import {
+  MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT,
+  MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
+} from './platform-runtime-event.mjs';
 
 export const MEETING_PLATFORM_RUNTIME_BUNDLE_SCHEMA = 'meeting_platform_runtime_bundle';
 export const MEETING_PLATFORM_RUNTIME_BUNDLE_MATRIX_SCHEMA = 'meeting_platform_runtime_bundle_matrix';
@@ -146,13 +150,19 @@ function startOptions(platform, adaptationPackage = {}, preset = {}, options = {
   });
 }
 
-function hostEndpoints(adaptationPackage = {}) {
+function endpointUrl(path, options = {}) {
+  const baseUrl = firstNonEmpty(options.baseUrl, options.base_url);
+  return baseUrl ? new URL(path, baseUrl).toString() : path;
+}
+
+function hostEndpoints(adaptationPackage = {}, options = {}) {
   const endpoints = adaptationPackage.collector?.timeline_ingest?.endpoints ?? {};
   return compactObject({
     startMeeting: endpoints.startMeeting,
     endMeeting: endpoints.endMeeting,
     insertMark: adaptationPackage.annotation_pipeline?.insert_endpoint ?? endpoints.insertMark,
     insertMarks: endpoints.insertMarks,
+    runtimeEvents: endpointUrl(MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT, options),
     importTranscript: adaptationPackage.transcript?.import_endpoint ?? endpoints.importTranscript,
   });
 }
@@ -195,7 +205,7 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
   const extension = adaptationPackage.extension ?? {};
   const manifest = contentScriptManifest(key, options, js);
   const start = startOptions(key, adaptationPackage, preset ?? {}, options);
-  const endpoints = hostEndpoints(adaptationPackage);
+  const endpoints = hostEndpoints(adaptationPackage, options);
   const messages = messageExamples(key, {
     ...options,
     url: firstNonEmpty(options.url, options.href, extension.matches?.[0]?.replace('*', '')),
@@ -213,6 +223,7 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
     modules: {
       platform_integration_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime',
       content_script_bridge: '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime',
+      runtime_event: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event',
       content_script: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script',
       browser_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime',
       timeline_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime',
@@ -253,6 +264,12 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
         'meeting_timeline.provider_event',
       ],
       accepted_methods: Object.keys(endpoints).filter((method) => endpoints[method]),
+      runtime_event: {
+        schema: MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
+        endpoint: endpoints.runtimeEvents,
+        build_function: 'buildMeetingPlatformRuntimeEvent',
+        client_factory: 'createMeetingPlatformRuntimeEventClient',
+      },
       examples: messages,
     },
     host: {

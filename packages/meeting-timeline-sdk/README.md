@@ -117,6 +117,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/timeline-bridge`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-kit`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime`
+- `@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event`
 - `@ai-annotation/meeting-timeline-sdk/adapters/signal-reconciler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-handler`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-webhook-router`
@@ -243,6 +244,26 @@ installMeetingPlatformIntegrationContentScriptBridge({
 ```
 
 `runtime.manifest()` 只证明 SDK 接线、runtime bundle、`captured_at_ms`、provider/transcript 非阻塞策略已经满足 host handoff；真实会议页 DOM 和官方事件证据仍然要用 `platform-real-intake` / `platform-handoff-readiness` 验收，不能用 runtime manifest 冒充 production ready。
+
+跨项目投递到 host 的统一 HTTP envelope 用 `platform-runtime-event`。Google Meet 扩展、Teams WebView preload、Zoom native helper 都可以只构造同一类事件包，再发到 `/api/meeting-platform/runtime-events`；host 侧 `handleRuntimeEvent()` 会分发到 observe、provider ingest、insert annotation、speaker/participant track 或 timeline view：
+
+```js
+import {
+  createMeetingPlatformRuntimeEventClient,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event';
+
+const runtimeEvents = createMeetingPlatformRuntimeEventClient({
+  baseUrl: 'https://timeline.example.com',
+});
+
+await runtimeEvents.insertAnnotation('google-meet', {
+  annotation: {
+    label: 'why?',
+    captured_at_ms: Date.now(),
+  },
+  current_meeting: currentMeeting,
+});
+```
 
 多平台正式接入前，可以先用 `platform-strategy` 输出机器可读策略。它把 Google Meet、Teams、Zoom、Webex、Lark 的共性收敛成同一条原则：实时标注轴由本地观察或 host detector 先建，provider webhook 只做 reconcile/backfill，post-meeting transcript 只做会后导入，不阻塞当前标注：
 
@@ -487,6 +508,8 @@ const googleRuntime = buildMeetingPlatformRuntimeBundle('google-meet', {
 // googleRuntime.runtime.content_script_bridge.options 可直接传给平台级 content-script bridge。
 // googleRuntime.messaging.examples.content_script_insert_annotation 是外部插入标注的消息格式。
 // googleRuntime.host.endpoints.insertMark 是实时标注写入地址。
+// googleRuntime.host.endpoints.runtimeEvents 是统一 runtime event envelope 写入地址。
+// googleRuntime.messaging.runtime_event.client_factory 指向 createMeetingPlatformRuntimeEventClient。
 // googleRuntime.readiness.provider_required_for_realtime === false。
 // googleRuntime.readiness.transcript_blocks_realtime === false。
 
