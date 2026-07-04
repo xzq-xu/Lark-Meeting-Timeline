@@ -21,6 +21,8 @@ assert.equal(google.runtime_contract.transcript_blocks_realtime, false);
 assert.equal(google.local_observer.required_for_realtime_axis, true);
 assert.deepEqual(google.extension.matches, ['https://meet.google.com/*']);
 assert.equal(google.annotation_pipeline.insert_endpoint, `${baseUrl}/api/annotations`);
+assert.equal(google.annotation_pipeline.runtime_event_endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);
+assert.equal(google.annotation_pipeline.runtime_event.client_factory, 'createMeetingPlatformRuntimeEventClient');
 assert.equal(google.annotation_pipeline.sdk_module, '@ai-annotation/meeting-timeline-sdk/adapters/platform-realtime-annotation');
 assert.equal(google.provider_observer.required_for_realtime, false);
 assert.equal(google.provider_observer.start_events.includes('google.workspace.meet.conference.v2.started'), true);

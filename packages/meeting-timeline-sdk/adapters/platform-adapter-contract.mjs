@@ -7,6 +7,9 @@ import {
 import { buildMeetingPlatformProviderConnectionPack } from './platform-provider-connection.mjs';
 import { buildMeetingPlatformRuntimeProfile } from './platform-runtime-profile.mjs';
 import { buildMeetingPlatformFieldCollectorConfig } from './platform-field-capture.mjs';
+import {
+  MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT,
+} from './platform-runtime-event.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_CONTRACT_SCHEMA = 'meeting_platform_adapter_contract';
 export const MEETING_PLATFORM_ADAPTER_CONTRACT_MATRIX_SCHEMA = 'meeting_platform_adapter_contract_matrix';
@@ -45,6 +48,11 @@ function providerEvents(runtime = {}) {
     artifact_events: runtime.provider_events?.artifact_events ?? [],
     lifecycle_events: runtime.provider_events?.lifecycle_events ?? [],
   };
+}
+
+function endpointUrl(path, options = {}) {
+  const baseUrl = firstNonEmpty(options.baseUrl, options.base_url);
+  return baseUrl ? new URL(path, baseUrl).toString() : path;
 }
 
 function localObserverContract(collector = {}, runtime = {}) {
@@ -104,6 +112,8 @@ function implementationContract(capabilities = {}, collector = {}, runtime = {})
       client: '@ai-annotation/meeting-timeline-sdk',
       kit: '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
       contract: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract',
+      integration_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime',
+      runtime_event: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event',
       events: capabilities.sdk_modules?.events,
       ingest: capabilities.sdk_modules?.ingest,
       local_observer: capabilities.sdk_modules?.local_observer,
@@ -113,6 +123,7 @@ function implementationContract(capabilities = {}, collector = {}, runtime = {})
     kit_methods: [
       'platformAdapterContract',
       'platformRuntimeProfile',
+      'platformRuntimeBundle',
       'platformProviderConnectionPack',
       'platformFieldCollectorConfig',
       'platformFieldEvidenceBundle',
@@ -192,6 +203,9 @@ function buildAcceptanceIssues(contract = {}, target = 'contract') {
   if (!hasValue(contract.annotations?.endpoints?.insertMark)) {
     issues.push(issue('error', 'missing_insert_mark_endpoint', 'Contract must expose annotations.endpoints.insertMark.'));
   }
+  if (!hasValue(contract.annotations?.endpoints?.runtimeEvents)) {
+    issues.push(issue('error', 'missing_runtime_events_endpoint', 'Contract must expose annotations.endpoints.runtimeEvents.'));
+  }
   if (contract.annotations?.timestamp_field !== 'captured_at_ms') {
     issues.push(issue('error', 'invalid_annotation_endpoint_timestamp_field', 'Annotation endpoint contract must name captured_at_ms.'));
   }
@@ -240,6 +254,9 @@ function buildAcceptanceIssues(contract = {}, target = 'contract') {
   }
   if (!includesValue(contract.implementation?.kit_methods, 'insertMark')) {
     issues.push(issue('error', 'missing_insert_mark_method', 'Implementation handoff must mention insertMark.'));
+  }
+  if (!hasValue(contract.implementation?.imports?.runtime_event)) {
+    issues.push(issue('error', 'missing_runtime_event_module', 'Implementation handoff must mention platform-runtime-event.'));
   }
   if (target === 'pilot' && contract.readiness?.ready_for_realtime_annotations !== true) {
     issues.push(issue('error', 'pilot_not_ready', 'Pilot acceptance requires ready_for_realtime_annotations=true.', {
@@ -298,10 +315,26 @@ export function buildMeetingPlatformAdapterContract(platform, options = {}) {
       ],
     },
     annotations: {
-      endpoints: collector.timeline_ingest?.endpoints,
+      endpoints: {
+        ...(collector.timeline_ingest?.endpoints ?? {}),
+        runtimeEvents: endpointUrl(MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT, options),
+      },
       timestamp_field: runtime.runtime_contract?.annotation_timestamp_field,
       policy: runtime.annotations,
       realtime_policy: collector.timeline_ingest?.realtime_annotation_policy,
+      runtime_event: {
+        schema: 'meeting_platform_runtime_event',
+        endpoint: endpointUrl(MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT, options),
+        client_factory: 'createMeetingPlatformRuntimeEventClient',
+        accepted_actions: [
+          'observe_meeting_app',
+          'provider_event',
+          'insert_annotation',
+          'speaker_track',
+          'participant_track',
+          'timeline_view',
+        ],
+      },
     },
     local_observer: localObserverContract(collector, runtime),
     provider_observer: providerObserverContract(provider, runtime, collector),
@@ -345,6 +378,7 @@ export function buildMeetingPlatformAdapterContractMatrix(options = {}) {
       speaker_min_stable_ms: contract.local_observer?.speaker_markers?.filter?.min_stable_ms,
       transcript_import: contract.transcript?.availability,
       missing_item_count: contract.readiness.missing_items?.length ?? 0,
+      runtime_events_endpoint: contract.annotations?.endpoints?.runtimeEvents,
     })),
     contracts,
     next_actions: unique(contracts.flatMap((contract) => contract.next_actions ?? [])),
@@ -377,6 +411,7 @@ export function buildMeetingPlatformAdapterContractAcceptanceReport(contractOrPl
       production_ready: contract.readiness?.production_ready === true,
       ready_for_realtime_annotations: contract.readiness?.ready_for_realtime_annotations === true,
       insert_mark_endpoint: contract.annotations?.endpoints?.insertMark,
+      runtime_events_endpoint: contract.annotations?.endpoints?.runtimeEvents,
       provider_start_event_count: contract.provider_observer?.events?.start_events?.length ?? 0,
       provider_end_event_count: contract.provider_observer?.events?.end_events?.length ?? 0,
       missing_item_count: contract.readiness?.missing_items?.length ?? 0,

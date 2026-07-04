@@ -786,6 +786,9 @@ assert.equal(buildMeetingPlatformArtifactHandoff('google-meet', {
 assert.equal(buildMeetingPlatformAdapterContract('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).supported_surfaces.browser_observer, true);
+assert.equal(buildMeetingPlatformAdapterContract('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).annotations.endpoints.runtimeEvents, 'http://localhost:8787/api/meeting-platform/runtime-events');
 assert.equal(buildMeetingPlatformAdapterContractMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],

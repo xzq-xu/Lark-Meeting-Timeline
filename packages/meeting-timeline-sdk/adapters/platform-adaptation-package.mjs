@@ -111,6 +111,8 @@ function localObserverSummary(collector = {}, runtimeAdapter = {}) {
 function annotationSummary(contract = {}, collector = {}) {
   return compactObject({
     insert_endpoint: contract.annotations?.endpoints?.insertMark ?? collector.timeline_ingest?.endpoints?.insertMark,
+    runtime_event_endpoint: contract.annotations?.endpoints?.runtimeEvents,
+    runtime_event: contract.annotations?.runtime_event,
     timestamp_field: 'captured_at_ms',
     realtime_policy: collector.timeline_ingest?.realtime_annotation_policy ?? contract.annotations?.realtime_policy,
     sdk_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-realtime-annotation',

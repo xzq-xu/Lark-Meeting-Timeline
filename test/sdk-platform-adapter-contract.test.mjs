@@ -29,6 +29,9 @@ assert.equal(google.realtime_axis.start.create_on, 'local_observer_active_meetin
 assert.equal(google.realtime_axis.end.create_on, 'local_observer_meeting_inactive_or_manual_stop');
 assert.equal(google.realtime_axis.rules.includes('insert_annotation_by_captured_at_ms_on_the_active_axis'), true);
 assert.equal(google.annotations.endpoints.insertMark, `${baseUrl}/api/annotations`);
+assert.equal(google.annotations.endpoints.runtimeEvents, `${baseUrl}/api/meeting-platform/runtime-events`);
+assert.equal(google.annotations.runtime_event.client_factory, 'createMeetingPlatformRuntimeEventClient');
+assert.equal(google.annotations.runtime_event.accepted_actions.includes('provider_event'), true);
 assert.equal(google.local_observer.matches.includes('https://meet.google.com/*'), true);
 assert.equal(google.local_observer.snapshot_collector.required_snapshots.includes('active_speaker'), true);
 assert.equal(google.provider_observer.required_for_realtime, false);
@@ -39,7 +42,10 @@ assert.equal(google.transcript.realtime_dependency, false);
 assert.equal(google.evidence.required_provider_coverage.includes('meeting_start'), true);
 assert.equal(google.evidence.required_local_snapshots.includes('active_speaker'), true);
 assert.equal(google.implementation.imports.contract, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract');
+assert.equal(google.implementation.imports.runtime_event, '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event');
+assert.equal(google.implementation.imports.integration_runtime, '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime');
 assert.equal(google.implementation.kit_methods.includes('platformAdapterContract'), true);
+assert.equal(google.implementation.kit_methods.includes('platformRuntimeBundle'), true);
 assert.equal(google.readiness.missing_items.includes('provider_missing:meeting_start'), true);
 
 const teams = buildMeetingPlatformAdapterContract('teams', { baseUrl });
@@ -67,6 +73,7 @@ assert.equal(matrix.browser_observer_count, 2);
 assert.equal(matrix.provider_observer_count, 2);
 assert.deepEqual(matrix.platforms, ['google_meet', 'microsoft_teams', 'local_detector']);
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').start_create_on, 'local_observer_active_meeting_detected');
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').runtime_events_endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);
 assert.equal(matrix.rows.find((row) => row.platform === 'local_detector').browser_observer, false);
 
 const googleAcceptance = buildMeetingPlatformAdapterContractAcceptanceReport(google);
@@ -75,6 +82,7 @@ assert.equal(googleAcceptance.platform, 'google_meet');
 assert.equal(googleAcceptance.target, 'contract');
 assert.equal(googleAcceptance.accepted, true);
 assert.equal(googleAcceptance.summary.insert_mark_endpoint, `${baseUrl}/api/annotations`);
+assert.equal(googleAcceptance.summary.runtime_events_endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);
 assert.equal(assertMeetingPlatformAdapterContract(google).accepted, true);
 assert.throws(
   () => assertMeetingPlatformAdapterContract({

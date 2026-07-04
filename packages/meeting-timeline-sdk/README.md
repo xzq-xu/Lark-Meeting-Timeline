@@ -416,6 +416,8 @@ const google = buildMeetingPlatformAdapterContract('google-meet', {
 
 // google.realtime_axis.rules 明确：本地观察先建轴，provider 事件只做 reconcile。
 // google.annotations.endpoints.insertMark 是实时标注写入 endpoint。
+// google.annotations.endpoints.runtimeEvents 是 observe/provider/annotation 的统一 runtime event endpoint。
+// google.annotations.runtime_event.client_factory 指向 createMeetingPlatformRuntimeEventClient。
 // google.provider_observer.events 列出 Google Workspace Events 需要监听的 started/ended/participant/artifact 事件。
 // google.local_observer.matches 可交给浏览器扩展或 WebView preload 白名单。
 // google.evidence.missing_items 表示当前离 production-ready 还缺哪些真实会议样本。
