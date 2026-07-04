@@ -231,6 +231,11 @@ import type {
   MeetingAppFixturePlatform,
 } from './meeting-app-fixtures.mjs';
 import type {
+  MeetingAppAdapterFitMatrix,
+  MeetingAppAdapterFitReport,
+  MeetingAppSnapshot,
+} from './meeting-apps.mjs';
+import type {
   MeetingAppTrackPipeline,
   MeetingAppTrackPipelineAccumulator,
   MeetingAppTrackPipelineInput,
@@ -338,6 +343,14 @@ export interface MeetingPlatformTimelineKit {
     input?: MeetingPlatformParticipantTrackInput | Record<string, unknown>[],
     trackOptions?: MeetingPlatformParticipantTrackOptions,
   ): MeetingPlatformParticipantTrack;
+  meetingAppAdapterFit(
+    input?: MeetingAppSnapshot | MeetingAppSnapshot[] | Record<string, unknown>,
+    fitOptions?: Record<string, unknown>,
+  ): MeetingAppAdapterFitReport;
+  meetingAppAdapterFitMatrix(
+    input?: MeetingAppSnapshot | MeetingAppSnapshot[] | Record<string, unknown>,
+    fitOptions?: Record<string, unknown>,
+  ): MeetingAppAdapterFitMatrix;
   meetingAppTrackPipeline(
     input?: MeetingAppTrackPipelineInput | Record<string, unknown>[],
     trackOptions?: MeetingAppTrackPipelineOptions,

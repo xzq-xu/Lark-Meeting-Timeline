@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 
 import {
+  MEETING_APP_ADAPTER_FIT_MATRIX_SCHEMA,
+  MEETING_APP_ADAPTER_FIT_SCHEMA,
+  buildMeetingAppAdapterFitMatrix,
+  buildMeetingAppAdapterFitReport,
   createMeetingAppObserver,
   detectMeetingAppPreset,
   normalizeMeetingAppSnapshot,
@@ -56,6 +60,23 @@ assert.equal(normalized[0].activeSpeaker.name, 'Ada Lovelace');
 assert.equal(normalized[0].activeSpeaker.speaking, true);
 assert.equal(normalized[0].participants.length, 2);
 
+const googleFit = buildMeetingAppAdapterFitReport(googleMeetDomSnapshot(), {
+  platform: 'google-meet',
+});
+assert.equal(googleFit.type, 'meeting_app_adapter_fit_report');
+assert.equal(googleFit.schema, MEETING_APP_ADAPTER_FIT_SCHEMA);
+assert.equal(googleFit.platform, 'google_meet');
+assert.deepEqual(googleFit.detected_platforms, ['google_meet']);
+assert.equal(googleFit.accepted, true);
+assert.equal(googleFit.ready_for_realtime_axis, true);
+assert.equal(googleFit.ready_for_speaker_track, true);
+assert.equal(googleFit.ready_for_participant_track, true);
+assert.equal(googleFit.recommended_surface, 'browser_extension_or_webview');
+assert.equal(googleFit.coverage.meeting_identity, true);
+assert.equal(googleFit.coverage.meeting_start_candidate, true);
+assert.equal(googleFit.rows[0].active_speaker_name, 'Ada Lovelace');
+assert.equal(googleFit.issues.some((item) => item.code === 'missing_meeting_end_candidate'), true);
+
 const explicitPlatformNormalized = normalizeMeetingAppSnapshot({
   url: 'https://meet.google.com/abc-defg-hij',
   title: 'Design review - Google Meet',
@@ -97,6 +118,44 @@ assert.equal(teams.platform, 'microsoft_teams');
 assert.equal(teams.inMeeting, true);
 assert.equal(teams.activeSpeaker.id, 'sam');
 assert.equal(teams.activeSpeaker.name, 'Sam Carter');
+
+const fitMatrix = buildMeetingAppAdapterFitMatrix({
+  platforms: ['google-meet', 'teams', 'zoom'],
+  inputs: {
+    google_meet: googleMeetDomSnapshot(),
+    microsoft_teams: {
+      application: { name: 'Microsoft Teams' },
+      window: { title: 'Weekly sync | Microsoft Teams', focused: true },
+      accessibility: {
+        controls: [{ label: 'Leave' }, { label: 'Mute microphone' }],
+        participants: [
+          { id: 'sam', label: 'Sam Carter speaking' },
+          { id: 'lin', label: 'Lin Zhang muted' },
+        ],
+      },
+      meeting_id: 'teams-local-window',
+      observedAtMs: startMs + 1_000,
+    },
+    zoom: {
+      app: { name: 'Zoom Workplace' },
+      window: {
+        title: 'Zoom Meeting',
+        focused: true,
+        controls: [{ label: 'Leave Meeting' }, { label: 'Participants' }],
+      },
+      meeting_id: 'zoom-local-123',
+      tiles: [{ id: 'mira', ariaLabel: 'Mira Patel is speaking' }],
+      observedAtMs: startMs + 2_000,
+    },
+  },
+});
+assert.equal(fitMatrix.schema, MEETING_APP_ADAPTER_FIT_MATRIX_SCHEMA);
+assert.equal(fitMatrix.platform_count, 3);
+assert.equal(fitMatrix.accepted_count, 3);
+assert.equal(fitMatrix.realtime_axis_ready_count, 3);
+assert.equal(fitMatrix.speaker_track_ready_count, 3);
+assert.equal(fitMatrix.participant_track_ready_count, 3);
+assert.equal(fitMatrix.rows.find((row) => row.platform === 'microsoft_teams').recommended_surface, 'native_detector');
 
 const zoomObserver = createMeetingAppObserver({
   source: 'desktop_observer',

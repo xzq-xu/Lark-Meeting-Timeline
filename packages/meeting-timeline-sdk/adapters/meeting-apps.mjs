@@ -7,6 +7,10 @@ import {
 import { detectMeetingApplication } from './meeting-session-discovery.mjs';
 import { normalizeMeetingPlatform } from './platform-setup.mjs';
 
+export const MEETING_APP_ADAPTER_FIT_SCHEMA = 'meeting_app_adapter_fit_report';
+export const MEETING_APP_ADAPTER_FIT_MATRIX_SCHEMA = 'meeting_app_adapter_fit_matrix';
+export const MEETING_APP_ADAPTER_FIT_SCHEMA_VERSION = 1;
+
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
 }
@@ -46,6 +50,10 @@ function normalizeText(value) {
 function compactText(value) {
   const text = normalizeText(value);
   return text || undefined;
+}
+
+function uniqueList(values = []) {
+  return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
 }
 
 function maybeTimeMs(input = {}, options = {}) {
@@ -865,6 +873,236 @@ export function normalizeMeetingAppSnapshots(input = {}, options = {}) {
   return appRows(input)
     .map((item) => normalizeMeetingAppSnapshot(item, options))
     .filter(Boolean);
+}
+
+function fitIssue(severity, code, message, details = {}) {
+  return compactObject({
+    severity,
+    code,
+    message,
+    ...details,
+  });
+}
+
+function inputShapeHints(value, output = new Set(), depth = 0) {
+  if (value == null || depth > 4) return output;
+  if (Array.isArray(value)) {
+    if (value.length > 0) output.add('array');
+    for (const item of value.slice(0, 20)) inputShapeHints(item, output, depth + 1);
+    return output;
+  }
+  if (typeof value !== 'object') return output;
+  if (value.querySelectorAll || value.document?.querySelectorAll || value.window?.document?.querySelectorAll) output.add('live_dom');
+  if (value.windows) output.add('browser_windows');
+  if (value.tabs) output.add('browser_tabs');
+  if (value.pages || value.frames) output.add('browser_pages');
+  if (value.url || value.href || value.tab?.url || value.page?.url || value.window?.url) output.add('meeting_url_candidate');
+  if (value.applications || value.apps || value.processes || value.application || value.app || value.process) output.add('native_app_snapshot');
+  if (value.accessibility || value.ax) output.add('accessibility_snapshot');
+  if (value.page || value.dom || value.controls || value.buttons || value.participants || value.tiles || value.texts) output.add('dom_like_snapshot');
+  for (const key of ['windows', 'tabs', 'pages', 'frames', 'applications', 'apps', 'processes', 'candidates', 'snapshots', 'items']) {
+    inputShapeHints(value[key], output, depth + 1);
+  }
+  return output;
+}
+
+function fitSurface(input = {}, rows = []) {
+  const shapes = inputShapeHints(input);
+  if (shapes.has('browser_tabs') || rows.some((row) => row.url?.startsWith?.('http'))) return 'browser_extension_or_webview';
+  if (shapes.has('native_app_snapshot') || shapes.has('accessibility_snapshot')) return 'native_detector';
+  if (shapes.has('live_dom') || shapes.has('dom_like_snapshot')) return 'embedded_webview_or_content_script';
+  return 'unknown';
+}
+
+function snapshotRow(snapshot = {}, index) {
+  const participants = asArray(snapshot.participants);
+  const activeSpeaker = snapshot.activeSpeaker ?? snapshot.active_speaker;
+  return compactObject({
+    index,
+    platform: snapshot.platform,
+    meeting_id: snapshot.meeting_id ?? snapshot.meeting?.meeting_id,
+    meeting_url: snapshot.meeting_url ?? snapshot.url ?? snapshot.meeting?.meeting_url,
+    title: snapshot.title,
+    in_meeting: snapshot.inMeeting,
+    active: snapshot.active,
+    visible: snapshot.visible,
+    audible: snapshot.audible,
+    participant_count: participants.length,
+    active_speaker_id: activeSpeaker?.id,
+    active_speaker_name: activeSpeaker?.name ?? activeSpeaker?.display_name,
+    has_active_speaker: Boolean(activeSpeaker?.id || activeSpeaker?.name || activeSpeaker?.display_name),
+  });
+}
+
+function fitNextActions(issues = []) {
+  return uniqueList(issues.map((item) => {
+    if (item.code === 'no_meeting_app_candidate') return 'send_browser_tabs_or_native_window_snapshot_to_adapter';
+    if (item.code === 'target_platform_not_detected') return 'include_platform_or_platform_specific_url_in_snapshot';
+    if (item.code === 'missing_meeting_identity') return 'include_meeting_url_title_or_stable_window_id';
+    if (item.code === 'missing_meeting_start_candidate') return 'capture_joined_meeting_state_with_leave_or_call_controls_visible';
+    if (item.code === 'missing_active_speaker') return 'capture_active_speaker_tile_or_audio_activity';
+    if (item.code === 'missing_participants') return 'capture_participant_tiles_or_roster_rows';
+    if (item.code === 'missing_meeting_end_candidate') return 'capture_after_leave_or_closed_window_state_for_end_detection';
+    return item.code;
+  }));
+}
+
+export function buildMeetingAppAdapterFitReport(input = {}, options = {}) {
+  const expectedPlatform = tryPlatform(firstNonEmpty(
+    options.platform,
+    options.provider,
+    input.platform,
+    input.provider,
+  ));
+  const normalized = normalizeMeetingAppSnapshots(input, expectedPlatform ? { ...options, platform: expectedPlatform } : options);
+  const rows = normalized.map((snapshot, index) => snapshotRow(snapshot, index));
+  const detectedPlatforms = uniqueList(rows.map((row) => row.platform));
+  const targetDetected = expectedPlatform ? detectedPlatforms.includes(expectedPlatform) : detectedPlatforms.length > 0;
+  const participantCount = rows.reduce((count, row) => count + Number(row.participant_count ?? 0), 0);
+  const activeSpeakerCount = rows.filter((row) => row.has_active_speaker).length;
+  const startCandidateCount = rows.filter((row) => row.in_meeting === true).length;
+  const endCandidateCount = rows.filter((row) => row.in_meeting === false).length;
+  const identityCount = rows.filter((row) => row.meeting_id || row.meeting_url).length;
+  const activeVisibleOrAudibleCount = rows.filter((row) => row.active === true || row.visible === true || row.audible === true).length;
+  const coverage = {
+    candidate_observation: rows.length > 0,
+    platform_detected: detectedPlatforms.length > 0,
+    target_platform_detected: targetDetected,
+    meeting_identity: identityCount > 0,
+    active_or_visible_or_audible: activeVisibleOrAudibleCount > 0,
+    meeting_start_candidate: startCandidateCount > 0,
+    meeting_end_candidate: endCandidateCount > 0,
+    active_speaker: activeSpeakerCount > 0,
+    participants: participantCount > 0,
+    realtime_axis_candidate: targetDetected && identityCount > 0 && startCandidateCount > 0,
+    speaker_track_candidate: targetDetected && identityCount > 0 && startCandidateCount > 0 && activeSpeakerCount > 0,
+    participant_track_candidate: targetDetected && identityCount > 0 && startCandidateCount > 0 && participantCount > 0,
+  };
+  const issues = [];
+  if (rows.length === 0) {
+    issues.push(fitIssue('error', 'no_meeting_app_candidate', 'No supported meeting app candidate was detected from the supplied host input.'));
+  }
+  if (expectedPlatform && !targetDetected) {
+    issues.push(fitIssue('error', 'target_platform_not_detected', 'The expected meeting app platform was not detected.', {
+      expected_platform: expectedPlatform,
+      detected_platforms: detectedPlatforms,
+    }));
+  }
+  if (rows.length > 0 && identityCount === 0) {
+    issues.push(fitIssue('error', 'missing_meeting_identity', 'No meeting id or meeting URL was inferred from the host input.'));
+  }
+  if (rows.length > 0 && startCandidateCount === 0) {
+    issues.push(fitIssue('error', 'missing_meeting_start_candidate', 'No joined/in-meeting candidate was inferred from the host input.'));
+  }
+  if (rows.length > 0 && activeSpeakerCount === 0) {
+    issues.push(fitIssue('warning', 'missing_active_speaker', 'No active speaker was inferred; speaker timeline markers will be unavailable until this signal is supplied.'));
+  }
+  if (rows.length > 0 && participantCount === 0) {
+    issues.push(fitIssue('warning', 'missing_participants', 'No participants were inferred; participant track and speaker attribution may be weak.'));
+  }
+  if (rows.length > 0 && endCandidateCount === 0) {
+    issues.push(fitIssue('warning', 'missing_meeting_end_candidate', 'No ended/left meeting candidate was observed; end events need a later sample or provider reconciliation.'));
+  }
+  const accepted = issues.every((item) => item.severity !== 'error');
+  return {
+    type: 'meeting_app_adapter_fit_report',
+    schema: MEETING_APP_ADAPTER_FIT_SCHEMA,
+    version: MEETING_APP_ADAPTER_FIT_SCHEMA_VERSION,
+    platform: expectedPlatform ?? (detectedPlatforms.length === 1 ? detectedPlatforms[0] : undefined),
+    expected_platform: expectedPlatform,
+    detected_platforms: detectedPlatforms,
+    accepted,
+    ready_for_realtime_axis: coverage.realtime_axis_candidate,
+    ready_for_speaker_track: coverage.speaker_track_candidate,
+    ready_for_participant_track: coverage.participant_track_candidate,
+    recommended_surface: fitSurface(input, rows),
+    input_shapes: [...inputShapeHints(input)].sort(),
+    candidate_count: rows.length,
+    meeting_identity_count: identityCount,
+    start_candidate_count: startCandidateCount,
+    end_candidate_count: endCandidateCount,
+    active_speaker_count: activeSpeakerCount,
+    participant_count: participantCount,
+    coverage,
+    rows,
+    issues,
+    next_actions: fitNextActions(issues),
+  };
+}
+
+function matrixInputForPlatform(platform, merged = {}, fallbackInput = {}) {
+  const source = merged.inputs ?? merged.inputByPlatform ?? merged.input_by_platform ?? {};
+  const dashed = platform.replaceAll('_', '-');
+  const aliases = platform === 'microsoft_teams'
+    ? ['teams', 'microsoft-teams']
+    : platform === 'google_meet'
+      ? ['google-meet', 'meet']
+      : platform === 'lark'
+        ? ['feishu', 'larksuite']
+        : [dashed];
+  for (const key of [platform, dashed, ...aliases]) {
+    if (source[key] != null) return source[key];
+  }
+  return fallbackInput;
+}
+
+export function buildMeetingAppAdapterFitMatrix(input = {}, options = {}) {
+  const objectInput = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+  const merged = { ...objectInput, ...options };
+  const source = merged.inputs ?? merged.inputByPlatform ?? merged.input_by_platform;
+  const fallbackInput = firstNonEmpty(merged.input, merged.snapshot, merged.snapshots, input);
+  let platforms = uniqueList(asArray(firstNonEmpty(
+    merged.platforms,
+    merged.platform_keys,
+    merged.platformKeys,
+    source && typeof source === 'object' ? Object.keys(source) : undefined,
+  )).map((platform) => tryPlatform(platform)).filter(Boolean));
+  if (platforms.length === 0) {
+    const report = buildMeetingAppAdapterFitReport(fallbackInput, options);
+    platforms = report.detected_platforms.length > 0 ? report.detected_platforms : [];
+    const reports = platforms.length > 0
+      ? platforms.map((platform) => buildMeetingAppAdapterFitReport(fallbackInput, { ...options, platform }))
+      : [report];
+    return fitMatrixFromReports(reports);
+  }
+  return fitMatrixFromReports(platforms.map((platform) => buildMeetingAppAdapterFitReport(
+    matrixInputForPlatform(platform, merged, fallbackInput),
+    { ...merged, platform },
+  )));
+}
+
+function fitMatrixFromReports(reports = []) {
+  return {
+    type: 'meeting_app_adapter_fit_matrix',
+    schema: MEETING_APP_ADAPTER_FIT_MATRIX_SCHEMA,
+    version: MEETING_APP_ADAPTER_FIT_SCHEMA_VERSION,
+    platform_count: reports.length,
+    accepted_count: reports.filter((report) => report.accepted).length,
+    realtime_axis_ready_count: reports.filter((report) => report.ready_for_realtime_axis).length,
+    speaker_track_ready_count: reports.filter((report) => report.ready_for_speaker_track).length,
+    participant_track_ready_count: reports.filter((report) => report.ready_for_participant_track).length,
+    platforms: uniqueList(reports.flatMap((report) => report.platform ?? report.detected_platforms ?? [])),
+    rows: reports.map((report) => ({
+      platform: report.platform,
+      expected_platform: report.expected_platform,
+      detected_platforms: report.detected_platforms,
+      accepted: report.accepted,
+      ready_for_realtime_axis: report.ready_for_realtime_axis,
+      ready_for_speaker_track: report.ready_for_speaker_track,
+      ready_for_participant_track: report.ready_for_participant_track,
+      recommended_surface: report.recommended_surface,
+      candidate_count: report.candidate_count,
+      meeting_identity_count: report.meeting_identity_count,
+      start_candidate_count: report.start_candidate_count,
+      end_candidate_count: report.end_candidate_count,
+      active_speaker_count: report.active_speaker_count,
+      participant_count: report.participant_count,
+      issue_codes: report.issues.map((item) => item.code),
+      next_actions: report.next_actions,
+    })),
+    reports,
+    next_actions: uniqueList(reports.flatMap((report) => report.next_actions)),
+  };
 }
 
 export function observeMeetingAppSample(state = null, input = {}, options = {}) {

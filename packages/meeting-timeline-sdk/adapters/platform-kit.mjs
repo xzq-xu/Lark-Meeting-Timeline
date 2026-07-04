@@ -16,6 +16,10 @@ import {
   diagnoseMeetingAppFixtureLifecycle,
 } from './meeting-app-fixtures.mjs';
 import {
+  buildMeetingAppAdapterFitMatrix,
+  buildMeetingAppAdapterFitReport,
+} from './meeting-apps.mjs';
+import {
   buildMeetingAppTrackPipeline,
   createMeetingAppTrackPipeline,
 } from './meeting-app-track-pipeline.mjs';
@@ -655,6 +659,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformParticipantTrack(platform, input = {}, trackOptions = {}) {
       return buildMeetingPlatformParticipantTrack(platform, input, withDefaults(defaults, trackOptions));
+    },
+    meetingAppAdapterFit(input = {}, fitOptions = {}) {
+      return buildMeetingAppAdapterFitReport(input, withDefaults(defaults, fitOptions));
+    },
+    meetingAppAdapterFitMatrix(input = {}, fitOptions = {}) {
+      return buildMeetingAppAdapterFitMatrix(input, withDefaults(defaults, fitOptions));
     },
     meetingAppTrackPipeline(input = {}, trackOptions = {}) {
       return buildMeetingAppTrackPipeline(input, withDefaults(defaults, trackOptions));

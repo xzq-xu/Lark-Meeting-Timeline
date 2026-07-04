@@ -278,6 +278,10 @@ import {
   buildMeetingAppLaunchGate,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate';
 import {
+  buildMeetingAppAdapterFitMatrix,
+  buildMeetingAppAdapterFitReport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-apps';
+import {
   assertMeetingAppRuntimeAdapterHandoff,
   buildMeetingAppDomAdaptationDiagnosisMatrix,
   buildMeetingAppRuntimeAdapterHandoffAcceptanceReport,
@@ -321,6 +325,13 @@ assert.equal(kit.report({ platforms: ['google-meet'] }).platform_rollout.type, '
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_registry_manifest.platform_count, 1);
 assert.equal(kit.meetingAppRuntimeAdapterProfile('https://meet.google.com/abc-defg-hij').platform, 'google_meet');
 assert.equal(kit.meetingAppRuntimeAdapterProfileMatrix({ platforms: ['google-meet', 'teams'] }).runtime_ready_count, 2);
+assert.equal(kit.meetingAppAdapterFit({
+  url: 'https://meet.google.com/abc-defg-hij',
+  page: {
+    controls: [{ label: 'Leave call' }],
+    participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+  },
+}, { platform: 'google-meet' }).ready_for_speaker_track, true);
 assert.equal(kit.selectMeetingAppRuntimeAdapter('https://meet.google.com/abc-defg-hij').launch.runtime_options.runtimePreset, 'google_meet');
 assert.equal(kit.meetingAppRuntimeAdapterHandoff('https://meet.google.com/abc-defg-hij').readiness.ready_to_start, true);
 assert.equal(kit.meetingAppRuntimeAdapterHandoffMatrix({ platforms: ['google-meet', 'teams'], surfaces: ['browser-extension'] }).handoff_count, 2);
@@ -630,6 +641,25 @@ assert.equal((await createMeetingAppTimelineRuntime(client, {
   },
 ])).new_mark_count, 1);
 assert.equal(resolveMeetingAppRuntimeAdapterProfile('https://meet.google.com/abc-defg-hij').platform, 'google_meet');
+assert.equal(buildMeetingAppAdapterFitReport({
+  url: 'https://meet.google.com/abc-defg-hij',
+  page: {
+    controls: [{ label: 'Leave call' }],
+    participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+  },
+}, { platform: 'google-meet' }).accepted, true);
+assert.equal(buildMeetingAppAdapterFitMatrix({
+  platforms: ['google-meet'],
+  inputs: {
+    google_meet: {
+      url: 'https://meet.google.com/abc-defg-hij',
+      page: {
+        controls: [{ label: 'Leave call' }],
+        participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+      },
+    },
+  },
+}).schema, 'meeting_app_adapter_fit_matrix');
 assert.equal(resolveMeetingAppRuntimeAdapterProfile('https://example.com/not-a-meeting').detected, false);
 assert.equal(selectMeetingAppRuntimeAdapter('https://meet.google.com/abc-defg-hij').selected, true);
 assert.equal(buildMeetingAppRuntimeAdapterHandoff('https://meet.google.com/abc-defg-hij').surface, 'browser_extension');

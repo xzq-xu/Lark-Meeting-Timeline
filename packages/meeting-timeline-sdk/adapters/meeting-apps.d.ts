@@ -8,6 +8,10 @@ import type {
 
 export type MeetingAppPlatform = 'google_meet' | 'microsoft_teams' | 'zoom' | 'lark' | 'webex';
 
+export const MEETING_APP_ADAPTER_FIT_SCHEMA: 'meeting_app_adapter_fit_report';
+export const MEETING_APP_ADAPTER_FIT_MATRIX_SCHEMA: 'meeting_app_adapter_fit_matrix';
+export const MEETING_APP_ADAPTER_FIT_SCHEMA_VERSION: 1;
+
 export interface MeetingAppPreset {
   platform: MeetingAppPlatform;
   displayName?: string;
@@ -99,6 +103,69 @@ export interface MeetingAppPresetDetection extends MeetingAppPreset {
   detected?: Record<string, unknown>;
 }
 
+export interface MeetingAppAdapterFitRow {
+  index: number;
+  platform?: string;
+  meeting_id?: string;
+  meeting_url?: string;
+  title?: string;
+  in_meeting?: boolean;
+  active?: boolean;
+  visible?: boolean;
+  audible?: boolean;
+  participant_count?: number;
+  active_speaker_id?: string;
+  active_speaker_name?: string;
+  has_active_speaker?: boolean;
+}
+
+export interface MeetingAppAdapterFitIssue {
+  severity: 'error' | 'warning' | string;
+  code: string;
+  message: string;
+  [key: string]: unknown;
+}
+
+export interface MeetingAppAdapterFitReport {
+  type: 'meeting_app_adapter_fit_report';
+  schema: 'meeting_app_adapter_fit_report';
+  version: 1;
+  platform?: string;
+  expected_platform?: string;
+  detected_platforms: string[];
+  accepted: boolean;
+  ready_for_realtime_axis: boolean;
+  ready_for_speaker_track: boolean;
+  ready_for_participant_track: boolean;
+  recommended_surface: string;
+  input_shapes: string[];
+  candidate_count: number;
+  meeting_identity_count: number;
+  start_candidate_count: number;
+  end_candidate_count: number;
+  active_speaker_count: number;
+  participant_count: number;
+  coverage: Record<string, boolean>;
+  rows: MeetingAppAdapterFitRow[];
+  issues: MeetingAppAdapterFitIssue[];
+  next_actions: string[];
+}
+
+export interface MeetingAppAdapterFitMatrix {
+  type: 'meeting_app_adapter_fit_matrix';
+  schema: 'meeting_app_adapter_fit_matrix';
+  version: 1;
+  platform_count: number;
+  accepted_count: number;
+  realtime_axis_ready_count: number;
+  speaker_track_ready_count: number;
+  participant_track_ready_count: number;
+  platforms: string[];
+  rows: Array<Record<string, unknown>>;
+  reports: MeetingAppAdapterFitReport[];
+  next_actions: string[];
+}
+
 export const MEETING_APP_PRESETS: Readonly<Record<MeetingAppPlatform, MeetingAppPreset>>;
 
 export function detectMeetingAppPreset(
@@ -115,6 +182,16 @@ export function normalizeMeetingAppSnapshots(
   input?: MeetingAppSnapshot | MeetingAppSnapshot[],
   options?: MeetingAppObserverOptions,
 ): MeetingAppSnapshot[];
+
+export function buildMeetingAppAdapterFitReport(
+  input?: MeetingAppSnapshot | MeetingAppSnapshot[] | Record<string, unknown>,
+  options?: MeetingAppObserverOptions,
+): MeetingAppAdapterFitReport;
+
+export function buildMeetingAppAdapterFitMatrix(
+  input?: MeetingAppSnapshot | MeetingAppSnapshot[] | Record<string, unknown>,
+  options?: MeetingAppObserverOptions,
+): MeetingAppAdapterFitMatrix;
 
 export function observeMeetingAppSample(
   state?: BrowserMeetingObserverState | null,

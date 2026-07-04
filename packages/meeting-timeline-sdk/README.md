@@ -868,6 +868,29 @@ const result = meetingApps.observe({
 
 `meeting-apps` 是轻量 preset，不依赖具体浏览器扩展 SDK，也不要求实时 OCR 或实时转写。它的作用是把 Google Meet 等会议软件的本地可观测状态变成统一 meeting signal；官方 provider webhook 仍然走 `google-meet` / `microsoft-teams` / `zoom` 等 adapter 做校准和会后 artifact。
 
+外部宿主项目刚接入时，可以先用 `meetingAppAdapterFit()` 做输入自检。它不会写时间轴，只判断当前 tabs/windows/DOM/AX 快照能不能被 SDK 识别成会议应用、能不能建立实时轴、能不能产出发言人/参会人轨：
+
+```js
+const fit = kit.meetingAppAdapterFit({
+  tabs: [{
+    active: true,
+    audible: true,
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Review - Google Meet',
+    page: {
+      buttons: [{ ariaLabel: 'Leave call' }],
+      tiles: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+    },
+  }],
+}, { platform: 'google-meet' });
+
+// fit.ready_for_realtime_axis === true
+// fit.ready_for_speaker_track === true
+// fit.next_actions 会提示缺 meeting identity、active speaker、participant 或 end sample。
+```
+
+多平台宿主可以把不同会议软件的样本放进 `meetingAppAdapterFitMatrix()`，先比较 Google Meet / Teams / Zoom / Lark / Webex 哪些输入已经能接入，哪些还缺本地观察字段。这个报告适合作为接入面板或 CI preflight；生产发布前仍然要继续跑 live snapshot diagnosis 和 handoff readiness。
+
 浏览器扩展或 WebView 里可以再往前接一层 `meeting-app-capture`。它只读取 DOM 文本、按钮、`aria-label`、participant tile、常见 `data-participant-*` / `data-user-*` / `data-person-*` 属性和音量/发言状态，输出 `meeting-apps` 可识别的快照；不截图、不 OCR、不读取转写正文：
 
 ```js

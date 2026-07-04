@@ -105,6 +105,45 @@ assert.equal(appFixtureAcceptance.accepted, true);
 assert.equal(appFixtureAcceptance.accepted_count, 5);
 assert.equal(appFixtureAcceptance.coverage_by_platform.google_meet.meeting_started, true);
 assert.equal(appFixtureAcceptance.coverage_by_platform.google_meet.meeting_ended, true);
+const appFit = kit.meetingAppAdapterFit({
+  tabs: [{
+    active: true,
+    audible: true,
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Google Meet',
+    page: {
+      buttons: [{ ariaLabel: 'Leave call' }],
+      tiles: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+    },
+  }],
+}, {
+  platform: 'google-meet',
+});
+assert.equal(appFit.accepted, true);
+assert.equal(appFit.ready_for_realtime_axis, true);
+assert.equal(appFit.ready_for_speaker_track, true);
+assert.equal(appFit.recommended_surface, 'browser_extension_or_webview');
+const appFitMatrix = kit.meetingAppAdapterFitMatrix({
+  platforms: ['google-meet', 'zoom'],
+  inputs: {
+    google_meet: {
+      url: 'https://meet.google.com/abc-defg-hij',
+      title: 'Google Meet',
+      page: {
+        controls: [{ label: 'Leave call' }],
+        participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace speaking' }],
+      },
+    },
+    zoom: {
+      app: { name: 'Zoom Workplace' },
+      window: { title: 'Zoom Meeting', controls: [{ label: 'Leave Meeting' }] },
+      meeting_id: 'zoom-local',
+      tiles: [{ id: 'mira', ariaLabel: 'Mira Patel is speaking' }],
+    },
+  },
+});
+assert.equal(appFitMatrix.platform_count, 2);
+assert.equal(appFitMatrix.realtime_axis_ready_count, 2);
 
 const appGate = kit.meetingAppLaunchGate('google-meet', {
   allowFixtureProduction: true,
