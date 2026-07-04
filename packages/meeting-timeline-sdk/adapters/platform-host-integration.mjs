@@ -17,6 +17,9 @@ import {
   buildMeetingPlatformRuntimeEventPlanMatrix,
 } from './platform-runtime-event.mjs';
 import {
+  buildMeetingPlatformAdaptationStrategyMatrix,
+} from './platform-strategy.mjs';
+import {
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
   buildMeetingPlatformAdapterContractMatrix,
 } from './platform-adapter-contract.mjs';
@@ -152,6 +155,12 @@ export function createMeetingPlatformHost(options = {}) {
         platforms: planOptions.platforms ?? planOptions.platform_keys ?? platforms,
       });
     },
+    adaptationStrategyMatrix(strategyOptions = {}) {
+      return kit.platformAdaptationStrategyMatrix({
+        ...strategyOptions,
+        platforms: strategyOptions.platforms ?? strategyOptions.platform_keys ?? platforms,
+      });
+    },
     runtimeBundle(platform, bundleOptions = {}) {
       return kit.platformRuntimeBundle(platform, bundleOptions);
     },
@@ -235,6 +244,9 @@ function routesSource(options = {}) {
   if (url.pathname === '/api/meeting-platform/runtime-event-plans') {
     return Response.json(host.runtimeEventPlans(options));
   }
+  if (url.pathname === '/api/meeting-platform/strategy') {
+    return Response.json(host.adaptationStrategyMatrix(options));
+  }
   if (url.pathname === '/api/meeting-platform/extension-plan') {
     return Response.json(host.extensionInstallPlan(options));
   }
@@ -287,6 +299,7 @@ await host.insertAnnotation('google_meet', {
 });
 
 const handoff = host.handoffBundle();
+const strategy = host.adaptationStrategyMatrix();
 const runtimeBundles = host.runtimeBundles();
 const runtimeEventPlans = host.runtimeEventPlans();
 const extensionPlan = host.extensionInstallPlan();
@@ -296,6 +309,7 @@ const integrationRuntime = host.integrationRuntimeSummary();
 Verification:
 
 \`\`\`sh
+npm run meeting-platform:strategy
 npm run meeting-app:extension:build
 npm run meeting-app:evidence-matrix
 npm run meeting-platform:rollout-matrix
@@ -344,6 +358,12 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     platforms,
     baseUrl,
   });
+  const adaptationStrategyMatrix = buildMeetingPlatformAdaptationStrategyMatrix({
+    ...options,
+    platforms,
+    baseUrl,
+    basePath,
+  });
   const extensionInstallPlan = buildMeetingAppExtensionInstallPlan({
     ...options,
     platforms: platforms.filter((platform) => platform !== 'local_detector'),
@@ -381,6 +401,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       adapter_contract_acceptance: '/api/meeting-platform/contract-acceptance',
       runtime_bundles: '/api/meeting-platform/runtime-bundles',
       runtime_event_plans: '/api/meeting-platform/runtime-event-plans',
+      strategy: '/api/meeting-platform/strategy',
       extension_plan: '/api/meeting-platform/extension-plan',
       integration_runtime: '/api/meeting-platform/integration-runtime',
       integration_runtime_manifest: '/api/meeting-platform/integration-runtime/manifest',
@@ -393,6 +414,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       buildPlatformIntegrationPlan(platform, { ...options, baseUrl, basePath }),
     ])),
     extension_install_plan: extensionInstallPlan,
+    adaptation_strategy_matrix: adaptationStrategyMatrix,
     runtime_event_plan_matrix: runtimeEventPlanMatrix,
     runtime_bundle_matrix: runtimeBundleMatrix,
     handoff_bundle: handoff,
@@ -417,6 +439,7 @@ export function buildMeetingPlatformHostIntegrationScaffold(options = {}) {
     name: packageName,
     scripts: {
       'meeting-platform:handoff': 'node ./scripts/print-handoff.mjs',
+      'meeting-platform:strategy': 'node ./scripts/print-strategy.mjs',
       'meeting-platform:readiness': 'node ./scripts/print-readiness.mjs',
       'meeting-platform:contracts': 'node ./scripts/print-contracts.mjs',
       'meeting-platform:contract-acceptance': 'node ./scripts/verify-contracts.mjs',
@@ -437,6 +460,14 @@ const host = createMeetingPlatformHost({
 });
 
 console.log(JSON.stringify(host.handoffBundle(), null, 2));
+`;
+  const strategyScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+console.log(JSON.stringify(host.adaptationStrategyMatrix(), null, 2));
 `;
   const readinessScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
 
@@ -522,6 +553,7 @@ console.log(JSON.stringify(host.integrationRuntimeManifest(), null, 2));
       sourceFile('src/meeting-platform-host.mjs', hostSource(plan.platforms, plan), 'host_source', 'text/javascript'),
       sourceFile('src/http-routes.mjs', routesSource(plan), 'http_routes_source', 'text/javascript'),
       sourceFile('scripts/print-handoff.mjs', handoffScript, 'handoff_script', 'text/javascript'),
+      sourceFile('scripts/print-strategy.mjs', strategyScript, 'adaptation_strategy_script', 'text/javascript'),
       sourceFile('scripts/print-readiness.mjs', readinessScript, 'readiness_script', 'text/javascript'),
       sourceFile('scripts/print-contracts.mjs', contractsScript, 'adapter_contract_script', 'text/javascript'),
       sourceFile('scripts/verify-contracts.mjs', contractAcceptanceScript, 'adapter_contract_acceptance_script', 'text/javascript'),
@@ -546,6 +578,7 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     'src/meeting-platform-host.mjs',
     'src/http-routes.mjs',
     'scripts/print-handoff.mjs',
+    'scripts/print-strategy.mjs',
     'scripts/print-readiness.mjs',
     'scripts/print-contracts.mjs',
     'scripts/verify-contracts.mjs',
@@ -588,6 +621,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!host.includes('platformRuntimeEventPlanMatrix')) {
     issues.push(issue('error', 'missing_runtime_event_plan_matrix', 'Host source must expose the runtime event plan matrix.'));
   }
+  if (!host.includes('platformAdaptationStrategyMatrix')) {
+    issues.push(issue('error', 'missing_adaptation_strategy_matrix', 'Host source must expose the adaptation strategy matrix.'));
+  }
   if (!host.includes('meetingAppExtensionInstallPlan')) {
     issues.push(issue('error', 'missing_extension_install_plan', 'Host source must expose the extension install plan.'));
   }
@@ -605,6 +641,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!routes.includes('/api/meeting-platform/runtime-event-plans')) {
     issues.push(issue('error', 'missing_runtime_event_plan_route', 'Route source must expose the runtime event plan matrix endpoint.'));
+  }
+  if (!routes.includes('/api/meeting-platform/strategy')) {
+    issues.push(issue('error', 'missing_adaptation_strategy_route', 'Route source must expose the adaptation strategy matrix endpoint.'));
   }
   if (!routes.includes('/api/meeting-platform/extension-plan')) {
     issues.push(issue('error', 'missing_extension_plan_route', 'Route source must expose the extension install plan endpoint.'));

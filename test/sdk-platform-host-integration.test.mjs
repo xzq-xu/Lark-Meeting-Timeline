@@ -32,6 +32,7 @@ assert.equal(plan.endpoints.platform_events, '/api/platform-events');
 assert.equal(plan.endpoints.adapter_contracts, '/api/meeting-platform/contracts');
 assert.equal(plan.endpoints.runtime_bundles, '/api/meeting-platform/runtime-bundles');
 assert.equal(plan.endpoints.runtime_event_plans, '/api/meeting-platform/runtime-event-plans');
+assert.equal(plan.endpoints.strategy, '/api/meeting-platform/strategy');
 assert.equal(plan.endpoints.extension_plan, '/api/meeting-platform/extension-plan');
 assert.equal(plan.endpoints.integration_runtime, '/api/meeting-platform/integration-runtime');
 assert.equal(plan.endpoints.integration_runtime_manifest, '/api/meeting-platform/integration-runtime/manifest');
@@ -43,6 +44,8 @@ assert.equal(plan.runtime_bundle_matrix.provider_required_for_realtime_count, 0)
 assert.equal(plan.runtime_event_plan_matrix.platform_count, 3);
 assert.equal(plan.runtime_event_plan_matrix.realtime_provider_dependency_count, 0);
 assert.equal(plan.runtime_event_plan_matrix.transcript_realtime_dependency_count, 0);
+assert.equal(plan.adaptation_strategy_matrix.strategy_count, 3);
+assert.equal(plan.adaptation_strategy_matrix.rows.every((row) => row.provider_blocks_realtime === false), true);
 assert.equal(plan.adapter_contract_matrix.platform_count, 3);
 assert.equal(plan.adapter_contract_acceptance_matrix.accepted_count, 3);
 assert.equal(plan.extension_install_plan.platforms.includes('google_meet'), true);
@@ -57,10 +60,11 @@ const scaffold = buildMeetingPlatformHostIntegrationScaffold({
 });
 
 assert.equal(scaffold.schema, MEETING_PLATFORM_HOST_INTEGRATION_SCAFFOLD_SCHEMA);
-assert.equal(scaffold.files.length, 14);
+assert.equal(scaffold.files.length, 15);
 assert.equal(file(scaffold, 'package.json').mime, 'application/json');
 const manifest = JSON.parse(file(scaffold, 'package.json').content);
 assert.equal(manifest.name, 'timeline-host-consumer');
+assert.equal(manifest.scripts['meeting-platform:strategy'], 'node ./scripts/print-strategy.mjs');
 assert.equal(manifest.scripts['meeting-platform:contracts'], 'node ./scripts/print-contracts.mjs');
 assert.equal(manifest.scripts['meeting-platform:contract-acceptance'], 'node ./scripts/verify-contracts.mjs');
 assert.equal(manifest.scripts['meeting-platform:runtime-bundles'], 'node ./scripts/print-runtime-bundles.mjs');
@@ -77,12 +81,14 @@ assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('p
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformAdapterContractAcceptanceMatrix'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformRuntimeBundleMatrix'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformRuntimeEventPlanMatrix'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformAdaptationStrategyMatrix'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('meetingAppExtensionInstallPlan'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('capturedAtMs'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('handleFetchRequest'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/contracts'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/runtime-bundles'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/runtime-event-plans'), true);
+assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/strategy'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/extension-plan'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/integration-runtime'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/integration-runtime/manifest'), true);
@@ -92,10 +98,12 @@ assert.equal(file(scaffold, 'scripts/print-contracts.mjs').content.includes('hos
 assert.equal(file(scaffold, 'scripts/verify-contracts.mjs').content.includes('adapterContractAcceptance'), true);
 assert.equal(file(scaffold, 'scripts/print-runtime-bundles.mjs').content.includes('host.runtimeBundles()'), true);
 assert.equal(file(scaffold, 'scripts/print-runtime-event-plans.mjs').content.includes('host.runtimeEventPlans()'), true);
+assert.equal(file(scaffold, 'scripts/print-strategy.mjs').content.includes('host.adaptationStrategyMatrix()'), true);
 assert.equal(file(scaffold, 'scripts/print-extension-plan.mjs').content.includes('host.extensionInstallPlan()'), true);
 assert.equal(file(scaffold, 'scripts/print-integration-runtime.mjs').content.includes('host.integrationRuntimeSummary()'), true);
 assert.equal(file(scaffold, 'scripts/print-integration-runtime-manifest.mjs').content.includes('host.integrationRuntimeManifest()'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('captured_at_ms'), true);
+assert.equal(file(scaffold, 'README.md').content.includes('adaptationStrategyMatrix'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('runtimeEventPlans'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('extensionInstallPlan'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('integrationRuntimeSummary'), true);
@@ -105,6 +113,7 @@ assert.equal(acceptance.schema, MEETING_PLATFORM_HOST_INTEGRATION_ACCEPTANCE_SCH
 assert.equal(acceptance.accepted, true);
 assert.equal(acceptance.blocking_count, 0);
 assert.equal(acceptance.required_files.includes('src/http-routes.mjs'), true);
+assert.equal(acceptance.required_files.includes('scripts/print-strategy.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/verify-contracts.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-runtime-bundles.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-runtime-event-plans.mjs'), true);

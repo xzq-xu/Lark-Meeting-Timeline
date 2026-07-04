@@ -383,6 +383,9 @@ assert.equal(kit.platformHostIntegrationScaffold({
 }).files.some((file) => file.path === 'scripts/print-runtime-bundles.mjs'), true);
 assert.equal(kit.platformHostIntegrationScaffold({
   platforms: ['zoom'],
+}).files.some((file) => file.path === 'scripts/print-strategy.mjs'), true);
+assert.equal(kit.platformHostIntegrationScaffold({
+  platforms: ['zoom'],
 }).files.some((file) => file.path === 'scripts/print-integration-runtime.mjs'), true);
 assert.equal(kit.platformProviderConnectionPack('zoom').security.verifier, 'verifyZoomWebhookEvent');
 assert.equal(kit.platformProviderConnectionMatrix({

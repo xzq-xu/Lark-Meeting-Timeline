@@ -31,6 +31,7 @@ export interface MeetingPlatformHostIntegrationPlan {
   evidence_paths: Record<string, string>;
   integration_plans: Record<string, Record<string, unknown>>;
   extension_install_plan: Record<string, unknown>;
+  adaptation_strategy_matrix: Record<string, unknown>;
   runtime_event_plan_matrix: Record<string, unknown>;
   runtime_bundle_matrix: Record<string, unknown>;
   handoff_bundle: Record<string, unknown>;
