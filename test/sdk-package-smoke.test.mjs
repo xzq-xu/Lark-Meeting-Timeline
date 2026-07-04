@@ -118,10 +118,11 @@ import {
   buildMeetingPlatformIntegrationRuntimeManifest,
   createMeetingPlatformIntegrationBrowserRuntime,
   createMeetingPlatformIntegrationContentScriptBridge,
-  createMeetingPlatformIntegrationRuntime,
-  detectMeetingPlatformForBrowser,
-  installMeetingPlatformIntegrationContentScriptBridge,
-} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';
+	  createMeetingPlatformIntegrationRuntime,
+	  detectMeetingPlatformForBrowser,
+	  installMeetingPlatformIntegrationContentScriptBridge,
+	  resolveMeetingPlatformForInput,
+	} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';
 import {
   MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
   buildMeetingPlatformAnnotationRuntimeEvent,
@@ -297,9 +298,19 @@ const integrationRuntime = createMeetingPlatformIntegrationRuntime(client, {
 });
 assert.equal(integrationRuntime.manifest().host_integration_ready, true);
 assert.equal(integrationRuntime.runtimeBundles().platform_count, 1);
+assert.equal(integrationRuntime.adaptationStrategyMatrix().strategy_count, 1);
+assert.equal(integrationRuntime.resolvePlatform({
+  url: 'https://meet.google.com/abc-defg-hij',
+}).platform, 'google_meet');
 assert.equal(detectMeetingPlatformForBrowser({
   url: 'https://meet.google.com/abc-defg-hij',
 }).platform, 'google_meet');
+assert.equal(resolveMeetingPlatformForInput({
+  url: 'https://meet.google.com/abc-defg-hij',
+}, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+}).supported, true);
 assert.equal(createMeetingPlatformIntegrationBrowserRuntime(client, {
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],

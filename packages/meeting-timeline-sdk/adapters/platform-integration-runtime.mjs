@@ -27,6 +27,9 @@ import {
 import {
   buildMeetingPlatformRuntimeBundleMatrix,
 } from './platform-runtime-bundle.mjs';
+import {
+  buildMeetingPlatformAdaptationStrategyMatrix,
+} from './platform-strategy.mjs';
 
 export const MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA = 'meeting_platform_integration_runtime';
 export const MEETING_PLATFORM_INTEGRATION_RUNTIME_MANIFEST_SCHEMA = 'meeting_platform_integration_runtime_manifest';
@@ -83,6 +86,12 @@ function byPlatform(rows = []) {
   return Object.fromEntries(asArray(rows).map((row) => [row.platform, row]));
 }
 
+function rowForPlatform(matrix = {}, platform) {
+  const normalized = maybeNormalizePlatform(platform);
+  if (!normalized) return undefined;
+  return asArray(matrix.rows).find((row) => row?.platform === normalized);
+}
+
 function runtimeIssues(manifest = {}) {
   const issues = [];
   if (manifest.registry_acceptance?.accepted !== true) {
@@ -125,6 +134,20 @@ function runtimeIssues(manifest = {}) {
       severity: 'error',
       code: 'adaptation_package_sdk_wiring_not_ready',
       message: 'Every selected platform must have an adaptation package with SDK wiring.',
+    });
+  }
+  if (manifest.adaptation_strategy_matrix?.strategy_count !== manifest.platform_count) {
+    issues.push({
+      severity: 'error',
+      code: 'adaptation_strategy_not_complete',
+      message: 'Every selected platform must have an adaptation strategy row.',
+    });
+  }
+  if ((manifest.adaptation_strategy_matrix?.rows ?? []).some((row) => row.provider_blocks_realtime === true || row.transcript_blocks_realtime === true)) {
+    issues.push({
+      severity: 'error',
+      code: 'adaptation_strategy_blocks_realtime',
+      message: 'Adaptation strategy must keep provider events and transcript import non-blocking for realtime annotations.',
     });
   }
   if ((manifest.handoff_readiness_matrix?.pilot_ready_count ?? 0) < manifest.platform_count) {
@@ -295,6 +318,68 @@ export function detectMeetingPlatformForBrowser(input = {}, options = {}) {
   });
 }
 
+export function resolveMeetingPlatformForInput(input = {}, options = {}) {
+  const merged = runtimeBaseOptions(options);
+  const platforms = selectedPlatforms(merged);
+  const detection = detectMeetingPlatformForBrowser(input, options);
+  const platform = maybeNormalizePlatform(detection.platform);
+  const supported = Boolean(platform && platforms.includes(platform));
+  const lookupPlatforms = unique([...platforms, platform]);
+  const registryManifest = buildMeetingPlatformRegistryManifest({
+    ...merged,
+    platforms: lookupPlatforms,
+  });
+  const strategyMatrix = buildMeetingPlatformAdaptationStrategyMatrix({
+    ...merged,
+    platforms: lookupPlatforms,
+  });
+  const runtimeBundleMatrix = buildMeetingPlatformRuntimeBundleMatrix({
+    ...merged,
+    platforms: lookupPlatforms,
+  });
+  const registryEntry = asArray(registryManifest.entries).find((entry) => entry.platform === platform);
+  const strategyRow = rowForPlatform(strategyMatrix, platform);
+  const runtimeRow = rowForPlatform(runtimeBundleMatrix, platform);
+  return compactObject({
+    type: 'meeting_platform_resolution',
+    detected: Boolean(platform),
+    supported,
+    platform,
+    reason: detection.reason,
+    meeting: detection.meeting,
+    browser: detection.browser,
+    current_platforms: platforms,
+    display_name: registryEntry?.display_name ?? strategyRow?.display_name,
+    registry: registryEntry ? {
+      aliases: registryEntry.aliases,
+      normalize_available: registryEntry.event_adapter?.normalize_available === true,
+      insert_endpoint: registryEntry.annotations?.insert_endpoint,
+      runtime_event_endpoint: registryEntry.annotations?.runtime_event_endpoint,
+    } : undefined,
+    strategy: strategyRow ? {
+      rollout_status: strategyRow.rollout_status,
+      recommendation: strategyRow.recommendation,
+      primary_axis_source: strategyRow.primary_axis_source,
+      provider_blocks_realtime: strategyRow.provider_blocks_realtime,
+      transcript_blocks_realtime: strategyRow.transcript_blocks_realtime,
+      speaker_realtime_primary: strategyRow.speaker_realtime_primary,
+    } : undefined,
+    runtime: runtimeRow ? {
+      runtime_ready: runtimeRow.runtime_ready,
+      browser_match_count: runtimeRow.browser_match_count,
+      provider_required_for_realtime: runtimeRow.provider_required_for_realtime,
+      transcript_blocks_realtime: runtimeRow.transcript_blocks_realtime,
+      speaker_min_stable_ms: runtimeRow.speaker_min_stable_ms,
+    } : undefined,
+    next_actions: supported
+      ? []
+      : platform
+        ? ['enable_detected_platform_in_runtime_platforms']
+        : ['provide_supported_meeting_url_or_explicit_platform'],
+    detection,
+  });
+}
+
 export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
   const merged = runtimeBaseOptions(options);
   const platforms = selectedPlatforms(merged);
@@ -315,6 +400,10 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     ...merged,
     platforms,
   });
+  const adaptationStrategyMatrix = buildMeetingPlatformAdaptationStrategyMatrix({
+    ...merged,
+    platforms,
+  });
   const handoffReadinessMatrix = buildMeetingPlatformHandoffReadinessMatrix({
     ...merged,
     platforms,
@@ -322,6 +411,7 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
   const runtimeRows = byPlatform(runtimeBundleMatrix.rows);
   const adaptationRows = byPlatform(adaptationPackageMatrix.rows);
   const liveRows = byPlatform(liveAdapterMatrix.rows);
+  const strategyRows = byPlatform(adaptationStrategyMatrix.rows);
   const handoffRows = byPlatform(handoffReadinessMatrix.rows);
   const rows = platforms.map((platform) => compactObject({
     platform,
@@ -330,7 +420,10 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     sdk_wiring_ready: runtimeRows[platform]?.sdk_wiring_ready === true && adaptationRows[platform]?.sdk_wiring_ready === true,
     browser_match_count: runtimeRows[platform]?.browser_match_count,
     recommended_mode: liveRows[platform]?.recommended_mode ?? adaptationRows[platform]?.recommended_mode,
+    primary_axis_source: strategyRows[platform]?.primary_axis_source,
+    strategy_recommendation: strategyRows[platform]?.recommendation,
     provider_required_for_realtime: runtimeRows[platform]?.provider_required_for_realtime === true,
+    provider_blocks_realtime: strategyRows[platform]?.provider_blocks_realtime === true,
     transcript_blocks_realtime: runtimeRows[platform]?.transcript_blocks_realtime === true,
     speaker_min_stable_ms: runtimeRows[platform]?.speaker_min_stable_ms,
     handoff_ready: handoffRows[platform]?.handoff_ready === true,
@@ -348,6 +441,7 @@ export function buildMeetingPlatformIntegrationRuntimeManifest(options = {}) {
     platforms,
     registry_acceptance: registryAcceptance,
     runtime_bundle_matrix: runtimeBundleMatrix,
+    adaptation_strategy_matrix: adaptationStrategyMatrix,
     adaptation_package_matrix: adaptationPackageMatrix,
     live_adapter_matrix: liveAdapterMatrix,
     handoff_readiness_matrix: handoffReadinessMatrix,
@@ -438,6 +532,18 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
         platforms: packageOptions.platforms ?? packageOptions.platform_keys ?? platforms,
       });
     },
+    adaptationStrategyMatrix(strategyOptions = {}) {
+      return kit.platformAdaptationStrategyMatrix({
+        ...strategyOptions,
+        platforms: strategyOptions.platforms ?? strategyOptions.platform_keys ?? platforms,
+      });
+    },
+    resolvePlatform(input = {}, resolveOptions = {}) {
+      return resolveMeetingPlatformForInput(input, withDefaults(defaults, {
+        ...resolveOptions,
+        platforms: resolveOptions.platforms ?? resolveOptions.platform_keys ?? platforms,
+      }));
+    },
     readiness(readinessOptions = {}) {
       return suite.readinessMatrix({
         ...readinessOptions,
@@ -486,6 +592,8 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
       if (['registry', 'platform_registry'].includes(action)) return runtime.registry(eventOptions);
       if (['manifest', 'runtime_manifest', 'integration_manifest'].includes(action)) return runtime.manifest(eventOptions);
       if (['runtime_bundles', 'runtime_bundle_matrix'].includes(action)) return runtime.runtimeBundles(eventOptions);
+      if (['strategy', 'adaptation_strategy', 'adaptation_strategy_matrix'].includes(action)) return runtime.adaptationStrategyMatrix(eventOptions);
+      if (['resolve', 'resolve_platform', 'platform_resolution'].includes(action)) return runtime.resolvePlatform(eventInput, eventOptions);
       if (['readiness', 'live_readiness'].includes(action)) return runtime.readiness(eventOptions);
       if (['handoff_readiness'].includes(action)) return runtime.handoffReadiness(eventOptions);
       const platform = platformFrom(eventInput, eventOptions);
@@ -517,6 +625,8 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
           'participant_track',
           'timeline_view',
           'runtime_bundles',
+          'adaptation_strategy_matrix',
+          'resolve_platform',
           'registry',
           'manifest',
           'readiness',
@@ -671,6 +781,13 @@ export function createMeetingPlatformIntegrationBrowserRuntime(clientOrOptions, 
     integrationRuntime,
     integration_runtime: integrationRuntime,
     detect,
+    resolvePlatform(input = {}, resolveOptions = {}) {
+      return integrationRuntime.resolvePlatform(input, {
+        ...options,
+        ...baseInputOptions,
+        ...resolveOptions,
+      });
+    },
     platformFor,
     observeMeetingApp(input = {}, observeOptions = {}) {
       const detection = detect(input, observeOptions);

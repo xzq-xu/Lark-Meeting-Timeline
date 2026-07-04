@@ -191,6 +191,12 @@ const runtime = createMeetingPlatformIntegrationRuntime({
   platforms: ['google-meet', 'teams', 'zoom'],
 });
 
+const resolution = runtime.resolvePlatform({
+  url: 'https://meet.google.com/abc-defg-hij',
+  title: 'Google Meet',
+});
+// resolution.platform === 'google_meet'; resolution.strategy.primary_axis_source === 'local_observer'
+
 await runtime.observeMeetingApp('google-meet', domSnapshot);
 await runtime.ingestProvider('google-meet', workspaceEvent);
 await runtime.insertAnnotation('google-meet', {
@@ -217,6 +223,8 @@ const browserRuntime = createMeetingPlatformIntegrationBrowserRuntime({
   baseUrl: 'https://timeline.example.com',
   platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
 });
+
+const currentPlatform = browserRuntime.resolvePlatform();
 
 await browserRuntime.sample();
 await browserRuntime.handleMessage({

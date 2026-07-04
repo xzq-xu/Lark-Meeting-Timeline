@@ -4,6 +4,7 @@ import type {
   MeetingPlatformRuntimeBundle,
   MeetingPlatformRuntimeBundleMatrix,
 } from './platform-runtime-bundle.mjs';
+import type { MeetingPlatformAdaptationStrategyMatrix } from './platform-strategy.mjs';
 
 export const MEETING_PLATFORM_INTEGRATION_RUNTIME_SCHEMA: 'meeting_platform_integration_runtime';
 export const MEETING_PLATFORM_INTEGRATION_RUNTIME_MANIFEST_SCHEMA: 'meeting_platform_integration_runtime_manifest';
@@ -36,7 +37,10 @@ export interface MeetingPlatformIntegrationRuntimeRow {
   sdk_wiring_ready: boolean;
   browser_match_count?: number;
   recommended_mode?: string;
+  primary_axis_source?: string;
+  strategy_recommendation?: string;
   provider_required_for_realtime: boolean;
+  provider_blocks_realtime: boolean;
   transcript_blocks_realtime: boolean;
   speaker_min_stable_ms?: number;
   handoff_ready: boolean;
@@ -61,6 +65,7 @@ export interface MeetingPlatformIntegrationRuntimeManifest {
   rows: MeetingPlatformIntegrationRuntimeRow[];
   registry_acceptance: Record<string, unknown>;
   runtime_bundle_matrix: MeetingPlatformRuntimeBundleMatrix;
+  adaptation_strategy_matrix: MeetingPlatformAdaptationStrategyMatrix;
   adaptation_package_matrix: Record<string, unknown>;
   live_adapter_matrix: Record<string, unknown>;
   handoff_readiness_matrix: Record<string, unknown>;
@@ -77,6 +82,44 @@ export interface MeetingPlatformBrowserDetection {
     title?: string;
   };
   runtime_preset_platform?: string;
+}
+
+export interface MeetingPlatformResolution {
+  type: 'meeting_platform_resolution';
+  detected: boolean;
+  supported: boolean;
+  platform?: string;
+  reason?: MeetingPlatformBrowserDetection['reason'];
+  meeting?: Record<string, unknown>;
+  browser?: MeetingPlatformBrowserDetection['browser'];
+  current_platforms: string[];
+  display_name?: string;
+  registry?: {
+    aliases?: string[];
+    normalize_available?: boolean;
+    insert_endpoint?: string;
+    runtime_event_endpoint?: string;
+    [key: string]: unknown;
+  };
+  strategy?: {
+    rollout_status?: string;
+    recommendation?: string;
+    primary_axis_source?: string;
+    provider_blocks_realtime?: boolean;
+    transcript_blocks_realtime?: boolean;
+    speaker_realtime_primary?: boolean;
+    [key: string]: unknown;
+  };
+  runtime?: {
+    runtime_ready?: boolean;
+    browser_match_count?: number;
+    provider_required_for_realtime?: boolean;
+    transcript_blocks_realtime?: boolean;
+    speaker_min_stable_ms?: number;
+    [key: string]: unknown;
+  };
+  next_actions: string[];
+  detection: MeetingPlatformBrowserDetection;
 }
 
 export interface MeetingPlatformIntegrationRuntime {
@@ -99,6 +142,8 @@ export interface MeetingPlatformIntegrationRuntime {
   runtimeBundle(platform: string, bundleOptions?: Record<string, unknown>): MeetingPlatformRuntimeBundle;
   runtimeBundles(bundleOptions?: Record<string, unknown>): MeetingPlatformRuntimeBundleMatrix;
   adaptationPackages(packageOptions?: Record<string, unknown>): Record<string, unknown>;
+  adaptationStrategyMatrix(strategyOptions?: Record<string, unknown>): MeetingPlatformAdaptationStrategyMatrix;
+  resolvePlatform(input?: Record<string, unknown>, resolveOptions?: Record<string, unknown>): MeetingPlatformResolution;
   readiness(readinessOptions?: Record<string, unknown>): Record<string, unknown>;
   handoffReadiness(readinessOptions?: Record<string, unknown>): Record<string, unknown>;
   observeMeetingApp(platform: string, snapshot?: Record<string, unknown>, observeOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -122,6 +167,7 @@ export interface MeetingPlatformIntegrationBrowserRuntime {
   integrationRuntime: MeetingPlatformIntegrationRuntime;
   integration_runtime: MeetingPlatformIntegrationRuntime;
   detect(input?: Record<string, unknown>, detectOptions?: Record<string, unknown>): MeetingPlatformBrowserDetection;
+  resolvePlatform(input?: Record<string, unknown>, resolveOptions?: Record<string, unknown>): MeetingPlatformResolution;
   platformFor(input?: Record<string, unknown>, platformOptions?: Record<string, unknown>): string;
   sample(sampleOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
   tick(sampleOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -163,6 +209,11 @@ export function detectMeetingPlatformForBrowser(
   input?: Record<string, unknown>,
   options?: MeetingPlatformIntegrationRuntimeOptions,
 ): MeetingPlatformBrowserDetection;
+
+export function resolveMeetingPlatformForInput(
+  input?: Record<string, unknown>,
+  options?: MeetingPlatformIntegrationRuntimeOptions,
+): MeetingPlatformResolution;
 
 export function buildMeetingPlatformIntegrationRuntimeManifest(
   options?: MeetingPlatformIntegrationRuntimeOptions,

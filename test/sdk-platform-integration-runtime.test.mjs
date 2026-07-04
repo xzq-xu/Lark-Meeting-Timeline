@@ -11,6 +11,7 @@ import {
   createMeetingPlatformIntegrationRuntime,
   detectMeetingPlatformForBrowser,
   installMeetingPlatformIntegrationContentScriptBridge,
+  resolveMeetingPlatformForInput,
 } from '../packages/meeting-timeline-sdk/adapters/platform-integration-runtime.mjs';
 import { buildPlatformFixtureEvent } from '../packages/meeting-timeline-sdk/adapters/platform-fixtures.mjs';
 
@@ -121,6 +122,33 @@ assert.equal(browserDetection.detected, true);
 assert.equal(browserDetection.platform, 'microsoft_teams');
 assert.equal(browserDetection.reason, 'url');
 
+const resolvedGoogle = resolveMeetingPlatformForInput({
+  url: 'https://meet.google.com/abc-defg-hij',
+  title: 'Google Meet',
+}, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom'],
+});
+assert.equal(resolvedGoogle.type, 'meeting_platform_resolution');
+assert.equal(resolvedGoogle.detected, true);
+assert.equal(resolvedGoogle.supported, true);
+assert.equal(resolvedGoogle.platform, 'google_meet');
+assert.equal(resolvedGoogle.strategy.primary_axis_source, 'local_observer');
+assert.equal(resolvedGoogle.registry.runtime_event_endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);
+assert.equal(resolvedGoogle.runtime.provider_required_for_realtime, false);
+
+const resolvedTeamsUnsupported = resolveMeetingPlatformForInput({
+  url: 'https://teams.microsoft.com/l/meetup-join/abc',
+}, {
+  baseUrl,
+  platforms: ['google-meet'],
+});
+assert.equal(resolvedTeamsUnsupported.platform, 'microsoft_teams');
+assert.equal(resolvedTeamsUnsupported.supported, false);
+assert.equal(resolvedTeamsUnsupported.strategy.primary_axis_source, 'local_observer');
+assert.equal(resolvedTeamsUnsupported.runtime.runtime_ready, true);
+assert.equal(resolvedTeamsUnsupported.next_actions.includes('enable_detected_platform_in_runtime_platforms'), true);
+
 const manifest = buildMeetingPlatformIntegrationRuntimeManifest({
   baseUrl,
   platforms: ['google-meet', 'zoom'],
@@ -134,8 +162,11 @@ assert.equal(manifest.warning_count, 1);
 assert.equal(manifest.registry_acceptance.accepted, true);
 assert.equal(manifest.runtime_bundle_matrix.runtime_ready_count, 2);
 assert.equal(manifest.runtime_bundle_matrix.provider_required_for_realtime_count, 0);
+assert.equal(manifest.adaptation_strategy_matrix.strategy_count, 2);
 assert.equal(manifest.adaptation_package_matrix.sdk_wiring_ready_count, 2);
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').browser_match_count, 1);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').primary_axis_source, 'local_observer');
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').provider_blocks_realtime, false);
 assert.equal(manifest.rows.find((row) => row.platform === 'zoom').sdk_wiring_ready, true);
 assert.equal(assertMeetingPlatformIntegrationRuntimeManifest(manifest).host_integration_ready, true);
 
@@ -175,6 +206,10 @@ assert.equal(runtime.summary().host_integration_ready, true);
 assert.equal(runtime.registry().acceptance.accepted, true);
 assert.equal(runtime.runtimeBundle('google-meet').browser.matches.includes('https://meet.google.com/*'), true);
 assert.equal(runtime.runtimeBundles().platform_count, 2);
+assert.equal(runtime.adaptationStrategyMatrix().strategy_count, 2);
+const runtimeResolution = runtime.resolvePlatform({ url: 'https://meet.google.com/abc-defg-hij' });
+assert.equal(runtimeResolution.supported, true);
+assert.equal(runtimeResolution.strategy.provider_blocks_realtime, false);
 assert.equal(runtime.adaptationPackages().sdk_wiring_ready_count, 2);
 assert.equal(runtime.adapter('google-meet').platform, 'google_meet');
 
@@ -282,6 +317,11 @@ const view = runtime.timelineView('zoom', {
 assert.equal(view.diagnostics.marker_count, 2);
 assert.equal(view.markers.some((marker) => marker.rail === 'speaker'), true);
 assert.equal((await runtime.handleEvent({ action: 'runtime_bundles' })).platform_count, 2);
+assert.equal((await runtime.handleEvent({ action: 'adaptation_strategy_matrix' })).strategy_count, 2);
+assert.equal((await runtime.handleEvent({
+  action: 'resolve_platform',
+  url: 'https://meet.google.com/abc-defg-hij',
+})).platform, 'google_meet');
 assert.equal((await runtime.handleEvent({ action: 'manifest' })).host_integration_ready, true);
 await assert.rejects(
   () => runtime.handleEvent({ action: 'insert_annotation' }),
@@ -299,6 +339,7 @@ const browserRuntime = createMeetingPlatformIntegrationBrowserRuntime(client, {
   speakerOptions: { minStableMs: 0 },
 });
 assert.equal(browserRuntime.detect().platform, 'google_meet');
+assert.equal(browserRuntime.resolvePlatform().platform, 'google_meet');
 assert.equal(browserRuntime.platformFor(), 'google_meet');
 const browserSample = await browserRuntime.sample();
 assert.equal(browserSample.emitted, true);
