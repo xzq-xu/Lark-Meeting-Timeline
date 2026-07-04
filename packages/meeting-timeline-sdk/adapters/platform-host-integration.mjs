@@ -88,7 +88,7 @@ export function createHostTimelineClient(options = {}) {
 function hostSource(platforms = [], options = {}) {
   const defaultPlatforms = JSON.stringify(platforms);
   const defaultBaseUrl = firstNonEmpty(options.baseUrl, options.base_url, 'http://localhost:8787');
-  return `import { createMeetingPlatformTimelineKit } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit';
+  return `import { createMeetingPlatformIntegrationRuntime } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';
 import { createHostTimelineClient } from './timeline-client.mjs';
 
 const DEFAULT_PLATFORMS = ${defaultPlatforms};
@@ -100,11 +100,12 @@ export function createMeetingPlatformHost(options = {}) {
     headers: options.headers,
   });
   const platforms = options.platforms ?? options.platform_keys ?? DEFAULT_PLATFORMS;
-  const kit = createMeetingPlatformTimelineKit(client, {
+  const integrationRuntime = createMeetingPlatformIntegrationRuntime(client, {
     ...options,
     platforms,
   });
-  const liveAdapters = kit.platformLiveAdapterSuite({ platforms });
+  const kit = integrationRuntime.kit;
+  const liveAdapters = integrationRuntime.liveAdapters;
 
   function extensionPlatforms(value = platforms) {
     const rows = Array.isArray(value) ? value : [value].filter(Boolean);
@@ -113,6 +114,8 @@ export function createMeetingPlatformHost(options = {}) {
 
   return {
     client,
+    integrationRuntime,
+    integration_runtime: integrationRuntime,
     kit,
     platforms,
     liveAdapters,
@@ -150,17 +153,32 @@ export function createMeetingPlatformHost(options = {}) {
         platforms: extensionOptions.platforms ?? extensionOptions.platform_keys ?? extensionPlatforms(platforms),
       });
     },
+    integrationRuntimeManifest(manifestOptions = {}) {
+      return integrationRuntime.manifest({
+        ...manifestOptions,
+        platforms: manifestOptions.platforms ?? manifestOptions.platform_keys ?? platforms,
+      });
+    },
+    integrationRuntimeSummary(summaryOptions = {}) {
+      return integrationRuntime.summary({
+        ...summaryOptions,
+        platforms: summaryOptions.platforms ?? summaryOptions.platform_keys ?? platforms,
+      });
+    },
+    handleRuntimeEvent(input = {}, payload, eventOptions = {}) {
+      return integrationRuntime.handleEvent(input, payload, eventOptions);
+    },
     adapter(platform, adapterOptions = {}) {
-      return liveAdapters.adapter(platform, adapterOptions);
+      return integrationRuntime.adapter(platform, adapterOptions);
     },
     observeMeetingApp(platform, snapshot = {}, observeOptions = {}) {
-      return liveAdapters.adapter(platform, observeOptions.adapterOptions ?? {}).observeMeetingApp(snapshot, observeOptions);
+      return integrationRuntime.observeMeetingApp(platform, snapshot, observeOptions);
     },
     ingestProvider(platform, requestOrPayload = {}, payload, ingestOptions = {}) {
-      return liveAdapters.adapter(platform, ingestOptions.adapterOptions ?? {}).ingestProvider(requestOrPayload, payload, ingestOptions);
+      return integrationRuntime.ingestProvider(platform, requestOrPayload, payload, ingestOptions);
     },
     insertAnnotation(platform, input = {}, markOptions = {}) {
-      return liveAdapters.adapter(platform, markOptions.adapterOptions ?? {}).insertAnnotation({
+      return integrationRuntime.insertAnnotation(platform, {
         ...input,
         platform,
         capturedAtMs: input.capturedAtMs ?? input.captured_at_ms ?? Date.now(),
@@ -208,6 +226,17 @@ function routesSource(options = {}) {
   if (url.pathname === '/api/meeting-platform/extension-plan') {
     return Response.json(host.extensionInstallPlan(options));
   }
+  if (url.pathname === '/api/meeting-platform/integration-runtime') {
+    return Response.json(host.integrationRuntimeSummary(options));
+  }
+  if (url.pathname === '/api/meeting-platform/integration-runtime/manifest') {
+    return Response.json(host.integrationRuntimeManifest(options));
+  }
+  if (url.pathname === '/api/meeting-platform/runtime-events' && request.method === 'POST') {
+    const payload = await request.json();
+    const result = await host.handleRuntimeEvent(payload, payload.payload ?? payload.raw, options);
+    return Response.json(result);
+  }
   return Response.json({ ok: false, error: 'not_found' }, { status: 404 });
 }
 `;
@@ -248,6 +277,7 @@ await host.insertAnnotation('google_meet', {
 const handoff = host.handoffBundle();
 const runtimeBundles = host.runtimeBundles();
 const extensionPlan = host.extensionInstallPlan();
+const integrationRuntime = host.integrationRuntimeSummary();
 \`\`\`
 
 Verification:
@@ -261,6 +291,8 @@ npm run meeting-platform:contracts
 npm run meeting-platform:contract-acceptance
 npm run meeting-platform:runtime-bundles
 npm run meeting-platform:extension-plan
+npm run meeting-platform:integration-runtime
+npm run meeting-platform:integration-runtime-manifest
 npm run sdk:package-smoke
 \`\`\`
 `;
@@ -309,6 +341,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     sdk: {
       package: '@ai-annotation/meeting-timeline-sdk',
       kit_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
+      integration_runtime_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime',
       live_adapter_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter',
       host_integration_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-host-integration',
     },
@@ -328,6 +361,9 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       adapter_contract_acceptance: '/api/meeting-platform/contract-acceptance',
       runtime_bundles: '/api/meeting-platform/runtime-bundles',
       extension_plan: '/api/meeting-platform/extension-plan',
+      integration_runtime: '/api/meeting-platform/integration-runtime',
+      integration_runtime_manifest: '/api/meeting-platform/integration-runtime/manifest',
+      runtime_events: '/api/meeting-platform/runtime-events',
     },
     commands: handoff.commands,
     evidence_paths: handoff.evidence_paths,
@@ -364,6 +400,8 @@ export function buildMeetingPlatformHostIntegrationScaffold(options = {}) {
       'meeting-platform:contract-acceptance': 'node ./scripts/verify-contracts.mjs',
       'meeting-platform:runtime-bundles': 'node ./scripts/print-runtime-bundles.mjs',
       'meeting-platform:extension-plan': 'node ./scripts/print-extension-plan.mjs',
+      'meeting-platform:integration-runtime': 'node ./scripts/print-integration-runtime.mjs',
+      'meeting-platform:integration-runtime-manifest': 'node ./scripts/print-integration-runtime-manifest.mjs',
     },
     dependencies: {
       '@ai-annotation/meeting-timeline-sdk': '^0.1.0',
@@ -425,6 +463,22 @@ const host = createMeetingPlatformHost({
 
 console.log(JSON.stringify(host.extensionInstallPlan(), null, 2));
 `;
+  const integrationRuntimeScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+console.log(JSON.stringify(host.integrationRuntimeSummary(), null, 2));
+`;
+  const integrationRuntimeManifestScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+console.log(JSON.stringify(host.integrationRuntimeManifest(), null, 2));
+`;
   return {
     type: 'meeting_platform_host_integration_scaffold',
     schema: MEETING_PLATFORM_HOST_INTEGRATION_SCAFFOLD_SCHEMA,
@@ -442,6 +496,8 @@ console.log(JSON.stringify(host.extensionInstallPlan(), null, 2));
       sourceFile('scripts/verify-contracts.mjs', contractAcceptanceScript, 'adapter_contract_acceptance_script', 'text/javascript'),
       sourceFile('scripts/print-runtime-bundles.mjs', runtimeBundlesScript, 'runtime_bundle_script', 'text/javascript'),
       sourceFile('scripts/print-extension-plan.mjs', extensionPlanScript, 'extension_plan_script', 'text/javascript'),
+      sourceFile('scripts/print-integration-runtime.mjs', integrationRuntimeScript, 'integration_runtime_script', 'text/javascript'),
+      sourceFile('scripts/print-integration-runtime-manifest.mjs', integrationRuntimeManifestScript, 'integration_runtime_manifest_script', 'text/javascript'),
       sourceFile('README.md', readmeSource(plan), 'readme', 'text/markdown'),
     ],
   };
@@ -463,6 +519,8 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     'scripts/verify-contracts.mjs',
     'scripts/print-runtime-bundles.mjs',
     'scripts/print-extension-plan.mjs',
+    'scripts/print-integration-runtime.mjs',
+    'scripts/print-integration-runtime-manifest.mjs',
     'README.md',
   ];
   for (const path of requiredFiles) {
@@ -473,11 +531,17 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   const host = fileByPath(scaffold, 'src/meeting-platform-host.mjs')?.content ?? '';
   const routes = fileByPath(scaffold, 'src/http-routes.mjs')?.content ?? '';
   const readme = fileByPath(scaffold, 'README.md')?.content ?? '';
-  if (!host.includes('createMeetingPlatformTimelineKit')) {
-    issues.push(issue('error', 'missing_platform_kit_import', 'Host source must create the platform kit.'));
+  if (!host.includes('createMeetingPlatformIntegrationRuntime')) {
+    issues.push(issue('error', 'missing_integration_runtime_import', 'Host source must create the platform integration runtime.'));
   }
-  if (!host.includes('platformLiveAdapterSuite')) {
-    issues.push(issue('error', 'missing_live_adapter_suite', 'Host source must create the live adapter suite.'));
+  if (!host.includes('integrationRuntimeManifest')) {
+    issues.push(issue('error', 'missing_integration_runtime_manifest', 'Host source must expose the integration runtime manifest.'));
+  }
+  if (!host.includes('integrationRuntimeSummary')) {
+    issues.push(issue('error', 'missing_integration_runtime_summary', 'Host source must expose the integration runtime summary.'));
+  }
+  if (!host.includes('liveAdapters')) {
+    issues.push(issue('error', 'missing_live_adapter_suite', 'Host source must expose the live adapter suite.'));
   }
   if (!host.includes('platformAdapterContractMatrix')) {
     issues.push(issue('error', 'missing_adapter_contract_matrix', 'Host source must expose the adapter contract matrix.'));
@@ -505,6 +569,12 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!routes.includes('/api/meeting-platform/extension-plan')) {
     issues.push(issue('error', 'missing_extension_plan_route', 'Route source must expose the extension install plan endpoint.'));
+  }
+  if (!routes.includes('/api/meeting-platform/integration-runtime')) {
+    issues.push(issue('error', 'missing_integration_runtime_route', 'Route source must expose the integration runtime summary endpoint.'));
+  }
+  if (!routes.includes('/api/meeting-platform/runtime-events')) {
+    issues.push(issue('error', 'missing_runtime_events_route', 'Route source must expose the runtime event endpoint.'));
   }
   if (!readme.includes('captured_at_ms')) {
     issues.push(issue('warning', 'readme_missing_timestamp_contract', 'README should state the captured_at_ms contract.'));

@@ -2310,7 +2310,7 @@ npm run meeting-platform:subscription-handoff -- \
 
 报告里 `ready_to_create_count` 表示能直接创建订阅的平台数，`manual_setup_count` 表示必须去平台控制台或长连接配置的平台数，`security_blocked_count` 和 `parameter_missing_count` 直接给 CI/接入面板做失败原因。即使 provider 订阅已全部可创建，实时标注仍然以宿主捕获的 `captured_at_ms` 为准；provider 事件只做 start/end/artifact 的回填和审计。
 
-如果要给另一个项目一个更完整的“可改造骨架”，用 `platform-host-integration` 生成 host scaffold。它会输出 `package.json`、timeline client、host wrapper、framework-neutral HTTP route、handoff/readiness/runtime-bundle/extension-plan 脚本和 README：
+如果要给另一个项目一个更完整的“可改造骨架”，用 `platform-host-integration` 生成 host scaffold。它会输出 `package.json`、timeline client、host wrapper、framework-neutral HTTP route、handoff/readiness/runtime-bundle/extension-plan/integration-runtime 脚本和 README。生成的 host wrapper 会先创建 `createMeetingPlatformIntegrationRuntime()`，因此下游项目可以优先接统一 runtime，再按需下钻到 runtime bundle 或 extension plan：
 
 ```js
 import {
@@ -2326,6 +2326,9 @@ const scaffold = buildMeetingPlatformHostIntegrationScaffold({
 
 assertMeetingPlatformHostIntegrationScaffold(scaffold);
 // scaffold.files 里包含 src/meeting-platform-host.mjs 和 src/http-routes.mjs。
+// host.integrationRuntimeSummary() 和 /api/meeting-platform/integration-runtime 可给宿主接入面板读取。
+// host.integrationRuntimeManifest() 和 /api/meeting-platform/integration-runtime/manifest 可给 CI/handoff gate 读取。
+// /api/meeting-platform/runtime-events 可让扩展/WebView/native host 统一投递 observe/insert/provider 事件。
 // host.runtimeBundles() 和 /api/meeting-platform/runtime-bundles 可直接给扩展/WebView/native host 读取。
 // host.extensionInstallPlan() 和 /api/meeting-platform/extension-plan 可直接给扩展构建器读取。
 ```

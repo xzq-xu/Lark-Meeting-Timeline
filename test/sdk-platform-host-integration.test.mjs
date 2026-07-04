@@ -32,6 +32,9 @@ assert.equal(plan.endpoints.platform_events, '/api/platform-events');
 assert.equal(plan.endpoints.adapter_contracts, '/api/meeting-platform/contracts');
 assert.equal(plan.endpoints.runtime_bundles, '/api/meeting-platform/runtime-bundles');
 assert.equal(plan.endpoints.extension_plan, '/api/meeting-platform/extension-plan');
+assert.equal(plan.endpoints.integration_runtime, '/api/meeting-platform/integration-runtime');
+assert.equal(plan.endpoints.integration_runtime_manifest, '/api/meeting-platform/integration-runtime/manifest');
+assert.equal(plan.endpoints.runtime_events, '/api/meeting-platform/runtime-events');
 assert.equal(plan.handoff_bundle.platform_count, 3);
 assert.equal(plan.runtime_bundle_matrix.platform_count, 3);
 assert.equal(plan.runtime_bundle_matrix.provider_required_for_realtime_count, 0);
@@ -49,7 +52,7 @@ const scaffold = buildMeetingPlatformHostIntegrationScaffold({
 });
 
 assert.equal(scaffold.schema, MEETING_PLATFORM_HOST_INTEGRATION_SCAFFOLD_SCHEMA);
-assert.equal(scaffold.files.length, 11);
+assert.equal(scaffold.files.length, 13);
 assert.equal(file(scaffold, 'package.json').mime, 'application/json');
 const manifest = JSON.parse(file(scaffold, 'package.json').content);
 assert.equal(manifest.name, 'timeline-host-consumer');
@@ -57,8 +60,13 @@ assert.equal(manifest.scripts['meeting-platform:contracts'], 'node ./scripts/pri
 assert.equal(manifest.scripts['meeting-platform:contract-acceptance'], 'node ./scripts/verify-contracts.mjs');
 assert.equal(manifest.scripts['meeting-platform:runtime-bundles'], 'node ./scripts/print-runtime-bundles.mjs');
 assert.equal(manifest.scripts['meeting-platform:extension-plan'], 'node ./scripts/print-extension-plan.mjs');
-assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('createMeetingPlatformTimelineKit'), true);
-assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformLiveAdapterSuite'), true);
+assert.equal(manifest.scripts['meeting-platform:integration-runtime'], 'node ./scripts/print-integration-runtime.mjs');
+assert.equal(manifest.scripts['meeting-platform:integration-runtime-manifest'], 'node ./scripts/print-integration-runtime-manifest.mjs');
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('createMeetingPlatformIntegrationRuntime'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('integrationRuntimeManifest'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('integrationRuntimeSummary'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('handleRuntimeEvent'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('liveAdapters'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformAdapterContractMatrix'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformAdapterContractAcceptanceMatrix'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformRuntimeBundleMatrix'), true);
@@ -68,13 +76,19 @@ assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('handleFetch
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/contracts'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/runtime-bundles'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/extension-plan'), true);
+assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/integration-runtime'), true);
+assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/integration-runtime/manifest'), true);
+assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/runtime-events'), true);
 assert.equal(file(scaffold, 'scripts/print-handoff.mjs').content.includes('host.handoffBundle()'), true);
 assert.equal(file(scaffold, 'scripts/print-contracts.mjs').content.includes('host.adapterContracts()'), true);
 assert.equal(file(scaffold, 'scripts/verify-contracts.mjs').content.includes('adapterContractAcceptance'), true);
 assert.equal(file(scaffold, 'scripts/print-runtime-bundles.mjs').content.includes('host.runtimeBundles()'), true);
 assert.equal(file(scaffold, 'scripts/print-extension-plan.mjs').content.includes('host.extensionInstallPlan()'), true);
+assert.equal(file(scaffold, 'scripts/print-integration-runtime.mjs').content.includes('host.integrationRuntimeSummary()'), true);
+assert.equal(file(scaffold, 'scripts/print-integration-runtime-manifest.mjs').content.includes('host.integrationRuntimeManifest()'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('captured_at_ms'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('extensionInstallPlan'), true);
+assert.equal(file(scaffold, 'README.md').content.includes('integrationRuntimeSummary'), true);
 
 const acceptance = buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaffold);
 assert.equal(acceptance.schema, MEETING_PLATFORM_HOST_INTEGRATION_ACCEPTANCE_SCHEMA);
@@ -84,6 +98,8 @@ assert.equal(acceptance.required_files.includes('src/http-routes.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/verify-contracts.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-runtime-bundles.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-extension-plan.mjs'), true);
+assert.equal(acceptance.required_files.includes('scripts/print-integration-runtime.mjs'), true);
+assert.equal(acceptance.required_files.includes('scripts/print-integration-runtime-manifest.mjs'), true);
 assert.equal(assertMeetingPlatformHostIntegrationScaffold(scaffold).accepted, true);
 
 const broken = {
