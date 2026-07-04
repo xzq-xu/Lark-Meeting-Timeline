@@ -10,12 +10,15 @@ import {
   MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA,
   MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
+  MEETING_APP_RUNTIME_ADAPTER_HANDOFF_ACCEPTANCE_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_HANDOFF_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_HANDOFF_MATRIX_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA,
   assertMeetingAppDeploymentManifest,
+  assertMeetingAppRuntimeAdapterHandoff,
+  assertMeetingAppRuntimeAdapterHandoffMatrix,
   buildAllMeetingAppDeploymentManifests,
   buildAllMeetingAppDomAdaptationDiagnoses,
   buildMeetingAppDomAdaptationDiagnosisMatrix,
@@ -36,6 +39,8 @@ import {
   buildMeetingAppLiveSnapshotCapturePlan,
   buildMeetingAppRuntimeAdapterAcceptanceReport,
   buildMeetingAppRuntimeAdapterConfig,
+  buildMeetingAppRuntimeAdapterHandoffAcceptanceReport,
+  buildMeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport,
   buildMeetingAppRuntimeAdapterHandoff,
   buildMeetingAppRuntimeAdapterHandoffMatrix,
   buildMeetingAppRuntimeAdapterProfileMatrix,
@@ -60,6 +65,7 @@ assert.equal(MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA, 'meeting_app_run
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA, 'meeting_app_runtime_adapter_selection');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_HANDOFF_SCHEMA, 'meeting_app_runtime_adapter_handoff');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_HANDOFF_MATRIX_SCHEMA, 'meeting_app_runtime_adapter_handoff_matrix');
+assert.equal(MEETING_APP_RUNTIME_ADAPTER_HANDOFF_ACCEPTANCE_SCHEMA, 'meeting_app_runtime_adapter_handoff_acceptance');
 assert.equal(MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA, 'meeting_app_live_snapshot_capture_plan');
 assert.equal(MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA, 'meeting_app_deployment_manifest');
 assert.equal(MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA, 'meeting_app_live_evidence_package');
@@ -234,6 +240,29 @@ assert.equal(browserHandoff.annotations.endpoints.insertMark, 'https://timeline.
 assert.equal(browserHandoff.host_contract.provider_event_role, 'reconcile_and_backfill_only');
 assert.equal(browserHandoff.readiness.ready_to_start, true);
 assert.equal(browserHandoff.next_actions.includes('start_runtime_with_handoff.runtime.options'), true);
+const browserHandoffAcceptance = buildMeetingAppRuntimeAdapterHandoffAcceptanceReport(browserHandoff);
+assert.equal(browserHandoffAcceptance.schema, MEETING_APP_RUNTIME_ADAPTER_HANDOFF_ACCEPTANCE_SCHEMA);
+assert.equal(browserHandoffAcceptance.accepted, true);
+assert.equal(browserHandoffAcceptance.production_ready, false);
+assert.equal(browserHandoffAcceptance.coverage.timestamp_field, true);
+assert.equal(browserHandoffAcceptance.coverage.provider_non_blocking, true);
+assert.equal(browserHandoffAcceptance.warning_count, 1);
+assert.equal(browserHandoffAcceptance.issues.some((item) => item.code === 'production_requires_live_snapshot'), true);
+assert.equal(assertMeetingAppRuntimeAdapterHandoff(browserHandoff).accepted, true);
+const unsafeBrowserHandoff = {
+  ...browserHandoff,
+  install: {
+    ...browserHandoff.install,
+    host_permissions: ['<all_urls>'],
+  },
+};
+const unsafeBrowserHandoffAcceptance = buildMeetingAppRuntimeAdapterHandoffAcceptanceReport(unsafeBrowserHandoff);
+assert.equal(unsafeBrowserHandoffAcceptance.accepted, false);
+assert.equal(unsafeBrowserHandoffAcceptance.issues.some((item) => item.code === 'overbroad_host_permission'), true);
+assert.throws(
+  () => assertMeetingAppRuntimeAdapterHandoff(unsafeBrowserHandoff),
+  /Meeting app runtime adapter handoff acceptance failed/,
+);
 
 const electronHandoff = buildMeetingAppRuntimeAdapterHandoff('https://meet.google.com/abc-defg-hij', {
   surface: 'electron-webview',
@@ -263,6 +292,14 @@ assert.equal(handoffMatrix.rows.find((row) => row.platform === 'google_meet' && 
 assert.equal(handoffMatrix.rows.find((row) => row.platform === 'microsoft_teams' && row.surface === 'native_detector').start_mode, 'host_supplies_snapshots');
 assert.equal(handoffMatrix.rows.every((row) => row.timestamp_field === 'captured_at_ms'), true);
 assert.equal(handoffMatrix.next_actions.includes('insert_annotations_with_captured_at_ms'), true);
+const handoffMatrixAcceptance = buildMeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport(handoffMatrix);
+assert.equal(handoffMatrixAcceptance.schema, MEETING_APP_RUNTIME_ADAPTER_HANDOFF_ACCEPTANCE_SCHEMA);
+assert.equal(handoffMatrixAcceptance.accepted, true);
+assert.equal(handoffMatrixAcceptance.production_ready, false);
+assert.equal(handoffMatrixAcceptance.accepted_count, 4);
+assert.equal(handoffMatrixAcceptance.warning_count, 4);
+assert.equal(handoffMatrixAcceptance.rows.every((row) => row.accepted === true), true);
+assert.equal(assertMeetingAppRuntimeAdapterHandoffMatrix(handoffMatrix).accepted, true);
 
 const googleCapturePlan = buildMeetingAppLiveSnapshotCapturePlan('google-meet');
 assert.equal(googleCapturePlan.type, 'meeting_app_live_snapshot_capture_plan');

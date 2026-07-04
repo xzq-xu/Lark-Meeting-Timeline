@@ -10,6 +10,7 @@ export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA: 'meeting_app_run
 export const MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA: 'meeting_app_runtime_adapter_selection';
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_SCHEMA: 'meeting_app_runtime_adapter_handoff';
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_MATRIX_SCHEMA: 'meeting_app_runtime_adapter_handoff_matrix';
+export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_ACCEPTANCE_SCHEMA: 'meeting_app_runtime_adapter_handoff_acceptance';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA: 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA: 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA: 'meeting_app_live_evidence_package';
@@ -170,6 +171,42 @@ export interface MeetingAppRuntimeAdapterHandoffMatrix {
   surfaces: string[];
   rows: Array<Record<string, unknown>>;
   handoffs: MeetingAppRuntimeAdapterHandoff[];
+  next_actions: string[];
+}
+
+export interface MeetingAppRuntimeAdapterHandoffAcceptanceReport {
+  type: 'meeting_app_runtime_adapter_handoff_acceptance_report';
+  schema: 'meeting_app_runtime_adapter_handoff_acceptance';
+  version: number;
+  accepted: boolean;
+  production_ready: boolean;
+  platform?: MeetingAppDomCaptureProfilePlatform | string | null;
+  surface?: string;
+  blocking_count: number;
+  warning_count: number;
+  coverage: Record<string, boolean>;
+  issues: Array<Record<string, unknown>>;
+  handoff: MeetingAppRuntimeAdapterHandoff | Record<string, unknown>;
+  next_actions: string[];
+}
+
+export interface MeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport {
+  type: 'meeting_app_runtime_adapter_handoff_matrix_acceptance_report';
+  schema: 'meeting_app_runtime_adapter_handoff_acceptance';
+  version: number;
+  accepted: boolean;
+  production_ready: boolean;
+  platform_count: number;
+  surface_count: number;
+  handoff_count: number;
+  accepted_count: number;
+  production_ready_count: number;
+  blocking_count: number;
+  warning_count: number;
+  rows: Array<Record<string, unknown>>;
+  issues: Array<Record<string, unknown>>;
+  reports: MeetingAppRuntimeAdapterHandoffAcceptanceReport[];
+  matrix: MeetingAppRuntimeAdapterHandoffMatrix | Record<string, unknown>;
   next_actions: string[];
 }
 
@@ -370,6 +407,26 @@ export function buildMeetingAppRuntimeAdapterHandoff(
 export function buildMeetingAppRuntimeAdapterHandoffMatrix(
   options?: MeetingAppIntegrationProfileOptions,
 ): MeetingAppRuntimeAdapterHandoffMatrix;
+
+export function buildMeetingAppRuntimeAdapterHandoffAcceptanceReport(
+  handoffOrInput?: string | Record<string, unknown> | MeetingAppRuntimeAdapterSelection | MeetingAppRuntimeAdapterHandoff,
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppRuntimeAdapterHandoffAcceptanceReport;
+
+export function assertMeetingAppRuntimeAdapterHandoff(
+  handoffOrInput?: string | Record<string, unknown> | MeetingAppRuntimeAdapterSelection | MeetingAppRuntimeAdapterHandoff,
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppRuntimeAdapterHandoffAcceptanceReport;
+
+export function buildMeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport(
+  matrixOrOptions?: Record<string, unknown> | MeetingAppRuntimeAdapterHandoff | MeetingAppRuntimeAdapterHandoffMatrix,
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport;
+
+export function assertMeetingAppRuntimeAdapterHandoffMatrix(
+  matrixOrOptions?: Record<string, unknown> | MeetingAppRuntimeAdapterHandoff | MeetingAppRuntimeAdapterHandoffMatrix,
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport;
 
 export function buildAllMeetingAppRuntimeAdapterConfigs(
   options?: MeetingAppIntegrationProfileOptions,

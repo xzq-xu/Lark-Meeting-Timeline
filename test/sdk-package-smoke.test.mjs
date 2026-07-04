@@ -278,7 +278,10 @@ import {
   buildMeetingAppLaunchGate,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate';
 import {
+  assertMeetingAppRuntimeAdapterHandoff,
   buildMeetingAppDomAdaptationDiagnosisMatrix,
+  buildMeetingAppRuntimeAdapterHandoffAcceptanceReport,
+  buildMeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport,
   buildMeetingAppRuntimeAdapterHandoff,
   buildMeetingAppRuntimeAdapterHandoffMatrix,
   buildMeetingAppRuntimeAdapterProfileMatrix,
@@ -320,6 +323,7 @@ assert.equal(kit.meetingAppRuntimeAdapterProfileMatrix({ platforms: ['google-mee
 assert.equal(kit.selectMeetingAppRuntimeAdapter('https://meet.google.com/abc-defg-hij').launch.runtime_options.runtimePreset, 'google_meet');
 assert.equal(kit.meetingAppRuntimeAdapterHandoff('https://meet.google.com/abc-defg-hij').readiness.ready_to_start, true);
 assert.equal(kit.meetingAppRuntimeAdapterHandoffMatrix({ platforms: ['google-meet', 'teams'], surfaces: ['browser-extension'] }).handoff_count, 2);
+assert.equal(kit.meetingAppRuntimeAdapterHandoffAcceptance('https://meet.google.com/abc-defg-hij').accepted, true);
 const integrationRuntimeManifest = buildMeetingPlatformIntegrationRuntimeManifest({
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet', 'zoom'],
@@ -628,6 +632,9 @@ assert.equal(resolveMeetingAppRuntimeAdapterProfile('https://example.com/not-a-m
 assert.equal(selectMeetingAppRuntimeAdapter('https://meet.google.com/abc-defg-hij').selected, true);
 assert.equal(buildMeetingAppRuntimeAdapterHandoff('https://meet.google.com/abc-defg-hij').surface, 'browser_extension');
 assert.equal(buildMeetingAppRuntimeAdapterHandoffMatrix({ platforms: ['google-meet'], surfaces: ['native-detector'] }).ready_count, 1);
+assert.equal(buildMeetingAppRuntimeAdapterHandoffAcceptanceReport('https://meet.google.com/abc-defg-hij').accepted, true);
+assert.equal(buildMeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport({ platforms: ['google-meet'], surfaces: ['native-detector'] }).accepted, true);
+assert.equal(assertMeetingAppRuntimeAdapterHandoff('https://meet.google.com/abc-defg-hij').accepted, true);
 assert.equal(buildMeetingAppRuntimeAdapterProfileMatrix({ platforms: ['google-meet', 'teams'] }).platform_count, 2);
 assert.equal(kit.platformTimelineViewPlan('zoom').schema, 'meeting_platform_timeline_view_plan');
 assert.equal(kit.platformTimelineViewMatrix({

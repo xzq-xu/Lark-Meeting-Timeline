@@ -226,6 +226,8 @@ import {
 import {
   assertMeetingAppRuntimeAdapterConfig,
   assertMeetingAppRuntimeAdapterValidation,
+  assertMeetingAppRuntimeAdapterHandoff,
+  assertMeetingAppRuntimeAdapterHandoffMatrix,
   assertMeetingAppDeploymentManifest,
   buildAllMeetingAppDomAdaptationDiagnoses,
   buildAllMeetingAppDeploymentManifestAcceptanceReports,
@@ -247,6 +249,8 @@ import {
   buildMeetingAppLiveSnapshotCapturePlan,
   buildMeetingAppRuntimeAdapterAcceptanceReport,
   buildMeetingAppRuntimeAdapterConfig,
+  buildMeetingAppRuntimeAdapterHandoffAcceptanceReport,
+  buildMeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport,
   buildMeetingAppRuntimeAdapterHandoff,
   buildMeetingAppRuntimeAdapterHandoffMatrix,
   buildMeetingAppRuntimeAdapterProfileMatrix,
@@ -893,6 +897,21 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppRuntimeAdapterHandoffMatrix(handoffOptions = {}) {
       return buildMeetingAppRuntimeAdapterHandoffMatrix(withDefaults(defaults, handoffOptions));
+    },
+    meetingAppRuntimeAdapterHandoffAcceptance(handoffOrInput = {}, acceptanceOptions = {}) {
+      return buildMeetingAppRuntimeAdapterHandoffAcceptanceReport(handoffOrInput, withDefaults(defaults, acceptanceOptions));
+    },
+    assertMeetingAppRuntimeAdapterHandoff(handoffOrInput = {}, acceptanceOptions = {}) {
+      return assertMeetingAppRuntimeAdapterHandoff(handoffOrInput, withDefaults(defaults, acceptanceOptions));
+    },
+    meetingAppRuntimeAdapterHandoffMatrixAcceptance(matrixOrOptions = {}, acceptanceOptions = {}) {
+      return buildMeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport(
+        matrixOrOptions,
+        withDefaults(defaults, acceptanceOptions),
+      );
+    },
+    assertMeetingAppRuntimeAdapterHandoffMatrix(matrixOrOptions = {}, acceptanceOptions = {}) {
+      return assertMeetingAppRuntimeAdapterHandoffMatrix(matrixOrOptions, withDefaults(defaults, acceptanceOptions));
     },
     meetingAppLiveSnapshotCapturePlan(platform, planOptions = {}) {
       return buildMeetingAppLiveSnapshotCapturePlan(platform, withDefaults(defaults, planOptions));
