@@ -1182,6 +1182,7 @@ const extensionPlan = meetingKit.meetingAppExtensionInstallPlan({
 // extensionPlan.manifest.content_scripts[0].matches 是 Google Meet / Teams 的白名单注入规则。
 // extensionPlan.content_script_adapter 指向 platform-integration-runtime，低层 meeting-app-content-script 仍作为内部兼容模块保留。
 // 默认也支持 Zoom、Lark/Feishu、Webex，且不会生成 <all_urls> 这种过宽权限。
+// 对完整 scaffold/runtime profile，extension.permissions 会包含 storage + tabs；tabs 用于 background 观察当前浏览器候选会议窗口。
 
 const extensionScaffold = meetingKit.meetingAppExtensionScaffold({
   platforms: ['google-meet'],

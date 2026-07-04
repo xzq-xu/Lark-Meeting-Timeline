@@ -60,8 +60,10 @@ assert.equal(googleProfile.display_name, 'Google Meet');
 assert.equal(googleProfile.recommended_mode, 'browser_extension_local_observer_first');
 assert.deepEqual(googleProfile.extension.matches, ['https://meet.google.com/*']);
 assert.equal(googleProfile.extension.recommended_permissions.includes('storage'), true);
+assert.equal(googleProfile.extension.recommended_permissions.includes('tabs'), true);
 assert.equal(googleProfile.extension.adapters.browser_runtime, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime');
 assert.equal(googleProfile.extension.message_types.client_call, 'meeting_timeline.client_call');
+assert.equal(googleProfile.extension.message_types.observe_candidates, 'meeting_timeline.observe_candidates');
 assert.equal(googleProfile.extension.timeline_endpoints.insertMark, '/api/annotations');
 assert.equal(googleProfile.runtime.runtimePreset, 'google_meet');
 assert.equal(googleProfile.runtime.observeMutations, true);
@@ -93,6 +95,8 @@ assert.equal(googleRuntimeConfig.capture_options.captureProfile, 'google_meet');
 assert.equal(googleRuntimeConfig.capture_options.participantSelectors.length > 0, true);
 assert.equal(googleRuntimeConfig.startup.attached_message_type, 'meeting_timeline.extension_attached');
 assert.equal(googleRuntimeConfig.supported_client_methods.includes('insertMark'), true);
+assert.equal(googleRuntimeConfig.extension.permissions.includes('tabs'), true);
+assert.equal(googleRuntimeConfig.extension.message_types.observe_candidates, 'meeting_timeline.observe_candidates');
 assert.equal(googleRuntimeConfig.readiness.runtime_ready, true);
 
 const googleCapturePlan = buildMeetingAppLiveSnapshotCapturePlan('google-meet');
@@ -121,9 +125,13 @@ assert.equal(googleDeploymentManifest.validation_report.accepted, false);
 assert.equal(googleDeploymentManifest.production_gate.requires_captured_dom, true);
 assert.equal(googleDeploymentManifest.production_gate.minimum_live_record_count, 2);
 assert.equal(googleDeploymentManifest.integration_targets.some((item) => item.surface === 'chrome_or_edge_extension'), true);
+assert.equal(googleDeploymentManifest.integration_targets.find((item) => item.surface === 'chrome_or_edge_extension').permissions.includes('tabs'), true);
+assert.equal(googleDeploymentManifest.integration_targets.find((item) => item.surface === 'chrome_or_edge_extension').candidate_observer.runtime_event_action, 'observe_platform_candidates');
 assert.equal(googleDeploymentManifest.integration_targets.some((item) => item.surface === 'electron_or_embedded_webview'), true);
 assert.equal(googleDeploymentManifest.runtime_contract.timestamp_field, 'captured_at_ms');
 assert.equal(googleDeploymentManifest.runtime_contract.required_signals.includes('speaker_started'), true);
+assert.equal(googleDeploymentManifest.runtime_contract.candidate_observation.message_type, 'meeting_timeline.observe_candidates');
+assert.equal(googleDeploymentManifest.runtime_contract.candidate_observation.required_permission, 'tabs');
 assert.equal(googleDeploymentManifest.handoff.kit_methods.includes('meetingAppDeploymentManifest'), true);
 assert.equal(googleDeploymentManifest.rollout_checklist.includes('pass_runtime_validation_with_production_ready_true'), true);
 const googleDeploymentAcceptance = buildMeetingAppDeploymentManifestAcceptanceReport(googleDeploymentManifest);
@@ -389,6 +397,8 @@ const selectedRuntimeAcceptance = buildAllMeetingAppRuntimeAdapterAcceptanceRepo
 assert.deepEqual(Object.keys(selectedRuntimeAcceptance), ['zoom', 'webex']);
 assert.equal(selectedRuntimeAcceptance.zoom.accepted, true);
 assert.equal(selectedRuntimeAcceptance.webex.coverage.storage_permission, true);
+assert.equal(selectedRuntimeAcceptance.webex.coverage.tabs_permission, true);
+assert.equal(selectedRuntimeAcceptance.webex.coverage.candidate_observer_message_type, true);
 
 const selectedRuntimeValidation = buildAllMeetingAppRuntimeAdapterValidationReports({
   platforms: ['zoom', 'webex'],

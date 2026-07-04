@@ -265,6 +265,7 @@ export function buildMeetingAppIntegrationProfile(platformOrInput = {}, options 
       recommended_permissions: uniqueList([
         ...(extensionPlan.manifest?.permissions ?? []),
         'storage',
+        'tabs',
       ]),
       content_scripts: extensionPlan.content_scripts,
       adapters: {
@@ -435,11 +436,17 @@ export function buildMeetingAppRuntimeAdapterAcceptanceReport(configOrPlatform =
   if (!asArray(config.extension?.permissions).includes('storage')) {
     issues.push(issue('error', 'missing_storage_permission', 'Runtime adapter config must request storage for extension diagnostics.'));
   }
+  if (!asArray(config.extension?.permissions).includes('tabs')) {
+    issues.push(issue('error', 'missing_tabs_permission', 'Runtime adapter config must request tabs for browser candidate observation.'));
+  }
   if (config.extension?.message_types?.client_call !== MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call) {
     issues.push(issue('error', 'missing_client_call_message_type', 'Runtime adapter config is missing the client_call message type.'));
   }
   if (config.extension?.message_types?.extension_attached !== MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached) {
     issues.push(issue('error', 'missing_attached_message_type', 'Runtime adapter config is missing the extension_attached message type.'));
+  }
+  if (config.extension?.message_types?.observe_candidates !== MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates) {
+    issues.push(issue('error', 'missing_candidate_observer_message_type', 'Runtime adapter config is missing the observe_candidates message type.'));
   }
   if (config.extension?.status_storage_key !== MEETING_APP_EXTENSION_STATUS_STORAGE_KEY) {
     issues.push(issue('error', 'invalid_status_storage_key', 'Runtime adapter config has an unexpected status storage key.', {
@@ -503,7 +510,13 @@ export function buildMeetingAppRuntimeAdapterAcceptanceReport(configOrPlatform =
     coverage: {
       extension_matches: asArray(config.extension?.matches).length > 0,
       storage_permission: asArray(config.extension?.permissions).includes('storage'),
-      message_types: Boolean(config.extension?.message_types?.client_call && config.extension?.message_types?.extension_attached),
+      tabs_permission: asArray(config.extension?.permissions).includes('tabs'),
+      message_types: Boolean(
+        config.extension?.message_types?.client_call
+        && config.extension?.message_types?.extension_attached
+        && config.extension?.message_types?.observe_candidates
+      ),
+      candidate_observer_message_type: config.extension?.message_types?.observe_candidates === MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
       bridge_preset: platform ? config.bridge_options?.browser_runtime_preset === platform : false,
       runtime_preset: platform ? config.runtime_options?.runtimePreset === platform : false,
       capture_profile: platform ? config.capture_options?.captureProfile === platform : false,
@@ -679,6 +692,12 @@ export function buildMeetingAppDeploymentManifest(platformOrInput = {}, options 
       supported_client_methods: config.supported_client_methods,
       message_types: config.extension?.message_types,
       timeline_endpoints: config.extension?.timeline_endpoints,
+      candidate_observation: {
+        message_type: MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+        runtime_event_action: 'observe_platform_candidates',
+        required_permission: 'tabs',
+        producer: 'browser_extension_background_or_native_host',
+      },
     },
     integration_targets: [
       {
@@ -686,8 +705,13 @@ export function buildMeetingAppDeploymentManifest(platformOrInput = {}, options 
         injection: 'manifest_v3_content_script',
         matches: extensionInstallPlan.matches,
         host_permissions: extensionInstallPlan.host_permissions,
+        permissions: config.extension?.permissions,
         content_script_adapter: extensionInstallPlan.content_script_adapter,
         background_bridge: 'meeting_app_extension_background_forwarder',
+        candidate_observer: {
+          message_type: MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+          runtime_event_action: 'observe_platform_candidates',
+        },
       },
       {
         surface: 'electron_or_embedded_webview',
