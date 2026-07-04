@@ -112,6 +112,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixture-tracks`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-track-pipeline`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-track-runtime`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-source`
 - `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry`
@@ -1002,6 +1003,26 @@ const pipeline = buildMeetingAppTrackPipeline(domSnapshots, {
 // pipeline.marks 可以批量插到当前会议轴；mark.intent 会是 speaker_track / participant_track
 // pipeline.coverage.transcript_required === false
 // pipeline.coverage.provider_event_required === false
+```
+
+如果宿主已经在循环采样真实会议页，可以直接用 `meeting-app-track-runtime` 管增量插入和去重。runtime 会保留最近一段快照，重复 observe 同一批快照不会重复写入同一个 mark；默认优先调用 `insertMarks` 批量接口，缺少批量接口时退回逐条 `insertMark`：
+
+```js
+import {
+  createMeetingTimelineClient,
+} from '@ai-annotation/meeting-timeline-sdk';
+import {
+  createMeetingAppTrackRuntime,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-track-runtime';
+
+const client = createMeetingTimelineClient({ baseUrl: 'http://localhost:8787' });
+const runtime = createMeetingAppTrackRuntime(client, {
+  speakerTrackOptions: { minStableMs: 250, endIdleMs: 500 },
+  participantTrackOptions: { leaveStableMs: 500 },
+});
+
+await runtime.observe(domSnapshot);
+// 返回值里的 new_marks 是这次新增并已写入的 speaker_track / participant_track marks
 ```
 
 正式接入 Google Meet / Teams Web / Zoom Web / Webex Web / Lark Web 前，建议再跑 `meeting-app-gate`。它不检查官方 webhook 权限，而是检查本地会议 App 路径是否满足实时标注：browser runtime preset、DOM capture profile、MutationObserver track/ignore selectors、建轴、发言人位置和结束信号。fixture-only 只能证明 SDK wiring；要证明生产可用，需要用 `meeting-app-snapshot-recorder` 记录真实采集到的 DOM snapshots：

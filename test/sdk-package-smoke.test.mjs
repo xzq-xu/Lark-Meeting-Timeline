@@ -87,6 +87,8 @@ assert.equal(packedFiles.includes('adapters/meeting-app-fixture-tracks.mjs'), tr
 assert.equal(packedFiles.includes('adapters/meeting-app-fixture-tracks.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-pipeline.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-pipeline.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-track-runtime.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-track-runtime.d.ts'), true);
 assert.equal(packedFiles.includes('README.md'), true);
 assert.equal(packedFiles.some((item) => item.startsWith('test/')), false);
 assert.equal(packedFiles.some((item) => item.startsWith('scripts/')), false);
@@ -280,6 +282,9 @@ import {
 import {
   buildMeetingAppTrackPipeline,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-track-pipeline';
+import {
+  createMeetingAppTrackRuntime,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-track-runtime';
 
 assert.equal(SDK_VERSION, '0.1.0');
 const client = createMeetingTimelineClient({
@@ -526,6 +531,55 @@ assert.equal(kit.meetingAppTrackPipeline([
     closeOpenSegmentsAtMs: 1783356001000,
   },
 }).marks[0].intent, 'speaker_track');
+const trackRuntime = createMeetingAppTrackRuntime(client, {
+  speakerTrackOptions: {
+    minStableMs: 250,
+    minSegmentMs: 0,
+    closeOpenSegmentsAtMs: 1783356001000,
+  },
+});
+assert.equal((await trackRuntime.observe([
+  {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+    observedAtMs: 1783356000000,
+    activeSpeaker: { id: 'ada', name: 'Ada', speaking: true },
+    participants: [{ id: 'ada', name: 'Ada', speaking: true }],
+  },
+  {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+    observedAtMs: 1783356000400,
+    activeSpeaker: { id: 'ada', name: 'Ada', speaking: true },
+    participants: [{ id: 'ada', name: 'Ada', speaking: true }],
+  },
+])).new_mark_count, 1);
+assert.equal((await kit.meetingAppTrackRuntime({
+  speakerTrackOptions: {
+    minStableMs: 250,
+    minSegmentMs: 0,
+    closeOpenSegmentsAtMs: 1783356001000,
+  },
+}).observe([
+  {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+    observedAtMs: 1783356000000,
+    activeSpeaker: { id: 'ada', name: 'Ada', speaking: true },
+    participants: [{ id: 'ada', name: 'Ada', speaking: true }],
+  },
+  {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+    observedAtMs: 1783356000400,
+    activeSpeaker: { id: 'ada', name: 'Ada', speaking: true },
+    participants: [{ id: 'ada', name: 'Ada', speaking: true }],
+  },
+])).new_mark_count, 1);
 assert.equal(kit.platformTimelineViewPlan('zoom').schema, 'meeting_platform_timeline_view_plan');
 assert.equal(kit.platformTimelineViewMatrix({
   platforms: ['zoom'],

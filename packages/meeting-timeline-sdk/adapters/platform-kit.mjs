@@ -19,6 +19,9 @@ import {
   buildMeetingAppTrackPipeline,
   createMeetingAppTrackPipeline,
 } from './meeting-app-track-pipeline.mjs';
+import {
+  createMeetingAppTrackRuntime,
+} from './meeting-app-track-runtime.mjs';
 import { diagnosePlatformEvent } from './platform-ingest.mjs';
 import { buildMeetingPlatformOnboardingReport, buildMeetingPlatformOnboardingSummary } from './platform-onboarding.mjs';
 import {
@@ -648,6 +651,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     createMeetingAppTrackPipeline(trackOptions = {}) {
       return createMeetingAppTrackPipeline(withDefaults(defaults, trackOptions));
+    },
+    meetingAppTrackRuntime(runtimeOptions = {}) {
+      return createMeetingAppTrackRuntime(bridge.client, withDefaults(defaults, runtimeOptions));
     },
     platformTimelineViewPlan(platform, viewOptions = {}) {
       return buildMeetingPlatformTimelineViewPlan(platform, withDefaults(defaults, viewOptions));

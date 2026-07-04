@@ -228,6 +228,10 @@ import type {
   MeetingAppTrackPipelineInput,
   MeetingAppTrackPipelineOptions,
 } from './meeting-app-track-pipeline.mjs';
+import type {
+  MeetingAppTrackRuntime,
+  MeetingAppTrackRuntimeOptions,
+} from './meeting-app-track-runtime.mjs';
 
 export interface MeetingPlatformTimelineKitOptions extends MeetingTimelineBridgeOptions, PlatformWebhookRouterOptions {
   baseUrl?: string;
@@ -331,6 +335,7 @@ export interface MeetingPlatformTimelineKit {
     trackOptions?: MeetingAppTrackPipelineOptions,
   ): MeetingAppTrackPipeline;
   createMeetingAppTrackPipeline(trackOptions?: MeetingAppTrackPipelineOptions): MeetingAppTrackPipelineAccumulator;
+  meetingAppTrackRuntime(runtimeOptions?: MeetingAppTrackRuntimeOptions): MeetingAppTrackRuntime;
   platformTimelineViewPlan(platform: string, viewOptions?: MeetingPlatformTimelineViewOptions): MeetingPlatformTimelineViewPlan;
   platformTimelineViewMatrix(viewOptions?: MeetingPlatformTimelineViewOptions): MeetingPlatformTimelineViewMatrix;
   platformTimelineView(
