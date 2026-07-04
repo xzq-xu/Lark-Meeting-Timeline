@@ -281,6 +281,7 @@ import {
   buildMeetingAppDomAdaptationDiagnosisMatrix,
   buildMeetingAppRuntimeAdapterProfileMatrix,
   resolveMeetingAppRuntimeAdapterProfile,
+  selectMeetingAppRuntimeAdapter,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-profile';
 import {
   buildMeetingAppFixtureTrackReadinessReport,
@@ -314,6 +315,7 @@ assert.equal(kit.report({ platforms: ['google-meet'] }).platform_rollout.type, '
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_registry_manifest.platform_count, 1);
 assert.equal(kit.meetingAppRuntimeAdapterProfile('https://meet.google.com/abc-defg-hij').platform, 'google_meet');
 assert.equal(kit.meetingAppRuntimeAdapterProfileMatrix({ platforms: ['google-meet', 'teams'] }).runtime_ready_count, 2);
+assert.equal(kit.selectMeetingAppRuntimeAdapter('https://meet.google.com/abc-defg-hij').launch.runtime_options.runtimePreset, 'google_meet');
 const integrationRuntimeManifest = buildMeetingPlatformIntegrationRuntimeManifest({
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet', 'zoom'],
@@ -619,6 +621,7 @@ assert.equal((await createMeetingAppTimelineRuntime(client, {
 ])).new_mark_count, 1);
 assert.equal(resolveMeetingAppRuntimeAdapterProfile('https://meet.google.com/abc-defg-hij').platform, 'google_meet');
 assert.equal(resolveMeetingAppRuntimeAdapterProfile('https://example.com/not-a-meeting').detected, false);
+assert.equal(selectMeetingAppRuntimeAdapter('https://meet.google.com/abc-defg-hij').selected, true);
 assert.equal(buildMeetingAppRuntimeAdapterProfileMatrix({ platforms: ['google-meet', 'teams'] }).platform_count, 2);
 assert.equal(kit.platformTimelineViewPlan('zoom').schema, 'meeting_platform_timeline_view_plan');
 assert.equal(kit.platformTimelineViewMatrix({

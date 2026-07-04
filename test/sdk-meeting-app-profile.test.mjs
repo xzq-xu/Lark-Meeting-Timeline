@@ -12,6 +12,7 @@ import {
   MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA,
   MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA,
+  MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA,
   assertMeetingAppDeploymentManifest,
   buildAllMeetingAppDeploymentManifests,
   buildAllMeetingAppDomAdaptationDiagnoses,
@@ -35,6 +36,7 @@ import {
   buildMeetingAppRuntimeAdapterConfig,
   buildMeetingAppRuntimeAdapterProfileMatrix,
   buildMeetingAppRuntimeAdapterValidationReport,
+  selectMeetingAppRuntimeAdapter,
   resolveMeetingAppRuntimeAdapterProfile,
   assertMeetingAppRuntimeAdapterConfig,
   assertMeetingAppRuntimeAdapterValidation,
@@ -51,6 +53,7 @@ assert.equal(MEETING_APP_INTEGRATION_PROFILE_SCHEMA, 'meeting_app_integration_pr
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA, 'meeting_app_runtime_adapter_config');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA, 'meeting_app_runtime_adapter_profile_resolution');
 assert.equal(MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA, 'meeting_app_runtime_adapter_profile_matrix');
+assert.equal(MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA, 'meeting_app_runtime_adapter_selection');
 assert.equal(MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA, 'meeting_app_live_snapshot_capture_plan');
 assert.equal(MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA, 'meeting_app_deployment_manifest');
 assert.equal(MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA, 'meeting_app_live_evidence_package');
@@ -154,6 +157,53 @@ assert.equal(profileMatrix.rows.find((row) => row.platform === 'google_meet').ex
 assert.equal(profileMatrix.rows.find((row) => row.platform === 'microsoft_teams').runtime_preset, 'microsoft_teams');
 assert.equal(profileMatrix.rows.find((row) => row.platform === 'zoom').capture_profile, 'zoom');
 assert.equal(profileMatrix.next_actions.includes('enable_observeTracks_or_trackMutations_when_speaker_position_marks_are_needed'), true);
+
+const adapterSelection = selectMeetingAppRuntimeAdapter({
+  windows: [{
+    id: 'main-window',
+    focused: true,
+    tabs: [
+      {
+        id: 'teams-tab',
+        active: false,
+        url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting',
+        title: 'Microsoft Teams meeting',
+      },
+      {
+        id: 'meet-tab',
+        active: true,
+        audible: true,
+        url: 'https://meet.google.com/abc-defg-hij',
+        title: 'Google Meet - Design review',
+      },
+    ],
+  }],
+}, {
+  platforms: ['google-meet', 'teams'],
+  observedAtMs: 1_783_356_000_000,
+});
+assert.equal(adapterSelection.type, 'meeting_app_runtime_adapter_selection');
+assert.equal(adapterSelection.schema, MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA);
+assert.equal(adapterSelection.selected, true);
+assert.equal(adapterSelection.detected, true);
+assert.equal(adapterSelection.supported, true);
+assert.equal(adapterSelection.platform, 'google_meet');
+assert.equal(adapterSelection.candidate_count, 2);
+assert.equal(adapterSelection.supported_candidate_count, 2);
+assert.equal(adapterSelection.selected_candidate.meeting_id, 'abc-defg-hij');
+assert.equal(adapterSelection.adapter.runtime_preset, 'google_meet');
+assert.equal(adapterSelection.adapter.capture_profile, 'google_meet');
+assert.equal(adapterSelection.adapter.extension_matches.includes('https://meet.google.com/*'), true);
+assert.equal(adapterSelection.adapter.track_output_intents.includes('speaker_track'), true);
+assert.equal(adapterSelection.launch.runtime_factory, 'createMeetingAppBrowserRuntime');
+assert.equal(adapterSelection.launch.runtime_options.runtimePreset, 'google_meet');
+assert.equal(adapterSelection.launch.capture_options.captureProfile, 'google_meet');
+assert.equal(adapterSelection.launch.track_runtime_options.speakerTrackOptions.minStableMs >= 500, true);
+assert.equal(adapterSelection.readiness.realtime_annotation_ready, true);
+assert.equal(adapterSelection.readiness.provider_events_block_realtime, false);
+assert.equal(adapterSelection.readiness.transcript_blocks_realtime, false);
+assert.equal(adapterSelection.candidates.find((candidate) => candidate.platform === 'microsoft_teams').supported, true);
+assert.equal(adapterSelection.next_actions.includes('createMeetingAppBrowserRuntime(client, resolution.runtime_config.runtime_options)'), true);
 
 const googleCapturePlan = buildMeetingAppLiveSnapshotCapturePlan('google-meet');
 assert.equal(googleCapturePlan.type, 'meeting_app_live_snapshot_capture_plan');

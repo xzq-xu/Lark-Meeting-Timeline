@@ -8,6 +8,7 @@ import {
   meetingAppSnapshotRecords,
 } from './meeting-app-snapshot-recorder.mjs';
 import { normalizeMeetingAppSnapshot } from './meeting-apps.mjs';
+import { selectMeetingSessionCandidate } from './meeting-session-discovery.mjs';
 import {
   MEETING_APP_EXTENSION_MESSAGE_TYPES,
   MEETING_APP_EXTENSION_STATUS_STORAGE_KEY,
@@ -27,6 +28,7 @@ export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS = MEETING_APP_FIXTURE_PLA
 export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA = 'meeting_app_runtime_adapter_config';
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA = 'meeting_app_runtime_adapter_profile_resolution';
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA = 'meeting_app_runtime_adapter_profile_matrix';
+export const MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA = 'meeting_app_runtime_adapter_selection';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA = 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA = 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA = 'meeting_app_live_evidence_package';
@@ -300,6 +302,76 @@ function matrixInputForPlatform(platform, options = {}) {
   return { platform };
 }
 
+function selectionObjectInput(input = {}) {
+  if (typeof input === 'string') return { url: input };
+  return input ?? {};
+}
+
+function candidateKey(value = {}) {
+  if (!value || typeof value !== 'object') return '';
+  return [
+    value.platform ?? value.meeting?.platform,
+    value.meeting_id ?? value.meetingId ?? value.meeting?.meeting_id ?? value.meeting?.meetingId,
+    value.meeting_url ?? value.meetingUrl ?? value.url ?? value.meeting?.meeting_url ?? value.meeting?.meetingUrl,
+    value.title ?? value.meeting?.title,
+  ].filter(Boolean).join('|');
+}
+
+function profileInputFromCandidate(candidate = {}) {
+  return compactObject({
+    ...candidate,
+    platform: firstNonEmpty(candidate.platform, candidate.meeting?.platform),
+    provider: firstNonEmpty(candidate.provider, candidate.platform, candidate.meeting?.platform),
+    url: firstNonEmpty(candidate.url, candidate.meeting_url, candidate.meetingUrl, candidate.meeting?.meeting_url, candidate.meeting?.meetingUrl),
+    title: firstNonEmpty(candidate.title, candidate.topic, candidate.name, candidate.meeting?.title),
+    meeting_id: firstNonEmpty(candidate.meeting_id, candidate.meetingId, candidate.meeting?.meeting_id, candidate.meeting?.meetingId),
+  });
+}
+
+function withoutExplicitResolverPlatform(options = {}) {
+  const {
+    platform,
+    provider,
+    key,
+    name,
+    ...rest
+  } = options;
+  return rest;
+}
+
+function candidateRowsFromSelection(selection = {}, supportedPlatforms = [], options = {}) {
+  const selectedKey = candidateKey(selection.selectedSnapshot ?? selection.detectedMeeting);
+  const rankedByKey = new Map(asArray(selection.candidates).map((candidate) => [
+    candidateKey(candidate.detectedMeeting ?? candidate.snapshot),
+    candidate,
+  ]));
+  return asArray(selection.normalizedCandidates).map((candidate) => {
+    const key = candidateKey(candidate);
+    const ranked = rankedByKey.get(key);
+    const profile = resolveMeetingAppRuntimeAdapterProfile(profileInputFromCandidate(candidate), {
+      ...withoutExplicitResolverPlatform(options),
+    });
+    return compactObject({
+      selected: key !== '' && key === selectedKey,
+      rank: ranked?.rank,
+      score: ranked?.score,
+      supported: Boolean(profile.platform && supportedPlatforms.includes(profile.platform)),
+      detected: profile.detected === true,
+      platform: profile.platform ?? candidate.platform,
+      display_name: profile.display_name,
+      meeting_id: candidate.meeting_id,
+      meeting_url: candidate.meeting_url,
+      title: candidate.title,
+      confidence: candidate.meeting?.confidence ?? candidate.discovery?.confidence,
+      reason: profile.reason ?? candidate.discovery?.platform_reason,
+      runtime_ready: profile.readiness?.runtime_ready === true,
+      runtime_preset: profile.runtime?.options?.runtimePreset,
+      capture_profile: profile.capture?.profile?.platform,
+      extension_match_count: profile.extension?.matches?.length ?? 0,
+    });
+  });
+}
+
 function readinessFor(gate = {}, runtimePreset = {}, captureProfile = {}) {
   const nextActions = [];
   if (gate.production_ready !== true) nextActions.push('capture_live_dom_snapshots_for_this_platform');
@@ -473,6 +545,99 @@ export function buildMeetingAppRuntimeAdapterProfileMatrix(options = {}) {
     profiles,
     next_actions: uniqueList(profiles.flatMap((profile) => profile.next_actions ?? [])),
   };
+}
+
+export function selectMeetingAppRuntimeAdapter(input = {}, options = {}) {
+  const rawInput = selectionObjectInput(input);
+  const supportedPlatforms = platformList(options);
+  const selection = selectMeetingSessionCandidate(rawInput, options);
+  const selectedCandidate = selection.selectedSnapshot ?? selection.detectedMeeting ?? null;
+  const selectedInput = selectedCandidate ? profileInputFromCandidate(selectedCandidate) : rawInput;
+  const profile = resolveMeetingAppRuntimeAdapterProfile(selectedInput, options);
+  const supported = Boolean(profile.platform && supportedPlatforms.includes(profile.platform));
+  const candidateRows = candidateRowsFromSelection(selection, supportedPlatforms, options);
+  const issues = [];
+  if (profile.detected !== true) {
+    issues.push(issue('warning', 'adapter_not_detected', 'No supported meeting app adapter was detected from the input.'));
+  }
+  if (profile.platform && !supported) {
+    issues.push(issue('error', 'adapter_platform_not_enabled', 'Detected meeting app platform is not enabled in this selection.', {
+      platform: profile.platform,
+      enabled_platforms: supportedPlatforms,
+    }));
+  }
+  if (profile.detected === true && profile.readiness?.runtime_ready !== true) {
+    issues.push(issue('error', 'adapter_runtime_not_ready', 'Detected meeting app adapter is missing runtime-ready configuration.', {
+      platform: profile.platform,
+    }));
+  }
+
+  const runtimeReady = profile.readiness?.runtime_ready === true;
+  const selected = profile.detected === true && supported && runtimeReady;
+  return compactObject({
+    type: 'meeting_app_runtime_adapter_selection',
+    schema: MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    selected,
+    detected: profile.detected === true,
+    supported,
+    platform: profile.platform,
+    display_name: profile.display_name,
+    reason: profile.reason ?? (selectedCandidate ? 'meeting_session_candidate' : undefined),
+    current_platforms: supportedPlatforms,
+    candidate_count: selection.normalizedCandidates?.length ?? 0,
+    supported_candidate_count: candidateRows.filter((candidate) => candidate.supported === true).length,
+    selected_candidate: selectedCandidate ? profileInputFromCandidate(selectedCandidate) : undefined,
+    selected_meeting: selection.detectedMeeting,
+    adapter: profile.detected === true ? {
+      platform: profile.platform,
+      display_name: profile.display_name,
+      extension_matches: profile.extension?.matches ?? [],
+      host_permissions: profile.extension?.host_permissions ?? [],
+      runtime_preset: profile.runtime?.options?.runtimePreset,
+      capture_profile: profile.capture?.profile?.platform,
+      observe_mutations: profile.runtime?.options?.observeMutations === true,
+      mutation_track_selectors: profile.runtime?.options?.mutationTrackSelectors ?? [],
+      track_output_intents: profile.tracks?.output_intents ?? [],
+      content_policy: profile.tracks?.content_policy,
+    } : undefined,
+    launch: profile.detected === true ? {
+      runtime_factory: 'createMeetingAppBrowserRuntime',
+      content_script_bridge_factory: 'createMeetingAppContentScriptBridge',
+      track_runtime_factory: 'createMeetingAppTrackRuntime',
+      runtime_options: profile.runtime_config?.runtime_options,
+      capture_options: profile.runtime_config?.capture_options,
+      bridge_options: profile.runtime_config?.bridge_options,
+      track_runtime_options: profile.tracks?.runtime_options,
+      startup: profile.runtime_config?.startup,
+      supported_client_methods: profile.runtime_config?.supported_client_methods,
+      timeline_endpoints: profile.extension?.timeline_endpoints,
+    } : undefined,
+    readiness: {
+      adapter_selected: selected,
+      runtime_ready: runtimeReady,
+      supported_platform: supported,
+      realtime_annotation_ready: selected,
+      speaker_track_ready: profile.tracks?.output_intents?.includes?.('speaker_track') === true,
+      participant_track_ready: profile.tracks?.output_intents?.includes?.('participant_track') === true,
+      provider_events_block_realtime: false,
+      transcript_blocks_realtime: false,
+      production_requires_live_snapshot: profile.readiness?.production_requires_live_snapshot === true,
+    },
+    profile,
+    candidates: candidateRows,
+    selection,
+    issues: [
+      ...issues,
+      ...(profile.issues ?? []),
+    ],
+    next_actions: uniqueList([
+      ...(selected ? [] : ['provide_supported_meeting_url_or_explicit_platform']),
+      ...(supported ? [] : ['enable_detected_platform_in_runtime_platforms']),
+      ...(runtimeReady ? [] : ['verify_runtime_adapter_config']),
+      ...(profile.next_actions ?? []),
+    ]),
+  });
 }
 
 export function buildMeetingAppIntegrationProfile(platformOrInput = {}, options = {}) {

@@ -249,6 +249,7 @@ import {
   buildMeetingAppRuntimeAdapterConfig,
   buildMeetingAppRuntimeAdapterProfileMatrix,
   buildMeetingAppRuntimeAdapterValidationReport,
+  selectMeetingAppRuntimeAdapter,
   resolveMeetingAppRuntimeAdapterProfile,
 } from './meeting-app-profile.mjs';
 import {
@@ -881,6 +882,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppRuntimeAdapterProfileMatrix(profileOptions = {}) {
       return buildMeetingAppRuntimeAdapterProfileMatrix(withDefaults(defaults, profileOptions));
+    },
+    selectMeetingAppRuntimeAdapter(input = {}, selectionOptions = {}) {
+      return selectMeetingAppRuntimeAdapter(input, withDefaults(defaults, selectionOptions));
     },
     meetingAppLiveSnapshotCapturePlan(platform, planOptions = {}) {
       return buildMeetingAppLiveSnapshotCapturePlan(platform, withDefaults(defaults, planOptions));

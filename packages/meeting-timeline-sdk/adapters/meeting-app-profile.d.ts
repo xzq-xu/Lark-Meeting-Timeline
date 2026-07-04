@@ -7,6 +7,7 @@ export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS: readonly MeetingAppDomCa
 export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA: 'meeting_app_runtime_adapter_config';
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA: 'meeting_app_runtime_adapter_profile_resolution';
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA: 'meeting_app_runtime_adapter_profile_matrix';
+export const MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA: 'meeting_app_runtime_adapter_selection';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA: 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA: 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA: 'meeting_app_live_evidence_package';
@@ -103,6 +104,31 @@ export interface MeetingAppRuntimeAdapterProfileMatrix {
   platforms: MeetingAppDomCaptureProfilePlatform[];
   rows: Array<Record<string, unknown>>;
   profiles: MeetingAppRuntimeAdapterProfileResolution[];
+  next_actions: string[];
+}
+
+export interface MeetingAppRuntimeAdapterSelection {
+  type: 'meeting_app_runtime_adapter_selection';
+  schema: 'meeting_app_runtime_adapter_selection';
+  version: number;
+  selected: boolean;
+  detected: boolean;
+  supported: boolean;
+  platform?: MeetingAppDomCaptureProfilePlatform | null;
+  display_name?: string;
+  reason?: string;
+  current_platforms: MeetingAppDomCaptureProfilePlatform[];
+  candidate_count: number;
+  supported_candidate_count: number;
+  selected_candidate?: Record<string, unknown>;
+  selected_meeting?: Record<string, unknown> | null;
+  adapter?: Record<string, unknown>;
+  launch?: Record<string, unknown>;
+  readiness: Record<string, unknown>;
+  profile: MeetingAppRuntimeAdapterProfileResolution;
+  candidates: Array<Record<string, unknown>>;
+  selection: Record<string, unknown>;
+  issues: Array<Record<string, unknown>>;
   next_actions: string[];
 }
 
@@ -289,6 +315,11 @@ export function resolveMeetingAppRuntimeAdapterProfile(
 export function buildMeetingAppRuntimeAdapterProfileMatrix(
   options?: MeetingAppIntegrationProfileOptions,
 ): MeetingAppRuntimeAdapterProfileMatrix;
+
+export function selectMeetingAppRuntimeAdapter(
+  input?: string | Record<string, unknown>,
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppRuntimeAdapterSelection;
 
 export function buildAllMeetingAppRuntimeAdapterConfigs(
   options?: MeetingAppIntegrationProfileOptions,

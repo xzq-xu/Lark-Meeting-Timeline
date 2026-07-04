@@ -171,6 +171,19 @@ assert.equal(runtimeAdapterProfileMatrix.platform_count, 2);
 assert.equal(runtimeAdapterProfileMatrix.detected_count, 2);
 assert.deepEqual(runtimeAdapterProfileMatrix.platforms, ['google_meet', 'microsoft_teams']);
 assert.equal(runtimeAdapterProfileMatrix.rows.every((row) => row.track_output_intents.includes('speaker_track')), true);
+const runtimeAdapterSelection = kit.selectMeetingAppRuntimeAdapter({
+  tabs: [
+    { active: false, url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting', title: 'Teams call' },
+    { active: true, audible: true, url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet' },
+  ],
+}, {
+  platforms: ['google-meet', 'teams'],
+  observedAtMs: 1_783_356_000_000,
+});
+assert.equal(runtimeAdapterSelection.selected, true);
+assert.equal(runtimeAdapterSelection.platform, 'google_meet');
+assert.equal(runtimeAdapterSelection.launch.runtime_options.runtimePreset, 'google_meet');
+assert.equal(runtimeAdapterSelection.supported_candidate_count, 2);
 const capturePlan = kit.meetingAppLiveSnapshotCapturePlan('google-meet');
 assert.equal(capturePlan.platform, 'google_meet');
 assert.equal(capturePlan.required_snapshots.some((item) => item.id === 'active_speaker'), true);
