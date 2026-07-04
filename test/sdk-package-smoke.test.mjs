@@ -35,6 +35,8 @@ assert.equal(packedFiles.includes('adapters/platform-runtime-event.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-runtime-event.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-registry.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-registry.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-conformance.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-conformance.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
@@ -161,6 +163,10 @@ import {
   buildMeetingPlatformRegistryManifest,
   meetingPlatformEventAdapterFor,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-registry';
+import {
+  assertMeetingPlatformConformanceReport,
+  buildMeetingPlatformConformanceReport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-conformance';
 import {
   buildMeetingPlatformAdaptationRunbook,
   buildMeetingPlatformRolloutPlan,
@@ -518,6 +524,14 @@ assert.equal(assertMeetingPlatformRegistryManifest({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).accepted, true);
+assert.equal(buildMeetingPlatformConformanceReport({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+}).accepted, true);
+assert.equal(assertMeetingPlatformConformanceReport({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+}).rows[0].adapter_first_route, 'local_observer_axis');
 assert.equal(kit.platformLiveAdapterHandoff('zoom').sdk.factory, 'createMeetingPlatformLiveAdapter');
 assert.equal(kit.platformLiveAdapterHandoffBundle({
   platforms: ['zoom'],

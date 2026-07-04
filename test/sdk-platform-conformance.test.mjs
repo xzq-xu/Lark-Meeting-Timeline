@@ -17,6 +17,11 @@ import {
   MEETING_PLATFORM_EVENT_ADAPTERS,
   meetingPlatformEventAdapterFor,
 } from '../packages/meeting-timeline-sdk/adapters/platform-registry.mjs';
+import {
+  assertMeetingPlatformConformanceReport,
+  buildMeetingPlatformConformanceReport,
+} from '../packages/meeting-timeline-sdk/adapters/platform-conformance.mjs';
+import { createMeetingPlatformTimelineKit } from '../packages/meeting-timeline-sdk/adapters/platform-kit.mjs';
 import * as transcriptAdapters from '../packages/meeting-timeline-sdk/adapters/transcript.mjs';
 
 const baseUrl = 'https://timeline.example.com';
@@ -34,6 +39,31 @@ assert.equal(normalizeMeetingPlatform('cisco-webex'), 'webex');
 assert.equal(normalizeMeetingPlatform('lark-suite'), 'lark');
 assert.throws(() => normalizeMeetingPlatform('unknown-meeting-platform'), /Unsupported meeting platform/);
 assert.equal(meetingPlatformEventAdapterFor('unknown-meeting-platform'), null);
+
+const conformance = buildMeetingPlatformConformanceReport({
+  baseUrl,
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+assert.equal(conformance.schema, 'meeting_platform_conformance_report');
+assert.equal(conformance.accepted, true);
+assert.equal(conformance.platform_count, 5);
+assert.equal(conformance.accepted_count, 5);
+assert.equal(conformance.normalizer_count, 5);
+assert.equal(conformance.adapter_contract_accepted_count, 5);
+assert.equal(conformance.adapter_route_ready_count, 5);
+assert.equal(conformance.runtime_ready_count, 5);
+assert.equal(conformance.candidate_observer_count, 5);
+assert.equal(conformance.provider_required_for_realtime_count, 0);
+assert.equal(conformance.transcript_blocking_count, 0);
+assert.equal(conformance.rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');
+assert.equal(conformance.rows.every((row) => row.timestamp_field === 'captured_at_ms'), true);
+assert.equal(assertMeetingPlatformConformanceReport({
+  baseUrl,
+  platforms: ['google-meet'],
+}).accepted, true);
+const kit = createMeetingPlatformTimelineKit({ baseUrl });
+assert.equal(kit.platformConformance({ platforms: ['zoom'] }).rows[0].platform, 'zoom');
+assert.equal(kit.assertPlatformConformance({ platforms: ['zoom'] }).accepted, true);
 
 const setupRows = allPlatformSetupManifests({ baseUrl });
 const capabilityRows = allPlatformCapabilityContracts({ baseUrl });

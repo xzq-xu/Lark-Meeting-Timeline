@@ -207,6 +207,10 @@ import type {
   MeetingPlatformHandoffReadinessMatrix,
   MeetingPlatformHandoffReadinessOptions,
 } from './platform-handoff-readiness.mjs';
+import type {
+  MeetingPlatformConformanceOptions,
+  MeetingPlatformConformanceReport,
+} from './platform-conformance.mjs';
 import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type {
@@ -327,6 +331,8 @@ export interface MeetingPlatformTimelineKit {
   platformAdaptationStrategyMatrix(strategyOptions?: MeetingPlatformRolloutOptions): MeetingPlatformAdaptationStrategyMatrix;
   platformAdapterRoute(platform: string, routeOptions?: MeetingPlatformAdapterRouteOptions): MeetingPlatformAdapterRoute;
   platformAdapterRouteMatrix(routeOptions?: MeetingPlatformAdapterRouteOptions): MeetingPlatformAdapterRouteMatrix;
+  platformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
+  assertPlatformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
   platformEvidencePackage(platformOrInput: string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, packageOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackage;
   platformEvidencePackageSummary(packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, summaryOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageSummary;
   platformEvidencePackageBuilder(platform: string, builderOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageBuilder;

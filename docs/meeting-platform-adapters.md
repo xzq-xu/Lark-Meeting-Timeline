@@ -390,6 +390,8 @@ GET  /api/platform-events/status
 
 SDK 还导出 `MEETING_PLATFORM_KEYS`、`MEETING_PLATFORM_ALIASES` 和 `normalizeMeetingPlatform()`，宿主项目应从这里读取平台列表和别名映射。新增平台时必须同时补齐 event adapter、setup manifest、capability contract、endpoint、安全配置，以及适用的 transcript normalizer，并通过 `test/sdk-platform-conformance.test.mjs`。最基础的 `platform-adapter-contract` 也会验 `candidate_observation`：真实会议平台必须声明 `meeting_timeline.observe_candidates`、`tabs` 权限、`observe_platform_candidates` runtime action 和 `/api/meeting-platform/observe-candidates` host endpoint；后续 registry/onboarding/handoff readiness 只是对这条实时建轴合同的更高层复验。
 
+下游项目如果只想先问“这个会议软件能不能按同一套 SDK 接入”，用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-conformance` 或仓库命令 `npm run meeting-platform:conformance`。它会把 Google Meet、Teams、Zoom、Webex、Lark 的 normalizer、setup manifest、capability contract、adapter contract、adapter route、runtime bundle、registry、candidate observation、`captured_at_ms` 和 provider/transcript 非阻塞规则压成一份 `meeting_platform_conformance_report`。这份报告适合 CI 和接入面板的第一层硬门槛：`accepted=true` 表示 SDK 调用面、实时建轴策略和统一动作入口可交给宿主项目接；它仍不代表 production-ready，真实会议 DOM/provider 证据必须继续进入 evidence package、real-intake 和 handoff readiness。
+
 真实 webhook 接入的安全层也已经放进 SDK：
 
 - `@ai-annotation/meeting-timeline-sdk/adapters/webhook-security`
@@ -463,6 +465,8 @@ packages/meeting-timeline-sdk/
     platform-setup.d.ts
     platform-registry.mjs
     platform-registry.d.ts
+    platform-conformance.mjs
+    platform-conformance.d.ts
     platform-integration-runtime.mjs
     platform-integration-runtime.d.ts
     platform-runtime-event.mjs

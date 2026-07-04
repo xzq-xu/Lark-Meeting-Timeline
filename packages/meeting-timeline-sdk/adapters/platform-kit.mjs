@@ -43,6 +43,10 @@ import {
   buildMeetingPlatformRegistryEntry,
   buildMeetingPlatformRegistryManifest,
 } from './platform-registry.mjs';
+import {
+  assertMeetingPlatformConformanceReport,
+  buildMeetingPlatformConformanceReport,
+} from './platform-conformance.mjs';
 import { createMeetingTimelineBridge } from './timeline-bridge.mjs';
 import {
   buildPlatformWebhookRouteTable,
@@ -401,6 +405,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     supported_platforms: MEETING_PLATFORM_KEYS,
     supported_meeting_app_platforms: MEETING_APP_FIXTURE_PLATFORMS,
     platform_registry_manifest: buildMeetingPlatformRegistryManifest(options),
+    platform_conformance_report: buildMeetingPlatformConformanceReport(options),
     capabilities: allPlatformCapabilityContracts(options),
     webhook_router: buildPlatformWebhookRouterStatus(options),
     onboarding: buildMeetingPlatformOnboardingSummary(options),
@@ -580,6 +585,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdapterRouteMatrix(routeOptions = {}) {
       return buildMeetingPlatformAdapterRouteMatrix(withDefaults(defaults, routeOptions));
+    },
+    platformConformance(conformanceOptions = {}) {
+      return buildMeetingPlatformConformanceReport(withDefaults(defaults, conformanceOptions));
+    },
+    assertPlatformConformance(conformanceOptions = {}) {
+      return assertMeetingPlatformConformanceReport(withDefaults(defaults, conformanceOptions));
     },
     platformEvidencePackage(platformOrInput, input = {}, packageOptions = {}) {
       if (platformOrInput && typeof platformOrInput === 'object' && !Array.isArray(platformOrInput)) {

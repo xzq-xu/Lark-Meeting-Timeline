@@ -1619,6 +1619,30 @@ npm run meeting-platform:registry -- \
   --report-file=data/meeting-platform-registry-report.json
 ```
 
+如果要在下游项目接入前做一层更严格的 SDK 静态验收，用 `platform-conformance`。它会把 normalizer、setup manifest、capability contract、adapter contract、adapter route、runtime bundle、registry、candidate observation、`captured_at_ms` 和 provider/transcript 非阻塞规则合成一份 `meeting_platform_conformance_report`；`accepted=true` 只说明 SDK 调用面和实时策略可交付，production 仍以后续真实 DOM/provider evidence package 和 handoff readiness 为准：
+
+```js
+import {
+  assertMeetingPlatformConformanceReport,
+  buildMeetingPlatformConformanceReport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-conformance';
+
+const conformanceOptions = {
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+};
+
+const conformance = buildMeetingPlatformConformanceReport(conformanceOptions);
+assertMeetingPlatformConformanceReport(conformanceOptions);
+```
+
+```sh
+npm run meeting-platform:conformance -- \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --report-file=data/meeting-platform-conformance-report.json
+```
+
 如果外部项目只想“收到平台 webhook 后直接落到会议轴”，可以用更高层的 `platform-ingest`：
 
 ```js
