@@ -33,7 +33,7 @@ assert.equal(report.provider_observer_count, 3);
 assert.equal(report.written_files.length, 3);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').package_file, join(outDir, 'google_meet.json'));
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').browser_match_count, 1);
-assert.equal(report.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 14);
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 16);
 assert.equal(report.rows.find((row) => row.platform === 'microsoft_teams').browser_match_count, 2);
 assert.equal(report.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 
@@ -64,6 +64,6 @@ const { stdout: textStdout } = await execFileAsync(process.execPath, [
 assert.match(textStdout, /meeting_platform_adaptation_package_report/);
 assert.match(textStdout, /sdk_ready=1/);
 assert.match(textStdout, /webex: mode=/);
-assert.match(textStdout, /runtime_actions=14/);
+assert.match(textStdout, /runtime_actions=16/);
 
 console.log('ok meeting platform adaptation package script');

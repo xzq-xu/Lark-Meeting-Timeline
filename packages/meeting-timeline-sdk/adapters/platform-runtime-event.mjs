@@ -23,6 +23,8 @@ export const MEETING_PLATFORM_RUNTIME_EVENT_ACTIONS = Object.freeze([
   'speaker_track',
   'participant_track',
   'timeline_view',
+  'adapter_route',
+  'adapter_routes',
   'runtime_bundles',
   'registry',
   'manifest',
@@ -57,6 +59,12 @@ const ACTION_ALIASES = new Map([
   ['participant_track', 'participant_track'],
   ['view', 'timeline_view'],
   ['timeline_view', 'timeline_view'],
+  ['adapter_route', 'adapter_route'],
+  ['platform_adapter_route', 'adapter_route'],
+  ['adapter_routes', 'adapter_routes'],
+  ['adapter_route_matrix', 'adapter_routes'],
+  ['platform_adapter_routes', 'adapter_routes'],
+  ['platform_adapter_route_matrix', 'adapter_routes'],
   ['runtime_bundle_matrix', 'runtime_bundles'],
   ['runtime_bundles', 'runtime_bundles'],
   ['platform_registry', 'registry'],
@@ -83,6 +91,7 @@ const PLATFORM_REQUIRED_ACTIONS = new Set([
   'speaker_track',
   'participant_track',
   'timeline_view',
+  'adapter_route',
 ]);
 
 function firstNonEmpty(...values) {
@@ -398,6 +407,23 @@ export function buildMeetingPlatformTimelineViewRuntimeEvent(platform, input = {
   }, options);
 }
 
+export function buildMeetingPlatformAdapterRouteRuntimeEvent(platform, input = {}, options = {}) {
+  return buildMeetingPlatformRuntimeEvent({
+    ...input,
+    action: 'adapter_route',
+    platform,
+    payload: input,
+  }, options);
+}
+
+export function buildMeetingPlatformAdapterRoutesRuntimeEvent(input = {}, options = {}) {
+  return buildMeetingPlatformRuntimeEvent({
+    ...input,
+    action: 'adapter_routes',
+    payload: input,
+  }, options);
+}
+
 export function buildMeetingPlatformRunManifestRuntimeEvent(input = {}, options = {}) {
   return buildMeetingPlatformRuntimeEvent({
     ...input,
@@ -512,6 +538,12 @@ function runtimeEventExamples(platform, options = {}) {
         marks: participantSignals,
       },
     }, options),
+    adapter_route: buildMeetingPlatformAdapterRouteRuntimeEvent(platform, {
+      platforms: [platform],
+    }, options),
+    adapter_routes: buildMeetingPlatformAdapterRoutesRuntimeEvent({
+      platforms: [platform],
+    }, options),
     run_manifest: buildMeetingPlatformRunManifestRuntimeEvent({
       platforms: [platform],
       target: 'production',
@@ -599,6 +631,28 @@ function runtimeEventActionRows(platform, endpoint) {
       realtime_role: 'render_view_model_request',
       required_fields: ['platform', 'meeting'],
       recommended_fields: ['annotations', 'speakerTrack', 'participantTrack'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'adapter_route',
+      client_method: 'adapterRoute',
+      producer: 'host_ci_or_admin_panel',
+      realtime_role: 'single_platform_adapter_route_inspection',
+      required_fields: ['platform'],
+      recommended_fields: [],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'adapter_routes',
+      client_method: 'adapterRoutes',
+      producer: 'host_ci_or_admin_panel',
+      realtime_role: 'adapter_route_matrix_inspection',
+      required_fields: [],
+      recommended_fields: ['platforms'],
       provider_dependency: false,
       transcript_dependency: false,
       endpoint,
@@ -728,6 +782,7 @@ export function buildMeetingPlatformRuntimeEventPlan(platform, options = {}) {
       'send speaker_track or participant_track only after local filtering/debounce',
       'send provider_event as reconcile/backfill evidence when official events arrive',
       'request timeline_view from the host UI instead of duplicating SVG positioning logic',
+      'request adapter_routes from admin tooling when rendering the platform integration route matrix',
       'send run_manifest or run_handoff_readiness from CI/admin tooling before host handoff',
     ],
     actions: actionRows,
@@ -854,6 +909,12 @@ export function createMeetingPlatformRuntimeEventClient(options = {}) {
     },
     timelineView(platform, input = {}, viewOptions = {}) {
       return send(buildMeetingPlatformTimelineViewRuntimeEvent(platform, input, viewOptions), viewOptions);
+    },
+    adapterRoute(platform, routeOptions = {}) {
+      return send(buildMeetingPlatformAdapterRouteRuntimeEvent(platform, routeOptions, routeOptions), routeOptions);
+    },
+    adapterRoutes(routeOptions = {}) {
+      return send(buildMeetingPlatformAdapterRoutesRuntimeEvent(routeOptions, routeOptions), routeOptions);
     },
     runtimeBundles(bundleOptions = {}) {
       return send({ action: 'runtime_bundles' }, bundleOptions);
