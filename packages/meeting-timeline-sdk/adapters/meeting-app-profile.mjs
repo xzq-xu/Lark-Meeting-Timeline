@@ -32,6 +32,7 @@ export const MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA = 'meeting_app_runtime
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_SCHEMA = 'meeting_app_runtime_adapter_handoff';
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_MATRIX_SCHEMA = 'meeting_app_runtime_adapter_handoff_matrix';
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_ACCEPTANCE_SCHEMA = 'meeting_app_runtime_adapter_handoff_acceptance';
+export const MEETING_APP_RUNTIME_ADAPTER_HOST_PACKAGE_SCHEMA = 'meeting_app_runtime_adapter_host_package';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA = 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA = 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA = 'meeting_app_live_evidence_package';
@@ -1165,6 +1166,96 @@ export function assertMeetingAppRuntimeAdapterHandoffMatrix(matrixOrOptions = {}
     });
   }
   return report;
+}
+
+export function buildMeetingAppRuntimeAdapterHostPackage(options = {}) {
+  const matrix = buildMeetingAppRuntimeAdapterHandoffMatrix(options);
+  const acceptance = buildMeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport(matrix, options);
+  const primarySurface = normalizeHandoffSurface(firstNonEmpty(
+    options.primarySurface,
+    options.primary_surface,
+    options.surface,
+    matrix.surfaces?.[0],
+    'browser_extension',
+  ));
+  return compactObject({
+    type: 'meeting_app_runtime_adapter_host_package',
+    schema: MEETING_APP_RUNTIME_ADAPTER_HOST_PACKAGE_SCHEMA,
+    version: MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION,
+    id: firstNonEmpty(options.packageId, options.package_id, 'meeting-app-runtime-adapter-host-package'),
+    base_url: firstNonEmpty(options.baseUrl, options.base_url),
+    accepted: acceptance.accepted,
+    production_ready: acceptance.production_ready,
+    primary_surface: primarySurface,
+    platforms: matrix.platforms,
+    surfaces: matrix.surfaces,
+    platform_count: matrix.platform_count,
+    surface_count: matrix.surface_count,
+    handoff_count: matrix.handoff_count,
+    ready_count: matrix.ready_count,
+    handoff_matrix: matrix,
+    handoff_acceptance: acceptance,
+    sdk: {
+      package: '@ai-annotation/meeting-timeline-sdk',
+      imports: {
+        kit: '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
+        meeting_app_profile: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-profile',
+        meeting_app_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime',
+        meeting_app_content_script: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script',
+        meeting_app_track_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-track-runtime',
+      },
+      required_methods: [
+        'selectMeetingAppRuntimeAdapter',
+        'meetingAppRuntimeAdapterHandoff',
+        'meetingAppRuntimeAdapterHandoffMatrix',
+        'meetingAppRuntimeAdapterHandoffMatrixAcceptance',
+      ],
+    },
+    host_entrypoints: [
+      {
+        id: 'adapter-selection',
+        method: 'kit.selectMeetingAppRuntimeAdapter(input)',
+        input_shapes: ['url', 'tab', 'tabs[]', 'windows[]', 'application_snapshot', 'meeting_app_snapshot'],
+        output: 'meeting_app_runtime_adapter_selection',
+      },
+      {
+        id: 'runtime-handoff',
+        method: 'kit.meetingAppRuntimeAdapterHandoff(selection, { surface })',
+        output: 'meeting_app_runtime_adapter_handoff',
+      },
+      {
+        id: 'handoff-ci-gate',
+        method: 'kit.meetingAppRuntimeAdapterHandoffMatrixAcceptance(matrix)',
+        output: 'meeting_app_runtime_adapter_handoff_matrix_acceptance_report',
+      },
+    ],
+    ci_gates: [
+      'assert_handoff_matrix_acceptance_before_host_release',
+      'reject_browser_extension_all_urls_permission',
+      'require_captured_at_ms_for_realtime_annotations',
+      'require_provider_and_transcript_non_blocking',
+      'require_runtime_and_track_options_for_each_surface',
+    ],
+    runtime_contract: {
+      annotation_timestamp_field: 'captured_at_ms',
+      provider_event_role: 'reconcile_and_backfill_only',
+      transcript_role: 'post_meeting_backfill_only',
+      realtime_axis_source: 'local_meeting_app_observer_first',
+      primary_runtime_surface: primarySurface,
+    },
+    rollout_checklist: [
+      'generate_handoff_matrix_for_target_platforms_and_surfaces',
+      'pass_handoff_matrix_acceptance',
+      'wire_adapter_selection_to_host_tab_or_window_observer',
+      'start_runtime_from_handoff_for_selected_surface',
+      'insert_annotations_with_captured_at_ms',
+      'capture_live_dom_snapshots_before_production_rollout',
+    ],
+    next_actions: uniqueList([
+      ...(acceptance.next_actions ?? []),
+      ...(acceptance.production_ready ? [] : ['capture_live_dom_snapshots_before_production_rollout']),
+    ]),
+  });
 }
 
 export function buildMeetingAppIntegrationProfile(platformOrInput = {}, options = {}) {

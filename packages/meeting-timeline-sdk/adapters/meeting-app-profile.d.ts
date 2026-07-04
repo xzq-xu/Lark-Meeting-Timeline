@@ -11,6 +11,7 @@ export const MEETING_APP_RUNTIME_ADAPTER_SELECTION_SCHEMA: 'meeting_app_runtime_
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_SCHEMA: 'meeting_app_runtime_adapter_handoff';
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_MATRIX_SCHEMA: 'meeting_app_runtime_adapter_handoff_matrix';
 export const MEETING_APP_RUNTIME_ADAPTER_HANDOFF_ACCEPTANCE_SCHEMA: 'meeting_app_runtime_adapter_handoff_acceptance';
+export const MEETING_APP_RUNTIME_ADAPTER_HOST_PACKAGE_SCHEMA: 'meeting_app_runtime_adapter_host_package';
 export const MEETING_APP_LIVE_SNAPSHOT_CAPTURE_PLAN_SCHEMA: 'meeting_app_live_snapshot_capture_plan';
 export const MEETING_APP_DEPLOYMENT_MANIFEST_SCHEMA: 'meeting_app_deployment_manifest';
 export const MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA: 'meeting_app_live_evidence_package';
@@ -207,6 +208,31 @@ export interface MeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport {
   issues: Array<Record<string, unknown>>;
   reports: MeetingAppRuntimeAdapterHandoffAcceptanceReport[];
   matrix: MeetingAppRuntimeAdapterHandoffMatrix | Record<string, unknown>;
+  next_actions: string[];
+}
+
+export interface MeetingAppRuntimeAdapterHostPackage {
+  type: 'meeting_app_runtime_adapter_host_package';
+  schema: 'meeting_app_runtime_adapter_host_package';
+  version: number;
+  id: string;
+  base_url?: string;
+  accepted: boolean;
+  production_ready: boolean;
+  primary_surface: string;
+  platforms: MeetingAppDomCaptureProfilePlatform[];
+  surfaces: string[];
+  platform_count: number;
+  surface_count: number;
+  handoff_count: number;
+  ready_count: number;
+  handoff_matrix: MeetingAppRuntimeAdapterHandoffMatrix;
+  handoff_acceptance: MeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport;
+  sdk: Record<string, unknown>;
+  host_entrypoints: Array<Record<string, unknown>>;
+  ci_gates: string[];
+  runtime_contract: Record<string, unknown>;
+  rollout_checklist: string[];
   next_actions: string[];
 }
 
@@ -427,6 +453,10 @@ export function assertMeetingAppRuntimeAdapterHandoffMatrix(
   matrixOrOptions?: Record<string, unknown> | MeetingAppRuntimeAdapterHandoff | MeetingAppRuntimeAdapterHandoffMatrix,
   options?: MeetingAppIntegrationProfileOptions,
 ): MeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport;
+
+export function buildMeetingAppRuntimeAdapterHostPackage(
+  options?: MeetingAppIntegrationProfileOptions,
+): MeetingAppRuntimeAdapterHostPackage;
 
 export function buildAllMeetingAppRuntimeAdapterConfigs(
   options?: MeetingAppIntegrationProfileOptions,

@@ -984,6 +984,22 @@ if (!acceptance.accepted) throw new Error(acceptance.issues.map((item) => item.c
 
 `meetingAppRuntimeAdapterHandoffAcceptance()` 和 `meetingAppRuntimeAdapterHandoffMatrixAcceptance()` 可以作为宿主项目的 CI gate：它们会检查 `captured_at_ms`、非阻塞 provider/transcript、权限范围、surface 安装能力、runtime/track options 是否完整。没有真实 DOM 快照前会保留 `production_requires_live_snapshot` warning，但不阻塞试点接入。
 
+如果要把这套配置交给另一个宿主项目，而不是让对方重新拼 matrix、acceptance、SDK import 和上线检查，可以直接生成 host package：
+
+```js
+const hostPackage = kit.meetingAppRuntimeAdapterHostPackage({
+  platforms: ['google-meet', 'teams', 'zoom'],
+  surfaces: ['browser-extension', 'electron-webview', 'native-detector'],
+  primarySurface: 'browser-extension',
+});
+
+if (!hostPackage.accepted) {
+  throw new Error(hostPackage.next_actions.join(', '));
+}
+```
+
+`hostPackage` 会同时带上 `handoff_matrix`、`handoff_acceptance`、推荐 SDK imports、宿主入口方法、CI gates、实时标注时间字段、provider/transcript 非阻塞规则和 rollout checklist。外部项目可以把它当成机器可读交付物，先接 `adapter-selection -> runtime-handoff -> handoff-ci-gate` 三个入口，后续再补真实 DOM 采样证据。
+
 如果是在浏览器扩展 content script、内嵌浏览器或 Electron WebView 里运行，可以用 `meeting-app-content-script` 直接安装浏览器侧 bridge。它会创建 `meeting-app-browser-runtime`，自动读取当前 `document/location/window`，安装扩展消息监听，并把 background script 或宿主转发来的标注消息写入时间轴：
 
 ```js

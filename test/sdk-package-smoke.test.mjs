@@ -284,6 +284,7 @@ import {
   buildMeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport,
   buildMeetingAppRuntimeAdapterHandoff,
   buildMeetingAppRuntimeAdapterHandoffMatrix,
+  buildMeetingAppRuntimeAdapterHostPackage,
   buildMeetingAppRuntimeAdapterProfileMatrix,
   resolveMeetingAppRuntimeAdapterProfile,
   selectMeetingAppRuntimeAdapter,
@@ -323,6 +324,7 @@ assert.equal(kit.meetingAppRuntimeAdapterProfileMatrix({ platforms: ['google-mee
 assert.equal(kit.selectMeetingAppRuntimeAdapter('https://meet.google.com/abc-defg-hij').launch.runtime_options.runtimePreset, 'google_meet');
 assert.equal(kit.meetingAppRuntimeAdapterHandoff('https://meet.google.com/abc-defg-hij').readiness.ready_to_start, true);
 assert.equal(kit.meetingAppRuntimeAdapterHandoffMatrix({ platforms: ['google-meet', 'teams'], surfaces: ['browser-extension'] }).handoff_count, 2);
+assert.equal(kit.meetingAppRuntimeAdapterHostPackage({ platforms: ['google-meet'], surfaces: ['browser-extension'] }).accepted, true);
 assert.equal(kit.meetingAppRuntimeAdapterHandoffAcceptance('https://meet.google.com/abc-defg-hij').accepted, true);
 const integrationRuntimeManifest = buildMeetingPlatformIntegrationRuntimeManifest({
   baseUrl: 'http://localhost:8787',
@@ -632,6 +634,7 @@ assert.equal(resolveMeetingAppRuntimeAdapterProfile('https://example.com/not-a-m
 assert.equal(selectMeetingAppRuntimeAdapter('https://meet.google.com/abc-defg-hij').selected, true);
 assert.equal(buildMeetingAppRuntimeAdapterHandoff('https://meet.google.com/abc-defg-hij').surface, 'browser_extension');
 assert.equal(buildMeetingAppRuntimeAdapterHandoffMatrix({ platforms: ['google-meet'], surfaces: ['native-detector'] }).ready_count, 1);
+assert.equal(buildMeetingAppRuntimeAdapterHostPackage({ platforms: ['google-meet'], surfaces: ['browser-extension'] }).schema, 'meeting_app_runtime_adapter_host_package');
 assert.equal(buildMeetingAppRuntimeAdapterHandoffAcceptanceReport('https://meet.google.com/abc-defg-hij').accepted, true);
 assert.equal(buildMeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport({ platforms: ['google-meet'], surfaces: ['native-detector'] }).accepted, true);
 assert.equal(assertMeetingAppRuntimeAdapterHandoff('https://meet.google.com/abc-defg-hij').accepted, true);

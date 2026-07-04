@@ -206,6 +206,7 @@ import type {
   MeetingAppRuntimeAdapterHandoff,
   MeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport,
   MeetingAppRuntimeAdapterHandoffMatrix,
+  MeetingAppRuntimeAdapterHostPackage,
   MeetingAppRuntimeAdapterProfileMatrix,
   MeetingAppRuntimeAdapterProfileResolution,
   MeetingAppRuntimeAdapterSelection,
@@ -487,6 +488,7 @@ export interface MeetingPlatformTimelineKit {
   assertMeetingAppRuntimeAdapterHandoff(handoffOrInput?: string | Record<string, unknown> | MeetingAppRuntimeAdapterSelection | MeetingAppRuntimeAdapterHandoff, acceptanceOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterHandoffAcceptanceReport;
   meetingAppRuntimeAdapterHandoffMatrixAcceptance(matrixOrOptions?: Record<string, unknown> | MeetingAppRuntimeAdapterHandoff | MeetingAppRuntimeAdapterHandoffMatrix, acceptanceOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport;
   assertMeetingAppRuntimeAdapterHandoffMatrix(matrixOrOptions?: Record<string, unknown> | MeetingAppRuntimeAdapterHandoff | MeetingAppRuntimeAdapterHandoffMatrix, acceptanceOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport;
+  meetingAppRuntimeAdapterHostPackage(hostPackageOptions?: MeetingAppIntegrationProfileOptions): MeetingAppRuntimeAdapterHostPackage;
   meetingAppLiveSnapshotCapturePlan(platform: string, planOptions?: MeetingAppIntegrationProfileOptions): MeetingAppLiveSnapshotCapturePlan;
   allMeetingAppLiveSnapshotCapturePlans(planOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppLiveSnapshotCapturePlan>>;
   allMeetingAppRuntimeAdapterConfigs(configOptions?: MeetingAppIntegrationProfileOptions): Partial<Record<string, MeetingAppRuntimeAdapterConfig>>;

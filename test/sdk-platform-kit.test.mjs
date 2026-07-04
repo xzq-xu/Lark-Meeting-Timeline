@@ -202,6 +202,13 @@ assert.equal(runtimeAdapterHandoffMatrix.ready_count, 4);
 assert.equal(runtimeAdapterHandoffMatrix.rows.find((row) => row.surface === 'electron_webview').start_mode, 'host_injected_runtime');
 assert.equal(kit.meetingAppRuntimeAdapterHandoffMatrixAcceptance(runtimeAdapterHandoffMatrix).accepted, true);
 assert.equal(kit.assertMeetingAppRuntimeAdapterHandoffMatrix(runtimeAdapterHandoffMatrix).accepted, true);
+const runtimeAdapterHostPackage = kit.meetingAppRuntimeAdapterHostPackage({
+  platforms: ['google-meet', 'teams'],
+  surfaces: ['browser-extension'],
+});
+assert.equal(runtimeAdapterHostPackage.accepted, true);
+assert.equal(runtimeAdapterHostPackage.handoff_count, 2);
+assert.equal(runtimeAdapterHostPackage.sdk.required_methods.includes('meetingAppRuntimeAdapterHandoffMatrixAcceptance'), true);
 const capturePlan = kit.meetingAppLiveSnapshotCapturePlan('google-meet');
 assert.equal(capturePlan.platform, 'google_meet');
 assert.equal(capturePlan.required_snapshots.some((item) => item.id === 'active_speaker'), true);
