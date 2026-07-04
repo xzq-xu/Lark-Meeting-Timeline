@@ -11,6 +11,12 @@ import type {
 } from './meeting-app-monitor.mjs';
 import type { MeetingAppObserverOptions, MeetingAppSnapshot } from './meeting-apps.mjs';
 import type { MeetingSourceAggregatorOptions, MeetingSourceResult } from './meeting-source.mjs';
+import type {
+  MeetingAppTrackRuntime,
+  MeetingAppTrackRuntimeObservation,
+  MeetingAppTrackRuntimeOptions,
+  MeetingAppTrackRuntimePreview,
+} from './meeting-app-track-runtime.mjs';
 import type { NativeMeetingObserverOptions, NativeMeetingSnapshot } from './native-meeting.mjs';
 
 export interface MeetingAppTimelineRuntimeOptions extends MeetingSourceAggregatorOptions, MeetingAppMonitorOptions {
@@ -29,6 +35,15 @@ export interface MeetingAppTimelineRuntimeOptions extends MeetingSourceAggregato
   };
   monitorOptions?: MeetingAppMonitorOptions;
   monitor_options?: MeetingAppMonitorOptions;
+  tracks?: MeetingAppTrackRuntime;
+  trackRuntime?: MeetingAppTrackRuntime;
+  track_runtime?: MeetingAppTrackRuntime;
+  trackRuntimeOptions?: MeetingAppTrackRuntimeOptions;
+  track_runtime_options?: MeetingAppTrackRuntimeOptions;
+  trackMonitor?: MeetingAppTimelineRuntimeOptions['monitor'];
+  track_monitor?: MeetingAppTimelineRuntimeOptions['monitor'];
+  trackMonitorOptions?: MeetingAppMonitorOptions;
+  track_monitor_options?: MeetingAppMonitorOptions;
 }
 
 export function createMeetingAppTimelineRuntime(
@@ -38,10 +53,18 @@ export function createMeetingAppTimelineRuntime(
   client: MeetingTimelineClient;
   sources: Record<string, unknown>;
   monitor: NonNullable<MeetingAppTimelineRuntimeOptions['monitor']>;
+  tracks: MeetingAppTrackRuntime;
+  trackMonitor: NonNullable<MeetingAppTimelineRuntimeOptions['monitor']>;
   sample(input?: MeetingAppDomCaptureInput, options?: MeetingAppMonitorOptions): Promise<MeetingAppMonitorSampleResult>;
   tick(input?: MeetingAppDomCaptureInput, options?: MeetingAppMonitorOptions): Promise<MeetingAppMonitorSampleResult>;
   start(inputProvider?: unknown, options?: MeetingAppMonitorOptions): MeetingAppMonitorState;
   stop(): MeetingAppMonitorState;
+  sampleTracks(input?: MeetingAppDomCaptureInput, options?: MeetingAppMonitorOptions): Promise<MeetingAppMonitorSampleResult>;
+  tickTracks(input?: MeetingAppDomCaptureInput, options?: MeetingAppMonitorOptions): Promise<MeetingAppMonitorSampleResult>;
+  startTracks(inputProvider?: unknown, options?: MeetingAppMonitorOptions): MeetingAppMonitorState;
+  stopTracks(): MeetingAppMonitorState;
+  observeMeetingAppTracks(input?: MeetingAppSnapshot | MeetingAppSnapshot[], options?: MeetingAppTrackRuntimeOptions): Promise<MeetingAppTrackRuntimeObservation>;
+  previewMeetingAppTracks(input?: MeetingAppSnapshot | MeetingAppSnapshot[], options?: MeetingAppTrackRuntimeOptions): MeetingAppTrackRuntimePreview;
   observeMeetingApp(input?: MeetingAppSnapshot, options?: MeetingAppObserverOptions): Promise<MeetingSourceResult>;
   observeApp(input?: MeetingAppSnapshot, options?: MeetingAppObserverOptions): Promise<MeetingSourceResult>;
   observeBrowser(input?: BrowserMeetingSnapshot, options?: BrowserMeetingObserverOptions): Promise<MeetingSourceResult>;

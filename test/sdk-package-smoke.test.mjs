@@ -85,6 +85,8 @@ assert.equal(packedFiles.includes('adapters/platform-evidence-package.mjs'), tru
 assert.equal(packedFiles.includes('adapters/platform-evidence-package.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-fixture-tracks.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-fixture-tracks.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-runtime.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-runtime.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-pipeline.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-pipeline.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-track-runtime.mjs'), true);
@@ -285,6 +287,9 @@ import {
 import {
   createMeetingAppTrackRuntime,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-track-runtime';
+import {
+  createMeetingAppTimelineRuntime,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime';
 
 assert.equal(SDK_VERSION, '0.1.0');
 const client = createMeetingTimelineClient({
@@ -563,6 +568,32 @@ assert.equal((await kit.meetingAppTrackRuntime({
     closeOpenSegmentsAtMs: 1783356001000,
   },
 }).observe([
+  {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+    observedAtMs: 1783356000000,
+    activeSpeaker: { id: 'ada', name: 'Ada', speaking: true },
+    participants: [{ id: 'ada', name: 'Ada', speaking: true }],
+  },
+  {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+    observedAtMs: 1783356000400,
+    activeSpeaker: { id: 'ada', name: 'Ada', speaking: true },
+    participants: [{ id: 'ada', name: 'Ada', speaking: true }],
+  },
+])).new_mark_count, 1);
+assert.equal((await createMeetingAppTimelineRuntime(client, {
+  trackRuntimeOptions: {
+    speakerTrackOptions: {
+      minStableMs: 250,
+      minSegmentMs: 0,
+      closeOpenSegmentsAtMs: 1783356001000,
+    },
+  },
+}).observeMeetingAppTracks([
   {
     platform: 'google_meet',
     meeting_id: 'abc-defg-hij',

@@ -1,6 +1,7 @@
 import { MeetingTimelineSdkError } from '../index.mjs';
 import { createMeetingAppDomMonitor } from './meeting-app-monitor.mjs';
 import { createMeetingSourceAggregator } from './meeting-source.mjs';
+import { createMeetingAppTrackRuntime } from './meeting-app-track-runtime.mjs';
 
 function isMeetingSource(value) {
   return Boolean(value)
@@ -50,6 +51,22 @@ function monitorOptions(options = {}) {
   };
 }
 
+function trackRuntimeOptions(options = {}) {
+  return {
+    ...options,
+    ...(options.trackRuntimeOptions ?? {}),
+    ...(options.track_runtime_options ?? {}),
+  };
+}
+
+function trackMonitorOptions(options = {}) {
+  return monitorOptions({
+    ...options,
+    ...(options.trackMonitorOptions ?? {}),
+    ...(options.track_monitor_options ?? {}),
+  });
+}
+
 function resolveSources(clientOrOptions, options = {}) {
   const explicit = options.sources ?? options.meetingSources ?? options.meeting_sources;
   if (explicit) {
@@ -66,11 +83,20 @@ function resolveSources(clientOrOptions, options = {}) {
 export function createMeetingAppTimelineRuntime(clientOrOptions, options = {}) {
   const sources = resolveSources(clientOrOptions, options);
   const monitor = options.monitor ?? createMeetingAppDomMonitor(sources, monitorOptions(options));
+  const tracks = options.tracks
+    ?? options.trackRuntime
+    ?? options.track_runtime
+    ?? createMeetingAppTrackRuntime(sources.client, trackRuntimeOptions(options));
+  const trackMonitor = options.trackMonitor
+    ?? options.track_monitor
+    ?? createMeetingAppDomMonitor(tracks, trackMonitorOptions(options));
 
   return {
     client: sources.client,
     sources,
     monitor,
+    tracks,
+    trackMonitor,
     sample(input = {}, sampleOptions = {}) {
       return monitor.sample(input, sampleOptions);
     },
@@ -82,6 +108,24 @@ export function createMeetingAppTimelineRuntime(clientOrOptions, options = {}) {
     },
     stop() {
       return monitor.stop();
+    },
+    sampleTracks(input = {}, sampleOptions = {}) {
+      return trackMonitor.sample(input, sampleOptions);
+    },
+    tickTracks(input = {}, sampleOptions = {}) {
+      return trackMonitor.tick(input, sampleOptions);
+    },
+    startTracks(inputProvider = null, startOptions = {}) {
+      return trackMonitor.start(inputProvider, startOptions);
+    },
+    stopTracks() {
+      return trackMonitor.stop();
+    },
+    observeMeetingAppTracks(input = {}, observeOptions = {}) {
+      return tracks.observe(input, observeOptions);
+    },
+    previewMeetingAppTracks(input = {}, previewOptions = {}) {
+      return tracks.preview(input, previewOptions);
     },
     observeMeetingApp(input = {}, observeOptions = {}) {
       return sources.observeMeetingApp(input, observeOptions);
@@ -125,12 +169,16 @@ export function createMeetingAppTimelineRuntime(clientOrOptions, options = {}) {
     getState() {
       return {
         monitor: monitor.getState(),
+        trackMonitor: trackMonitor.getState(),
+        tracks: tracks.getState(),
         sources: sources.getState(),
       };
     },
     reset(nextState = {}) {
       return {
         monitor: monitor.reset(nextState.monitor ?? nextState.monitorState ?? nextState.monitor_state ?? null),
+        trackMonitor: trackMonitor.reset(nextState.trackMonitor ?? nextState.track_monitor ?? nextState.trackMonitorState ?? null),
+        tracks: tracks.reset(nextState.tracks ?? nextState.trackRuntime ?? nextState.track_runtime ?? {}),
         sources: sources.reset(nextState.sources ?? nextState.source ?? nextState.meetingSources ?? {}),
       };
     },

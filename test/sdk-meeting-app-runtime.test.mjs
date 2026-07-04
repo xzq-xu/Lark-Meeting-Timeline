@@ -135,12 +135,111 @@ const duplicateEnd = await runtime.ingestSignals({
 assert.equal(calls.length, callCountBeforeDuplicateEnd);
 assert.equal(duplicateEnd.reconciliation.skipped.length, 1);
 
+const trackPreview = runtime.previewMeetingAppTracks([
+  {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+    observedAtMs: startMs + 3_000,
+    activeSpeaker: { id: 'ada', name: 'Ada Lovelace', speaking: true },
+    participants: [{ id: 'ada', name: 'Ada Lovelace', speaking: true }],
+  },
+  {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+    observedAtMs: startMs + 3_400,
+    activeSpeaker: { id: 'ada', name: 'Ada Lovelace', speaking: true },
+    participants: [{ id: 'ada', name: 'Ada Lovelace', speaking: true }],
+  },
+], {
+  speakerTrackOptions: {
+    minStableMs: 250,
+    minSegmentMs: 0,
+    closeOpenSegmentsAtMs: startMs + 4_000,
+  },
+});
+assert.equal(trackPreview.new_mark_count, 1);
+const trackObserved = await runtime.observeMeetingAppTracks([
+  {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+    observedAtMs: startMs + 3_000,
+    activeSpeaker: { id: 'ada', name: 'Ada Lovelace', speaking: true },
+    participants: [{ id: 'ada', name: 'Ada Lovelace', speaking: true }],
+  },
+  {
+    platform: 'google_meet',
+    meeting_id: 'abc-defg-hij',
+    meeting_url: 'https://meet.google.com/abc-defg-hij',
+    observedAtMs: startMs + 3_400,
+    activeSpeaker: { id: 'ada', name: 'Ada Lovelace', speaking: true },
+    participants: [{ id: 'ada', name: 'Ada Lovelace', speaking: true }],
+  },
+], {
+  speakerTrackOptions: {
+    minStableMs: 250,
+    minSegmentMs: 0,
+    closeOpenSegmentsAtMs: startMs + 4_000,
+  },
+});
+assert.equal(trackObserved.new_mark_count, 1);
+assert.equal(calls.at(-1).method, 'insertMarks');
+assert.equal(calls.at(-1).inputs[0].intent, 'speaker_track');
+const duplicateTrackObserved = await runtime.observeMeetingAppTracks([], {
+  speakerTrackOptions: {
+    minStableMs: 250,
+    minSegmentMs: 0,
+    closeOpenSegmentsAtMs: startMs + 4_000,
+  },
+});
+assert.equal(duplicateTrackObserved.new_mark_count, 0);
+
 const running = runtime.start(() => ({ document: meetDocument() }), { immediate: false, sampleIntervalMs: 10_000 });
 assert.equal(running.running, true);
 assert.equal(runtime.stop().running, false);
 
+const trackCalls = [];
+const trackOnlyRuntime = createMeetingAppTimelineRuntime({
+  async startMeeting(input) {
+    trackCalls.push({ method: 'startMeeting', input });
+    return { ok: true, input };
+  },
+  async endMeeting(input) {
+    trackCalls.push({ method: 'endMeeting', input });
+    return { ok: true, input };
+  },
+  async insertMark(input, options) {
+    trackCalls.push({ method: 'insertMark', input, options });
+    return { ok: true, input };
+  },
+  async insertMarks(inputs, options) {
+    trackCalls.push({ method: 'insertMarks', inputs, options });
+    return { ok: true, inputs };
+  },
+}, {
+  now: () => startMs,
+  captureOptions: { browserName: 'Chrome' },
+  trackRuntimeOptions: {
+    speakerTrackOptions: {
+      minStableMs: 0,
+      minSegmentMs: 0,
+      closeOpenSegmentsAtMs: startMs + 1_000,
+    },
+  },
+});
+const trackSample = await trackOnlyRuntime.sampleTracks({ document: meetDocument() }, { force: true });
+assert.equal(trackSample.emitted, true);
+assert.equal(trackSample.result.new_mark_count, 1);
+assert.equal(trackCalls.at(-1).method, 'insertMarks');
+assert.equal(trackOnlyRuntime.startTracks(() => ({ document: meetDocument() }), { immediate: false, sampleIntervalMs: 10_000 }).running, true);
+assert.equal(trackOnlyRuntime.stopTracks().running, false);
+
 const state = runtime.getState();
 assert.equal(state.monitor.running, false);
+assert.equal(state.trackMonitor.running, false);
+assert.equal(state.tracks.seen_mark_count, 1);
 assert.equal(state.sources.reconciler.active?.meeting_id, undefined);
 
 console.log('ok meeting app timeline runtime');

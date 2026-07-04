@@ -908,6 +908,13 @@ const runtime = createMeetingAppTimelineRuntime({
 });
 
 runtime.start(() => ({ document, location, window }));
+runtime.startTracks(() => ({ document, location, window }));
+
+// 如果宿主自己已经采好了快照，也可以直接走同一个 runtime 的 track 入口。
+await runtime.observeMeetingAppTracks(domSnapshots, {
+  speakerTrackOptions: { minStableMs: 250, endIdleMs: 500 },
+  participantTrackOptions: { leaveStableMs: 500 },
+});
 
 await runtime.insertMark({
   id: crypto.randomUUID(),
