@@ -145,6 +145,8 @@ import type {
   MeetingPlatformRuntimeHost,
   MeetingPlatformRuntimeHostConfig,
   MeetingPlatformRuntimeHostConfigMatrix,
+  MeetingPlatformRuntimeHostHandoff,
+  MeetingPlatformRuntimeHostHandoffMatrix,
   MeetingPlatformRuntimeHostOptions,
 } from './meeting-platform-runtime-host.mjs';
 import type {
@@ -426,6 +428,11 @@ export interface MeetingPlatformTimelineKit {
   platformRuntimeBundleMatrix(bundleOptions?: MeetingPlatformRuntimeBundleOptions): MeetingPlatformRuntimeBundleMatrix;
   platformRuntimeHostConfig(platform: string | MeetingPlatformRuntimeBundle | Record<string, unknown>, hostOptions?: MeetingPlatformRuntimeHostOptions): MeetingPlatformRuntimeHostConfig;
   platformRuntimeHostConfigMatrix(hostOptions?: MeetingPlatformRuntimeHostOptions): MeetingPlatformRuntimeHostConfigMatrix;
+  platformRuntimeHostHandoff(
+    platformOrConfig: string | MeetingPlatformRuntimeBundle | MeetingPlatformRuntimeHostConfig | Record<string, unknown>,
+    handoffOptions?: MeetingPlatformRuntimeHostOptions,
+  ): MeetingPlatformRuntimeHostHandoff;
+  platformRuntimeHostHandoffMatrix(handoffOptions?: MeetingPlatformRuntimeHostOptions): MeetingPlatformRuntimeHostHandoffMatrix;
   createPlatformRuntimeHost(
     clientOrRuntime?: MeetingTimelineClient | Record<string, unknown>,
     platformOrConfig?: string | MeetingPlatformRuntimeBundle | MeetingPlatformRuntimeHostConfig | Record<string, unknown>,

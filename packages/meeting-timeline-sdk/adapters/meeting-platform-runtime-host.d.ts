@@ -12,6 +12,8 @@ import type {
 
 export const MEETING_PLATFORM_RUNTIME_HOST_CONFIG_SCHEMA: 'meeting_platform_runtime_host_config';
 export const MEETING_PLATFORM_RUNTIME_HOST_CONFIG_MATRIX_SCHEMA: 'meeting_platform_runtime_host_config_matrix';
+export const MEETING_PLATFORM_RUNTIME_HOST_HANDOFF_SCHEMA: 'meeting_platform_runtime_host_handoff';
+export const MEETING_PLATFORM_RUNTIME_HOST_HANDOFF_MATRIX_SCHEMA: 'meeting_platform_runtime_host_handoff_matrix';
 export const MEETING_PLATFORM_RUNTIME_HOST_STATE_SCHEMA: 'meeting_platform_runtime_host_state';
 export const MEETING_PLATFORM_RUNTIME_HOST_SCHEMA_VERSION: 1;
 
@@ -70,6 +72,57 @@ export interface MeetingPlatformRuntimeHostConfigMatrix {
   configs: MeetingPlatformRuntimeHostConfig[];
   runtime_bundle_matrix: Record<string, unknown>;
   observer_scheduler_config_matrix: Record<string, unknown>;
+  next_actions: string[];
+}
+
+export interface MeetingPlatformRuntimeHostHandoff {
+  type: 'meeting_platform_runtime_host_handoff';
+  schema: 'meeting_platform_runtime_host_handoff';
+  version: 1;
+  platform: string;
+  display_name?: string;
+  objective: string;
+  package_entry: string;
+  imports: Record<string, string>;
+  host_config: MeetingPlatformRuntimeHostConfig;
+  browser: Record<string, unknown>;
+  runtime: {
+    factory: string;
+    driver: Record<string, unknown>;
+    timestamp_field: string;
+    provider_events_role: string;
+    transcript_role: string;
+  };
+  host_hooks: Array<Record<string, string>>;
+  example: string;
+  acceptance: {
+    accepted: boolean;
+    check_count: number;
+    passed_count: number;
+    checks: Array<Record<string, unknown>>;
+  };
+  readiness: {
+    accepted: boolean;
+    host_ready: boolean;
+    runtime_ready: boolean;
+    provider_required_for_realtime: boolean;
+    transcript_blocks_realtime: boolean;
+  };
+  next_actions: string[];
+}
+
+export interface MeetingPlatformRuntimeHostHandoffMatrix {
+  type: 'meeting_platform_runtime_host_handoff_matrix';
+  schema: 'meeting_platform_runtime_host_handoff_matrix';
+  version: 1;
+  platform_count: number;
+  accepted_count: number;
+  host_ready_count: number;
+  provider_blocking_count: number;
+  transcript_blocking_count: number;
+  platforms: string[];
+  rows: Array<Record<string, unknown>>;
+  handoffs: MeetingPlatformRuntimeHostHandoff[];
   next_actions: string[];
 }
 
@@ -155,6 +208,15 @@ export function buildMeetingPlatformRuntimeHostConfig(
 export function buildMeetingPlatformRuntimeHostConfigMatrix(
   options?: MeetingPlatformRuntimeHostOptions,
 ): MeetingPlatformRuntimeHostConfigMatrix;
+
+export function buildMeetingPlatformRuntimeHostHandoff(
+  bundleOrPlatform?: MeetingPlatformRuntimeHostConfig | MeetingPlatformRuntimeBundle | string | Record<string, unknown>,
+  options?: MeetingPlatformRuntimeHostOptions,
+): MeetingPlatformRuntimeHostHandoff;
+
+export function buildMeetingPlatformRuntimeHostHandoffMatrix(
+  options?: MeetingPlatformRuntimeHostOptions,
+): MeetingPlatformRuntimeHostHandoffMatrix;
 
 export function createMeetingPlatformRuntimeHost(
   clientOrRuntime: MeetingTimelineClient | MeetingAppObserverSchedulerRuntime | Record<string, unknown>,

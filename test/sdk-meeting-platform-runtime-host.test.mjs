@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   buildMeetingPlatformRuntimeHostConfig,
   buildMeetingPlatformRuntimeHostConfigMatrix,
+  buildMeetingPlatformRuntimeHostHandoff,
+  buildMeetingPlatformRuntimeHostHandoffMatrix,
   createMeetingPlatformRuntimeHost,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-platform-runtime-host.mjs';
 import {
@@ -34,6 +36,27 @@ assert.equal(matrix.change_observer_count, 3);
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').runtime_factory, 'createMeetingAppBrowserRuntime');
 assert.equal(matrix.runtime_bundle_matrix.runtime_host_ready_count, 3);
 assert.equal(matrix.observer_scheduler_config_matrix.sdk_ready_count, 3);
+
+const googleHandoff = buildMeetingPlatformRuntimeHostHandoff(googleConfig);
+assert.equal(googleHandoff.schema, 'meeting_platform_runtime_host_handoff');
+assert.equal(googleHandoff.platform, 'google_meet');
+assert.equal(googleHandoff.package_entry, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-runtime-host');
+assert.equal(googleHandoff.acceptance.accepted, true);
+assert.equal(googleHandoff.runtime.timestamp_field, 'captured_at_ms');
+assert.equal(googleHandoff.runtime.provider_events_role, 'reconcile_and_backfill_only');
+assert.equal(googleHandoff.runtime.transcript_role, 'post_meeting_backfill_only');
+assert.equal(googleHandoff.host_hooks.some((item) => item.call === 'host.changed()'), true);
+assert.equal(googleHandoff.example.includes("createMeetingPlatformRuntimeHost(timeline, 'google_meet'"), true);
+const handoffMatrix = buildMeetingPlatformRuntimeHostHandoffMatrix({
+  baseUrl,
+  platforms: ['google-meet', 'teams', 'zoom'],
+});
+assert.equal(handoffMatrix.schema, 'meeting_platform_runtime_host_handoff_matrix');
+assert.equal(handoffMatrix.platform_count, 3);
+assert.equal(handoffMatrix.accepted_count, 3);
+assert.equal(handoffMatrix.provider_blocking_count, 0);
+assert.equal(handoffMatrix.transcript_blocking_count, 0);
+assert.equal(handoffMatrix.rows.find((row) => row.platform === 'zoom').host_hook_count, 5);
 
 const calls = [];
 const runtime = {
@@ -177,6 +200,9 @@ const kit = createMeetingPlatformTimelineKit(client, {
 assert.equal(kit.platformRuntimeHostConfig('google-meet').schema, 'meeting_platform_runtime_host_config');
 assert.equal(kit.platformRuntimeHostConfigMatrix().platform_count, 2);
 assert.equal(kit.report().platform_runtime_host_config_matrix.host_ready_count, 2);
+assert.equal(kit.platformRuntimeHostHandoff('google-meet').schema, 'meeting_platform_runtime_host_handoff');
+assert.equal(kit.platformRuntimeHostHandoffMatrix().accepted_count, 2);
+assert.equal(kit.report().platform_runtime_host_handoff_matrix.accepted_count, 2);
 const kitHost = kit.createPlatformRuntimeHost(runtime, 'google-meet', {
   setTimeout: fakeSetTimeout,
   clearTimeout: fakeClearTimeout,

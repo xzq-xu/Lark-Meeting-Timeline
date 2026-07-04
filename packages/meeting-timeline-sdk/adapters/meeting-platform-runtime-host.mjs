@@ -20,6 +20,8 @@ import {
 
 export const MEETING_PLATFORM_RUNTIME_HOST_CONFIG_SCHEMA = 'meeting_platform_runtime_host_config';
 export const MEETING_PLATFORM_RUNTIME_HOST_CONFIG_MATRIX_SCHEMA = 'meeting_platform_runtime_host_config_matrix';
+export const MEETING_PLATFORM_RUNTIME_HOST_HANDOFF_SCHEMA = 'meeting_platform_runtime_host_handoff';
+export const MEETING_PLATFORM_RUNTIME_HOST_HANDOFF_MATRIX_SCHEMA = 'meeting_platform_runtime_host_handoff_matrix';
 export const MEETING_PLATFORM_RUNTIME_HOST_STATE_SCHEMA = 'meeting_platform_runtime_host_state';
 export const MEETING_PLATFORM_RUNTIME_HOST_SCHEMA_VERSION = 1;
 
@@ -288,6 +290,177 @@ export function buildMeetingPlatformRuntimeHostConfigMatrix(options = {}) {
       platforms,
     }),
     next_actions: unique(configs.flatMap((config) => config.next_actions ?? [])),
+  };
+}
+
+function packageExample(platform, options = {}) {
+  const variableName = String(firstNonEmpty(options.clientVariable, options.client_variable, 'timeline'));
+  return [
+    "import { createMeetingPlatformRuntimeHost } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-runtime-host';",
+    '',
+    `const host = createMeetingPlatformRuntimeHost(${variableName}, '${platform}', { window, document });`,
+    'host.start();',
+    '',
+    '// Optional host hooks:',
+    'host.changed();',
+    'host.speakerCandidate();',
+    'host.candidateMissing();',
+    'host.stop();',
+  ].join('\n');
+}
+
+function handoffAcceptance(config = {}) {
+  const checks = [
+    {
+      id: 'runtime_bundle_ready',
+      ok: config.readiness?.runtime_ready === true,
+      evidence: 'runtime_bundle.readiness.runtime_ready',
+    },
+    {
+      id: 'observer_scheduler_ready',
+      ok: config.readiness?.observer_scheduler_ready === true,
+      evidence: 'observer_scheduler_config.sdk_ready',
+    },
+    {
+      id: 'change_observer_enabled',
+      ok: config.driver?.change_observer?.enabled === true,
+      evidence: 'driver.change_observer.enabled',
+    },
+    {
+      id: 'keep_alive_enabled',
+      ok: config.driver?.keep_alive?.enabled === true,
+      evidence: 'driver.keep_alive.enabled',
+    },
+    {
+      id: 'provider_not_required_for_realtime',
+      ok: config.readiness?.provider_required_for_realtime !== true,
+      evidence: 'readiness.provider_required_for_realtime',
+    },
+    {
+      id: 'transcript_not_required_for_realtime',
+      ok: config.readiness?.transcript_blocks_realtime !== true,
+      evidence: 'readiness.transcript_blocks_realtime',
+    },
+  ];
+  return {
+    accepted: checks.every((check) => check.ok === true),
+    check_count: checks.length,
+    passed_count: checks.filter((check) => check.ok).length,
+    checks,
+  };
+}
+
+export function buildMeetingPlatformRuntimeHostHandoff(bundleOrPlatform = {}, options = {}) {
+  const config = bundleOrPlatform?.schema === MEETING_PLATFORM_RUNTIME_HOST_CONFIG_SCHEMA
+    ? bundleOrPlatform
+    : buildMeetingPlatformRuntimeHostConfig(bundleOrPlatform, options);
+  const bundle = config.runtime_bundle ?? {};
+  const acceptance = handoffAcceptance(config);
+  return compactObject({
+    type: 'meeting_platform_runtime_host_handoff',
+    schema: MEETING_PLATFORM_RUNTIME_HOST_HANDOFF_SCHEMA,
+    version: MEETING_PLATFORM_RUNTIME_HOST_SCHEMA_VERSION,
+    platform: config.platform,
+    display_name: config.display_name,
+    objective: 'handoff_package_for_embedding_realtime_meeting_timeline_runtime_host',
+    package_entry: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-runtime-host',
+    imports: {
+      create_host: 'createMeetingPlatformRuntimeHost',
+      build_config: 'buildMeetingPlatformRuntimeHostConfig',
+      build_matrix: 'buildMeetingPlatformRuntimeHostConfigMatrix',
+    },
+    host_config: config,
+    browser: {
+      matches: bundle.browser?.matches ?? [],
+      host_permissions: bundle.browser?.host_permissions ?? [],
+      permissions: bundle.browser?.permissions ?? [],
+      content_scripts: bundle.browser?.content_scripts ?? [],
+      manifest: bundle.browser?.manifest,
+    },
+    runtime: {
+      factory: config.runtime_factory,
+      driver: config.driver,
+      timestamp_field: bundle.host?.annotation_timestamp_field ?? config.observer_scheduler_config?.timestamp_field ?? 'captured_at_ms',
+      provider_events_role: config.observer_plan?.signal_contract?.provider_events_role ?? 'reconcile_and_backfill_only',
+      transcript_role: config.observer_plan?.signal_contract?.transcript_role ?? 'post_meeting_backfill_only',
+    },
+    host_hooks: [
+      {
+        hook: 'surface_open_or_content_script_attached',
+        call: 'host.start()',
+        purpose: 'start_keep_alive_and_change_observer',
+      },
+      {
+        hook: 'dom_mutation_or_native_snapshot_change',
+        call: 'host.changed()',
+        purpose: 'debounced_realtime_axis_sample',
+      },
+      {
+        hook: 'active_speaker_candidate_detected',
+        call: 'host.speakerCandidate()',
+        purpose: 'schedule_stable_speaker_followup',
+      },
+      {
+        hook: 'meeting_surface_missing_or_tab_closed',
+        call: 'host.candidateMissing()',
+        purpose: 'emit_meeting_ended_after_grace_window',
+      },
+      {
+        hook: 'surface_unload_or_host_dispose',
+        call: 'host.stop()',
+        purpose: 'clear_observers_and_timers',
+      },
+    ],
+    example: packageExample(config.platform, options),
+    acceptance,
+    readiness: {
+      accepted: acceptance.accepted,
+      host_ready: config.readiness?.host_ready === true,
+      runtime_ready: config.readiness?.runtime_ready === true,
+      provider_required_for_realtime: config.readiness?.provider_required_for_realtime === true,
+      transcript_blocks_realtime: config.readiness?.transcript_blocks_realtime === true,
+    },
+    next_actions: unique([
+      'embed_example_bootstrap_in_browser_extension_webview_or_native_host',
+      'forward_surface_change_events_to_host.changed',
+      'forward_surface_missing_or_close_to_host.candidateMissing',
+      'validate_with_live_meeting_snapshot_before_pilot',
+      ...(config.next_actions ?? []),
+    ]),
+  });
+}
+
+export function buildMeetingPlatformRuntimeHostHandoffMatrix(options = {}) {
+  const platforms = selectedPlatforms(options);
+  const handoffs = platforms.map((platform) => buildMeetingPlatformRuntimeHostHandoff(platform, {
+    ...options,
+    platform,
+    platforms: undefined,
+    platform_keys: undefined,
+  }));
+  return {
+    type: 'meeting_platform_runtime_host_handoff_matrix',
+    schema: MEETING_PLATFORM_RUNTIME_HOST_HANDOFF_MATRIX_SCHEMA,
+    version: MEETING_PLATFORM_RUNTIME_HOST_SCHEMA_VERSION,
+    platform_count: handoffs.length,
+    accepted_count: handoffs.filter((handoff) => handoff.acceptance?.accepted === true).length,
+    host_ready_count: handoffs.filter((handoff) => handoff.readiness?.host_ready === true).length,
+    provider_blocking_count: handoffs.filter((handoff) => handoff.readiness?.provider_required_for_realtime === true).length,
+    transcript_blocking_count: handoffs.filter((handoff) => handoff.readiness?.transcript_blocks_realtime === true).length,
+    platforms,
+    rows: handoffs.map((handoff) => ({
+      platform: handoff.platform,
+      display_name: handoff.display_name,
+      accepted: handoff.acceptance?.accepted === true,
+      host_ready: handoff.readiness?.host_ready === true,
+      browser_match_count: handoff.browser?.matches?.length ?? 0,
+      host_hook_count: handoff.host_hooks?.length ?? 0,
+      timestamp_field: handoff.runtime?.timestamp_field,
+      provider_events_role: handoff.runtime?.provider_events_role,
+      transcript_role: handoff.runtime?.transcript_role,
+    })),
+    handoffs,
+    next_actions: unique(handoffs.flatMap((handoff) => handoff.next_actions ?? [])),
   };
 }
 

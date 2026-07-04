@@ -186,6 +186,12 @@ const platformHostConfigMatrix = kit.platformRuntimeHostConfigMatrix({ platforms
 assert.equal(platformHostConfigMatrix.platform_count, 2);
 assert.equal(platformHostConfigMatrix.host_ready_count, 2);
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_runtime_host_config_matrix.host_ready_count, 1);
+const platformHostHandoff = kit.platformRuntimeHostHandoff('google-meet');
+assert.equal(platformHostHandoff.schema, 'meeting_platform_runtime_host_handoff');
+assert.equal(platformHostHandoff.acceptance.accepted, true);
+const platformHostHandoffMatrix = kit.platformRuntimeHostHandoffMatrix({ platforms: ['google-meet', 'zoom'] });
+assert.equal(platformHostHandoffMatrix.accepted_count, 2);
+assert.equal(kit.report({ platforms: ['google-meet'] }).platform_runtime_host_handoff_matrix.accepted_count, 1);
 const kitRuntimeHost = kit.createPlatformRuntimeHost({
   inputProvider() {
     return { platform: 'google_meet', url: 'https://meet.google.com/abc-defg-hij' };

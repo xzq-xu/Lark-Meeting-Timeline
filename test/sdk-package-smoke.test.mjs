@@ -319,6 +319,8 @@ import {
 import {
   buildMeetingPlatformRuntimeHostConfig,
   buildMeetingPlatformRuntimeHostConfigMatrix,
+  buildMeetingPlatformRuntimeHostHandoff,
+  buildMeetingPlatformRuntimeHostHandoffMatrix,
   createMeetingPlatformRuntimeHost,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-runtime-host';
 
@@ -713,6 +715,8 @@ assert.equal(typeof createMeetingAppObserverScheduler({
 }, 'google-meet').handleTrigger, 'function');
 assert.equal(buildMeetingPlatformRuntimeHostConfig('google-meet').schema, 'meeting_platform_runtime_host_config');
 assert.equal(buildMeetingPlatformRuntimeHostConfigMatrix({ platforms: ['google-meet'] }).schema, 'meeting_platform_runtime_host_config_matrix');
+assert.equal(buildMeetingPlatformRuntimeHostHandoff('google-meet').schema, 'meeting_platform_runtime_host_handoff');
+assert.equal(buildMeetingPlatformRuntimeHostHandoffMatrix({ platforms: ['google-meet'] }).schema, 'meeting_platform_runtime_host_handoff_matrix');
 assert.equal(typeof createMeetingPlatformRuntimeHost({
   async sample() {
     return { ok: true };
@@ -844,6 +848,10 @@ assert.equal(kit.platformRuntimeHostConfig('google-meet').schema, 'meeting_platf
 assert.equal(kit.platformRuntimeHostConfigMatrix({
   platforms: ['google-meet'],
 }).host_ready_count, 1);
+assert.equal(kit.platformRuntimeHostHandoff('google-meet').acceptance.accepted, true);
+assert.equal(kit.platformRuntimeHostHandoffMatrix({
+  platforms: ['google-meet'],
+}).accepted_count, 1);
 assert.equal(kit.platformRuntimeEventPlan('google-meet').schema, 'meeting_platform_runtime_event_plan');
 assert.equal(kit.platformRuntimeEventPlan('google-meet').realtime_contract.provider_events_required_for_realtime, false);
 assert.equal(kit.platformRuntimeEventPlanMatrix({

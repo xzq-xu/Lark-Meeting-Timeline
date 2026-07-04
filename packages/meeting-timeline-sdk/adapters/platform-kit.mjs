@@ -175,6 +175,8 @@ import {
 import {
   buildMeetingPlatformRuntimeHostConfig,
   buildMeetingPlatformRuntimeHostConfigMatrix,
+  buildMeetingPlatformRuntimeHostHandoff,
+  buildMeetingPlatformRuntimeHostHandoffMatrix,
   createMeetingPlatformRuntimeHost,
 } from './meeting-platform-runtime-host.mjs';
 import {
@@ -432,6 +434,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_runtime_event_plan_matrix: buildMeetingPlatformRuntimeEventPlanMatrix(options),
     platform_runtime_bundle_matrix: buildMeetingPlatformRuntimeBundleMatrix(options),
     platform_runtime_host_config_matrix: buildMeetingPlatformRuntimeHostConfigMatrix(options),
+    platform_runtime_host_handoff_matrix: buildMeetingPlatformRuntimeHostHandoffMatrix(options),
     platform_adapter_contract_matrix: buildMeetingPlatformAdapterContractMatrix(options),
     platform_adapter_contract_acceptance_matrix: buildMeetingPlatformAdapterContractAcceptanceMatrix(options),
     platform_field_capture_matrix: buildMeetingPlatformFieldCaptureMatrix(options),
@@ -769,6 +772,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformRuntimeHostConfigMatrix(hostOptions = {}) {
       return buildMeetingPlatformRuntimeHostConfigMatrix(withDefaults(defaults, hostOptions));
+    },
+    platformRuntimeHostHandoff(platformOrConfig, handoffOptions = {}) {
+      return buildMeetingPlatformRuntimeHostHandoff(platformOrConfig, withDefaults(defaults, handoffOptions));
+    },
+    platformRuntimeHostHandoffMatrix(handoffOptions = {}) {
+      return buildMeetingPlatformRuntimeHostHandoffMatrix(withDefaults(defaults, handoffOptions));
     },
     createPlatformRuntimeHost(clientOrRuntime = bridge.client, platformOrConfig = {}, hostOptions = {}) {
       const hostInput = typeof platformOrConfig === 'string' || platformOrConfig?.schema

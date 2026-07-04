@@ -949,6 +949,16 @@ host.candidateMissing(); // 当前会议页面/窗口消失时，按 grace windo
 
 同一个 API 也适用于 Teams / Zoom / Webex / Lark。平台差异主要落在 runtime bundle 的 selector、host permission、cadence 和 provider reconcile 描述里；实时标注仍然坚持本地观察优先，provider event 和 transcript 只做后处理校准。
 
+如果要把接入任务交给另一个项目，可以生成 handoff 包：
+
+```js
+const handoff = kit.platformRuntimeHostHandoff('google-meet');
+
+// handoff.package_entry 指向 SDK import。
+// handoff.host_hooks 列出宿主需要转发的 surface open/change/missing/close 钩子。
+// handoff.acceptance.checks 是接入前的最小验收条件。
+```
+
 浏览器扩展或 WebView 里可以再往前接一层 `meeting-app-capture`。它只读取 DOM 文本、按钮、`aria-label`、participant tile、常见 `data-participant-*` / `data-user-*` / `data-person-*` 属性和音量/发言状态，输出 `meeting-apps` 可识别的快照；不截图、不 OCR、不读取转写正文：
 
 ```js
