@@ -119,7 +119,7 @@ npm run meeting-app:adapter-capability
 
 给宿主项目真正接入时，SDK 还提供 `buildMeetingAppAdapterIntegrationPackage()` / `buildMeetingAppAdapterIntegrationPackageMatrix()` 和 `kit.meetingAppAdapterIntegrationPackage()` / `kit.meetingAppAdapterIntegrationPackageMatrix()`。这一层把 handoff package、capability report、execution plan、runtime delivery、SDK entrypoints、验收命令和 evidence contract 合成单个平台或多平台接入包，适合直接交给 Google Meet、Teams、Zoom、Webex、Lark 的宿主工程消费；配套的 `assertMeetingAppAdapterIntegrationPackage()` / `assertMeetingAppAdapterIntegrationPackageMatrix()` 默认检查 pilot 接入，传 `target: 'production'` 才会要求真实会议证据齐全，因此不会把静态可接入误判为正式可上线。
 
-SDK 主入口 `@ai-annotation/meeting-timeline-sdk` 已直接导出 `createMeetingPlatformTimelineKit()`、`buildMeetingAppAdapterIntegrationPackageMatrix()`、`detectMeetingPlatformForBrowser()` 和 runtime event helpers；宿主项目可以先用主入口完成接入，只有做更细粒度 bundle 时再使用 `adapters/*` subpath。
+SDK 主入口 `@ai-annotation/meeting-timeline-sdk` 已直接导出 `createMeetingAppTimelineSdk()`、`createMeetingPlatformTimelineKit()`、`buildMeetingAppAdapterIntegrationPackageMatrix()`、`detectMeetingPlatformForBrowser()` 和 runtime event helpers；宿主项目可以先用 `createMeetingAppTimelineSdk()` 一次拿到 client、kit、本地 integration runtime、runtime event client 和 package matrix 能力，只有做更细粒度 bundle 时再使用 `adapters/*` subpath。
 
 ```bash
 npm run meeting-app:adapter-integration-package

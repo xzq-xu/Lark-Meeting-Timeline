@@ -1,3 +1,15 @@
+import {
+  buildMeetingAppAdapterIntegrationPackage,
+  buildMeetingAppAdapterIntegrationPackageMatrix,
+} from './adapters/meeting-app-adapter-integration-package.mjs';
+import {
+  createMeetingPlatformIntegrationRuntime,
+  detectMeetingPlatformForBrowser,
+} from './adapters/platform-integration-runtime.mjs';
+import {
+  createMeetingPlatformRuntimeEventClient,
+} from './adapters/platform-runtime-event.mjs';
+
 export const SDK_VERSION = '0.1.0';
 
 export const DEFAULT_ENDPOINTS = Object.freeze({
@@ -12,6 +24,14 @@ export const DEFAULT_ENDPOINTS = Object.freeze({
   transcriptImport: '/api/import/transcript',
   stream: '/api/stream',
 });
+
+export const DEFAULT_MEETING_APP_TIMELINE_SDK_PLATFORMS = Object.freeze([
+  'google-meet',
+  'teams',
+  'zoom',
+  'webex',
+  'lark',
+]);
 
 export class MeetingTimelineSdkError extends Error {
   constructor(message, details = {}) {
@@ -463,6 +483,209 @@ export function createMeetingTimelineClient(options = {}) {
 }
 
 export const createMeetingTimelineSdk = createMeetingTimelineClient;
+
+function hasMeetingTimelineClient(value) {
+  return Boolean(value)
+    && typeof value === 'object'
+    && typeof value.startMeeting === 'function'
+    && typeof value.insertMark === 'function';
+}
+
+function timelineClientFromHostOptions(options = {}) {
+  const explicitClient = options.client ?? options.timelineClient ?? options.timeline_client;
+  if (hasMeetingTimelineClient(explicitClient)) return explicitClient;
+  if (hasMeetingTimelineClient(options)) return options;
+  return createMeetingTimelineClient({
+    ...options,
+    ...(options.clientOptions ?? options.client_options ?? {}),
+  });
+}
+
+function meetingAppTimelineSdkPlatforms(options = {}) {
+  return firstNonEmpty(
+    options.platforms,
+    options.platform_keys,
+    options.platformKeys,
+    DEFAULT_MEETING_APP_TIMELINE_SDK_PLATFORMS,
+  );
+}
+
+function runtimeEventClientOptions(options = {}) {
+  return compactObject({
+    ...options,
+    ...(options.runtimeEventClientOptions ?? options.runtime_event_client_options ?? {}),
+  });
+}
+
+function shouldUseRuntimeEvent(options = {}, defaults = {}) {
+  const mode = String(firstNonEmpty(
+    options.mode,
+    options.delivery,
+    options.route,
+    defaults.mode,
+    defaults.delivery,
+    defaults.route,
+    '',
+  )).toLowerCase().replace(/[-\s]+/g, '_');
+  return options.remote === true
+    || options.runtimeEvent === true
+    || options.runtime_event === true
+    || mode === 'remote'
+    || mode === 'runtime_event'
+    || mode === 'runtime_events';
+}
+
+function platformAndInput(runtime, platformOrInput, inputOrOptions = {}, options = {}) {
+  if (typeof platformOrInput === 'string') {
+    return {
+      platform: platformOrInput,
+      input: inputOrOptions ?? {},
+      options,
+    };
+  }
+  const input = platformOrInput ?? {};
+  const methodOptions = inputOrOptions ?? {};
+  const resolution = runtime.resolvePlatform(input, methodOptions);
+  return {
+    platform: firstNonEmpty(methodOptions.platform, input.platform, input.provider, resolution.platform),
+    input,
+    options: methodOptions,
+    resolution,
+  };
+}
+
+export function createMeetingAppTimelineSdk(options = {}) {
+  const client = timelineClientFromHostOptions(options);
+  const platforms = meetingAppTimelineSdkPlatforms(options);
+  const defaults = compactObject({
+    ...options,
+    platforms,
+  });
+  const runtime = createMeetingPlatformIntegrationRuntime(client, defaults);
+  const runtimeEvents = createMeetingPlatformRuntimeEventClient(runtimeEventClientOptions({
+    ...defaults,
+    fetch: options.runtimeEventFetch ?? options.runtime_event_fetch ?? options.fetch,
+    fetchImpl: options.runtimeEventFetchImpl ?? options.runtime_event_fetch_impl ?? options.fetchImpl,
+  }));
+  const sdk = {
+    type: 'meeting_app_timeline_sdk',
+    schema: 'meeting_app_timeline_sdk',
+    schema_version: 1,
+    platforms: runtime.platforms,
+    client,
+    kit: runtime.kit,
+    runtime,
+    integrationRuntime: runtime,
+    integration_runtime: runtime,
+    runtimeEvents,
+    runtime_events: runtimeEvents,
+    detect(input = {}, detectOptions = {}) {
+      return detectMeetingPlatformForBrowser(input, {
+        ...defaults,
+        ...detectOptions,
+      });
+    },
+    resolve(input = {}, resolveOptions = {}) {
+      return runtime.resolvePlatform(input, resolveOptions);
+    },
+    resolveCandidates(input = {}, resolveOptions = {}) {
+      return runtime.resolvePlatformCandidates(input, resolveOptions);
+    },
+    package(platformOrOptions = {}, packageOptions = {}) {
+      if (typeof platformOrOptions === 'string') {
+        return buildMeetingAppAdapterIntegrationPackage(platformOrOptions, {
+          ...defaults,
+          ...packageOptions,
+        });
+      }
+      return buildMeetingAppAdapterIntegrationPackage({
+        ...defaults,
+        ...platformOrOptions,
+      }, packageOptions);
+    },
+    integrationPackage(platformOrOptions = {}, packageOptions = {}) {
+      return sdk.package(platformOrOptions, packageOptions);
+    },
+    packageMatrix(packageOptions = {}) {
+      return buildMeetingAppAdapterIntegrationPackageMatrix({
+        ...defaults,
+        ...packageOptions,
+        platforms: packageOptions.platforms ?? packageOptions.platform_keys ?? runtime.platforms,
+      });
+    },
+    integrationPackageMatrix(packageOptions = {}) {
+      return sdk.packageMatrix(packageOptions);
+    },
+    manifest(manifestOptions = {}) {
+      return runtime.manifest(manifestOptions);
+    },
+    readiness(readinessOptions = {}) {
+      return runtime.readiness(readinessOptions);
+    },
+    handoffReadiness(readinessOptions = {}) {
+      return runtime.handoffReadiness(readinessOptions);
+    },
+    observePlatformCandidates(input = {}, observeOptions = {}) {
+      return shouldUseRuntimeEvent(observeOptions, defaults)
+        ? runtimeEvents.observePlatformCandidates(input, observeOptions)
+        : runtime.observePlatformCandidates(input, observeOptions);
+    },
+    observeMeetingApp(platformOrInput, inputOrOptions = {}, optionsForPlatform = {}) {
+      const resolved = platformAndInput(runtime, platformOrInput, inputOrOptions, optionsForPlatform);
+      return shouldUseRuntimeEvent(resolved.options, defaults)
+        ? runtimeEvents.observeMeetingApp(resolved.platform, resolved.input, resolved.options)
+        : runtime.observeMeetingApp(resolved.platform, resolved.input, resolved.options);
+    },
+    observeApp(platformOrInput, inputOrOptions = {}, optionsForPlatform = {}) {
+      return sdk.observeMeetingApp(platformOrInput, inputOrOptions, optionsForPlatform);
+    },
+    insertAnnotation(platformOrInput, inputOrOptions = {}, optionsForPlatform = {}) {
+      const resolved = platformAndInput(runtime, platformOrInput, inputOrOptions, optionsForPlatform);
+      return shouldUseRuntimeEvent(resolved.options, defaults)
+        ? runtimeEvents.insertAnnotation(resolved.platform, resolved.input, resolved.options)
+        : runtime.insertAnnotation(resolved.platform, resolved.input, resolved.options);
+    },
+    insertMark(platformOrInput, inputOrOptions = {}, optionsForPlatform = {}) {
+      return sdk.insertAnnotation(platformOrInput, inputOrOptions, optionsForPlatform);
+    },
+    ingestProvider(platformOrInput, inputOrPayload = {}, optionsOrPayload = {}, maybeOptions = {}) {
+      if (typeof platformOrInput === 'string') {
+        return shouldUseRuntimeEvent(maybeOptions, defaults)
+          ? runtimeEvents.ingestProvider(platformOrInput, inputOrPayload, maybeOptions)
+          : runtime.ingestProvider(platformOrInput, inputOrPayload, optionsOrPayload, maybeOptions);
+      }
+      const resolved = platformAndInput(runtime, platformOrInput, inputOrPayload);
+      return shouldUseRuntimeEvent(resolved.options, defaults)
+        ? runtimeEvents.ingestProvider(resolved.platform, resolved.input, resolved.options)
+        : runtime.ingestProvider(resolved.platform, resolved.input, resolved.input, resolved.options);
+    },
+    speakerTrack(platformOrInput, inputOrOptions = {}, optionsForPlatform = {}) {
+      const resolved = platformAndInput(runtime, platformOrInput, inputOrOptions, optionsForPlatform);
+      return shouldUseRuntimeEvent(resolved.options, defaults)
+        ? runtimeEvents.speakerTrack(resolved.platform, resolved.input, resolved.options)
+        : runtime.speakerTrack(resolved.platform, resolved.input, resolved.options);
+    },
+    participantTrack(platformOrInput, inputOrOptions = {}, optionsForPlatform = {}) {
+      const resolved = platformAndInput(runtime, platformOrInput, inputOrOptions, optionsForPlatform);
+      return shouldUseRuntimeEvent(resolved.options, defaults)
+        ? runtimeEvents.participantTrack(resolved.platform, resolved.input, resolved.options)
+        : runtime.participantTrack(resolved.platform, resolved.input, resolved.options);
+    },
+    timelineView(platformOrInput, inputOrOptions = {}, optionsForPlatform = {}) {
+      const resolved = platformAndInput(runtime, platformOrInput, inputOrOptions, optionsForPlatform);
+      return shouldUseRuntimeEvent(resolved.options, defaults)
+        ? runtimeEvents.timelineView(resolved.platform, resolved.input, resolved.options)
+        : runtime.timelineView(resolved.platform, resolved.input, resolved.options);
+    },
+    sendRuntimeEvent(eventInput = {}, sendOptions = {}) {
+      return runtimeEvents.send(eventInput, sendOptions);
+    },
+    handleRuntimeEvent(eventInput = {}, payload, eventOptions = {}) {
+      return runtime.handleEvent(eventInput, payload, eventOptions);
+    },
+  };
+  return sdk;
+}
 
 export * from './adapters/platform-kit.mjs';
 export * from './adapters/meeting-app-adapter-integration-package.mjs';

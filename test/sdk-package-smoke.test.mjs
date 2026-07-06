@@ -163,6 +163,7 @@ import {
   SDK_VERSION,
   buildMeetingAppAdapterIntegrationPackageMatrix as buildMeetingAppAdapterIntegrationPackageMatrixFromRoot,
   buildMeetingPlatformIntegrationRuntimeManifest as buildMeetingPlatformIntegrationRuntimeManifestFromRoot,
+  createMeetingAppTimelineSdk,
   createMeetingTimelineClient,
   createMeetingPlatformTimelineKit as createMeetingPlatformTimelineKitFromRoot,
   detectMeetingPlatformForBrowser as detectMeetingPlatformForBrowserFromRoot,
@@ -454,6 +455,11 @@ assert.equal(buildMeetingPlatformIntegrationRuntimeManifestFromRoot({
 assert.equal(buildMeetingAppAdapterIntegrationPackageMatrixFromRoot({
   platforms: ['google-meet'],
 }).platform_count, 1);
+assert.equal(createMeetingAppTimelineSdk({
+  baseUrl: 'http://localhost:8787',
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+  platforms: ['google-meet'],
+}).schema, 'meeting_app_timeline_sdk');
 
 const kit = createMeetingPlatformTimelineKit(client, {
   baseUrl: 'http://localhost:8787',

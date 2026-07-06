@@ -1,4 +1,5 @@
 export const SDK_VERSION: string;
+export const DEFAULT_MEETING_APP_TIMELINE_SDK_PLATFORMS: readonly string[];
 
 export interface MeetingStartInput {
   platform?: string;
@@ -191,6 +192,85 @@ export class MeetingTimelineClient {
 
 export function createMeetingTimelineClient(options: MeetingTimelineClientOptions): MeetingTimelineClient;
 export const createMeetingTimelineSdk: typeof createMeetingTimelineClient;
+
+export interface MeetingAppTimelineSdkOptions extends Partial<MeetingTimelineClientOptions> {
+  client?: MeetingTimelineClient;
+  timelineClient?: MeetingTimelineClient;
+  timeline_client?: MeetingTimelineClient;
+  platforms?: Iterable<string> | string[];
+  platform_keys?: Iterable<string> | string[];
+  platformKeys?: Iterable<string> | string[];
+  runtimeEventClientOptions?: Record<string, unknown>;
+  runtime_event_client_options?: Record<string, unknown>;
+  runtimeEventFetch?: typeof fetch;
+  runtime_event_fetch?: typeof fetch;
+  runtimeEventFetchImpl?: typeof fetch;
+  runtime_event_fetch_impl?: typeof fetch;
+  mode?: string;
+  delivery?: string;
+  route?: string;
+  remote?: boolean;
+  runtimeEvent?: boolean;
+  runtime_event?: boolean;
+  [key: string]: unknown;
+}
+
+export interface MeetingAppTimelineSdk {
+  type: 'meeting_app_timeline_sdk';
+  schema: 'meeting_app_timeline_sdk';
+  schema_version: 1;
+  platforms: string[];
+  client: MeetingTimelineClient;
+  kit: import('./adapters/platform-kit.mjs').MeetingPlatformTimelineKit;
+  runtime: import('./adapters/platform-integration-runtime.mjs').MeetingPlatformIntegrationRuntime;
+  integrationRuntime: import('./adapters/platform-integration-runtime.mjs').MeetingPlatformIntegrationRuntime;
+  integration_runtime: import('./adapters/platform-integration-runtime.mjs').MeetingPlatformIntegrationRuntime;
+  runtimeEvents: import('./adapters/platform-runtime-event.mjs').MeetingPlatformRuntimeEventClient;
+  runtime_events: import('./adapters/platform-runtime-event.mjs').MeetingPlatformRuntimeEventClient;
+  detect(input?: Record<string, unknown>, options?: Record<string, unknown>): Record<string, unknown>;
+  resolve(input?: Record<string, unknown>, options?: Record<string, unknown>): Record<string, unknown>;
+  resolveCandidates(input?: Record<string, unknown>, options?: Record<string, unknown>): Record<string, unknown>;
+  package(
+    platformOrOptions?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-adapter-integration-package.mjs').MeetingAppAdapterIntegrationPackage;
+  integrationPackage: MeetingAppTimelineSdk['package'];
+  packageMatrix(options?: Record<string, unknown>): import('./adapters/meeting-app-adapter-integration-package.mjs').MeetingAppAdapterIntegrationPackageMatrix;
+  integrationPackageMatrix: MeetingAppTimelineSdk['packageMatrix'];
+  manifest(options?: Record<string, unknown>): Record<string, unknown>;
+  readiness(options?: Record<string, unknown>): Record<string, unknown>;
+  handoffReadiness(options?: Record<string, unknown>): Record<string, unknown>;
+  observePlatformCandidates(input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown> | unknown;
+  observeMeetingApp(
+    platformOrInput: string | Record<string, unknown>,
+    inputOrOptions?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<unknown> | unknown;
+  observeApp: MeetingAppTimelineSdk['observeMeetingApp'];
+  insertAnnotation(
+    platformOrInput: string | TimelineMarkInput,
+    inputOrOptions?: TimelineMarkInput | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<unknown> | unknown;
+  insertMark: MeetingAppTimelineSdk['insertAnnotation'];
+  ingestProvider(
+    platformOrInput: string | Record<string, unknown>,
+    payloadOrOptions?: Record<string, unknown>,
+    optionsOrPayload?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<unknown> | unknown;
+  speakerTrack(
+    platformOrInput: string | Record<string, unknown>,
+    inputOrOptions?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<unknown> | unknown;
+  participantTrack: MeetingAppTimelineSdk['speakerTrack'];
+  timelineView: MeetingAppTimelineSdk['speakerTrack'];
+  sendRuntimeEvent(input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
+  handleRuntimeEvent(input?: Record<string, unknown>, payload?: unknown, options?: Record<string, unknown>): Promise<unknown> | unknown;
+}
+
+export function createMeetingAppTimelineSdk(options: MeetingAppTimelineSdkOptions): MeetingAppTimelineSdk;
 
 export * from './adapters/platform-kit.mjs';
 export * from './adapters/meeting-app-adapter-integration-package.mjs';

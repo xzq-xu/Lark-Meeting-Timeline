@@ -626,6 +626,21 @@ console.log(pkg.runtime_delivery.adapter_route, pkg.entrypoints, pkg.integration
 
 SDK 主入口会直接暴露 `platform-kit`、`meeting-app-adapter-integration-package`、`platform-integration-runtime` 和 `platform-runtime-event` 这几层；需要极细粒度 tree-shaking 时，仍可以从 `@ai-annotation/meeting-timeline-sdk/adapters/*` subpath 导入。
 
+宿主项目也可以用更高层的 `createMeetingAppTimelineSdk()`：
+
+```js
+import { createMeetingAppTimelineSdk } from '@ai-annotation/meeting-timeline-sdk';
+
+const meetingSdk = createMeetingAppTimelineSdk({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+const detected = meetingSdk.detect({ url: location.href, title: document.title });
+await meetingSdk.observeMeetingApp(detected.platform, liveDomSnapshot, { remote: true });
+await meetingSdk.insertAnnotation(detected.platform, mark, { remote: true });
+```
+
 `platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。CI 里可以用 `assertMeetingAppAdapterIntegrationPackage()`、`assertMeetingAppAdapterIntegrationPackageMatrix()` 或 kit 上的同名方法做 gate；默认 target 是 `pilot`，如果传 `target: 'production'`，则必须补齐真实会议 evidence package、provider start/end reconcile 和 handoff readiness 之后才会通过。
 
 同一层也可以从 CLI 直接导出，默认覆盖 Google Meet、Teams、Zoom、Webex、Lark：
