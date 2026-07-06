@@ -228,6 +228,11 @@ import type {
   MeetingPlatformConsumerHandoffOptions,
 } from './platform-consumer-handoff.mjs';
 import type {
+  MeetingPlatformImplementationHandoff,
+  MeetingPlatformImplementationHandoffMatrix,
+  MeetingPlatformImplementationHandoffOptions,
+} from './platform-implementation-handoff.mjs';
+import type {
   MeetingAppAdapterManifest,
   MeetingAppAdapterManifestMatrix,
   MeetingAppAdapterManifestOptions,
@@ -389,6 +394,8 @@ export interface MeetingPlatformTimelineKit {
   assertPlatformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
   platformConsumerHandoff(handoffOptions?: MeetingPlatformConsumerHandoffOptions): MeetingPlatformConsumerHandoff;
   assertPlatformConsumerHandoff(handoffOptions?: MeetingPlatformConsumerHandoffOptions): MeetingPlatformConsumerHandoff;
+  platformImplementationHandoff(platform: string, handoffOptions?: MeetingPlatformImplementationHandoffOptions): MeetingPlatformImplementationHandoff;
+  platformImplementationHandoffMatrix(handoffOptions?: MeetingPlatformImplementationHandoffOptions): MeetingPlatformImplementationHandoffMatrix;
   platformEvidencePackage(platformOrInput: string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, packageOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackage;
   platformEvidencePackageSummary(packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, summaryOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageSummary;
   platformEvidencePackageBuilder(platform: string, builderOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageBuilder;

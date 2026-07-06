@@ -33,7 +33,10 @@ assert.equal(handoff.entrypoints.primary_modules.app_adapter_manifest, '@ai-anno
 assert.equal(handoff.entrypoints.primary_modules.app_adapter_spec, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-spec');
 assert.equal(handoff.entrypoints.primary_modules.app_adapter_runtime_config, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-runtime-config');
 assert.equal(handoff.entrypoints.primary_modules.meeting_platform_connector, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector');
+assert.equal(handoff.entrypoints.primary_modules.implementation_handoff, '@ai-annotation/meeting-timeline-sdk/adapters/platform-implementation-handoff');
 assert.equal(handoff.entrypoints.kit_methods.includes('platformConsumerHandoff'), true);
+assert.equal(handoff.entrypoints.kit_methods.includes('platformImplementationHandoff'), true);
+assert.equal(handoff.entrypoints.kit_methods.includes('platformImplementationHandoffMatrix'), true);
 assert.equal(handoff.entrypoints.kit_methods.includes('meetingAppAdapterManifestMatrix'), true);
 assert.equal(handoff.entrypoints.kit_methods.includes('meetingAppAdapterSpecMatrix'), true);
 assert.equal(handoff.entrypoints.kit_methods.includes('meetingAppAdapterRuntimeConfigMatrix'), true);
@@ -59,6 +62,7 @@ assert.equal(handoff.sdk_facade_handoff.create_function, 'createMeetingAppTimeli
 assert.equal(handoff.sdk_facade_handoff.constructor_options.baseUrl, baseUrl);
 assert.equal(handoff.sdk_facade_handoff.required_facade_methods.includes('platformAdaptationPackage'), true);
 assert.equal(handoff.sdk_facade_handoff.required_facade_methods.includes('platformRuntimeBundle'), true);
+assert.equal(handoff.sdk_facade_handoff.required_facade_methods.includes('platformImplementationHandoff'), true);
 assert.equal(handoff.sdk_facade_handoff.minimal_realtime_flow[0].method, 'createMeetingAppTimelineSdk({ baseUrl, platforms })');
 assert.equal(handoff.sdk_facade_handoff.minimal_realtime_flow.some((step) => String(step.method).includes('sdk.insertAnnotation')), true);
 assert.equal(handoff.sdk_facade_handoff.surface_wiring.browser_extension.content_script_messages.includes('meeting_timeline.sample_tracks'), true);

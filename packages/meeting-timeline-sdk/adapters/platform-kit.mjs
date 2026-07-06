@@ -105,6 +105,10 @@ import {
   assertMeetingPlatformConsumerHandoff,
   buildMeetingPlatformConsumerHandoff,
 } from './platform-consumer-handoff.mjs';
+import {
+  buildMeetingPlatformImplementationHandoff,
+  buildMeetingPlatformImplementationHandoffMatrix,
+} from './platform-implementation-handoff.mjs';
 import { createMeetingTimelineBridge } from './timeline-bridge.mjs';
 import {
   buildPlatformWebhookRouteTable,
@@ -467,6 +471,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_connector_hub: buildMeetingPlatformConnectorHub(options),
     platform_conformance_report: buildMeetingPlatformConformanceReport(options),
     platform_consumer_handoff: buildMeetingPlatformConsumerHandoff(options),
+    platform_implementation_handoff_matrix: buildMeetingPlatformImplementationHandoffMatrix(options),
     capabilities: allPlatformCapabilityContracts(options),
     webhook_router: buildPlatformWebhookRouterStatus(options),
     onboarding: buildMeetingPlatformOnboardingSummary(options),
@@ -666,6 +671,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertPlatformConsumerHandoff(handoffOptions = {}) {
       return assertMeetingPlatformConsumerHandoff(withDefaults(defaults, handoffOptions));
+    },
+    platformImplementationHandoff(platform, handoffOptions = {}) {
+      return buildMeetingPlatformImplementationHandoff(platform, withDefaults(defaults, handoffOptions));
+    },
+    platformImplementationHandoffMatrix(handoffOptions = {}) {
+      return buildMeetingPlatformImplementationHandoffMatrix(withDefaults(defaults, handoffOptions));
     },
     platformEvidencePackage(platformOrInput, input = {}, packageOptions = {}) {
       if (platformOrInput && typeof platformOrInput === 'object' && !Array.isArray(platformOrInput)) {

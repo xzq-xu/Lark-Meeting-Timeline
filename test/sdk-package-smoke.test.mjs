@@ -43,6 +43,8 @@ assert.equal(packedFiles.includes('adapters/platform-conformance.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-conformance.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-consumer-handoff.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-consumer-handoff.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-implementation-handoff.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-implementation-handoff.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
@@ -192,6 +194,7 @@ import {
   buildMeetingPlatformConsumerHandoff as buildMeetingPlatformConsumerHandoffFromRoot,
   buildMeetingPlatformConnector as buildMeetingPlatformConnectorFromRoot,
   buildMeetingPlatformConnectorHub as buildMeetingPlatformConnectorHubFromRoot,
+  buildMeetingPlatformImplementationHandoff as buildMeetingPlatformImplementationHandoffFromRoot,
   buildMeetingPlatformIntegrationRuntimeManifest as buildMeetingPlatformIntegrationRuntimeManifestFromRoot,
   buildMeetingPlatformRuntimeBundle as buildMeetingPlatformRuntimeBundleFromRoot,
   createMeetingAppTimelineSdk,
@@ -525,6 +528,10 @@ assert.equal(rootMeetingAppSdk.platformAdaptationPackage('google-meet').adaptati
 assert.equal(rootMeetingAppSdk.adaptationPackageMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformConsumerHandoff().schema, 'meeting_platform_consumer_handoff');
 assert.equal(rootMeetingAppSdk.consumerHandoff().accepted, true);
+assert.equal(rootMeetingAppSdk.platformImplementationHandoff('google-meet').schema, 'meeting_platform_implementation_handoff');
+assert.equal(rootMeetingAppSdk.implementationHandoff('google-meet').provider_reconcile.path, 'google_workspace_events_pubsub');
+assert.equal(rootMeetingAppSdk.platformImplementationHandoffMatrix().platform_count, 1);
+assert.equal(rootMeetingAppSdk.implementationHandoffMatrix().implementation_ready_count, 1);
 assert.equal(rootMeetingAppSdk.platformRuntimeBundle('google-meet').runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
 assert.equal(rootMeetingAppSdk.runtimeBundleMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterRoute('google-meet').platform, 'google_meet');
@@ -539,6 +546,9 @@ assert.equal(buildMeetingPlatformConsumerHandoffFromRoot({
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],
 }).accepted, true);
+assert.equal(buildMeetingPlatformImplementationHandoffFromRoot('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).recommended_first_surface, 'browser_extension');
 assert.equal(buildMeetingPlatformRuntimeBundleFromRoot('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).schema, 'meeting_platform_runtime_bundle');
@@ -809,6 +819,8 @@ assert.equal(assertMeetingPlatformConsumerHandoff({
   platforms: ['google-meet'],
 }).rows[0].adapter_first_route, 'local_observer_axis');
 assert.equal(kit.platformConsumerHandoff({ platforms: ['zoom'] }).entrypoints.kit_methods.includes('platformConsumerHandoff'), true);
+assert.equal(kit.platformImplementationHandoff('zoom').provider_reconcile.path, 'zoom_meeting_webhooks');
+assert.equal(kit.platformImplementationHandoffMatrix({ platforms: ['zoom'] }).implementation_ready_count, 1);
 assert.equal(kit.platformLiveAdapterHandoff('zoom').sdk.factory, 'createMeetingPlatformLiveAdapter');
 assert.equal(kit.platformLiveAdapterHandoffBundle({
   platforms: ['zoom'],

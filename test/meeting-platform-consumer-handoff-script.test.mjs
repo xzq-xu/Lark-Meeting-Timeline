@@ -38,6 +38,8 @@ assert.equal(report.participant_track_ready_count, 3);
 assert.equal(report.production_ready_count, 0);
 assert.equal(report.entrypoints.primary_modules.consumer_handoff, '@ai-annotation/meeting-timeline-sdk/adapters/platform-consumer-handoff');
 assert.equal(report.entrypoints.primary_modules.meeting_platform_connector, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector');
+assert.equal(report.entrypoints.primary_modules.implementation_handoff, '@ai-annotation/meeting-timeline-sdk/adapters/platform-implementation-handoff');
+assert.equal(report.entrypoints.kit_methods.includes('platformImplementationHandoff'), true);
 assert.equal(report.lightweight_connector_handoff.content_script_bridge.message_types.includes('meeting_timeline.insert_mark'), true);
 assert.equal(report.lightweight_connector_handoff.host_requirements.timestamp_field, 'captured_at_ms');
 assert.equal(report.sdk_facade_handoff.create_function, 'createMeetingAppTimelineSdk');

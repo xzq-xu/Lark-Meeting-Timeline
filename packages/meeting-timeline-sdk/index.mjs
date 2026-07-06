@@ -940,6 +940,19 @@ export function createMeetingAppTimelineSdk(options = {}) {
     assertConsumerHandoff(handoffOptions = {}) {
       return sdk.assertPlatformConsumerHandoff(handoffOptions);
     },
+    platformImplementationHandoff(platformOrOptions = {}, handoffOptions = {}) {
+      const resolved = singlePlatformInput(runtime, platformOrOptions, handoffOptions);
+      return runtime.kit.platformImplementationHandoff(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
+    },
+    implementationHandoff(platformOrOptions = {}, handoffOptions = {}) {
+      return sdk.platformImplementationHandoff(platformOrOptions, handoffOptions);
+    },
+    platformImplementationHandoffMatrix(handoffOptions = {}) {
+      return runtime.kit.platformImplementationHandoffMatrix(sdkPlatformOptions(runtime, handoffOptions));
+    },
+    implementationHandoffMatrix(handoffOptions = {}) {
+      return sdk.platformImplementationHandoffMatrix(handoffOptions);
+    },
     platformRuntimeBundle(platformOrOptions = {}, bundleOptions = {}) {
       const resolved = singlePlatformInput(runtime, platformOrOptions, bundleOptions);
       return runtime.kit.platformRuntimeBundle(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
@@ -1064,6 +1077,7 @@ export * from './adapters/platform-integration-runtime.mjs';
 export * from './adapters/platform-runtime-event.mjs';
 export * from './adapters/platform-adaptation-package.mjs';
 export * from './adapters/platform-consumer-handoff.mjs';
+export * from './adapters/platform-implementation-handoff.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-strategy.mjs';
