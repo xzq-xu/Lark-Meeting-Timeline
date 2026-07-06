@@ -215,6 +215,42 @@ export interface MeetingAppTimelineSdkOptions extends Partial<MeetingTimelineCli
   [key: string]: unknown;
 }
 
+export interface MeetingAppTimelineConnectorPackage {
+  type: 'meeting_app_timeline_connector_package';
+  schema: 'meeting_app_timeline_connector_package';
+  schema_version: 1;
+  id: string;
+  base_url?: string;
+  accepted: boolean;
+  platforms: string[];
+  surfaces: string[];
+  platform_count: number;
+  surface_count: number;
+  handoff_count: number;
+  ready_count: number;
+  host_package: import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterHostPackage;
+  handoff_matrix: import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterHandoffMatrix;
+  handoff_acceptance: import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport;
+  observer_plan_by_surface: Record<string, import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeObserverPlanMatrix>;
+  scheduler_config_by_surface: Record<string, import('./adapters/meeting-app-observer-scheduler.mjs').MeetingAppObserverSchedulerConfigMatrix>;
+  extension?: {
+    scaffold?: import('./adapters/meeting-app-extension.mjs').MeetingAppExtensionScaffold;
+    acceptance?: import('./adapters/meeting-app-extension.mjs').MeetingAppExtensionScaffoldAcceptanceReport;
+    install_plan?: import('./adapters/meeting-app-extension.mjs').MeetingAppExtensionInstallPlan;
+    manifest?: Record<string, unknown>;
+    bundle?: Record<string, unknown>;
+    file_count?: number;
+  };
+  runtime_events: {
+    endpoint: string;
+    plan_matrix: import('./adapters/platform-runtime-event.mjs').MeetingPlatformRuntimeEventPlanMatrix;
+    action_count: number;
+  };
+  entrypoints: Array<Record<string, unknown>>;
+  contracts: Record<string, unknown>;
+  next_actions: string[];
+}
+
 export interface MeetingAppTimelineSdk {
   type: 'meeting_app_timeline_sdk';
   schema: 'meeting_app_timeline_sdk';
@@ -282,6 +318,8 @@ export interface MeetingAppTimelineSdk {
   handoffMatrixAcceptance: MeetingAppTimelineSdk['runtimeAdapterHandoffMatrixAcceptance'];
   runtimeAdapterHostPackage(options?: Record<string, unknown>): import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterHostPackage;
   hostPackage: MeetingAppTimelineSdk['runtimeAdapterHostPackage'];
+  connectorPackage(options?: Record<string, unknown>): MeetingAppTimelineConnectorPackage;
+  runtimeConnectorPackage: MeetingAppTimelineSdk['connectorPackage'];
   manifest(options?: Record<string, unknown>): Record<string, unknown>;
   readiness(options?: Record<string, unknown>): Record<string, unknown>;
   handoffReadiness(options?: Record<string, unknown>): Record<string, unknown>;

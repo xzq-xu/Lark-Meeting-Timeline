@@ -646,9 +646,13 @@ const handoff = meetingSdk.handoff({ url: location.href, title: document.title }
 const hostPackage = meetingSdk.hostPackage({
   surfaces: ['browser-extension', 'native-detector'],
 });
+const connectorPackage = meetingSdk.connectorPackage({
+  surfaces: ['browser-extension', 'native-detector'],
+  observeTracks: true,
+});
 ```
 
-这个 facade 也直接暴露宿主集成需要的机器可读适配产物：`adapterProfile()`、`observerPlan()`、`selectAdapter()`、`handoff()`、`handoffMatrix()`、`handoffAcceptance()` 和 `hostPackage()`。外部项目可以先用 `hostPackage()` 拿到 Google Meet / Teams / Zoom / Webex / Lark 的 content-script/WebView/native detector 安装目标、runtime options、speaker/participant track 参数、CI gates 和 `captured_at_ms` 非阻塞标注契约，再按当前会议 URL 用 `handoff()` 选择单场会议的启动配置。
+这个 facade 也直接暴露宿主集成需要的机器可读适配产物：`adapterProfile()`、`observerPlan()`、`selectAdapter()`、`handoff()`、`handoffMatrix()`、`handoffAcceptance()`、`hostPackage()` 和 `connectorPackage()`。外部项目可以先用 `hostPackage()` 拿到 Google Meet / Teams / Zoom / Webex / Lark 的 content-script/WebView/native detector 安装目标、runtime options、speaker/participant track 参数、CI gates 和 `captured_at_ms` 非阻塞标注契约，再按当前会议 URL 用 `handoff()` 选择单场会议的启动配置。`connectorPackage()` 是更完整的交付物，会把 host package、按 surface 拆分的 observer plan、scheduler config、浏览器扩展 scaffold、runtime event plan 和硬契约收在一起，适合直接给另一个项目落地。
 
 `platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。CI 里可以用 `assertMeetingAppAdapterIntegrationPackage()`、`assertMeetingAppAdapterIntegrationPackageMatrix()` 或 kit 上的同名方法做 gate；默认 target 是 `pilot`，如果传 `target: 'production'`，则必须补齐真实会议 evidence package、provider start/end reconcile 和 handoff readiness 之后才会通过。
 

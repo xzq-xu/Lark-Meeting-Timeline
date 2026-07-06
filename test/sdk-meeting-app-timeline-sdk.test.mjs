@@ -122,6 +122,23 @@ assert.equal(hostPackage.accepted, true);
 assert.equal(hostPackage.runtime_contract.annotation_timestamp_field, 'captured_at_ms');
 assert.equal(hostPackage.ci_gates.includes('require_provider_and_transcript_non_blocking'), true);
 
+const connectorPackage = sdk.connectorPackage({
+  surfaces: ['browser-extension', 'native-detector'],
+  observeTracks: true,
+});
+assert.equal(connectorPackage.schema, 'meeting_app_timeline_connector_package');
+assert.equal(connectorPackage.accepted, true);
+assert.deepEqual(connectorPackage.surfaces, ['browser_extension', 'native_detector']);
+assert.equal(connectorPackage.host_package.schema, 'meeting_app_runtime_adapter_host_package');
+assert.equal(connectorPackage.observer_plan_by_surface.browser_extension.platform_count, 2);
+assert.equal(connectorPackage.scheduler_config_by_surface.native_detector.platform_count, 2);
+assert.equal(connectorPackage.scheduler_config_by_surface.browser_extension.track_enabled_count, 2);
+assert.equal(connectorPackage.extension.acceptance.accepted, true);
+assert.equal(connectorPackage.extension.manifest.permissions.includes('tabs'), true);
+assert.equal(connectorPackage.runtime_events.plan_matrix.platform_count, 2);
+assert.equal(connectorPackage.contracts.provider_events_block_realtime, false);
+assert.equal(connectorPackage.entrypoints.some((entry) => entry.id === 'speaker-participant-track'), true);
+
 const allPlatformsHostPackage = createMeetingAppTimelineSdk({
   baseUrl,
   fetch: fetchImpl,

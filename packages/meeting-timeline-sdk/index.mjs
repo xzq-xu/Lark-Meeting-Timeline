@@ -58,6 +58,16 @@ function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
 }
 
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value !== 'string' && typeof value[Symbol.iterator] === 'function') return Array.from(value);
+  return value == null ? [] : [value];
+}
+
+function uniqueStrings(values = []) {
+  return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
+}
+
 export function compactObject(value) {
   if (Array.isArray(value)) return value.map((item) => compactObject(item));
   if (!isPlainObject(value)) return value;
@@ -578,6 +588,68 @@ function singlePlatformInput(runtime, platformOrOptions = {}, options = {}) {
   };
 }
 
+function normalizeConnectorSurface(surface = 'browser_extension') {
+  const key = String(surface || 'browser_extension').trim().toLowerCase().replace(/[-\s]+/g, '_');
+  const aliases = {
+    extension: 'browser_extension',
+    browser: 'browser_extension',
+    chrome_extension: 'browser_extension',
+    edge_extension: 'browser_extension',
+    electron: 'electron_webview',
+    electron_preload: 'electron_webview',
+    embedded_webview: 'webview',
+    native: 'native_detector',
+    local_detector: 'native_detector',
+    desktop_detector: 'native_detector',
+  };
+  return aliases[key] ?? key;
+}
+
+function connectorSurfaces(options = {}) {
+  return uniqueStrings(asArray(firstNonEmpty(
+    options.surfaces,
+    options.surface_keys,
+    options.surfaceKeys,
+    options.targetSurfaces,
+    options.target_surfaces,
+    options.surface,
+    options.targetSurface,
+    options.target_surface,
+    ['browser_extension'],
+  )).map((surface) => normalizeConnectorSurface(surface)));
+}
+
+function includeExtensionScaffold(options = {}, surfaces = []) {
+  if (options.includeExtensionScaffold === false || options.include_extension_scaffold === false) return false;
+  return surfaces.includes('browser_extension');
+}
+
+function connectorExtensionOptions(defaults = {}, options = {}) {
+  return {
+    ...defaults,
+    ...(options.extensionOptions ?? {}),
+    ...(options.extension_options ?? {}),
+    platforms: firstNonEmpty(
+      options.extensionOptions?.platforms,
+      options.extension_options?.platforms,
+      options.platforms,
+      options.platform_keys,
+      options.platformKeys,
+      defaults.platforms,
+    ),
+  };
+}
+
+function connectorNextActions(...groups) {
+  const visit = (group) => {
+    if (Array.isArray(group)) return group.flatMap((item) => visit(item));
+    if (typeof group === 'string') return [group];
+    if (group?.next_actions) return visit(group.next_actions);
+    return [];
+  };
+  return uniqueStrings(groups.flatMap((group) => visit(group)));
+}
+
 export function createMeetingAppTimelineSdk(options = {}) {
   const client = timelineClientFromHostOptions(options);
   const platforms = meetingAppTimelineSdkPlatforms(options);
@@ -718,6 +790,130 @@ export function createMeetingAppTimelineSdk(options = {}) {
     },
     hostPackage(hostPackageOptions = {}) {
       return sdk.runtimeAdapterHostPackage(hostPackageOptions);
+    },
+    connectorPackage(connectorOptions = {}) {
+      const surfaces = connectorSurfaces(connectorOptions);
+      const merged = sdkPlatformOptions(runtime, {
+        ...connectorOptions,
+        surfaces,
+      });
+      const hostPackage = sdk.hostPackage(merged);
+      const handoffMatrix = hostPackage.handoff_matrix ?? sdk.handoffMatrix(merged);
+      const handoffAcceptance = hostPackage.handoff_acceptance ?? sdk.handoffMatrixAcceptance(handoffMatrix, merged);
+      const observerPlanBySurface = Object.fromEntries(surfaces.map((surface) => [
+        surface,
+        sdk.observerPlanMatrix({
+          ...merged,
+          surface,
+        }),
+      ]));
+      const schedulerConfigBySurface = Object.fromEntries(surfaces.map((surface) => [
+        surface,
+        runtime.kit.meetingAppObserverSchedulerConfigMatrix({
+          ...merged,
+          surface,
+          observeTracks: firstNonEmpty(connectorOptions.observeTracks, connectorOptions.observe_tracks, true),
+          observe_tracks: firstNonEmpty(connectorOptions.observe_tracks, connectorOptions.observeTracks, true),
+        }),
+      ]));
+      const extensionScaffold = includeExtensionScaffold(connectorOptions, surfaces)
+        ? runtime.kit.meetingAppExtensionScaffold(connectorExtensionOptions(merged, connectorOptions))
+        : undefined;
+      const extensionAcceptance = extensionScaffold
+        ? runtime.kit.meetingAppExtensionAcceptance(connectorExtensionOptions(merged, connectorOptions))
+        : undefined;
+      const runtimeEventPlanMatrix = runtime.kit.platformRuntimeEventPlanMatrix(merged);
+      const accepted = hostPackage.accepted === true
+        && handoffAcceptance.accepted === true
+        && (extensionAcceptance ? extensionAcceptance.accepted === true : true);
+      return compactObject({
+        type: 'meeting_app_timeline_connector_package',
+        schema: 'meeting_app_timeline_connector_package',
+        schema_version: 1,
+        id: firstNonEmpty(
+          connectorOptions.packageId,
+          connectorOptions.package_id,
+          `${hostPackage.id ?? 'meeting-app-runtime-adapter'}-connector`,
+        ),
+        base_url: firstNonEmpty(connectorOptions.baseUrl, connectorOptions.base_url, defaults.baseUrl, defaults.base_url),
+        accepted,
+        platforms: hostPackage.platforms,
+        surfaces: hostPackage.surfaces ?? surfaces,
+        platform_count: hostPackage.platform_count,
+        surface_count: surfaces.length,
+        handoff_count: hostPackage.handoff_count,
+        ready_count: hostPackage.ready_count,
+        host_package: hostPackage,
+        handoff_matrix: handoffMatrix,
+        handoff_acceptance: handoffAcceptance,
+        observer_plan_by_surface: observerPlanBySurface,
+        scheduler_config_by_surface: schedulerConfigBySurface,
+        extension: extensionScaffold ? {
+          scaffold: extensionScaffold,
+          acceptance: extensionAcceptance,
+          install_plan: extensionScaffold.install_plan,
+          manifest: extensionScaffold.manifest,
+          bundle: extensionScaffold.bundle,
+          file_count: extensionScaffold.files?.length ?? 0,
+        } : undefined,
+        runtime_events: {
+          endpoint: runtimeEvents.endpoint,
+          plan_matrix: runtimeEventPlanMatrix,
+          action_count: runtimeEventPlanMatrix.rows?.length ?? 0,
+        },
+        entrypoints: [
+          {
+            id: 'select-adapter',
+            method: 'sdk.selectAdapter(input)',
+            output: 'meeting_app_runtime_adapter_selection',
+          },
+          {
+            id: 'handoff',
+            method: 'sdk.handoff(selectionOrInput, { surface })',
+            output: 'meeting_app_runtime_adapter_handoff',
+          },
+          {
+            id: 'observe',
+            method: 'sdk.observeMeetingApp(platformOrInput, input, { remote: true })',
+            output: 'runtime_event_or_local_observation_result',
+          },
+          {
+            id: 'speaker-participant-track',
+            method: 'sdk.speakerTrack(...) / sdk.participantTrack(...)',
+            output: 'position_markers_without_transcript_text',
+          },
+          {
+            id: 'ci-gate',
+            method: 'sdk.handoffMatrixAcceptance(matrix)',
+            output: 'meeting_app_runtime_adapter_handoff_matrix_acceptance_report',
+          },
+        ],
+        contracts: {
+          timestamp_field: 'captured_at_ms',
+          provider_events_block_realtime: false,
+          transcript_blocks_realtime: false,
+          local_observer_first: true,
+          speaker_track_text_required: false,
+          participant_track_text_required: false,
+          production_requires_live_snapshot: true,
+        },
+        next_actions: connectorNextActions(
+          hostPackage,
+          handoffAcceptance,
+          runtimeEventPlanMatrix,
+          extensionAcceptance,
+          Object.values(observerPlanBySurface),
+          Object.values(schedulerConfigBySurface),
+          [
+            'wire_connector_package_entrypoints_into_host_project',
+            'run_connector_package_handoff_acceptance_in_ci',
+            'collect_live_dom_snapshots_before_production_rollout',
+          ],
+        ),
+      });
+    },
+    runtimeConnectorPackage(connectorOptions = {}) {
+      return sdk.connectorPackage(connectorOptions);
     },
     manifest(manifestOptions = {}) {
       return runtime.manifest(manifestOptions);
