@@ -237,6 +237,51 @@ export interface MeetingAppTimelineSdk {
   integrationPackage: MeetingAppTimelineSdk['package'];
   packageMatrix(options?: Record<string, unknown>): import('./adapters/meeting-app-adapter-integration-package.mjs').MeetingAppAdapterIntegrationPackageMatrix;
   integrationPackageMatrix: MeetingAppTimelineSdk['packageMatrix'];
+  integrationProfile(
+    platformOrOptions?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-profile.mjs').MeetingAppIntegrationProfile;
+  integrationMatrix(options?: Record<string, unknown>): import('./adapters/meeting-app-profile.mjs').MeetingAppIntegrationMatrix;
+  runtimeAdapterProfile(
+    input?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterProfileResolution;
+  adapterProfile: MeetingAppTimelineSdk['runtimeAdapterProfile'];
+  runtimeAdapterProfileMatrix(options?: Record<string, unknown>): import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterProfileMatrix;
+  adapterProfileMatrix: MeetingAppTimelineSdk['runtimeAdapterProfileMatrix'];
+  observerPlan(
+    platformOrInput?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeObserverPlan;
+  runtimeObserverPlan: MeetingAppTimelineSdk['observerPlan'];
+  observerPlanMatrix(options?: Record<string, unknown>): import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeObserverPlanMatrix;
+  runtimeObserverPlanMatrix: MeetingAppTimelineSdk['observerPlanMatrix'];
+  selectAdapter(
+    input?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterSelection;
+  selectRuntimeAdapter: MeetingAppTimelineSdk['selectAdapter'];
+  runtimeAdapterHandoff(
+    selectionOrInput?: string | Record<string, unknown> | import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterSelection,
+    options?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterHandoff;
+  adapterHandoff: MeetingAppTimelineSdk['runtimeAdapterHandoff'];
+  handoff: MeetingAppTimelineSdk['runtimeAdapterHandoff'];
+  runtimeAdapterHandoffMatrix(options?: Record<string, unknown>): import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterHandoffMatrix;
+  adapterHandoffMatrix: MeetingAppTimelineSdk['runtimeAdapterHandoffMatrix'];
+  handoffMatrix: MeetingAppTimelineSdk['runtimeAdapterHandoffMatrix'];
+  runtimeAdapterHandoffAcceptance(
+    handoffOrInput?: string | Record<string, unknown> | import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterSelection | import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterHandoff,
+    options?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterHandoffAcceptanceReport;
+  handoffAcceptance: MeetingAppTimelineSdk['runtimeAdapterHandoffAcceptance'];
+  runtimeAdapterHandoffMatrixAcceptance(
+    matrixOrOptions?: Record<string, unknown> | import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterHandoff | import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterHandoffMatrix,
+    options?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterHandoffMatrixAcceptanceReport;
+  handoffMatrixAcceptance: MeetingAppTimelineSdk['runtimeAdapterHandoffMatrixAcceptance'];
+  runtimeAdapterHostPackage(options?: Record<string, unknown>): import('./adapters/meeting-app-profile.mjs').MeetingAppRuntimeAdapterHostPackage;
+  hostPackage: MeetingAppTimelineSdk['runtimeAdapterHostPackage'];
   manifest(options?: Record<string, unknown>): Record<string, unknown>;
   readiness(options?: Record<string, unknown>): Record<string, unknown>;
   handoffReadiness(options?: Record<string, unknown>): Record<string, unknown>;

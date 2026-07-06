@@ -554,6 +554,30 @@ function platformAndInput(runtime, platformOrInput, inputOrOptions = {}, options
   };
 }
 
+function sdkPlatformOptions(runtime, options = {}) {
+  return {
+    ...options,
+    platforms: firstNonEmpty(options.platforms, options.platform_keys, options.platformKeys, runtime.platforms),
+  };
+}
+
+function singlePlatformInput(runtime, platformOrOptions = {}, options = {}) {
+  if (typeof platformOrOptions === 'string') {
+    return {
+      platform: platformOrOptions,
+      options,
+    };
+  }
+  const input = platformOrOptions ?? {};
+  return {
+    platform: firstNonEmpty(options.platform, options.provider, input.platform, input.provider, input.key, runtime.platforms?.[0]),
+    options: {
+      ...input,
+      ...options,
+    },
+  };
+}
+
 export function createMeetingAppTimelineSdk(options = {}) {
   const client = timelineClientFromHostOptions(options);
   const platforms = meetingAppTimelineSdkPlatforms(options);
@@ -615,6 +639,85 @@ export function createMeetingAppTimelineSdk(options = {}) {
     },
     integrationPackageMatrix(packageOptions = {}) {
       return sdk.packageMatrix(packageOptions);
+    },
+    integrationProfile(platformOrOptions = {}, profileOptions = {}) {
+      const resolved = singlePlatformInput(runtime, platformOrOptions, profileOptions);
+      return runtime.kit.meetingAppIntegrationProfile(resolved.platform, resolved.options);
+    },
+    integrationMatrix(profileOptions = {}) {
+      return runtime.kit.meetingAppIntegrationMatrix(sdkPlatformOptions(runtime, profileOptions));
+    },
+    runtimeAdapterProfile(input = {}, profileOptions = {}) {
+      return runtime.kit.meetingAppRuntimeAdapterProfile(input, sdkPlatformOptions(runtime, profileOptions));
+    },
+    adapterProfile(input = {}, profileOptions = {}) {
+      return sdk.runtimeAdapterProfile(input, profileOptions);
+    },
+    runtimeAdapterProfileMatrix(profileOptions = {}) {
+      return runtime.kit.meetingAppRuntimeAdapterProfileMatrix(sdkPlatformOptions(runtime, profileOptions));
+    },
+    adapterProfileMatrix(profileOptions = {}) {
+      return sdk.runtimeAdapterProfileMatrix(profileOptions);
+    },
+    observerPlan(platformOrInput = {}, planOptions = {}) {
+      return runtime.kit.meetingAppRuntimeObserverPlan(platformOrInput, sdkPlatformOptions(runtime, planOptions));
+    },
+    runtimeObserverPlan(platformOrInput = {}, planOptions = {}) {
+      return sdk.observerPlan(platformOrInput, planOptions);
+    },
+    observerPlanMatrix(planOptions = {}) {
+      return runtime.kit.meetingAppRuntimeObserverPlanMatrix(sdkPlatformOptions(runtime, planOptions));
+    },
+    runtimeObserverPlanMatrix(planOptions = {}) {
+      return sdk.observerPlanMatrix(planOptions);
+    },
+    selectAdapter(input = {}, selectionOptions = {}) {
+      return runtime.kit.selectMeetingAppRuntimeAdapter(input, sdkPlatformOptions(runtime, selectionOptions));
+    },
+    selectRuntimeAdapter(input = {}, selectionOptions = {}) {
+      return sdk.selectAdapter(input, selectionOptions);
+    },
+    runtimeAdapterHandoff(selectionOrInput = {}, handoffOptions = {}) {
+      return runtime.kit.meetingAppRuntimeAdapterHandoff(selectionOrInput, sdkPlatformOptions(runtime, handoffOptions));
+    },
+    adapterHandoff(selectionOrInput = {}, handoffOptions = {}) {
+      return sdk.runtimeAdapterHandoff(selectionOrInput, handoffOptions);
+    },
+    handoff(selectionOrInput = {}, handoffOptions = {}) {
+      return sdk.runtimeAdapterHandoff(selectionOrInput, handoffOptions);
+    },
+    runtimeAdapterHandoffMatrix(handoffOptions = {}) {
+      return runtime.kit.meetingAppRuntimeAdapterHandoffMatrix(sdkPlatformOptions(runtime, handoffOptions));
+    },
+    adapterHandoffMatrix(handoffOptions = {}) {
+      return sdk.runtimeAdapterHandoffMatrix(handoffOptions);
+    },
+    handoffMatrix(handoffOptions = {}) {
+      return sdk.runtimeAdapterHandoffMatrix(handoffOptions);
+    },
+    runtimeAdapterHandoffAcceptance(handoffOrInput = {}, acceptanceOptions = {}) {
+      return runtime.kit.meetingAppRuntimeAdapterHandoffAcceptance(
+        handoffOrInput,
+        sdkPlatformOptions(runtime, acceptanceOptions),
+      );
+    },
+    handoffAcceptance(handoffOrInput = {}, acceptanceOptions = {}) {
+      return sdk.runtimeAdapterHandoffAcceptance(handoffOrInput, acceptanceOptions);
+    },
+    runtimeAdapterHandoffMatrixAcceptance(matrixOrOptions = {}, acceptanceOptions = {}) {
+      return runtime.kit.meetingAppRuntimeAdapterHandoffMatrixAcceptance(
+        matrixOrOptions,
+        sdkPlatformOptions(runtime, acceptanceOptions),
+      );
+    },
+    handoffMatrixAcceptance(matrixOrOptions = {}, acceptanceOptions = {}) {
+      return sdk.runtimeAdapterHandoffMatrixAcceptance(matrixOrOptions, acceptanceOptions);
+    },
+    runtimeAdapterHostPackage(hostPackageOptions = {}) {
+      return runtime.kit.meetingAppRuntimeAdapterHostPackage(sdkPlatformOptions(runtime, hostPackageOptions));
+    },
+    hostPackage(hostPackageOptions = {}) {
+      return sdk.runtimeAdapterHostPackage(hostPackageOptions);
     },
     manifest(manifestOptions = {}) {
       return runtime.manifest(manifestOptions);

@@ -455,11 +455,13 @@ assert.equal(buildMeetingPlatformIntegrationRuntimeManifestFromRoot({
 assert.equal(buildMeetingAppAdapterIntegrationPackageMatrixFromRoot({
   platforms: ['google-meet'],
 }).platform_count, 1);
-assert.equal(createMeetingAppTimelineSdk({
+const rootMeetingAppSdk = createMeetingAppTimelineSdk({
   baseUrl: 'http://localhost:8787',
   fetch: async () => new Response(JSON.stringify({ ok: true })),
   platforms: ['google-meet'],
-}).schema, 'meeting_app_timeline_sdk');
+});
+assert.equal(rootMeetingAppSdk.schema, 'meeting_app_timeline_sdk');
+assert.equal(rootMeetingAppSdk.hostPackage({ surfaces: ['browser-extension'] }).schema, 'meeting_app_runtime_adapter_host_package');
 
 const kit = createMeetingPlatformTimelineKit(client, {
   baseUrl: 'http://localhost:8787',

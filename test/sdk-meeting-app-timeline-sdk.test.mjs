@@ -71,6 +71,67 @@ assert.equal(packageMatrix.schema, 'meeting_app_adapter_integration_package_matr
 assert.equal(packageMatrix.platform_count, 2);
 assert.equal(packageMatrix.realtime_ready_count, 2);
 
+const integrationProfile = sdk.integrationProfile('google-meet');
+assert.equal(integrationProfile.schema, 'meeting_app_integration_profile');
+assert.equal(integrationProfile.platform, 'google_meet');
+assert.equal(integrationProfile.event_model.realtime_axis.timestamp_invariant, 'annotations_use_absolute_captured_at_ms');
+
+const adapterProfile = sdk.adapterProfile('https://meet.google.com/abc-defg-hij');
+assert.equal(adapterProfile.schema, 'meeting_app_runtime_adapter_profile_resolution');
+assert.equal(adapterProfile.detected, true);
+assert.equal(adapterProfile.platform, 'google_meet');
+assert.equal(adapterProfile.tracks.output_intents.includes('speaker_track'), true);
+
+const observerPlan = sdk.observerPlan({
+  url: 'https://meet.google.com/abc-defg-hij',
+  page: {
+    controls: [{ label: 'Leave call' }],
+    participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+  },
+}, {
+  surface: 'browser-extension',
+});
+assert.equal(observerPlan.schema, 'meeting_app_runtime_observer_plan');
+assert.equal(observerPlan.platform, 'google_meet');
+assert.equal(observerPlan.accepted, true);
+assert.equal(observerPlan.signal_contract.timestamp_field, 'captured_at_ms');
+assert.equal(observerPlan.track_runtime.output_intents.includes('participant_track'), true);
+
+const handoff = sdk.handoff('https://meet.google.com/abc-defg-hij', {
+  surface: 'browser-extension',
+});
+assert.equal(handoff.schema, 'meeting_app_runtime_adapter_handoff');
+assert.equal(handoff.platform, 'google_meet');
+assert.equal(handoff.readiness.ready_to_start, true);
+assert.equal(handoff.annotations.provider_events_block_realtime, false);
+assert.equal(sdk.handoffAcceptance(handoff).accepted, true);
+
+const handoffMatrix = sdk.handoffMatrix({
+  surfaces: ['browser-extension', 'native-detector'],
+});
+assert.equal(handoffMatrix.schema, 'meeting_app_runtime_adapter_handoff_matrix');
+assert.equal(handoffMatrix.platform_count, 2);
+assert.equal(handoffMatrix.handoff_count, 4);
+assert.equal(handoffMatrix.ready_count, 4);
+
+const hostPackage = sdk.hostPackage({
+  surfaces: ['browser-extension', 'native-detector'],
+});
+assert.equal(hostPackage.schema, 'meeting_app_runtime_adapter_host_package');
+assert.equal(hostPackage.accepted, true);
+assert.equal(hostPackage.runtime_contract.annotation_timestamp_field, 'captured_at_ms');
+assert.equal(hostPackage.ci_gates.includes('require_provider_and_transcript_non_blocking'), true);
+
+const allPlatformsHostPackage = createMeetingAppTimelineSdk({
+  baseUrl,
+  fetch: fetchImpl,
+}).hostPackage({
+  surfaces: ['browser-extension'],
+});
+assert.deepEqual(allPlatformsHostPackage.platforms, ['google_meet', 'microsoft_teams', 'zoom', 'webex', 'lark']);
+assert.equal(allPlatformsHostPackage.handoff_count, 5);
+assert.equal(allPlatformsHostPackage.ready_count, 5);
+
 const remoteObserved = await sdk.observeMeetingApp({
   url: 'https://meet.google.com/abc-defg-hij',
   title: 'Google Meet',
