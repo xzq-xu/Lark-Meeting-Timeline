@@ -38,6 +38,27 @@ const client = {
   },
 };
 
+function fakeBrowserWindow(url = 'https://meet.google.com/abc-defg-hij') {
+  const document = {
+    nodeType: 9,
+    title: 'Kit connector browser runtime',
+    hidden: false,
+    location: { href: url },
+    body: { nodeType: 1 },
+    documentElement: { nodeType: 1 },
+    querySelectorAll() {
+      return [];
+    },
+  };
+  return {
+    document,
+    location: { href: url, origin: new URL(url).origin },
+    navigator: { userAgent: 'Chrome fixture' },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+}
+
 assert.equal(
   platformCapabilityContract('google-meet', { baseUrl }).sdk_modules.platform_kit,
   '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
@@ -142,6 +163,53 @@ await connectorHubRuntime.insertAnnotation({
 });
 assert.equal(connectorRuntimeCalls.at(-1).body.action, 'insert_annotation');
 assert.equal(connectorRuntimeCalls.at(-1).body.platform, 'google_meet');
+const kitConnectorWindow = fakeBrowserWindow();
+const kitConnectorBrowserRuntime = kit.createPlatformConnectorBrowserRuntime({
+  fetch: async (url, init) => {
+    const body = JSON.parse(init.body);
+    connectorRuntimeCalls.push({ url, body });
+    return new Response(JSON.stringify({ ok: true, accepted: body }), {
+      headers: { 'content-type': 'application/json' },
+    });
+  },
+  window: kitConnectorWindow,
+  now: () => 1_782_614_400_000,
+});
+assert.equal(kitConnectorBrowserRuntime.schema, 'meeting_platform_connector_browser_runtime');
+assert.equal(kitConnectorBrowserRuntime.resolvePlatform().platform, 'google_meet');
+await kitConnectorBrowserRuntime.insertAnnotation({
+  id: 'kit-browser-mark-001',
+  label: 'browser follow-up',
+  captured_at_ms: 1_782_614_402_000,
+});
+assert.equal(connectorRuntimeCalls.at(-1).body.action, 'insert_annotation');
+assert.equal(connectorRuntimeCalls.at(-1).body.platform, 'google_meet');
+assert.equal(connectorRuntimeCalls.at(-1).body.annotation.id, 'kit-browser-mark-001');
+const kitConnectorBridge = kit.createPlatformConnectorContentScriptBridge({
+  fetch: async (url, init) => {
+    const body = JSON.parse(init.body);
+    connectorRuntimeCalls.push({ url, body });
+    return new Response(JSON.stringify({ ok: true, accepted: body }), {
+      headers: { 'content-type': 'application/json' },
+    });
+  },
+  window: kitConnectorWindow,
+  now: () => 1_782_614_400_000,
+});
+assert.equal(kitConnectorBridge.schema, 'meeting_platform_connector_content_script_bridge');
+const kitBridgeResponse = await kitConnectorBridge.dispatchMessage({
+  type: 'meeting_timeline.insert_mark',
+  payload: {
+    mark: {
+      id: 'kit-bridge-mark-001',
+      label: 'bridge follow-up',
+      captured_at_ms: 1_782_614_403_000,
+    },
+  },
+});
+assert.equal(kitBridgeResponse.handled, true);
+assert.equal(connectorRuntimeCalls.at(-1).body.platform, 'google_meet');
+assert.equal(connectorRuntimeCalls.at(-1).body.annotation.id, 'kit-bridge-mark-001');
 assert.equal(kit.platformConsumerHandoff({ platforms: ['google-meet'] }).schema, 'meeting_platform_consumer_handoff');
 assert.equal(kit.assertPlatformConsumerHandoff({ platforms: ['google-meet'] }).accepted, true);
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_consumer_handoff.consumer_ready_count, 1);

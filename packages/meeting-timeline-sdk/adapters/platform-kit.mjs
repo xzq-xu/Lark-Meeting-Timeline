@@ -90,8 +90,11 @@ import {
   buildMeetingPlatformConnectorAcceptanceReport,
   buildMeetingPlatformConnectorHub,
   buildMeetingPlatformConnectorMatrix,
+  createMeetingPlatformConnectorBrowserRuntime,
+  createMeetingPlatformConnectorContentScriptBridge,
   createMeetingPlatformConnectorHub,
   createMeetingPlatformConnectorRuntime,
+  installMeetingPlatformConnectorContentScriptBridge,
   resolveMeetingPlatformConnectorInput,
 } from './meeting-platform-connector.mjs';
 import {
@@ -1377,6 +1380,15 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     createPlatformConnectorHub(connectorOptions = {}) {
       return createMeetingPlatformConnectorHub(withDefaults(defaults, connectorOptions));
+    },
+    createPlatformConnectorBrowserRuntime(connectorOptions = {}) {
+      return createMeetingPlatformConnectorBrowserRuntime(withDefaults(defaults, connectorOptions));
+    },
+    createPlatformConnectorContentScriptBridge(connectorOptions = {}) {
+      return createMeetingPlatformConnectorContentScriptBridge(withDefaults(defaults, connectorOptions));
+    },
+    installPlatformConnectorContentScriptBridge(connectorOptions = {}) {
+      return installMeetingPlatformConnectorContentScriptBridge(withDefaults(defaults, connectorOptions));
     },
     capability(platform, platformOptions = {}) {
       return platformCapabilityContract(platform, withDefaults(defaults, platformOptions));

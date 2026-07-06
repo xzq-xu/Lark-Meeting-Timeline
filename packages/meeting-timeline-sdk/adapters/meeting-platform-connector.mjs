@@ -15,6 +15,11 @@ import {
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
 import { detectMeetingFromUrl } from './meeting-url.mjs';
+import {
+  createMeetingAppBrowserRuntime,
+  meetingAppBrowserInput,
+} from './meeting-app-browser-runtime.mjs';
+import { createMeetingAppContentScriptBridge } from './meeting-app-content-script.mjs';
 
 export const MEETING_PLATFORM_CONNECTOR_SCHEMA = 'meeting_platform_connector';
 export const MEETING_PLATFORM_CONNECTOR_MATRIX_SCHEMA = 'meeting_platform_connector_matrix';
@@ -22,6 +27,8 @@ export const MEETING_PLATFORM_CONNECTOR_ACCEPTANCE_SCHEMA = 'meeting_platform_co
 export const MEETING_PLATFORM_CONNECTOR_RUNTIME_SCHEMA = 'meeting_platform_connector_runtime';
 export const MEETING_PLATFORM_CONNECTOR_HUB_SCHEMA = 'meeting_platform_connector_hub';
 export const MEETING_PLATFORM_CONNECTOR_RESOLUTION_SCHEMA = 'meeting_platform_connector_resolution';
+export const MEETING_PLATFORM_CONNECTOR_BROWSER_RUNTIME_SCHEMA = 'meeting_platform_connector_browser_runtime';
+export const MEETING_PLATFORM_CONNECTOR_CONTENT_SCRIPT_BRIDGE_SCHEMA = 'meeting_platform_connector_content_script_bridge';
 export const MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION = 1;
 
 const DEFAULT_CONNECTOR_PLATFORMS = Object.freeze([
@@ -989,6 +996,251 @@ export function createMeetingPlatformConnectorHub(options = {}) {
       return defaultRuntime(readinessOptions).runHandoffReadiness(readinessOptions);
     },
   };
+}
+
+function browserBaseOptions(options = {}) {
+  return {
+    window: options.window,
+    win: options.win,
+    document: options.document,
+    doc: options.doc,
+    location: options.location,
+    navigator: options.navigator,
+  };
+}
+
+function connectorRouteInput(input = {}, options = {}) {
+  const browserInput = meetingAppBrowserInput(browserBaseOptions(options));
+  if (!isPlainObject(input)) return browserInput;
+  return compactObject({
+    ...browserInput,
+    ...input,
+    meeting: {
+      ...(browserInput.meeting ?? {}),
+      ...(input.meeting ?? {}),
+    },
+  });
+}
+
+function resultOk(result) {
+  return result?.ok !== false && result?.error == null;
+}
+
+function createConnectorBrowserSources(hub, options = {}) {
+  let lastResult = null;
+  let insertCount = 0;
+  let observeCount = 0;
+
+  async function insertOne(input = {}, insertOptions = {}) {
+    const route = connectorRouteInput(input, options);
+    const result = await hub.insertAnnotation(route, input, insertOptions);
+    insertCount += 1;
+    lastResult = result;
+    return result;
+  }
+
+  const client = {
+    insertMark: insertOne,
+    insertAnnotation: insertOne,
+    async insertMarks(inputs = [], insertOptions = {}) {
+      const rows = asArray(inputs);
+      const results = [];
+      for (const input of rows) results.push(await insertOne(input, insertOptions));
+      return {
+        ok: results.every(resultOk),
+        result_count: results.length,
+        results,
+      };
+    },
+  };
+
+  const sources = {
+    client,
+    async observeMeetingApp(input = {}, observeOptions = {}) {
+      const snapshot = connectorRouteInput(input, options);
+      const result = await hub.observeMeetingApp(snapshot, observeOptions);
+      observeCount += 1;
+      lastResult = result;
+      return compactObject({
+        ok: resultOk(result),
+        runtime_event_result: result,
+        platform_resolution: hub.resolvePlatform(snapshot, observeOptions),
+      });
+    },
+    observeApp(input = {}, observeOptions = {}) {
+      return this.observeMeetingApp(input, observeOptions);
+    },
+    observeBrowser(input = {}, observeOptions = {}) {
+      return this.observeMeetingApp(input, observeOptions);
+    },
+    observeNative(input = {}, observeOptions = {}) {
+      return this.observeMeetingApp(input, observeOptions);
+    },
+    observeLocal(input = {}, observeOptions = {}) {
+      return this.observeMeetingApp(input, observeOptions);
+    },
+    insertMark: client.insertMark,
+    insertAnnotation: client.insertAnnotation,
+    insertMarks: client.insertMarks,
+    async ingestProvider(platformOrInput = {}, payload = undefined, ingestOptions = {}) {
+      const route = typeof platformOrInput === 'string'
+        ? platformOrInput
+        : connectorRouteInput(platformOrInput, options);
+      const providerPayload = payload === undefined ? platformOrInput : payload;
+      const result = await hub.ingestProvider(route, providerPayload, ingestOptions);
+      lastResult = result;
+      return result;
+    },
+    ingestSignals(signals = [], ingestOptions = {}) {
+      return this.ingestProvider(connectorRouteInput(ingestOptions, options), {
+        source: 'local_detector',
+        signals: asArray(signals),
+      }, ingestOptions);
+    },
+    importTranscript(input = {}, transcriptOptions = {}) {
+      return this.ingestProvider(connectorRouteInput(input, options), {
+        source: 'transcript_import',
+        transcript: input,
+      }, transcriptOptions);
+    },
+    startMeeting(input = {}) {
+      return this.observeMeetingApp({
+        ...input,
+        in_meeting: true,
+        lifecycle_hint: 'meeting_started',
+      });
+    },
+    endMeeting(input = {}) {
+      return this.observeMeetingApp({
+        ...input,
+        in_meeting: false,
+        lifecycle_hint: 'meeting_ended',
+      });
+    },
+    getState() {
+      return {
+        observe_count: observeCount,
+        insert_count: insertCount,
+        last_result: lastResult,
+      };
+    },
+    reset() {
+      lastResult = null;
+      insertCount = 0;
+      observeCount = 0;
+      return this.getState();
+    },
+  };
+  return sources;
+}
+
+export function createMeetingPlatformConnectorBrowserRuntime(options = {}) {
+  const hub = options.hub
+    ?? options.connectorHub
+    ?? options.connector_hub
+    ?? createMeetingPlatformConnectorHub(options);
+  const sources = options.sources
+    ?? createConnectorBrowserSources(hub, options);
+  const browserRuntime = createMeetingAppBrowserRuntime({}, {
+    ...options,
+    sources,
+  });
+
+  return {
+    ...browserRuntime,
+    type: 'meeting_platform_connector_browser_runtime',
+    schema: MEETING_PLATFORM_CONNECTOR_BROWSER_RUNTIME_SCHEMA,
+    schema_version: MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION,
+    hub,
+    connector_hub: hub,
+    sources,
+    browserInput(input = {}) {
+      return connectorRouteInput(input, options);
+    },
+    resolvePlatform(input = {}, resolveOptions = {}) {
+      return hub.resolvePlatform(connectorRouteInput(input, options), resolveOptions);
+    },
+    observePlatformCandidates(input = {}, observeOptions = {}) {
+      return hub.observePlatformCandidates(connectorRouteInput(input, options), observeOptions);
+    },
+    observeMeetingApp(input = {}, observeOptions = {}) {
+      return sources.observeMeetingApp(input, observeOptions);
+    },
+    insertAnnotation(input = {}, markOptions = {}) {
+      return sources.insertAnnotation(input, markOptions);
+    },
+    insertMark(input = {}, markOptions = {}) {
+      return sources.insertMark(input, markOptions);
+    },
+    insertMarks(inputs = [], markOptions = {}) {
+      return sources.insertMarks(inputs, markOptions);
+    },
+    getState() {
+      return {
+        ...browserRuntime.getState(),
+        connector_hub: {
+          platforms: hub.platforms,
+          default_platform: hub.default_platform,
+          endpoint: hub.endpoint,
+        },
+        browser_resolution: hub.resolvePlatform(connectorRouteInput({}, options)),
+        connector_sources: sources.getState?.(),
+      };
+    },
+    reset(nextState = {}) {
+      return {
+        browser_runtime: browserRuntime.reset?.(nextState.browser_runtime ?? nextState.browserRuntime ?? {}),
+        connector_sources: sources.reset?.(nextState.sources ?? nextState.connector_sources ?? {}),
+      };
+    },
+  };
+}
+
+export function createMeetingPlatformConnectorContentScriptBridge(options = {}) {
+  const runtime = options.runtime
+    ?? options.browserRuntime
+    ?? options.browser_runtime
+    ?? createMeetingPlatformConnectorBrowserRuntime(options);
+  const bridge = createMeetingAppContentScriptBridge({}, {
+    ...options,
+    runtime,
+  });
+
+  return {
+    ...bridge,
+    type: 'meeting_platform_connector_content_script_bridge',
+    schema: MEETING_PLATFORM_CONNECTOR_CONTENT_SCRIPT_BRIDGE_SCHEMA,
+    schema_version: MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION,
+    runtime,
+    hub: runtime.hub,
+    connector_hub: runtime.hub,
+    resolvePlatform(input = {}, resolveOptions = {}) {
+      return runtime.resolvePlatform?.(input, resolveOptions);
+    },
+    observePlatformCandidates(input = {}, observeOptions = {}) {
+      return runtime.observePlatformCandidates?.(input, observeOptions);
+    },
+    getState() {
+      return {
+        ...bridge.getState(),
+        connector_hub: {
+          platforms: runtime.hub?.platforms,
+          default_platform: runtime.hub?.default_platform,
+          endpoint: runtime.hub?.endpoint,
+        },
+        browser_resolution: runtime.resolvePlatform?.(),
+      };
+    },
+    dispose() {
+      return bridge.dispose();
+    },
+  };
+}
+
+export function installMeetingPlatformConnectorContentScriptBridge(options = {}) {
+  const bridge = createMeetingPlatformConnectorContentScriptBridge(options);
+  bridge.start(options.startOptions ?? options.start_options ?? {});
+  return bridge;
 }
 
 export function buildDefaultMeetingPlatformConnectorMatrix(options = {}) {

@@ -191,6 +191,8 @@ import {
   buildMeetingPlatformIntegrationRuntimeManifest as buildMeetingPlatformIntegrationRuntimeManifestFromRoot,
   createMeetingAppTimelineSdk,
   createMeetingAppTimelineConnectorRuntimeClient as createMeetingAppTimelineConnectorRuntimeClientFromRoot,
+  createMeetingPlatformConnectorBrowserRuntime as createMeetingPlatformConnectorBrowserRuntimeFromRoot,
+  createMeetingPlatformConnectorContentScriptBridge as createMeetingPlatformConnectorContentScriptBridgeFromRoot,
   createMeetingPlatformConnectorHub as createMeetingPlatformConnectorHubFromRoot,
   createMeetingPlatformConnectorRuntime as createMeetingPlatformConnectorRuntimeFromRoot,
   createMeetingTimelineClient,
@@ -396,6 +398,8 @@ import {
   buildMeetingPlatformConnectorAcceptanceReport,
   buildMeetingPlatformConnectorHub,
   buildMeetingPlatformConnectorMatrix,
+  createMeetingPlatformConnectorBrowserRuntime,
+  createMeetingPlatformConnectorContentScriptBridge,
   createMeetingPlatformConnectorHub,
   createMeetingPlatformConnectorRuntime,
   resolveMeetingPlatformConnectorInput,
@@ -538,6 +542,26 @@ assert.equal(createMeetingPlatformConnectorHubFromRoot({
   baseUrl: 'http://localhost:8787',
   fetch: async () => new Response(JSON.stringify({ ok: true })),
 }).resolvePlatform({ url: 'https://meet.google.com/abc-defg-hij' }).platform, 'google_meet');
+assert.equal(createMeetingPlatformConnectorBrowserRuntime({
+  platform: 'google-meet',
+  baseUrl: 'http://localhost:8787',
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+}).schema, 'meeting_platform_connector_browser_runtime');
+assert.equal(createMeetingPlatformConnectorBrowserRuntimeFromRoot({
+  platform: 'google-meet',
+  baseUrl: 'http://localhost:8787',
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+}).resolvePlatform({ platform: 'google-meet' }).platform, 'google_meet');
+assert.equal(createMeetingPlatformConnectorContentScriptBridge({
+  platform: 'google-meet',
+  baseUrl: 'http://localhost:8787',
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+}).schema, 'meeting_platform_connector_content_script_bridge');
+assert.equal(createMeetingPlatformConnectorContentScriptBridgeFromRoot({
+  platform: 'google-meet',
+  baseUrl: 'http://localhost:8787',
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+}).resolvePlatform({ platform: 'google-meet' }).platform, 'google_meet');
 const connectorRuntimeClientFromRoot = createMeetingAppTimelineConnectorRuntimeClientFromRoot(rootConnectorPackage, {
   fetch: async () => new Response(JSON.stringify({ ok: true })),
 });
@@ -567,6 +591,14 @@ assert.equal(kit.createPlatformConnectorRuntime('google-meet', {
 assert.equal(kit.createPlatformConnectorHub({
   fetch: async () => new Response(JSON.stringify({ ok: true })),
 }).connectorFor({ url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample' }).platform, 'microsoft_teams');
+assert.equal(kit.createPlatformConnectorBrowserRuntime({
+  platform: 'google-meet',
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+}).schema, 'meeting_platform_connector_browser_runtime');
+assert.equal(kit.createPlatformConnectorContentScriptBridge({
+  platform: 'google-meet',
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+}).schema, 'meeting_platform_connector_content_script_bridge');
 assert.equal(kit.meetingAppRuntimeAdapterProfile('https://meet.google.com/abc-defg-hij').platform, 'google_meet');
 assert.equal(kit.meetingAppRuntimeAdapterProfileMatrix({ platforms: ['google-meet', 'teams'] }).runtime_ready_count, 2);
 assert.equal(kit.meetingAppAdapterFit({

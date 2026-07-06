@@ -743,7 +743,22 @@ await hub.observePlatformCandidates({
 });
 ```
 
-`platform-kit` 也暴露同一入口：`kit.platformConnector('google-meet')`、`kit.platformConnectorMatrix()`、`kit.platformConnectorHub()`、`kit.resolvePlatformConnector(input)`、`kit.platformConnectorAcceptance(connector)`、`kit.createPlatformConnectorRuntime(connector, { fetch })` 和 `kit.createPlatformConnectorHub({ fetch })`。这适合宿主项目已经统一使用 `createMeetingPlatformTimelineKit()`，但仍希望按平台懒加载 Google Meet / Teams / Zoom / Webex / Lark connector runtime，或者直接把当前浏览器/会议窗口状态交给 SDK 自动分发。
+如果注入点是浏览器扩展 content script、Electron WebView preload 或移动端内嵌 WebView，可以直接使用 connector browser runtime。它会复用 `meeting-app-browser-runtime` 的 DOM 采样、MutationObserver 和 speaker/participant track 逻辑，但底层写入走 connector hub，不要求宿主提供完整 timeline client：
+
+```js
+import {
+  installMeetingPlatformConnectorContentScriptBridge,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector';
+
+installMeetingPlatformConnectorContentScriptBridge({
+  baseUrl: 'https://timeline.example.com',
+  fetch,
+});
+```
+
+安装后，background worker 或宿主 WebView 只要发送 `meeting_timeline.insert_mark` / `meeting_timeline.sample` / `meeting_timeline.sample_tracks` 消息；bridge 会从当前 `location.href` 识别 Google Meet、Teams、Zoom、Webex 或 Lark，并投递统一的 `insert_annotation`、`observe_meeting_app`、`speaker_track` 或 `participant_track` runtime event。
+
+`platform-kit` 也暴露同一入口：`kit.platformConnector('google-meet')`、`kit.platformConnectorMatrix()`、`kit.platformConnectorHub()`、`kit.resolvePlatformConnector(input)`、`kit.platformConnectorAcceptance(connector)`、`kit.createPlatformConnectorRuntime(connector, { fetch })`、`kit.createPlatformConnectorHub({ fetch })`、`kit.createPlatformConnectorBrowserRuntime({ fetch })` 和 `kit.createPlatformConnectorContentScriptBridge({ fetch })`。这适合宿主项目已经统一使用 `createMeetingPlatformTimelineKit()`，但仍希望按平台懒加载 Google Meet / Teams / Zoom / Webex / Lark connector runtime，或者直接把当前浏览器/会议窗口状态交给 SDK 自动分发。
 
 `platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。CI 里可以用 `assertMeetingAppAdapterIntegrationPackage()`、`assertMeetingAppAdapterIntegrationPackageMatrix()` 或 kit 上的同名方法做 gate；默认 target 是 `pilot`，如果传 `target: 'production'`，则必须补齐真实会议 evidence package、provider start/end reconcile 和 handoff readiness 之后才会通过。
 

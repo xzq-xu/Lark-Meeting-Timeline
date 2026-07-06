@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 
 import {
   MEETING_PLATFORM_CONNECTOR_ACCEPTANCE_SCHEMA,
+  MEETING_PLATFORM_CONNECTOR_BROWSER_RUNTIME_SCHEMA,
+  MEETING_PLATFORM_CONNECTOR_CONTENT_SCRIPT_BRIDGE_SCHEMA,
   MEETING_PLATFORM_CONNECTOR_HUB_SCHEMA,
   MEETING_PLATFORM_CONNECTOR_MATRIX_SCHEMA,
   MEETING_PLATFORM_CONNECTOR_RESOLUTION_SCHEMA,
@@ -14,8 +16,11 @@ import {
   buildMeetingPlatformConnectorAcceptanceReport,
   buildMeetingPlatformConnectorHub,
   buildMeetingPlatformConnectorMatrix,
+  createMeetingPlatformConnectorBrowserRuntime,
+  createMeetingPlatformConnectorContentScriptBridge,
   createMeetingPlatformConnectorHub,
   createMeetingPlatformConnectorRuntime,
+  installMeetingPlatformConnectorContentScriptBridge,
   resolveMeetingPlatformConnectorInput,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-platform-connector.mjs';
 import {
@@ -24,6 +29,52 @@ import {
 } from '../packages/meeting-timeline-sdk/index.mjs';
 
 const baseUrl = 'https://timeline.example.com';
+
+function fakeExtensionRuntime() {
+  const listeners = [];
+  return {
+    onMessage: {
+      addListener(listener) {
+        listeners.push(listener);
+      },
+      removeListener(listener) {
+        const index = listeners.indexOf(listener);
+        if (index >= 0) listeners.splice(index, 1);
+      },
+    },
+    listenerCount() {
+      return listeners.length;
+    },
+    emit(message, sender = { tab: { id: 7 } }) {
+      if (listeners.length === 0) return Promise.resolve({ consumed: false });
+      return new Promise((resolve) => {
+        const consumed = listeners[0](message, sender, (response) => resolve({ consumed, response }));
+        if (consumed !== true) resolve({ consumed, response: undefined });
+      });
+    },
+  };
+}
+
+function fakeBrowserWindow(url = 'https://meet.google.com/abc-defg-hij') {
+  const document = {
+    nodeType: 9,
+    title: 'Connector browser runtime',
+    hidden: false,
+    location: { href: url },
+    body: { nodeType: 1 },
+    documentElement: { nodeType: 1 },
+    querySelectorAll() {
+      return [];
+    },
+  };
+  return {
+    document,
+    location: { href: url, origin: new URL(url).origin },
+    navigator: { userAgent: 'Chrome fixture' },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+}
 
 const google = buildMeetingPlatformConnector('google-meet', { baseUrl });
 assert.equal(google.schema, MEETING_PLATFORM_CONNECTOR_SCHEMA);
@@ -268,6 +319,81 @@ const rootHubRuntime = createMeetingPlatformConnectorHubFromRoot({
   fetch: fetchImpl,
 });
 assert.equal(rootHubRuntime.connectorFor('google-meet').platform, 'google_meet');
+
+const browserWindow = fakeBrowserWindow();
+const browserRuntime = createMeetingPlatformConnectorBrowserRuntime({
+  baseUrl,
+  fetch: fetchImpl,
+  window: browserWindow,
+  now: () => 1_782_614_400_000,
+});
+assert.equal(browserRuntime.schema, MEETING_PLATFORM_CONNECTOR_BROWSER_RUNTIME_SCHEMA);
+assert.equal(browserRuntime.resolvePlatform().platform, 'google_meet');
+await browserRuntime.insertAnnotation({
+  id: 'browser-mark-001',
+  label: 'browser why?',
+  captured_at_ms: 1_782_614_430_000,
+});
+assert.equal(calls.at(-1).body.action, 'insert_annotation');
+assert.equal(calls.at(-1).body.platform, 'google_meet');
+assert.equal(calls.at(-1).body.annotation.id, 'browser-mark-001');
+await browserRuntime.observeMeetingApp({ in_meeting: true });
+assert.equal(calls.at(-1).body.action, 'observe_meeting_app');
+assert.equal(calls.at(-1).body.platform, 'google_meet');
+await browserRuntime.observePlatformCandidates({
+  tabs: [{ active: true, url: 'https://zoom.us/j/987654321', title: 'Zoom meeting' }],
+});
+assert.equal(calls.at(-1).body.action, 'observe_platform_candidates');
+assert.equal(calls.at(-1).body.tabs[0].url, 'https://zoom.us/j/987654321');
+
+const connectorBridge = createMeetingPlatformConnectorContentScriptBridge({
+  baseUrl,
+  fetch: fetchImpl,
+  window: browserWindow,
+  now: () => 1_782_614_400_000,
+});
+assert.equal(connectorBridge.schema, MEETING_PLATFORM_CONNECTOR_CONTENT_SCRIPT_BRIDGE_SCHEMA);
+assert.equal(connectorBridge.resolvePlatform().platform, 'google_meet');
+const bridgeResponse = await connectorBridge.dispatchMessage({
+  type: 'meeting_timeline.insert_mark',
+  payload: {
+    mark: {
+      id: 'bridge-mark-001',
+      label: 'bridge why?',
+      captured_at_ms: 1_782_614_431_000,
+    },
+  },
+});
+assert.equal(bridgeResponse.handled, true);
+assert.equal(bridgeResponse.action, 'insertMark');
+assert.equal(calls.at(-1).body.platform, 'google_meet');
+assert.equal(calls.at(-1).body.annotation.id, 'bridge-mark-001');
+
+const extensionRuntime = fakeExtensionRuntime();
+const installedBridge = installMeetingPlatformConnectorContentScriptBridge({
+  baseUrl,
+  fetch: fetchImpl,
+  window: browserWindow,
+  extensionRuntime,
+  startOptions: { startRuntime: false },
+});
+assert.equal(extensionRuntime.listenerCount(), 1);
+const extensionMessage = await extensionRuntime.emit({
+  type: 'meeting_timeline.insert_mark',
+  payload: {
+    mark: {
+      id: 'extension-mark-001',
+      label: 'extension why?',
+      captured_at_ms: 1_782_614_432_000,
+    },
+  },
+});
+assert.equal(extensionMessage.consumed, true);
+assert.equal(extensionMessage.response.handled, true);
+assert.equal(calls.at(-1).body.platform, 'google_meet');
+assert.equal(calls.at(-1).body.annotation.id, 'extension-mark-001');
+installedBridge.dispose();
+assert.equal(extensionRuntime.listenerCount(), 0);
 
 const rootRuntime = createMeetingPlatformConnectorRuntimeFromRoot('teams', {
   baseUrl,

@@ -15,6 +15,8 @@ import type {
 import type {
   MeetingPlatformConnector,
   MeetingPlatformConnectorAcceptanceReport,
+  MeetingPlatformConnectorBrowserRuntime,
+  MeetingPlatformConnectorContentScriptBridge,
   MeetingPlatformConnectorHub,
   MeetingPlatformConnectorHubRuntime,
   MeetingPlatformConnectorMatrix,
@@ -638,6 +640,9 @@ export interface MeetingPlatformTimelineKit {
     connectorOptions?: MeetingPlatformConnectorOptions,
   ): MeetingPlatformConnectorRuntime;
   createPlatformConnectorHub(connectorOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorHubRuntime;
+  createPlatformConnectorBrowserRuntime(connectorOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorBrowserRuntime;
+  createPlatformConnectorContentScriptBridge(connectorOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorContentScriptBridge;
+  installPlatformConnectorContentScriptBridge(connectorOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorContentScriptBridge;
   platformAdapterContract(platform: string, contractOptions?: MeetingPlatformAdapterContractOptions): MeetingPlatformAdapterContract;
   platformAdapterContractMatrix(contractOptions?: MeetingPlatformAdapterContractOptions): MeetingPlatformAdapterContractMatrix;
   platformAdapterContractAcceptance(

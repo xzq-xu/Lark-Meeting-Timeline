@@ -11,6 +11,8 @@ export const MEETING_PLATFORM_CONNECTOR_ACCEPTANCE_SCHEMA: 'meeting_platform_con
 export const MEETING_PLATFORM_CONNECTOR_RUNTIME_SCHEMA: 'meeting_platform_connector_runtime';
 export const MEETING_PLATFORM_CONNECTOR_HUB_SCHEMA: 'meeting_platform_connector_hub';
 export const MEETING_PLATFORM_CONNECTOR_RESOLUTION_SCHEMA: 'meeting_platform_connector_resolution';
+export const MEETING_PLATFORM_CONNECTOR_BROWSER_RUNTIME_SCHEMA: 'meeting_platform_connector_browser_runtime';
+export const MEETING_PLATFORM_CONNECTOR_CONTENT_SCRIPT_BRIDGE_SCHEMA: 'meeting_platform_connector_content_script_bridge';
 export const MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION: 1;
 
 export interface MeetingPlatformConnectorOptions {
@@ -201,6 +203,47 @@ export interface MeetingPlatformConnectorHubRuntime {
   runHandoffReadiness(readinessOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
 }
 
+export interface MeetingPlatformConnectorBrowserRuntime {
+  type: 'meeting_platform_connector_browser_runtime';
+  schema: typeof MEETING_PLATFORM_CONNECTOR_BROWSER_RUNTIME_SCHEMA;
+  schema_version: typeof MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION;
+  hub: MeetingPlatformConnectorHubRuntime;
+  connector_hub: MeetingPlatformConnectorHubRuntime;
+  sources: Record<string, unknown>;
+  browserInput(input?: Record<string, unknown>): Record<string, unknown>;
+  resolvePlatform(input?: Record<string, unknown>, resolveOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorResolution;
+  observePlatformCandidates(input?: Record<string, unknown>, observeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  observeMeetingApp(input?: Record<string, unknown>, observeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  insertAnnotation(input?: Record<string, unknown>, markOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  insertMark(input?: Record<string, unknown>, markOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  insertMarks(inputs?: Record<string, unknown>[], markOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  sample(input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<Record<string, unknown>>;
+  handleMessage(message?: Record<string, unknown>, messageOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
+  start(inputProvider?: unknown, startOptions?: Record<string, unknown>): Record<string, unknown>;
+  stop(): Record<string, unknown>;
+  getState(): Record<string, unknown>;
+  reset(nextState?: Record<string, unknown>): Record<string, unknown>;
+}
+
+export interface MeetingPlatformConnectorContentScriptBridge {
+  type: 'meeting_platform_connector_content_script_bridge';
+  schema: typeof MEETING_PLATFORM_CONNECTOR_CONTENT_SCRIPT_BRIDGE_SCHEMA;
+  schema_version: typeof MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION;
+  runtime: MeetingPlatformConnectorBrowserRuntime | Record<string, unknown>;
+  hub?: MeetingPlatformConnectorHubRuntime;
+  connector_hub?: MeetingPlatformConnectorHubRuntime;
+  resolvePlatform(input?: Record<string, unknown>, resolveOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorResolution | undefined;
+  observePlatformCandidates(input?: Record<string, unknown>, observeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown> | undefined;
+  dispatchMessage(message?: Record<string, unknown>, messageOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
+  start(startOptions?: Record<string, unknown>): Record<string, unknown>;
+  stop(): Record<string, unknown>;
+  dispose(): Record<string, unknown>;
+  installExtensionMessaging(installOptions?: Record<string, unknown>): Record<string, unknown>;
+  installWindowMessaging(installOptions?: Record<string, unknown>): Record<string, unknown>;
+  removeMessaging(kind?: string): Record<string, unknown>;
+  getState(): Record<string, unknown>;
+}
+
 export function buildMeetingPlatformConnector(
   platformOrOptions?: string | MeetingPlatformConnectorOptions,
   options?: MeetingPlatformConnectorOptions,
@@ -237,6 +280,18 @@ export function createMeetingPlatformConnectorRuntime(
 export function createMeetingPlatformConnectorHub(
   options?: MeetingPlatformConnectorOptions,
 ): MeetingPlatformConnectorHubRuntime;
+
+export function createMeetingPlatformConnectorBrowserRuntime(
+  options?: MeetingPlatformConnectorOptions,
+): MeetingPlatformConnectorBrowserRuntime;
+
+export function createMeetingPlatformConnectorContentScriptBridge(
+  options?: MeetingPlatformConnectorOptions,
+): MeetingPlatformConnectorContentScriptBridge;
+
+export function installMeetingPlatformConnectorContentScriptBridge(
+  options?: MeetingPlatformConnectorOptions,
+): MeetingPlatformConnectorContentScriptBridge;
 
 export function buildDefaultMeetingPlatformConnectorMatrix(
   options?: MeetingPlatformConnectorOptions,
