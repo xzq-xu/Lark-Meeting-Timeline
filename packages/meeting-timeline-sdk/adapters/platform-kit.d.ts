@@ -469,8 +469,10 @@ export interface MeetingPlatformTimelineKit {
   assertPlatformAdapterStartupPlan(input?: string | URL | MeetingPlatformAdapterDecisionInput, startupOptions?: MeetingPlatformAdapterStartupPlanOptions): MeetingPlatformAdapterStartupPlan;
   assertPlatformAdapterStartupPlanMatrix(input?: MeetingPlatformAdapterDecisionInput, startupOptions?: MeetingPlatformAdapterStartupPlanOptions): MeetingPlatformAdapterStartupPlanMatrix;
   platformAdapterPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
+  platformAdapterCurrentWindowPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
   platformAdapterPreflightMatrix(input?: MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflightMatrix;
   assertPlatformAdapterPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
+  assertPlatformAdapterCurrentWindowPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
   assertPlatformAdapterPreflightMatrix(input?: MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflightMatrix;
   platformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
   assertPlatformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;

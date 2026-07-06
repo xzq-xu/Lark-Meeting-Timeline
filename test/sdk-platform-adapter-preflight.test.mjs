@@ -4,8 +4,10 @@ import {
   buildMeetingAppFixtureSnapshot,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
 import {
+  assertMeetingPlatformAdapterCurrentWindowPreflight,
   assertMeetingPlatformAdapterPreflight,
   assertMeetingPlatformAdapterPreflightMatrix,
+  buildMeetingPlatformAdapterCurrentWindowPreflight,
   buildMeetingPlatformAdapterPreflight,
   buildMeetingPlatformAdapterPreflightMatrix,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-preflight.mjs';
@@ -17,6 +19,67 @@ import {
 } from '../packages/meeting-timeline-sdk/index.mjs';
 
 const baseUrl = 'https://timeline.example.com';
+
+function node(tagName, attrs = {}, text = '') {
+  return {
+    tagName: tagName.toUpperCase(),
+    attributes: attrs,
+    dataset: Object.fromEntries(Object.entries(attrs)
+      .filter(([key]) => key.startsWith('data-'))
+      .map(([key, value]) => [
+        key.slice(5).replace(/-([a-z])/g, (_, char) => char.toUpperCase()),
+        value,
+      ])),
+    innerText: text,
+    textContent: text,
+    getAttribute(name) {
+      return attrs[name] ?? null;
+    },
+  };
+}
+
+function selectorAttrMatches(item, selector) {
+  if (selector === 'button') return item.tagName === 'BUTTON';
+  if (selector.startsWith('.')) {
+    return String(item.attributes.class ?? '').split(/\s+/).includes(selector.slice(1));
+  }
+  const attrParts = [...String(selector).matchAll(/\[([a-zA-Z0-9_-]+)([*]?=)?(?:"([^"]*)"|'([^']*)'|([^\]\s]+))?(?:\s+i)?\]/g)];
+  if (!attrParts.length) return false;
+  return attrParts.every((match) => {
+    const [, attrName, operator, doubleQuoted, singleQuoted, bare] = match;
+    const actual = item.attributes[attrName];
+    if (operator == null) return actual != null;
+    if (actual == null) return false;
+    const expected = doubleQuoted ?? singleQuoted ?? bare ?? '';
+    if (operator === '*=') return String(actual).toLowerCase().includes(String(expected).toLowerCase());
+    return String(actual) === String(expected);
+  });
+}
+
+function queryNodes(nodes, selector) {
+  const text = String(selector);
+  if (text === '*') return nodes;
+  const generic = nodes.filter((item) => selectorAttrMatches(item, text));
+  if (generic.length) return generic;
+  if (text.includes('speaking')) {
+    return nodes.filter((item) => /speaking|active speaker|正在发言|正在讲话|正在说话/i.test(item.attributes['aria-label'] ?? ''));
+  }
+  if (text.includes('aria-live')) return nodes.filter((item) => item.attributes['aria-live']);
+  if (text.includes('role="status"')) return nodes.filter((item) => item.attributes.role === 'status');
+  return [];
+}
+
+function fakeDocument({ url, title, nodes = [], hidden = false }) {
+  return {
+    nodeType: 9,
+    title,
+    hidden,
+    location: { href: url },
+    querySelectorAll(selector) {
+      return queryNodes(nodes, selector);
+    },
+  };
+}
 
 const googleActive = buildMeetingAppFixtureSnapshot('google-meet', {
   state: 'active',
@@ -69,6 +132,53 @@ assert.equal(assertMeetingPlatformAdapterPreflight({
   requireSpeakerTrack: true,
 }).accepted, true);
 
+const googleCurrentWindow = buildMeetingPlatformAdapterCurrentWindowPreflight({
+  document: fakeDocument({
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Design review - Google Meet',
+    nodes: [
+      node('button', { 'aria-label': 'Turn off microphone' }),
+      node('button', { 'aria-label': 'Leave call' }),
+      node('div', {
+        'data-participant-id': 'ada',
+        'aria-label': 'Ada Lovelace is speaking',
+        'data-audio-level': '0.84',
+      }),
+      node('div', {
+        'data-participant-id': 'grace',
+        'aria-label': 'Grace Hopper, muted',
+      }),
+      node('div', { role: 'status', 'aria-live': 'polite' }, 'You are presenting'),
+    ],
+  }),
+}, {
+  baseUrl,
+  observedAtMs: 1_783_356_020_000,
+  requireSpeakerTrack: true,
+});
+assert.equal(googleCurrentWindow.accepted, true);
+assert.equal(googleCurrentWindow.platform, 'google_meet');
+assert.equal(googleCurrentWindow.current_window.capture_profile, 'google_meet');
+assert.equal(googleCurrentWindow.capture.participant_count, 2);
+assert.equal(googleCurrentWindow.readiness.realtime_annotation_ready, true);
+assert.equal(googleCurrentWindow.captured_snapshot, undefined);
+assert.equal(assertMeetingPlatformAdapterCurrentWindowPreflight({
+  document: fakeDocument({
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Design review - Google Meet',
+    nodes: [
+      node('button', { 'aria-label': 'Leave call' }),
+      node('div', {
+        'data-participant-id': 'ada',
+        'aria-label': 'Ada Lovelace is speaking',
+      }),
+    ],
+  }),
+}, {
+  baseUrl,
+  requireSpeakerTrack: true,
+}).accepted, true);
+
 const googleLifecycle = buildMeetingPlatformAdapterPreflight({
   platform: 'google-meet',
   snapshots: [googleActive, googleEnded],
@@ -101,6 +211,52 @@ assert.equal(matrix.realtime_ready_count, 2);
 assert.equal(matrix.live_evidence_ready_count, 2);
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').status, 'needs_live_page_evidence');
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').realtime_annotation_ready, true);
+const teamsCurrentWindow = buildMeetingPlatformAdapterCurrentWindowPreflight({
+  document: fakeDocument({
+    url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+    title: 'Weekly Sync | Microsoft Teams',
+    nodes: [
+      node('button', { 'aria-label': 'Leave' }),
+      node('button', { 'aria-label': 'Share content' }),
+      node('div', {
+        'data-tid': 'participant-ada',
+        'data-user-id': 'ada',
+        'data-display-name': 'Ada Lovelace',
+        'aria-label': 'Ada Lovelace speaking',
+      }),
+    ],
+  }),
+}, {
+  baseUrl,
+  requireSpeakerTrack: true,
+});
+assert.equal(teamsCurrentWindow.platform, 'microsoft_teams');
+assert.equal(teamsCurrentWindow.accepted, true);
+assert.equal(teamsCurrentWindow.capture.profile, 'microsoft_teams');
+
+const zoomCurrentWindow = buildMeetingPlatformAdapterCurrentWindowPreflight({
+  document: fakeDocument({
+    url: 'https://us06web.zoom.us/wc/987654321/start',
+    title: 'Zoom Meeting',
+    nodes: [
+      node('button', { 'aria-label': 'Leave Meeting' }),
+      node('button', { 'aria-label': 'Participants' }),
+      node('div', {
+        'data-user-id': 'mira',
+        'aria-label': 'Mira Patel is speaking',
+      }),
+    ],
+  }),
+}, {
+  baseUrl,
+  requireSpeakerTrack: true,
+  includeCapturedSnapshot: true,
+});
+assert.equal(zoomCurrentWindow.platform, 'zoom');
+assert.equal(zoomCurrentWindow.accepted, true);
+assert.equal(zoomCurrentWindow.captured_snapshot.capture.profile, 'zoom');
+assert.equal(zoomCurrentWindow.capture.participant_count, 1);
+
 const inputSnapshotMatrix = buildMeetingPlatformAdapterPreflightMatrix({
   snapshots: {
     'google-meet': [googleActive],
@@ -142,6 +298,21 @@ assert.equal(kit.platformAdapterPreflightMatrix({}, {
     'google-meet': [googleActive],
   },
 }).realtime_ready_count, 1);
+assert.equal(kit.platformAdapterCurrentWindowPreflight({
+  document: fakeDocument({
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Kit preflight - Google Meet',
+    nodes: [
+      node('button', { 'aria-label': 'Leave call' }),
+      node('div', {
+        'data-participant-id': 'ada',
+        'aria-label': 'Ada Lovelace is speaking',
+      }),
+    ],
+  }),
+}, {
+  requireSpeakerTrack: true,
+}).accepted, true);
 
 const sdk = createMeetingAppTimelineSdk({
   baseUrl,
@@ -164,6 +335,51 @@ assert.equal(sdk.platformAdapterPreflightMatrix({}, {
 assert.equal(sdk.assertAdapterPreflight({
   platform: 'google-meet',
   snapshots: [googleActive],
+}).accepted, true);
+assert.equal(sdk.platformAdapterCurrentWindowPreflight({
+  document: fakeDocument({
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'SDK preflight - Google Meet',
+    nodes: [
+      node('button', { 'aria-label': 'Leave call' }),
+      node('div', {
+        'data-participant-id': 'ada',
+        'aria-label': 'Ada Lovelace is speaking',
+      }),
+    ],
+  }),
+}, {
+  requireSpeakerTrack: true,
+}).readiness.realtime_annotation_ready, true);
+assert.equal(sdk.adapterCurrentWindowPreflight({
+  document: fakeDocument({
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'SDK alias preflight - Google Meet',
+    nodes: [
+      node('button', { 'aria-label': 'Leave call' }),
+      node('div', {
+        'data-participant-id': 'ada',
+        'aria-label': 'Ada Lovelace is speaking',
+      }),
+    ],
+  }),
+}, {
+  requireSpeakerTrack: true,
+}).accepted, true);
+assert.equal(sdk.assertAdapterCurrentWindowPreflight({
+  document: fakeDocument({
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'SDK assert preflight - Google Meet',
+    nodes: [
+      node('button', { 'aria-label': 'Leave call' }),
+      node('div', {
+        'data-participant-id': 'ada',
+        'aria-label': 'Ada Lovelace is speaking',
+      }),
+    ],
+  }),
+}, {
+  requireSpeakerTrack: true,
 }).accepted, true);
 
 console.log('ok meeting platform adapter preflight');

@@ -1302,6 +1302,12 @@ export function createMeetingAppTimelineSdk(options = {}) {
     adapterPreflight(input = {}, preflightOptions = {}) {
       return sdk.platformAdapterPreflight(input, preflightOptions);
     },
+    platformAdapterCurrentWindowPreflight(input = {}, preflightOptions = {}) {
+      return runtime.kit.platformAdapterCurrentWindowPreflight(input, sdkPlatformOptions(runtime, preflightOptions));
+    },
+    adapterCurrentWindowPreflight(input = {}, preflightOptions = {}) {
+      return sdk.platformAdapterCurrentWindowPreflight(input, preflightOptions);
+    },
     platformAdapterPreflightMatrix(input = {}, preflightOptions = {}) {
       return runtime.kit.platformAdapterPreflightMatrix(input, sdkPlatformOptions(runtime, preflightOptions));
     },
@@ -1313,6 +1319,12 @@ export function createMeetingAppTimelineSdk(options = {}) {
     },
     assertAdapterPreflight(input = {}, preflightOptions = {}) {
       return sdk.assertPlatformAdapterPreflight(input, preflightOptions);
+    },
+    assertPlatformAdapterCurrentWindowPreflight(input = {}, preflightOptions = {}) {
+      return runtime.kit.assertPlatformAdapterCurrentWindowPreflight(input, sdkPlatformOptions(runtime, preflightOptions));
+    },
+    assertAdapterCurrentWindowPreflight(input = {}, preflightOptions = {}) {
+      return sdk.assertPlatformAdapterCurrentWindowPreflight(input, preflightOptions);
     },
     assertPlatformAdapterPreflightMatrix(input = {}, preflightOptions = {}) {
       return runtime.kit.assertPlatformAdapterPreflightMatrix(input, sdkPlatformOptions(runtime, preflightOptions));

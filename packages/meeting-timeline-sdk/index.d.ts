@@ -544,6 +544,11 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
   ): import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflight;
   adapterPreflight: MeetingAppTimelineSdk['platformAdapterPreflight'];
+  platformAdapterCurrentWindowPreflight(
+    input?: import('./adapters/meeting-app-capture.mjs').MeetingAppDomCaptureInput | Document | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
+  ): import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflight;
+  adapterCurrentWindowPreflight: MeetingAppTimelineSdk['platformAdapterCurrentWindowPreflight'];
   platformAdapterPreflightMatrix(
     input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
     options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
@@ -554,6 +559,11 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
   ): import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflight;
   assertAdapterPreflight: MeetingAppTimelineSdk['assertPlatformAdapterPreflight'];
+  assertPlatformAdapterCurrentWindowPreflight(
+    input?: import('./adapters/meeting-app-capture.mjs').MeetingAppDomCaptureInput | Document | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
+  ): import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflight;
+  assertAdapterCurrentWindowPreflight: MeetingAppTimelineSdk['assertPlatformAdapterCurrentWindowPreflight'];
   assertPlatformAdapterPreflightMatrix(
     input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
     options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,

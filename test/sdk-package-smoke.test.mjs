@@ -318,6 +318,7 @@ import {
   buildMeetingPlatformAdapterDecisionMatrix as buildMeetingPlatformAdapterDecisionMatrixFromRoot,
   buildMeetingPlatformAdapterStartupPlan as buildMeetingPlatformAdapterStartupPlanFromRoot,
   buildMeetingPlatformAdapterStartupPlanMatrix as buildMeetingPlatformAdapterStartupPlanMatrixFromRoot,
+  buildMeetingPlatformAdapterCurrentWindowPreflight as buildMeetingPlatformAdapterCurrentWindowPreflightFromRoot,
   buildMeetingPlatformAdapterPreflight as buildMeetingPlatformAdapterPreflightFromRoot,
   buildMeetingPlatformAdapterPreflightMatrix as buildMeetingPlatformAdapterPreflightMatrixFromRoot,
   buildMeetingPlatformAdapterRoute as buildMeetingPlatformAdapterRouteFromRoot,
@@ -408,6 +409,7 @@ import {
   buildMeetingPlatformAdapterStartupPlanMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-startup';
 import {
+  buildMeetingPlatformAdapterCurrentWindowPreflight,
   buildMeetingPlatformAdapterPreflight,
   buildMeetingPlatformAdapterPreflightMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight';
@@ -732,6 +734,52 @@ const rootGoogleActiveSnapshot = buildMeetingAppFixtureSnapshot('google-meet', {
   state: 'active',
   observedAtMs: 1_783_356_000_000,
 });
+function rootSmokeNode(tagName, attrs = {}, text = '') {
+  return {
+    tagName: tagName.toUpperCase(),
+    attributes: attrs,
+    dataset: Object.fromEntries(Object.entries(attrs)
+      .filter(([key]) => key.startsWith('data-'))
+      .map(([key, value]) => [
+        key.slice(5).replace(/-([a-z])/g, (_, char) => char.toUpperCase()),
+        value,
+      ])),
+    innerText: text,
+    textContent: text,
+    getAttribute(name) {
+      return attrs[name] ?? null;
+    },
+  };
+}
+function rootSmokeDocument() {
+  const nodes = [
+    rootSmokeNode('button', { 'aria-label': 'Leave call' }),
+    rootSmokeNode('div', {
+      'data-participant-id': 'ada',
+      'aria-label': 'Ada Lovelace is speaking',
+    }),
+  ];
+  return {
+    nodeType: 9,
+    title: 'Package smoke - Google Meet',
+    hidden: false,
+    location: { href: 'https://meet.google.com/abc-defg-hij' },
+    querySelectorAll(selector) {
+      const text = String(selector);
+      if (text === 'button') return nodes.filter((item) => item.tagName === 'BUTTON');
+      if (text.includes('aria-label') && text.includes('Leave call')) {
+        return nodes.filter((item) => String(item.attributes['aria-label'] ?? '').toLowerCase().includes('leave call'));
+      }
+      if (text.includes('aria-label') && text.includes('speaking')) {
+        return nodes.filter((item) => String(item.attributes['aria-label'] ?? '').toLowerCase().includes('speaking'));
+      }
+      if (text.includes('data-participant-id')) {
+        return nodes.filter((item) => item.attributes['data-participant-id']);
+      }
+      return [];
+    },
+  };
+}
 assert.equal(rootMeetingAppSdk.schema, 'meeting_app_timeline_sdk');
 assert.equal(rootMeetingAppSdk.hostPackage({ surfaces: ['browser-extension'] }).schema, 'meeting_app_runtime_adapter_host_package');
 const rootConnectorPackage = rootMeetingAppSdk.connectorPackage({ surfaces: ['browser-extension'] });
@@ -865,6 +913,16 @@ assert.equal(rootMeetingAppSdk.platformAdapterPreflight({
   url: 'https://meet.google.com/abc-defg-hij',
   snapshots: [rootGoogleActiveSnapshot],
 }).accepted, true);
+assert.equal(rootMeetingAppSdk.platformAdapterCurrentWindowPreflight({
+  document: rootSmokeDocument(),
+}, {
+  requireSpeakerTrack: true,
+}).accepted, true);
+assert.equal(rootMeetingAppSdk.adapterCurrentWindowPreflight({
+  document: rootSmokeDocument(),
+}, {
+  requireSpeakerTrack: true,
+}).readiness.realtime_annotation_ready, true);
 assert.equal(rootMeetingAppSdk.adapterPreflight({
   platform: 'google-meet',
   snapshots: [rootGoogleActiveSnapshot],
@@ -918,6 +976,12 @@ assert.equal(buildMeetingPlatformAdapterPreflightFromRoot({
 }, {
   baseUrl: 'http://localhost:8787',
 }).status, 'ready_for_realtime_annotations');
+assert.equal(buildMeetingPlatformAdapterCurrentWindowPreflightFromRoot({
+  document: rootSmokeDocument(),
+}, {
+  baseUrl: 'http://localhost:8787',
+  requireSpeakerTrack: true,
+}).accepted, true);
 assert.equal(buildMeetingPlatformAdapterPreflightMatrixFromRoot({}, {
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],
@@ -2307,6 +2371,12 @@ assert.equal(buildMeetingPlatformAdapterPreflight({
 }, {
   baseUrl: 'http://localhost:8787',
 }).readiness.realtime_annotation_ready, true);
+assert.equal(buildMeetingPlatformAdapterCurrentWindowPreflight({
+  document: rootSmokeDocument(),
+}, {
+  baseUrl: 'http://localhost:8787',
+  requireSpeakerTrack: true,
+}).capture.profile, 'google_meet');
 assert.equal(buildMeetingPlatformAdapterPreflightMatrix({}, {
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],

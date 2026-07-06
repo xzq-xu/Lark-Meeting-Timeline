@@ -3,6 +3,9 @@ import {
   buildMeetingPlatformAdapterStartupPlan,
 } from './platform-adapter-startup.mjs';
 import {
+  captureMeetingAppDomSnapshot,
+} from './meeting-app-capture.mjs';
+import {
   MEETING_APP_FIXTURE_PLATFORMS,
 } from './meeting-app-fixtures.mjs';
 import {
@@ -108,6 +111,25 @@ function evidenceInput(input = {}) {
     meetingAppRecords: input.meetingAppRecords,
     meeting_app_records: input.meeting_app_records,
   });
+}
+
+function evidenceSnapshotsForPlatform(platform, input = {}) {
+  const snapshots = [];
+  for (const source of [
+    input.snapshots,
+    input.domSnapshots,
+    input.dom_snapshots,
+  ]) {
+    if (Array.isArray(source)) {
+      snapshots.push(...source);
+      continue;
+    }
+    if (!isPlainObject(source)) continue;
+    for (const key of platformAliases(platform)) {
+      if (source[key] != null) snapshots.push(...asArray(source[key]));
+    }
+  }
+  return snapshots;
 }
 
 function preflightIssue(severity, code, message, details = {}) {
@@ -292,6 +314,78 @@ function preflightSummary(startup = {}, diagnosis = {}, readiness = {}) {
   };
 }
 
+function currentWindowCaptureOptions(options = {}) {
+  return compactObject({
+    ...options,
+    ...(options.captureOptions ?? {}),
+    ...(options.capture_options ?? {}),
+    source: firstNonEmpty(
+      options.captureSource,
+      options.capture_source,
+      options.source,
+      'platform_adapter_current_window_preflight',
+    ),
+  });
+}
+
+function currentWindowInput(objectInput = {}, capturedSnapshot = {}, options = {}) {
+  const platform = normalizeMaybePlatform(firstNonEmpty(
+    objectInput.platform,
+    objectInput.provider,
+    options.platform,
+    options.provider,
+    capturedSnapshot.capture?.profile,
+    capturedSnapshot.platform,
+  ));
+  const priorSnapshots = platform ? [
+    ...evidenceSnapshotsForPlatform(platform, objectInput),
+    ...evidenceSnapshotsForPlatform(platform, options),
+  ] : [];
+  return compactObject({
+    platform,
+    url: firstNonEmpty(objectInput.url, objectInput.href, capturedSnapshot.url, capturedSnapshot.page?.url, capturedSnapshot.dom?.url),
+    title: firstNonEmpty(objectInput.title, capturedSnapshot.title, capturedSnapshot.page?.title, capturedSnapshot.dom?.title),
+    snapshots: [
+      ...priorSnapshots,
+      capturedSnapshot,
+    ],
+  });
+}
+
+function capturedSnapshotSummary(capturedSnapshot = {}) {
+  return {
+    source: capturedSnapshot.source,
+    observed_at_ms: capturedSnapshot.observedAtMs ?? capturedSnapshot.observed_at_ms,
+    url: capturedSnapshot.url,
+    title: capturedSnapshot.title,
+    profile: capturedSnapshot.capture?.profile,
+    profile_display_name: capturedSnapshot.capture?.profile_display_name,
+    control_count: capturedSnapshot.capture?.control_count ?? capturedSnapshot.page?.controls?.length ?? 0,
+    participant_count: capturedSnapshot.capture?.participant_count ?? capturedSnapshot.page?.participants?.length ?? 0,
+    text_count: capturedSnapshot.capture?.text_count ?? capturedSnapshot.page?.texts?.length ?? 0,
+    shadow_root_count: capturedSnapshot.capture?.shadow_root_count,
+  };
+}
+
+function withoutEvidenceOptions(options = {}) {
+  const {
+    snapshots,
+    domSnapshots,
+    dom_snapshots,
+    recordSet,
+    record_set,
+    snapshotRecords,
+    snapshot_records,
+    records,
+    meetingAppRecordSet,
+    meeting_app_record_set,
+    meetingAppRecords,
+    meeting_app_records,
+    ...rest
+  } = options;
+  return rest;
+}
+
 export function buildMeetingPlatformAdapterPreflight(input = {}, options = {}) {
   const objectInput = normalizeInput(input);
   const startup = buildMeetingPlatformAdapterStartupPlan(objectInput, options);
@@ -334,6 +428,31 @@ export function buildMeetingPlatformAdapterPreflight(input = {}, options = {}) {
     summary: preflightSummary(startup, diagnosis, readiness),
     issues,
     next_actions: nextActions(startup, diagnosis, readiness, issues),
+  });
+}
+
+export function buildMeetingPlatformAdapterCurrentWindowPreflight(input = {}, options = {}) {
+  const objectInput = normalizeInput(input);
+  const capturedSnapshot = captureMeetingAppDomSnapshot(objectInput, currentWindowCaptureOptions(options));
+  const preflight = buildMeetingPlatformAdapterPreflight(
+    currentWindowInput(objectInput, capturedSnapshot, options),
+    withoutEvidenceOptions(options),
+  );
+  return compactObject({
+    ...preflight,
+    current_window: {
+      captured: true,
+      capture_schema: capturedSnapshot.schema,
+      capture_source: capturedSnapshot.source,
+      capture_profile: capturedSnapshot.capture?.profile,
+      observed_at_ms: capturedSnapshot.observedAtMs ?? capturedSnapshot.observed_at_ms,
+      url: capturedSnapshot.url,
+      title: capturedSnapshot.title,
+    },
+    capture: capturedSnapshotSummary(capturedSnapshot),
+    captured_snapshot: options.includeCapturedSnapshot === true || options.include_captured_snapshot === true
+      ? capturedSnapshot
+      : undefined,
   });
 }
 
@@ -380,6 +499,20 @@ export function buildMeetingPlatformAdapterPreflightMatrix(input = {}, options =
     preflights,
     next_actions: unique(preflights.flatMap((preflight) => preflight.next_actions ?? [])),
   };
+}
+
+export function assertMeetingPlatformAdapterCurrentWindowPreflight(input = {}, options = {}) {
+  const preflight = buildMeetingPlatformAdapterCurrentWindowPreflight(input, options);
+  if (preflight.accepted !== true) {
+    throw new MeetingTimelineSdkError('Meeting platform adapter current-window preflight is not accepted', {
+      platform: preflight.platform,
+      status: preflight.status,
+      issues: preflight.issues,
+      next_actions: preflight.next_actions,
+      preflight,
+    });
+  }
+  return preflight;
 }
 
 export function assertMeetingPlatformAdapterPreflight(input = {}, options = {}) {

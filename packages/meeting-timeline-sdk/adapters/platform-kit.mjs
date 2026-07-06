@@ -186,8 +186,10 @@ import {
   buildMeetingPlatformAdapterStartupPlanMatrix,
 } from './platform-adapter-startup.mjs';
 import {
+  assertMeetingPlatformAdapterCurrentWindowPreflight,
   assertMeetingPlatformAdapterPreflight,
   assertMeetingPlatformAdapterPreflightMatrix,
+  buildMeetingPlatformAdapterCurrentWindowPreflight,
   buildMeetingPlatformAdapterPreflight,
   buildMeetingPlatformAdapterPreflightMatrix,
 } from './platform-adapter-preflight.mjs';
@@ -810,11 +812,17 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     platformAdapterPreflight(input = {}, preflightOptions = {}) {
       return buildMeetingPlatformAdapterPreflight(input, withDefaults(defaults, preflightOptions));
     },
+    platformAdapterCurrentWindowPreflight(input = {}, preflightOptions = {}) {
+      return buildMeetingPlatformAdapterCurrentWindowPreflight(input, withDefaults(defaults, preflightOptions));
+    },
     platformAdapterPreflightMatrix(input = {}, preflightOptions = {}) {
       return buildMeetingPlatformAdapterPreflightMatrix(input, withDefaults(defaults, preflightOptions));
     },
     assertPlatformAdapterPreflight(input = {}, preflightOptions = {}) {
       return assertMeetingPlatformAdapterPreflight(input, withDefaults(defaults, preflightOptions));
+    },
+    assertPlatformAdapterCurrentWindowPreflight(input = {}, preflightOptions = {}) {
+      return assertMeetingPlatformAdapterCurrentWindowPreflight(input, withDefaults(defaults, preflightOptions));
     },
     assertPlatformAdapterPreflightMatrix(input = {}, preflightOptions = {}) {
       return assertMeetingPlatformAdapterPreflightMatrix(input, withDefaults(defaults, preflightOptions));

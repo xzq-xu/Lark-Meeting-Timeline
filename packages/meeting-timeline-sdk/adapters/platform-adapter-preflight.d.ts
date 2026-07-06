@@ -8,6 +8,10 @@ import type {
 import type {
   MeetingAppDomAdaptationDiagnosis,
 } from './meeting-app-profile.mjs';
+import type {
+  MeetingAppDomCaptureInput,
+  MeetingAppDomCaptureSnapshot,
+} from './meeting-app-capture.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_PREFLIGHT_SCHEMA: 'meeting_platform_adapter_preflight';
 export const MEETING_PLATFORM_ADAPTER_PREFLIGHT_MATRIX_SCHEMA: 'meeting_platform_adapter_preflight_matrix';
@@ -22,6 +26,12 @@ export interface MeetingPlatformAdapterPreflightOptions extends MeetingPlatformA
   require_complete_lifecycle?: boolean;
   requireMeetingEnd?: boolean;
   require_meeting_end?: boolean;
+  includeCapturedSnapshot?: boolean;
+  include_captured_snapshot?: boolean;
+  captureOptions?: Record<string, unknown>;
+  capture_options?: Record<string, unknown>;
+  captureSource?: string;
+  capture_source?: string;
   [key: string]: unknown;
 }
 
@@ -53,6 +63,9 @@ export interface MeetingPlatformAdapterPreflight {
   dom_diagnosis?: MeetingAppDomAdaptationDiagnosis | Record<string, unknown>;
   readiness: MeetingPlatformAdapterPreflightReadiness;
   summary?: Record<string, unknown>;
+  current_window?: Record<string, unknown>;
+  capture?: Record<string, unknown>;
+  captured_snapshot?: MeetingAppDomCaptureSnapshot;
   issues?: Array<Record<string, unknown>>;
   next_actions: string[];
 }
@@ -79,10 +92,20 @@ export function buildMeetingPlatformAdapterPreflight(
   options?: MeetingPlatformAdapterPreflightOptions,
 ): MeetingPlatformAdapterPreflight;
 
+export function buildMeetingPlatformAdapterCurrentWindowPreflight(
+  input?: MeetingAppDomCaptureInput | Document | MeetingPlatformAdapterDecisionInput,
+  options?: MeetingPlatformAdapterPreflightOptions,
+): MeetingPlatformAdapterPreflight;
+
 export function buildMeetingPlatformAdapterPreflightMatrix(
   input?: MeetingPlatformAdapterDecisionInput,
   options?: MeetingPlatformAdapterPreflightOptions,
 ): MeetingPlatformAdapterPreflightMatrix;
+
+export function assertMeetingPlatformAdapterCurrentWindowPreflight(
+  input?: MeetingAppDomCaptureInput | Document | MeetingPlatformAdapterDecisionInput,
+  options?: MeetingPlatformAdapterPreflightOptions,
+): MeetingPlatformAdapterPreflight;
 
 export function assertMeetingPlatformAdapterPreflight(
   input?: string | URL | MeetingPlatformAdapterDecisionInput,
