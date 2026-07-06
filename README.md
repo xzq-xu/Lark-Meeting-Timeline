@@ -137,6 +137,8 @@ npm run meeting-app:connector-package
 
 它会写出 `data/meeting-app-connector-package/` 和 `data/meeting-app-connector-package-report.json`，把 host package、handoff matrix、observer plan、scheduler config、runtime event plan 和浏览器扩展 scaffold 合在一起。这个入口也随 SDK 包发布为 `meeting-app-connector-package`，适合下游项目直接生成 Google Meet、Teams、Zoom、Webex、Lark 的浏览器扩展或 native detector 接入材料。
 
+下游接入方可以再用 SDK 子模块 `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package` 对这份包做 CI 验收，检查实时标注必须依赖的 `captured_at_ms`、本地 observer、runtime event endpoint、speaker/participant 轨道和 browser extension scaffold 是否齐全。
+
 如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
 
 ```bash

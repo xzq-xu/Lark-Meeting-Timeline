@@ -107,6 +107,8 @@ assert.equal(packedFiles.includes('adapters/meeting-app-adapter-capability.mjs')
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-capability.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-integration-package.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-connector-package.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-connector-package.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-profile.mjs'), true);
@@ -181,6 +183,7 @@ import {
   MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA as ROOT_MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
   SDK_VERSION,
   buildMeetingAppAdapterIntegrationPackageMatrix as buildMeetingAppAdapterIntegrationPackageMatrixFromRoot,
+  buildMeetingAppTimelineConnectorPackageAcceptanceReport as buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot,
   buildMeetingPlatformIntegrationRuntimeManifest as buildMeetingPlatformIntegrationRuntimeManifestFromRoot,
   createMeetingAppTimelineSdk,
   createMeetingTimelineClient,
@@ -376,6 +379,11 @@ import {
   buildMeetingAppAdapterIntegrationPackageMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-integration-package';
 import {
+  assertMeetingAppTimelineConnectorPackage,
+  buildMeetingAppTimelineConnectorHandoff,
+  buildMeetingAppTimelineConnectorPackageAcceptanceReport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package';
+import {
   assertMeetingAppRuntimeAdapterHandoff,
   buildMeetingAppDomAdaptationDiagnosisMatrix,
   buildMeetingAppRuntimeAdapterHandoffAcceptanceReport,
@@ -481,7 +489,12 @@ const rootMeetingAppSdk = createMeetingAppTimelineSdk({
 });
 assert.equal(rootMeetingAppSdk.schema, 'meeting_app_timeline_sdk');
 assert.equal(rootMeetingAppSdk.hostPackage({ surfaces: ['browser-extension'] }).schema, 'meeting_app_runtime_adapter_host_package');
-assert.equal(rootMeetingAppSdk.connectorPackage({ surfaces: ['browser-extension'] }).schema, 'meeting_app_timeline_connector_package');
+const rootConnectorPackage = rootMeetingAppSdk.connectorPackage({ surfaces: ['browser-extension'] });
+assert.equal(rootConnectorPackage.schema, 'meeting_app_timeline_connector_package');
+assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot(rootConnectorPackage).accepted, true);
+assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReport(rootConnectorPackage).accepted, true);
+assert.equal(buildMeetingAppTimelineConnectorHandoff(rootConnectorPackage).schema, 'meeting_app_timeline_connector_handoff');
+assert.equal(assertMeetingAppTimelineConnectorPackage(rootConnectorPackage), rootConnectorPackage);
 
 const kit = createMeetingPlatformTimelineKit(client, {
   baseUrl: 'http://localhost:8787',

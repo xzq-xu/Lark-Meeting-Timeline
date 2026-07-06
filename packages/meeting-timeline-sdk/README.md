@@ -667,6 +667,24 @@ npx meeting-app-connector-package \
 
 CLI 会输出 `connector-package.json`、`host-package.json`、handoff/acceptance 矩阵、按 surface 拆分的 observer plan / scheduler config、runtime event plan，以及可作为起点的浏览器扩展 scaffold。报告会剥离 scaffold 文件内容，避免 CI 日志和交接摘要过大；实际文件会写在 `extension/` 目录下。
 
+下游项目拿到 connector package 后，不需要自己猜哪些字段是硬约束，可以直接用 `meeting-app-connector-package` 子模块验收和生成交接摘要：
+
+```js
+import {
+  assertMeetingAppTimelineConnectorPackage,
+  buildMeetingAppTimelineConnectorHandoff,
+  buildMeetingAppTimelineConnectorPackageAcceptanceReport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package';
+
+const acceptance = buildMeetingAppTimelineConnectorPackageAcceptanceReport(connectorPackage, {
+  target: 'realtime',
+});
+assertMeetingAppTimelineConnectorPackage(connectorPackage);
+const handoff = buildMeetingAppTimelineConnectorHandoff(connectorPackage);
+```
+
+默认 `target: 'realtime'` 会检查 `captured_at_ms`、provider/transcript 非阻塞、runtime event endpoint、`observe_meeting_app` / `insert_annotation` / speaker / participant 轨道动作、每个 surface 的 observer plan 和 scheduler config，以及浏览器扩展 scaffold。`target: 'production'` 会额外要求真实会议 live snapshot evidence，因此不会把静态包误判成生产可上线。
+
 `platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。CI 里可以用 `assertMeetingAppAdapterIntegrationPackage()`、`assertMeetingAppAdapterIntegrationPackageMatrix()` 或 kit 上的同名方法做 gate；默认 target 是 `pilot`，如果传 `target: 'production'`，则必须补齐真实会议 evidence package、provider start/end reconcile 和 handoff readiness 之后才会通过。
 
 同一层也可以从 CLI 直接导出，默认覆盖 Google Meet、Teams、Zoom、Webex、Lark：
