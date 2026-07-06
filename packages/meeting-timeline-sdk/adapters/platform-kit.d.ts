@@ -202,6 +202,11 @@ import type {
   MeetingPlatformAdapterAcceptanceChecklistOptions,
 } from './platform-adapter-acceptance-checklist.mjs';
 import type {
+  MeetingPlatformAdapterExportPackage,
+  MeetingPlatformAdapterExportPackageMatrix,
+  MeetingPlatformAdapterExportPackageOptions,
+} from './platform-adapter-export-package.mjs';
+import type {
   MeetingPlatformAdapterSample,
   MeetingPlatformAdapterSampleMatrix,
   MeetingPlatformAdapterSampleOptions,
@@ -417,6 +422,8 @@ export interface MeetingPlatformTimelineKit {
   platformAdapterPortfolio(portfolioOptions?: MeetingPlatformAdapterPortfolioOptions): MeetingPlatformAdapterPortfolio;
   platformAdapterAcceptanceChecklist(platform: string, checklistInput?: MeetingPlatformAdapterAcceptanceChecklistOptions, checklistOptions?: MeetingPlatformAdapterAcceptanceChecklistOptions): MeetingPlatformAdapterAcceptanceChecklist;
   platformAdapterAcceptanceChecklistMatrix(checklistInput?: MeetingPlatformAdapterAcceptanceChecklistOptions, checklistOptions?: MeetingPlatformAdapterAcceptanceChecklistOptions): MeetingPlatformAdapterAcceptanceChecklistMatrix;
+  platformAdapterExportPackage(platform: string, exportInput?: MeetingPlatformAdapterExportPackageOptions, exportOptions?: MeetingPlatformAdapterExportPackageOptions): MeetingPlatformAdapterExportPackage;
+  platformAdapterExportPackageMatrix(exportInput?: MeetingPlatformAdapterExportPackageOptions, exportOptions?: MeetingPlatformAdapterExportPackageOptions): MeetingPlatformAdapterExportPackageMatrix;
   platformEvidencePackage(platformOrInput: string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, packageOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackage;
   platformEvidencePackageSummary(packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, summaryOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageSummary;
   platformEvidencePackageBuilder(platform: string, builderOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageBuilder;

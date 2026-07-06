@@ -281,6 +281,10 @@ import {
   buildMeetingPlatformAdapterAcceptanceChecklistMatrix,
 } from './platform-adapter-acceptance-checklist.mjs';
 import {
+  buildMeetingPlatformAdapterExportPackage,
+  buildMeetingPlatformAdapterExportPackageMatrix,
+} from './platform-adapter-export-package.mjs';
+import {
   assertMeetingPlatformAdapterSample,
   assertMeetingPlatformAdapterSampleMatrix,
   buildMeetingPlatformAdapterSamplePlan,
@@ -548,6 +552,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_adapter_authoring_matrix: buildMeetingPlatformAdapterAuthoringMatrix(options),
     platform_adapter_portfolio: buildMeetingPlatformAdapterPortfolio(options),
     platform_adapter_acceptance_checklist_matrix: buildMeetingPlatformAdapterAcceptanceChecklistMatrix(options),
+    platform_adapter_export_package_matrix: buildMeetingPlatformAdapterExportPackageMatrix(options),
     platform_field_capture_matrix: buildMeetingPlatformFieldCaptureMatrix(options),
     platform_field_capture_manifest_matrix: buildMeetingPlatformFieldCaptureManifestMatrix(options),
     platform_field_collector_config_matrix: buildMeetingPlatformFieldCollectorConfigMatrix(options),
@@ -710,6 +715,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdapterAcceptanceChecklistMatrix(checklistInput = {}, checklistOptions = {}) {
       return buildMeetingPlatformAdapterAcceptanceChecklistMatrix(checklistInput, withDefaults(defaults, checklistOptions));
+    },
+    platformAdapterExportPackage(platform, exportInput = {}, exportOptions = {}) {
+      return buildMeetingPlatformAdapterExportPackage(platform, exportInput, withDefaults(defaults, exportOptions));
+    },
+    platformAdapterExportPackageMatrix(exportInput = {}, exportOptions = {}) {
+      return buildMeetingPlatformAdapterExportPackageMatrix(exportInput, withDefaults(defaults, exportOptions));
     },
     platformEvidencePackage(platformOrInput, input = {}, packageOptions = {}) {
       if (platformOrInput && typeof platformOrInput === 'object' && !Array.isArray(platformOrInput)) {

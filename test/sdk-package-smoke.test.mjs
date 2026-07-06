@@ -29,8 +29,10 @@ assert.equal(packedFiles.includes('index.mjs'), true);
 assert.equal(packedFiles.includes('index.d.ts'), true);
 assert.equal(packedFiles.includes('bin/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-app-connector-package.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-platform-adapter-export-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-connector-package.mjs'), true);
+assert.equal(packedFiles.includes('cli/meeting-platform-adapter-export-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-integration-runtime.mjs'), true);
@@ -51,6 +53,8 @@ assert.equal(packedFiles.includes('adapters/platform-adapter-portfolio.mjs'), tr
 assert.equal(packedFiles.includes('adapters/platform-adapter-portfolio.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-acceptance-checklist.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-acceptance-checklist.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-export-package.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-export-package.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
@@ -187,6 +191,22 @@ assert.equal(connectorBinReport.platform_count, 1);
 assert.deepEqual(connectorBinReport.surfaces, ['browser_extension']);
 assert.equal(connectorBinReport.package.schema, 'meeting_app_timeline_connector_package');
 
+const { stdout: adapterExportBinStdout } = await execFileAsync(
+  join(consumerDir, 'node_modules', '.bin', 'meeting-platform-adapter-export-package'),
+  [
+    '--platforms=google-meet',
+    '--target=static',
+    '--json=true',
+  ],
+  {
+    cwd: consumerDir,
+  },
+);
+const adapterExportBinReport = JSON.parse(adapterExportBinStdout);
+assert.equal(adapterExportBinReport.type, 'meeting_platform_adapter_export_package_report');
+assert.equal(adapterExportBinReport.platform_count, 1);
+assert.equal(adapterExportBinReport.export_ready_count, 1);
+
 await writeFile(join(consumerDir, 'smoke.mjs'), `
 import assert from 'node:assert/strict';
 import {
@@ -198,6 +218,7 @@ import {
   buildMeetingPlatformAdaptationStrategy as buildMeetingPlatformAdaptationStrategyFromRoot,
   buildMeetingPlatformAdapterAuthoringPlan as buildMeetingPlatformAdapterAuthoringPlanFromRoot,
   buildMeetingPlatformAdapterAcceptanceChecklist as buildMeetingPlatformAdapterAcceptanceChecklistFromRoot,
+  buildMeetingPlatformAdapterExportPackage as buildMeetingPlatformAdapterExportPackageFromRoot,
   buildMeetingPlatformAdapterPortfolio as buildMeetingPlatformAdapterPortfolioFromRoot,
   buildMeetingPlatformAdapterRoute as buildMeetingPlatformAdapterRouteFromRoot,
   buildMeetingPlatformConsumerHandoff as buildMeetingPlatformConsumerHandoffFromRoot,
@@ -365,6 +386,10 @@ import {
   buildMeetingPlatformAdapterAcceptanceChecklist,
   buildMeetingPlatformAdapterAcceptanceChecklistMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-acceptance-checklist';
+import {
+  buildMeetingPlatformAdapterExportPackage,
+  buildMeetingPlatformAdapterExportPackageMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-export-package';
 import {
   assertMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
@@ -559,6 +584,8 @@ assert.equal(rootMeetingAppSdk.platformAdapterPortfolioItem('google-meet').p1_pr
 assert.equal(rootMeetingAppSdk.adapterPortfolio({ platforms: ['google-meet', 'Acme Rooms'] }).external_authoring_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterAcceptanceChecklist('google-meet', {}, { target: 'static' }).accepted, true);
 assert.equal(rootMeetingAppSdk.adapterAcceptanceChecklistMatrix({ platforms: ['google-meet'] }, { target: 'static' }).accepted_count, 1);
+assert.equal(rootMeetingAppSdk.platformAdapterExportPackage('google-meet', {}, { target: 'static' }).export_ready, true);
+assert.equal(rootMeetingAppSdk.adapterExportPackageMatrix({ platforms: ['google-meet'] }, { target: 'static' }).export_ready_count, 1);
 assert.equal(rootMeetingAppSdk.platformRuntimeBundle('google-meet').runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
 assert.equal(rootMeetingAppSdk.runtimeBundleMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterRoute('google-meet').platform, 'google_meet');
@@ -854,6 +881,8 @@ assert.equal(kit.platformAdapterPortfolioItem('zoom').p1_provider_reconcile.path
 assert.equal(kit.platformAdapterPortfolio({ platforms: ['zoom'] }).pilot_ready_count, 1);
 assert.equal(kit.platformAdapterAcceptanceChecklist('zoom', {}, { target: 'static' }).accepted, true);
 assert.equal(kit.platformAdapterAcceptanceChecklistMatrix({ platforms: ['zoom'] }, { target: 'static' }).accepted_count, 1);
+assert.equal(kit.platformAdapterExportPackage('zoom', {}, { target: 'static' }).host_files.some((file) => file.source === 'runtime_bundle'), true);
+assert.equal(kit.platformAdapterExportPackageMatrix({ platforms: ['zoom'] }, { target: 'static' }).export_ready_count, 1);
 assert.equal(kit.platformLiveAdapterHandoff('zoom').sdk.factory, 'createMeetingPlatformLiveAdapter');
 assert.equal(kit.platformLiveAdapterHandoffBundle({
   platforms: ['zoom'],
@@ -1743,6 +1772,20 @@ assert.equal(buildMeetingPlatformAdapterAcceptanceChecklistFromRoot('google-meet
   baseUrl: 'http://localhost:8787',
   target: 'static',
 }).accepted, true);
+assert.equal(buildMeetingPlatformAdapterExportPackage('google-meet', {}, {
+  baseUrl: 'http://localhost:8787',
+  target: 'static',
+}).artifact_refs.runtime_bundle.path, 'google_meet/runtime-bundle.json');
+assert.equal(buildMeetingPlatformAdapterExportPackageMatrix({
+  platforms: ['google-meet'],
+}, {
+  baseUrl: 'http://localhost:8787',
+  target: 'static',
+}).export_ready_count, 1);
+assert.equal(buildMeetingPlatformAdapterExportPackageFromRoot('google-meet', {}, {
+  baseUrl: 'http://localhost:8787',
+  target: 'static',
+}).surface_entrypoints.provider_reconcile.blocks_realtime_annotation, false);
 assert.equal(buildMeetingPlatformAdapterContract('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).annotations.endpoints.runtimeEvents, 'http://localhost:8787/api/meeting-platform/runtime-events');
