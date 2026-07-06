@@ -177,7 +177,7 @@ npm run meeting-platform:handoff-readiness
 
 报告里的 `runtime_host_replay_ready_count` 必须等于 `platform_count`，每行的 `runtime_host_replay_accepted=true` 才代表该平台可以作为可复用 SDK 接入单元交付。
 
-如果接入方直接使用 `platform-integration-runtime`，等价的 SDK 总入口是 `runMeetingPlatformIntegrationRuntimeManifest({ requireHandoffReady: true, ...evidenceByPlatform })` 或 runtime 实例的 `runManifest()`。如果接入方用 `platform-host-integration` 生成 host scaffold，则使用生成出的 `host.runIntegrationRuntimeManifest()`、`host.runHandoffReadiness()`、`npm run meeting-platform:integration-runtime-run-manifest` 和 `npm run meeting-platform:handoff-readiness`。这些入口会把静态 runtime wiring、adapter route、speaker/participant 位置轨、handoff readiness 和 runtime replay 合成一个 `host_integration_ready` 结论。
+如果接入方直接使用 `platform-integration-runtime`，等价的 SDK 总入口是 `runMeetingPlatformIntegrationRuntimeManifest({ requireHandoffReady: true, ...evidenceByPlatform })` 或 runtime 实例的 `runManifest()`。如果接入方用 `platform-host-integration` 生成 host scaffold，则使用生成出的 `host.runIntegrationRuntimeManifest()`、`host.runHandoffReadiness()`、`npm run meeting-platform:integration-runtime-run-manifest` 和 `npm run meeting-platform:handoff-readiness`。这些入口会把静态 runtime wiring、adapter route、speaker/participant 位置轨、handoff readiness 和 runtime replay 合成一个 `host_integration_ready` 结论。`platform-consumer-handoff` 现在也会输出 `lightweight_connector_handoff`，把 `createMeetingPlatformConnectorHub()`、`createMeetingPlatformConnectorBrowserRuntime()` 和 `installMeetingPlatformConnectorContentScriptBridge()` 作为轻量接入路径列给下游项目；只需要 content script/WebView preload 发 `meeting_timeline.*` 消息时，不必先接完整 integration runtime。
 
 SDK 包级交付前再跑一次 package smoke：
 

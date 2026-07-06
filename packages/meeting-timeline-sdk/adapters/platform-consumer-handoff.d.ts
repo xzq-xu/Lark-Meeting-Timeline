@@ -81,6 +81,8 @@ export interface MeetingPlatformConsumerHandoff {
   consumer_ready_count: number;
   conformance_accepted_count: number;
   runtime_ready_count: number;
+  lightweight_connector_ready: boolean;
+  lightweight_connector_platform_count: number;
   adapter_route_ready_count: number;
   candidate_observer_count: number;
   speaker_track_ready_count: number;
@@ -95,6 +97,7 @@ export interface MeetingPlatformConsumerHandoff {
   platforms: string[];
   entrypoints: MeetingPlatformConsumerHandoffEntrypoints;
   hard_contracts: Record<string, unknown>;
+  lightweight_connector_handoff: Record<string, unknown>;
   boot_order: Array<Record<string, unknown>>;
   endpoints: Record<string, string>;
   commands: Record<string, string>;

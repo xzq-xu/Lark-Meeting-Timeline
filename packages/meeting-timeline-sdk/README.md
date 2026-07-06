@@ -760,6 +760,8 @@ installMeetingPlatformConnectorContentScriptBridge({
 
 `platform-kit` 也暴露同一入口：`kit.platformConnector('google-meet')`、`kit.platformConnectorMatrix()`、`kit.platformConnectorHub()`、`kit.resolvePlatformConnector(input)`、`kit.platformConnectorAcceptance(connector)`、`kit.createPlatformConnectorRuntime(connector, { fetch })`、`kit.createPlatformConnectorHub({ fetch })`、`kit.createPlatformConnectorBrowserRuntime({ fetch })` 和 `kit.createPlatformConnectorContentScriptBridge({ fetch })`。这适合宿主项目已经统一使用 `createMeetingPlatformTimelineKit()`，但仍希望按平台懒加载 Google Meet / Teams / Zoom / Webex / Lark connector runtime，或者直接把当前浏览器/会议窗口状态交给 SDK 自动分发。
 
+交付给其他项目时，`platform-consumer-handoff` 会把这条轻量路径写进 `lightweight_connector_handoff`：包括 `meeting-platform-connector` 模块名、hub/browser runtime/content-script bridge factory、`meeting_timeline.insert_mark` / `meeting_timeline.sample` / `meeting_timeline.sample_tracks` 消息类型、host runtime event endpoint 和 `captured_at_ms` 契约。这样接入方可以明确选择两条路线：完整 `platform-integration-runtime` 用于 host 级编排，或轻量 connector bridge 用于浏览器扩展、Electron WebView preload、移动端 WebView 的页面侧事件投递。
+
 `platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。CI 里可以用 `assertMeetingAppAdapterIntegrationPackage()`、`assertMeetingAppAdapterIntegrationPackageMatrix()` 或 kit 上的同名方法做 gate；默认 target 是 `pilot`，如果传 `target: 'production'`，则必须补齐真实会议 evidence package、provider start/end reconcile 和 handoff readiness 之后才会通过。
 
 同一层也可以从 CLI 直接导出，默认覆盖 Google Meet、Teams、Zoom、Webex、Lark：

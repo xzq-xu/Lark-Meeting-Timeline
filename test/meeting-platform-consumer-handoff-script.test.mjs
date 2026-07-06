@@ -30,11 +30,16 @@ assert.equal(report.schema, 'meeting_platform_consumer_handoff');
 assert.equal(report.accepted, true);
 assert.equal(report.platform_count, 3);
 assert.equal(report.consumer_ready_count, 3);
+assert.equal(report.lightweight_connector_ready, true);
+assert.equal(report.lightweight_connector_platform_count, 3);
 assert.equal(report.candidate_observer_count, 3);
 assert.equal(report.speaker_track_ready_count, 3);
 assert.equal(report.participant_track_ready_count, 3);
 assert.equal(report.production_ready_count, 0);
 assert.equal(report.entrypoints.primary_modules.consumer_handoff, '@ai-annotation/meeting-timeline-sdk/adapters/platform-consumer-handoff');
+assert.equal(report.entrypoints.primary_modules.meeting_platform_connector, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector');
+assert.equal(report.lightweight_connector_handoff.content_script_bridge.message_types.includes('meeting_timeline.insert_mark'), true);
+assert.equal(report.lightweight_connector_handoff.host_requirements.timestamp_field, 'captured_at_ms');
 assert.equal(report.rows.find((row) => row.platform === 'microsoft_teams').consumer_ready, true);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');
 

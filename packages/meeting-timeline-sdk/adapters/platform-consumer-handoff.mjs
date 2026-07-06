@@ -14,6 +14,9 @@ import {
 import {
   buildMeetingPlatformHostIntegrationPlan,
 } from './platform-host-integration.mjs';
+import {
+  buildMeetingPlatformConnectorHub,
+} from './meeting-platform-connector.mjs';
 
 export const MEETING_PLATFORM_CONSUMER_HANDOFF_SCHEMA = 'meeting_platform_consumer_handoff';
 export const MEETING_PLATFORM_CONSUMER_HANDOFF_SCHEMA_VERSION = 1;
@@ -109,20 +112,28 @@ function buildBootOrder(hostPlan = {}, commands = {}) {
     },
     {
       step: 3,
+      action: 'choose_lightweight_connector_or_full_integration_runtime',
+      lightweight_entrypoint: 'createMeetingPlatformConnectorHub',
+      content_script_bridge: 'installMeetingPlatformConnectorContentScriptBridge',
+      when_to_use: 'browser_extension_or_webview_only_needs_runtime_events',
+      full_runtime_entrypoint: 'createMeetingPlatformIntegrationRuntime',
+    },
+    {
+      step: 4,
       action: 'wire_local_observer_candidate_binding',
       endpoint: hostPlan.endpoints?.platform_candidate_observation,
       runtime_event_action: 'observe_platform_candidates',
       required_before: 'insert_realtime_annotation',
     },
     {
-      step: 4,
+      step: 5,
       action: 'insert_realtime_annotations_by_capture_time',
       endpoint: hostPlan.endpoints?.annotations,
       runtime_event_endpoint: hostPlan.endpoints?.runtime_events,
       required_field: 'captured_at_ms',
     },
     {
-      step: 5,
+      step: 6,
       action: 'emit_speaker_and_participant_positions',
       endpoints: [
         hostPlan.endpoints?.runtime_events,
@@ -130,13 +141,13 @@ function buildBootOrder(hostPlan = {}, commands = {}) {
       source_priority: ['local_observer_samples', 'provider_reconcile', 'post_meeting_artifacts'],
     },
     {
-      step: 6,
+      step: 7,
       action: 'connect_provider_events_as_reconcile_backfill',
       endpoint: hostPlan.endpoints?.platform_events,
       blocks_realtime_annotation: false,
     },
     {
-      step: 7,
+      step: 8,
       action: 'collect_real_evidence_and_run_handoff_readiness',
       command: commands.handoff_readiness,
       required_for: ['pilot', 'production'],
@@ -155,6 +166,7 @@ function buildEntrypoints(hostPlan = {}, options = {}) {
       app_adapter_spec: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-spec',
       app_adapter_runtime_config: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-runtime-config',
       consumer_handoff: '@ai-annotation/meeting-timeline-sdk/adapters/platform-consumer-handoff',
+      meeting_platform_connector: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector',
       conformance: hostPlan.sdk?.platform_conformance_module,
       runtime_event: hostPlan.sdk?.runtime_event_module,
       live_adapter: hostPlan.sdk?.live_adapter_module,
@@ -174,6 +186,15 @@ function buildEntrypoints(hostPlan = {}, options = {}) {
       'platformAdapterRouteMatrix',
       'platformRuntimeEventPlanMatrix',
       'platformHandoffReadinessMatrix',
+      'platformConnector',
+      'platformConnectorMatrix',
+      'platformConnectorHub',
+      'resolvePlatformConnector',
+      'createPlatformConnectorRuntime',
+      'createPlatformConnectorHub',
+      'createPlatformConnectorBrowserRuntime',
+      'createPlatformConnectorContentScriptBridge',
+      'installPlatformConnectorContentScriptBridge',
     ],
     host_methods: [
       'platformConformance',
@@ -190,6 +211,76 @@ function buildEntrypoints(hostPlan = {}, options = {}) {
   };
 }
 
+function buildLightweightConnectorHandoff(connectorHub = {}, hostPlan = {}) {
+  return compactObject({
+    type: 'meeting_platform_lightweight_connector_handoff',
+    accepted: connectorHub.accepted === true,
+    platform_count: connectorHub.platform_count,
+    accepted_count: connectorHub.accepted_count,
+    realtime_ready_count: connectorHub.realtime_ready_count,
+    candidate_observer_count: connectorHub.candidate_observer_count,
+    platforms: connectorHub.platforms,
+    runtime_event_endpoint: connectorHub.runtime_event_endpoint,
+    module: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector',
+    factories: {
+      build_connector: 'buildMeetingPlatformConnector',
+      create_runtime: 'createMeetingPlatformConnectorRuntime',
+      build_hub: 'buildMeetingPlatformConnectorHub',
+      create_hub: 'createMeetingPlatformConnectorHub',
+      create_browser_runtime: 'createMeetingPlatformConnectorBrowserRuntime',
+      create_content_script_bridge: 'createMeetingPlatformConnectorContentScriptBridge',
+      install_content_script_bridge: 'installMeetingPlatformConnectorContentScriptBridge',
+    },
+    kit_methods: [
+      'platformConnector',
+      'platformConnectorMatrix',
+      'platformConnectorHub',
+      'resolvePlatformConnector',
+      'createPlatformConnectorRuntime',
+      'createPlatformConnectorHub',
+      'createPlatformConnectorBrowserRuntime',
+      'createPlatformConnectorContentScriptBridge',
+      'installPlatformConnectorContentScriptBridge',
+    ],
+    content_script_bridge: {
+      supported_surfaces: ['browser_extension_content_script', 'electron_webview_preload', 'mobile_webview'],
+      route_source_priority: [
+        'explicit platform/provider',
+        'current location.href',
+        'message payload url',
+        'tab/window candidate url',
+      ],
+      message_types: [
+        'meeting_timeline.insert_mark',
+        'meeting_timeline.insert_marks',
+        'meeting_timeline.sample',
+        'meeting_timeline.sample_tracks',
+        'meeting_timeline.provider_event',
+        'meeting_timeline.observe_candidates',
+      ],
+      output_runtime_actions: [
+        'insert_annotation',
+        'observe_meeting_app',
+        'observe_platform_candidates',
+        'provider_event',
+        'speaker_track',
+        'participant_track',
+      ],
+    },
+    host_requirements: {
+      fetch_required_in_browser_context: true,
+      runtime_event_endpoint: hostPlan.endpoints?.runtime_events ?? connectorHub.runtime_event_endpoint,
+      annotation_endpoint: hostPlan.endpoints?.annotations,
+      candidate_observation_endpoint: hostPlan.endpoints?.platform_candidate_observation,
+      timestamp_field: 'captured_at_ms',
+      provider_events_block_realtime: false,
+      transcript_blocks_realtime: false,
+    },
+    readiness: connectorHub.readiness,
+    issues: connectorHub.issues,
+  });
+}
+
 function buildContracts(hostPlan = {}) {
   return {
     timestamp_field: 'captured_at_ms',
@@ -202,6 +293,13 @@ function buildContracts(hostPlan = {}) {
     speaker_track_required_for_realtime_timeline: true,
     participant_track_required_for_realtime_timeline: true,
     meeting_end_must_close_current_axis: true,
+    lightweight_connector_bridge_supported: true,
+    connector_bridge_message_types: [
+      'meeting_timeline.insert_mark',
+      'meeting_timeline.sample',
+      'meeting_timeline.sample_tracks',
+      'meeting_timeline.provider_event',
+    ],
     host_runtime_contract: hostPlan.runtime_contract,
   };
 }
@@ -338,6 +436,7 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
     platforms,
   };
   const hostPlan = buildMeetingPlatformHostIntegrationPlan(sharedOptions);
+  const connectorHub = buildMeetingPlatformConnectorHub(sharedOptions);
   const conformanceReport = buildMeetingPlatformConformanceReport(sharedOptions);
   const adaptationPackageMatrix = buildMeetingPlatformAdaptationPackageMatrix(sharedOptions);
   const handoffReadinessMatrix = firstNonEmpty(
@@ -380,6 +479,11 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
       : issue('error', 'platform_conformance_report_not_accepted', 'Static platform conformance must pass for consumer handoff.', {
         blocking_count: conformanceReport.blocking_count,
       }),
+    connectorHub.accepted === true
+      ? undefined
+      : issue('error', 'lightweight_connector_handoff_not_ready', 'Lightweight connector hub must be ready for browser/WebView consumer handoff.', {
+        blocking_count: connectorHub.blocking_count,
+      }),
   ].filter(Boolean);
   const issues = [...structuralIssues, ...rowIssues];
   const blocking = issues.filter((item) => item.severity === 'error');
@@ -395,6 +499,8 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
     consumer_ready_count: rows.filter((row) => row.consumer_ready === true).length,
     conformance_accepted_count: rows.filter((row) => row.conformance_accepted === true).length,
     runtime_ready_count: rows.filter((row) => row.runtime_ready === true).length,
+    lightweight_connector_ready: connectorHub.accepted === true,
+    lightweight_connector_platform_count: connectorHub.platform_count,
     adapter_route_ready_count: rows.filter((row) => row.adapter_route_ready === true).length,
     candidate_observer_count: rows.filter((row) => row.candidate_observation_ready === true).length,
     speaker_track_ready_count: rows.filter((row) => row.speaker_track_ready === true).length,
@@ -409,6 +515,7 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
     platforms,
     entrypoints: buildEntrypoints(hostPlan, sharedOptions),
     hard_contracts: buildContracts(hostPlan),
+    lightweight_connector_handoff: buildLightweightConnectorHandoff(connectorHub, hostPlan),
     boot_order: buildBootOrder(hostPlan, commands),
     endpoints: hostPlan.endpoints,
     commands,
