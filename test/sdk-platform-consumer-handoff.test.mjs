@@ -66,6 +66,18 @@ assert.equal(handoff.sdk_facade_handoff.surface_wiring.provider_adapter.realtime
 assert.equal(handoff.sdk_facade_handoff.timestamp_field, 'captured_at_ms');
 assert.equal(handoff.sdk_facade_handoff.platform_rows.find((row) => row.platform === 'google_meet').provider_path, 'google_workspace_events_pubsub');
 assert.equal(handoff.sdk_facade_handoff.platform_rows.find((row) => row.platform === 'google_meet').facade_methods.runtime_bundle, "sdk.platformRuntimeBundle('google_meet')");
+assert.equal(handoff.surface_coverage_matrix.schema, 'meeting_platform_surface_coverage_matrix');
+assert.equal(handoff.surface_coverage_matrix.platform_count, 5);
+assert.equal(handoff.surface_coverage_matrix.browser_extension_ready_count, 5);
+assert.equal(handoff.surface_coverage_matrix.webview_preload_ready_count, 5);
+assert.equal(handoff.surface_coverage_matrix.native_detector_ready_count, 5);
+assert.equal(handoff.surface_coverage_matrix.provider_reconcile_ready_count, 5);
+assert.equal(handoff.surface_coverage_matrix.post_meeting_backfill_supported_count, 5);
+assert.equal(handoff.surface_coverage_matrix.lightweight_connector_ready_count, 5);
+assert.equal(handoff.surface_coverage_matrix.rows.find((row) => row.platform === 'google_meet').browser_extension.message_type, 'meeting_timeline.observe_candidates');
+assert.equal(handoff.surface_coverage_matrix.rows.find((row) => row.platform === 'google_meet').provider_reconcile.provider_path, 'google_workspace_events_pubsub');
+assert.equal(handoff.surface_coverage_matrix.rows.find((row) => row.platform === 'microsoft_teams').provider_reconcile.provider_path, 'microsoft_graph_change_notifications');
+assert.equal(handoff.surface_coverage_matrix.rows.find((row) => row.platform === 'zoom').post_meeting_backfill.supported, true);
 assert.equal(handoff.boot_order[0].action, 'run_static_consumer_handoff');
 assert.equal(handoff.boot_order.some((step) => step.action === 'choose_lightweight_connector_or_full_integration_runtime'), true);
 assert.equal(handoff.rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');

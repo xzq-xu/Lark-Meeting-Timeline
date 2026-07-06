@@ -432,6 +432,95 @@ function buildSdkFacadeHandoff(platforms = [], inputs = {}) {
   });
 }
 
+function buildSurfaceCoverageMatrix(platforms = [], inputs = {}) {
+  const {
+    adaptationRows = {},
+    runtimeRows = {},
+    routeRows = {},
+    handoffRows = {},
+  } = inputs;
+  const rows = platforms.map((platform) => {
+    const adaptation = adaptationRows[platform] ?? {};
+    const runtime = runtimeRows[platform] ?? {};
+    const route = routeRows[platform] ?? {};
+    const handoff = handoffRows[platform] ?? {};
+    const browserReady = (runtime.browser_match_count ?? adaptation.browser_match_count ?? 0) > 0
+      && (runtime.candidate_observation_ready === true || adaptation.candidate_observation_ready === true);
+    const webviewReady = browserReady && runtime.lightweight_connector_ready === true;
+    const nativeDetectorReady = (route.route_ready === true || route.adapter_route_ready === true || handoff.pilot_ready === true)
+      && runtime.provider_required_for_realtime !== true
+      && runtime.transcript_blocks_realtime !== true;
+    const providerReady = Boolean(adaptation.provider_transport ?? runtime.provider_transport)
+      && runtime.provider_required_for_realtime !== true;
+    const backfillSupported = adaptation.post_meeting_backfill_supported === true
+      || runtime.transcript_blocks_realtime === false;
+    return {
+      platform,
+      display_name: adaptation.display_name ?? runtime.display_name ?? handoff.display_name,
+      browser_extension: {
+        ready: browserReady,
+        browser_match_count: runtime.browser_match_count ?? adaptation.browser_match_count ?? 0,
+        candidate_observation_ready: runtime.candidate_observation_ready === true || adaptation.candidate_observation_ready === true,
+        message_type: runtime.candidate_observer_message_type ?? adaptation.candidate_observer_message_type,
+        permission: runtime.candidate_observer_permission ?? adaptation.candidate_observer_permission,
+        install_method: 'sdk.platformRuntimeBundle(platform).runtime.lightweight_connector_bridge',
+      },
+      webview_preload: {
+        ready: webviewReady,
+        window_messaging_supported: true,
+        install_method: 'sdk.platformRuntimeBundle(platform).runtime.lightweight_connector_bridge.options with windowMessaging=true',
+      },
+      native_detector: {
+        ready: nativeDetectorReady,
+        first_call: 'sdk.observePlatformCandidates({ windows, processes, activeWindow })',
+        adapter_first_route: route.first_route ?? runtime.adapter_first_route,
+        timestamp_field: 'captured_at_ms',
+      },
+      provider_reconcile: {
+        ready: providerReady,
+        transport: adaptation.provider_transport ?? runtime.provider_transport,
+        provider_path: adaptation.provider_path,
+        realtime_blocking: false,
+        required_for_realtime: runtime.provider_required_for_realtime === true,
+        permission_risk: adaptation.provider_permission_risk,
+      },
+      post_meeting_backfill: {
+        supported: backfillSupported,
+        transcript_blocks_realtime: runtime.transcript_blocks_realtime === true,
+        source: 'transcript_or_recording_artifact_after_meeting_end',
+      },
+      lightweight_connector: {
+        ready: runtime.lightweight_connector_ready === true,
+        install_function: runtime.lightweight_connector_install_function,
+      },
+      speaker_track: {
+        ready: handoff.speaker_track_ready === true || runtime.observer_scheduler_ready === true,
+        min_stable_ms: handoff.speaker_min_stable_ms ?? runtime.speaker_min_stable_ms,
+      },
+      participant_track: {
+        ready: handoff.participant_track_ready === true || runtime.observer_scheduler_ready === true,
+        duplicate_window_ms: handoff.participant_duplicate_window_ms,
+      },
+    };
+  });
+  return {
+    type: 'meeting_platform_surface_coverage_matrix',
+    schema: 'meeting_platform_surface_coverage_matrix',
+    schema_version: 1,
+    platform_count: rows.length,
+    browser_extension_ready_count: rows.filter((row) => row.browser_extension.ready).length,
+    webview_preload_ready_count: rows.filter((row) => row.webview_preload.ready).length,
+    native_detector_ready_count: rows.filter((row) => row.native_detector.ready).length,
+    provider_reconcile_ready_count: rows.filter((row) => row.provider_reconcile.ready).length,
+    post_meeting_backfill_supported_count: rows.filter((row) => row.post_meeting_backfill.supported).length,
+    lightweight_connector_ready_count: rows.filter((row) => row.lightweight_connector.ready).length,
+    speaker_track_ready_count: rows.filter((row) => row.speaker_track.ready).length,
+    participant_track_ready_count: rows.filter((row) => row.participant_track.ready).length,
+    platforms,
+    rows,
+  };
+}
+
 function hostPlanSummary(hostPlan = {}) {
   return compactObject({
     type: hostPlan.type,
@@ -591,6 +680,12 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
     requireProductionReady,
   }));
   const rowIssues = rows.flatMap((row) => row.issues ?? []);
+  const surfaceCoverageMatrix = buildSurfaceCoverageMatrix(platforms, {
+    adaptationRows,
+    runtimeRows,
+    routeRows,
+    handoffRows,
+  });
   const structuralIssues = [
     hostPlan.candidate_observation_contract?.all_ready === true
       ? undefined
@@ -652,6 +747,7 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
       routeRows,
       connectorHub,
     }),
+    surface_coverage_matrix: surfaceCoverageMatrix,
     boot_order: buildBootOrder(hostPlan, commands),
     endpoints: hostPlan.endpoints,
     commands,

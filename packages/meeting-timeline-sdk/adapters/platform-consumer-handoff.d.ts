@@ -86,6 +86,34 @@ export interface MeetingPlatformSdkFacadeHandoff {
   platform_rows: Array<Record<string, unknown>>;
 }
 
+export interface MeetingPlatformSurfaceCoverageMatrix {
+  type: 'meeting_platform_surface_coverage_matrix';
+  schema: 'meeting_platform_surface_coverage_matrix';
+  schema_version: 1;
+  platform_count: number;
+  browser_extension_ready_count: number;
+  webview_preload_ready_count: number;
+  native_detector_ready_count: number;
+  provider_reconcile_ready_count: number;
+  post_meeting_backfill_supported_count: number;
+  lightweight_connector_ready_count: number;
+  speaker_track_ready_count: number;
+  participant_track_ready_count: number;
+  platforms: string[];
+  rows: Array<{
+    platform: string;
+    display_name?: string;
+    browser_extension: Record<string, unknown>;
+    webview_preload: Record<string, unknown>;
+    native_detector: Record<string, unknown>;
+    provider_reconcile: Record<string, unknown>;
+    post_meeting_backfill: Record<string, unknown>;
+    lightweight_connector: Record<string, unknown>;
+    speaker_track: Record<string, unknown>;
+    participant_track: Record<string, unknown>;
+  }>;
+}
+
 export interface MeetingPlatformConsumerHandoff {
   type: 'meeting_platform_consumer_handoff';
   schema: typeof MEETING_PLATFORM_CONSUMER_HANDOFF_SCHEMA;
@@ -115,6 +143,7 @@ export interface MeetingPlatformConsumerHandoff {
   hard_contracts: Record<string, unknown>;
   lightweight_connector_handoff: Record<string, unknown>;
   sdk_facade_handoff: MeetingPlatformSdkFacadeHandoff;
+  surface_coverage_matrix: MeetingPlatformSurfaceCoverageMatrix;
   boot_order: Array<Record<string, unknown>>;
   endpoints: Record<string, string>;
   commands: Record<string, string>;

@@ -44,6 +44,11 @@ assert.equal(report.sdk_facade_handoff.create_function, 'createMeetingAppTimelin
 assert.equal(report.sdk_facade_handoff.required_facade_methods.includes('platformConsumerHandoff'), true);
 assert.equal(report.sdk_facade_handoff.surface_wiring.browser_extension.content_script_messages.includes('meeting_timeline.observe_candidates'), true);
 assert.equal(report.sdk_facade_handoff.platform_rows.find((row) => row.platform === 'google_meet').provider_path, 'google_workspace_events_pubsub');
+assert.equal(report.surface_coverage_matrix.platform_count, 3);
+assert.equal(report.surface_coverage_matrix.browser_extension_ready_count, 3);
+assert.equal(report.surface_coverage_matrix.provider_reconcile_ready_count, 3);
+assert.equal(report.surface_coverage_matrix.rows.find((row) => row.platform === 'google_meet').webview_preload.ready, true);
+assert.equal(report.surface_coverage_matrix.rows.find((row) => row.platform === 'microsoft_teams').provider_reconcile.provider_path, 'microsoft_graph_change_notifications');
 assert.equal(report.rows.find((row) => row.platform === 'microsoft_teams').consumer_ready, true);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');
 
