@@ -237,6 +237,10 @@ import type {
   MeetingPlatformAdapterMessageBridgeOptions,
 } from './platform-adapter-message-bridge.mjs';
 import type {
+  MeetingPlatformAdapterSmokeOptions,
+  MeetingPlatformAdapterSmokeReport,
+} from './platform-adapter-smoke.mjs';
+import type {
   MeetingPlatformAdapterSample,
   MeetingPlatformAdapterSampleMatrix,
   MeetingPlatformAdapterSampleOptions,
@@ -468,6 +472,8 @@ export interface MeetingPlatformTimelineKit {
   platformAdapterRunnerHandoff(manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, handoffOptions?: MeetingPlatformAdapterRunnerOptions): MeetingPlatformAdapterRunnerHandoff;
   platformAdapterMessageBridge(manifestOrRunner?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterRunner | Record<string, unknown>, clientOrBridgeOptions?: MeetingPlatformAdapterSessionClient | MeetingPlatformAdapterMessageBridgeOptions, bridgeOptions?: MeetingPlatformAdapterMessageBridgeOptions): MeetingPlatformAdapterMessageBridge;
   platformAdapterMessageBridgeHandoff(manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, handoffOptions?: MeetingPlatformAdapterMessageBridgeOptions): MeetingPlatformAdapterMessageBridgeHandoff;
+  platformAdapterSmoke(manifestOrOptions?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterSmokeOptions, smokeOptions?: MeetingPlatformAdapterSmokeOptions): Promise<MeetingPlatformAdapterSmokeReport>;
+  assertPlatformAdapterSmoke(manifestOrOptions?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterSmokeOptions, smokeOptions?: MeetingPlatformAdapterSmokeOptions): Promise<MeetingPlatformAdapterSmokeReport>;
   platformEvidencePackage(platformOrInput: string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, packageOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackage;
   platformEvidencePackageSummary(packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, summaryOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageSummary;
   platformEvidencePackageBuilder(platform: string, builderOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageBuilder;

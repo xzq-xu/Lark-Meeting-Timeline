@@ -73,6 +73,8 @@ assert.equal(packedFiles.includes('adapters/platform-adapter-runner.mjs'), true)
 assert.equal(packedFiles.includes('adapters/platform-adapter-runner.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-message-bridge.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-message-bridge.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-smoke.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-smoke.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
@@ -289,6 +291,7 @@ import {
   buildMeetingPlatformAdapterMessageBridgeHandoff as buildMeetingPlatformAdapterMessageBridgeHandoffFromRoot,
   buildMeetingPlatformAdapterRunnerHandoff as buildMeetingPlatformAdapterRunnerHandoffFromRoot,
   buildMeetingPlatformAdapterSessionHandoff as buildMeetingPlatformAdapterSessionHandoffFromRoot,
+  assertMeetingPlatformAdapterSmoke as assertMeetingPlatformAdapterSmokeFromRoot,
   buildMeetingPlatformConsumerHandoff as buildMeetingPlatformConsumerHandoffFromRoot,
   buildMeetingPlatformConnector as buildMeetingPlatformConnectorFromRoot,
   buildMeetingPlatformConnectorHub as buildMeetingPlatformConnectorHubFromRoot,
@@ -305,6 +308,7 @@ import {
   createMeetingPlatformAdapterRunner as createMeetingPlatformAdapterRunnerFromRoot,
   createMeetingPlatformAdapterMessageBridge as createMeetingPlatformAdapterMessageBridgeFromRoot,
   openMeetingPlatformAdapterSession as openMeetingPlatformAdapterSessionFromRoot,
+  runMeetingPlatformAdapterSmoke as runMeetingPlatformAdapterSmokeFromRoot,
   createMeetingTimelineClient,
   createMeetingPlatformTimelineKit as createMeetingPlatformTimelineKitFromRoot,
   detectMeetingPlatformForBrowser as detectMeetingPlatformForBrowserFromRoot,
@@ -488,6 +492,10 @@ import {
   buildMeetingPlatformAdapterMessageBridgeHandoff,
   createMeetingPlatformAdapterMessageBridge,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-message-bridge';
+import {
+  assertMeetingPlatformAdapterSmoke,
+  runMeetingPlatformAdapterSmoke,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-smoke';
 import {
   assertMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
@@ -738,6 +746,27 @@ assert.equal((await rootAdapterMessageBridge.handleMessage({
   payload: { mark: { label: 'bridge smoke mark' } },
 })).action, 'insert_annotation');
 assert.equal(rootMeetingAppSdk.adapterMessageBridgeHandoff(rootInstallManifest).schema, 'meeting_platform_adapter_message_bridge_handoff');
+const rootAdapterSmoke = await rootMeetingAppSdk.adapterSmoke(rootInstallManifest, {
+  platforms: ['google-meet'],
+  captured_at_ms: 1_782_900_600_000,
+});
+assert.equal(rootAdapterSmoke.accepted, true);
+assert.equal(rootAdapterSmoke.rows[0].platform, 'google_meet');
+assert.equal((await rootMeetingAppSdk.assertAdapterSmoke(rootInstallManifest, {
+  platforms: ['google-meet'],
+})).accepted, true);
+assert.equal((await runMeetingPlatformAdapterSmokeFromRoot(rootInstallManifest, {
+  platforms: ['google-meet'],
+})).accepted, true);
+assert.equal((await assertMeetingPlatformAdapterSmokeFromRoot(rootInstallManifest, {
+  platforms: ['google-meet'],
+})).schema, 'meeting_platform_adapter_smoke_report');
+assert.equal((await runMeetingPlatformAdapterSmoke(rootInstallManifest, {
+  platforms: ['google-meet'],
+})).accepted, true);
+assert.equal((await assertMeetingPlatformAdapterSmoke(rootInstallManifest, {
+  platforms: ['google-meet'],
+})).accepted, true);
 assert.equal(rootMeetingAppSdk.platformRuntimeBundle('google-meet').runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
 assert.equal(rootMeetingAppSdk.runtimeBundleMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterRoute('google-meet').platform, 'google_meet');

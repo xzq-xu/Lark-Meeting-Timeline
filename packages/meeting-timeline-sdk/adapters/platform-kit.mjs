@@ -311,6 +311,10 @@ import {
   createMeetingPlatformAdapterMessageBridge,
 } from './platform-adapter-message-bridge.mjs';
 import {
+  assertMeetingPlatformAdapterSmoke,
+  runMeetingPlatformAdapterSmoke,
+} from './platform-adapter-smoke.mjs';
+import {
   assertMeetingPlatformAdapterSample,
   assertMeetingPlatformAdapterSampleMatrix,
   buildMeetingPlatformAdapterSamplePlan,
@@ -850,6 +854,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdapterMessageBridgeHandoff(manifestOrInput = {}, handoffOptions = {}) {
       return buildMeetingPlatformAdapterMessageBridgeHandoff(manifestOrInput, withDefaults(defaults, handoffOptions));
+    },
+    platformAdapterSmoke(manifestOrOptions = {}, smokeOptions = {}) {
+      return runMeetingPlatformAdapterSmoke(manifestOrOptions, withDefaults(defaults, smokeOptions));
+    },
+    assertPlatformAdapterSmoke(manifestOrOptions = {}, smokeOptions = {}) {
+      return assertMeetingPlatformAdapterSmoke(manifestOrOptions, withDefaults(defaults, smokeOptions));
     },
     platformEvidencePackage(platformOrInput, input = {}, packageOptions = {}) {
       if (platformOrInput && typeof platformOrInput === 'object' && !Array.isArray(platformOrInput)) {

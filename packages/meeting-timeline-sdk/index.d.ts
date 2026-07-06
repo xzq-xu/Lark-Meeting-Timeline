@@ -455,6 +455,16 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-message-bridge.mjs').MeetingPlatformAdapterMessageBridgeOptions,
   ): import('./adapters/platform-adapter-message-bridge.mjs').MeetingPlatformAdapterMessageBridgeHandoff;
   adapterMessageBridgeHandoff: MeetingAppTimelineSdk['platformAdapterMessageBridgeHandoff'];
+  platformAdapterSmoke(
+    manifestOrOptions?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-smoke.mjs').MeetingPlatformAdapterSmokeOptions,
+    options?: import('./adapters/platform-adapter-smoke.mjs').MeetingPlatformAdapterSmokeOptions,
+  ): Promise<import('./adapters/platform-adapter-smoke.mjs').MeetingPlatformAdapterSmokeReport>;
+  adapterSmoke: MeetingAppTimelineSdk['platformAdapterSmoke'];
+  assertPlatformAdapterSmoke(
+    manifestOrOptions?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-smoke.mjs').MeetingPlatformAdapterSmokeOptions,
+    options?: import('./adapters/platform-adapter-smoke.mjs').MeetingPlatformAdapterSmokeOptions,
+  ): Promise<import('./adapters/platform-adapter-smoke.mjs').MeetingPlatformAdapterSmokeReport>;
+  assertAdapterSmoke: MeetingAppTimelineSdk['assertPlatformAdapterSmoke'];
   platformRuntimeBundle(
     platformOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
@@ -532,6 +542,7 @@ export * from './adapters/platform-adapter-launch-plan.mjs';
 export * from './adapters/platform-adapter-session.mjs';
 export * from './adapters/platform-adapter-runner.mjs';
 export * from './adapters/platform-adapter-message-bridge.mjs';
+export * from './adapters/platform-adapter-smoke.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-strategy.mjs';
