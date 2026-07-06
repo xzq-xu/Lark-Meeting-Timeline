@@ -71,6 +71,8 @@ assert.equal(packedFiles.includes('adapters/platform-adapter-session.mjs'), true
 assert.equal(packedFiles.includes('adapters/platform-adapter-session.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-runner.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-runner.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-message-bridge.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-message-bridge.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
@@ -284,6 +286,7 @@ import {
   buildMeetingPlatformAdapterLaunchPlan as buildMeetingPlatformAdapterLaunchPlanFromRoot,
   buildMeetingPlatformAdapterPortfolio as buildMeetingPlatformAdapterPortfolioFromRoot,
   buildMeetingPlatformAdapterRoute as buildMeetingPlatformAdapterRouteFromRoot,
+  buildMeetingPlatformAdapterMessageBridgeHandoff as buildMeetingPlatformAdapterMessageBridgeHandoffFromRoot,
   buildMeetingPlatformAdapterRunnerHandoff as buildMeetingPlatformAdapterRunnerHandoffFromRoot,
   buildMeetingPlatformAdapterSessionHandoff as buildMeetingPlatformAdapterSessionHandoffFromRoot,
   buildMeetingPlatformConsumerHandoff as buildMeetingPlatformConsumerHandoffFromRoot,
@@ -300,6 +303,7 @@ import {
   createMeetingPlatformConnectorRuntime as createMeetingPlatformConnectorRuntimeFromRoot,
   createMeetingPlatformAdapterSession as createMeetingPlatformAdapterSessionFromRoot,
   createMeetingPlatformAdapterRunner as createMeetingPlatformAdapterRunnerFromRoot,
+  createMeetingPlatformAdapterMessageBridge as createMeetingPlatformAdapterMessageBridgeFromRoot,
   openMeetingPlatformAdapterSession as openMeetingPlatformAdapterSessionFromRoot,
   createMeetingTimelineClient,
   createMeetingPlatformTimelineKit as createMeetingPlatformTimelineKitFromRoot,
@@ -480,6 +484,10 @@ import {
   createMeetingPlatformAdapterRunner,
   openMeetingPlatformAdapterSession,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-runner';
+import {
+  buildMeetingPlatformAdapterMessageBridgeHandoff,
+  createMeetingPlatformAdapterMessageBridge,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-message-bridge';
 import {
   assertMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
@@ -717,6 +725,19 @@ assert.equal((await rootMeetingAppSdk.openPlatformAdapterSession(rootInstallMani
   clock: () => 779,
 })).payload.observe_event.captured_at_ms, 779);
 assert.equal(rootMeetingAppSdk.adapterRunnerHandoff(rootInstallManifest).schema, 'meeting_platform_adapter_runner_handoff');
+const rootAdapterMessageBridge = rootMeetingAppSdk.platformAdapterMessageBridge(rootInstallManifest, rootAdapterSessionClient, {
+  clock: () => 780,
+});
+assert.equal(rootAdapterMessageBridge.schema, 'meeting_platform_adapter_message_bridge');
+assert.equal((await rootAdapterMessageBridge.handleMessage({
+  type: 'meeting_timeline.open_session',
+  payload: { url: 'https://meet.google.com/abc-defg-hij' },
+})).result.payload.observe_event.captured_at_ms, 780);
+assert.equal((await rootAdapterMessageBridge.handleMessage({
+  type: 'meeting_timeline.insert_mark',
+  payload: { mark: { label: 'bridge smoke mark' } },
+})).action, 'insert_annotation');
+assert.equal(rootMeetingAppSdk.adapterMessageBridgeHandoff(rootInstallManifest).schema, 'meeting_platform_adapter_message_bridge_handoff');
 assert.equal(rootMeetingAppSdk.platformRuntimeBundle('google-meet').runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
 assert.equal(rootMeetingAppSdk.runtimeBundleMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterRoute('google-meet').platform, 'google_meet');
@@ -2001,6 +2022,16 @@ assert.equal((await openMeetingPlatformAdapterSessionFromRoot(directInstallManif
 }, {
   clock: () => 903,
 })).payload.observe_event.captured_at_ms, 903);
+assert.equal(buildMeetingPlatformAdapterMessageBridgeHandoff(directInstallManifest).schema, 'meeting_platform_adapter_message_bridge_handoff');
+assert.equal(buildMeetingPlatformAdapterMessageBridgeHandoffFromRoot(directInstallManifest).bridge_factory, 'createMeetingPlatformAdapterMessageBridge');
+const directMessageBridge = createMeetingPlatformAdapterMessageBridge(directInstallManifest, directRunnerClient, {
+  clock: () => 904,
+});
+assert.equal((await directMessageBridge.handleMessage({
+  type: 'meeting_timeline.open_session',
+  payload: { url: 'https://meet.google.com/abc-defg-hij' },
+})).result.payload.observe_event.captured_at_ms, 904);
+assert.equal(createMeetingPlatformAdapterMessageBridgeFromRoot(directInstallManifest, directRunnerClient).schema, 'meeting_platform_adapter_message_bridge');
 assert.equal(buildMeetingPlatformAdapterContract('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).annotations.endpoints.runtimeEvents, 'http://localhost:8787/api/meeting-platform/runtime-events');

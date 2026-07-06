@@ -444,6 +444,17 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-runner.mjs').MeetingPlatformAdapterRunnerOptions,
   ): import('./adapters/platform-adapter-runner.mjs').MeetingPlatformAdapterRunnerHandoff;
   adapterRunnerHandoff: MeetingAppTimelineSdk['platformAdapterRunnerHandoff'];
+  platformAdapterMessageBridge(
+    manifestOrRunner?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | import('./adapters/platform-adapter-runner.mjs').MeetingPlatformAdapterRunner | Record<string, unknown>,
+    clientOrOptions?: import('./adapters/platform-adapter-session.mjs').MeetingPlatformAdapterSessionClient | import('./adapters/platform-adapter-message-bridge.mjs').MeetingPlatformAdapterMessageBridgeOptions,
+    options?: import('./adapters/platform-adapter-message-bridge.mjs').MeetingPlatformAdapterMessageBridgeOptions,
+  ): import('./adapters/platform-adapter-message-bridge.mjs').MeetingPlatformAdapterMessageBridge;
+  adapterMessageBridge: MeetingAppTimelineSdk['platformAdapterMessageBridge'];
+  platformAdapterMessageBridgeHandoff(
+    manifestOrInput?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | Record<string, unknown>,
+    options?: import('./adapters/platform-adapter-message-bridge.mjs').MeetingPlatformAdapterMessageBridgeOptions,
+  ): import('./adapters/platform-adapter-message-bridge.mjs').MeetingPlatformAdapterMessageBridgeHandoff;
+  adapterMessageBridgeHandoff: MeetingAppTimelineSdk['platformAdapterMessageBridgeHandoff'];
   platformRuntimeBundle(
     platformOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
@@ -520,6 +531,7 @@ export * from './adapters/platform-adapter-install-manifest.mjs';
 export * from './adapters/platform-adapter-launch-plan.mjs';
 export * from './adapters/platform-adapter-session.mjs';
 export * from './adapters/platform-adapter-runner.mjs';
+export * from './adapters/platform-adapter-message-bridge.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-strategy.mjs';

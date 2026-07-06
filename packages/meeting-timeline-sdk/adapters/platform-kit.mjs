@@ -307,6 +307,10 @@ import {
   openMeetingPlatformAdapterSession,
 } from './platform-adapter-runner.mjs';
 import {
+  buildMeetingPlatformAdapterMessageBridgeHandoff,
+  createMeetingPlatformAdapterMessageBridge,
+} from './platform-adapter-message-bridge.mjs';
+import {
   assertMeetingPlatformAdapterSample,
   assertMeetingPlatformAdapterSampleMatrix,
   buildMeetingPlatformAdapterSamplePlan,
@@ -838,6 +842,14 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdapterRunnerHandoff(manifestOrInput = {}, handoffOptions = {}) {
       return buildMeetingPlatformAdapterRunnerHandoff(manifestOrInput, withDefaults(defaults, handoffOptions));
+    },
+    platformAdapterMessageBridge(manifestOrRunner = {}, clientOrBridgeOptions = {}, bridgeOptions = {}) {
+      const mergedOptions = adapterSessionOptions(defaults, clientOrBridgeOptions, bridgeOptions);
+      const client = adapterSessionClient(bridge, clientOrBridgeOptions, mergedOptions);
+      return createMeetingPlatformAdapterMessageBridge(manifestOrRunner, client, mergedOptions);
+    },
+    platformAdapterMessageBridgeHandoff(manifestOrInput = {}, handoffOptions = {}) {
+      return buildMeetingPlatformAdapterMessageBridgeHandoff(manifestOrInput, withDefaults(defaults, handoffOptions));
     },
     platformEvidencePackage(platformOrInput, input = {}, packageOptions = {}) {
       if (platformOrInput && typeof platformOrInput === 'object' && !Array.isArray(platformOrInput)) {

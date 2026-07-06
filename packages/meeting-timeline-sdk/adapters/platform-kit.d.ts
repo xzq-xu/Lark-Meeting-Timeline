@@ -232,6 +232,11 @@ import type {
   MeetingPlatformAdapterRunnerOptions,
 } from './platform-adapter-runner.mjs';
 import type {
+  MeetingPlatformAdapterMessageBridge,
+  MeetingPlatformAdapterMessageBridgeHandoff,
+  MeetingPlatformAdapterMessageBridgeOptions,
+} from './platform-adapter-message-bridge.mjs';
+import type {
   MeetingPlatformAdapterSample,
   MeetingPlatformAdapterSampleMatrix,
   MeetingPlatformAdapterSampleOptions,
@@ -461,6 +466,8 @@ export interface MeetingPlatformTimelineKit {
   platformAdapterRunner(manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, clientOrRunnerOptions?: MeetingPlatformAdapterSessionClient | MeetingPlatformAdapterRunnerOptions, runnerOptions?: MeetingPlatformAdapterRunnerOptions): MeetingPlatformAdapterRunner;
   openPlatformAdapterSession(manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, launchInput?: MeetingPlatformAdapterLaunchPlanOptions | MeetingPlatformAdapterLaunchPlan | string | Record<string, unknown>, openOptions?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterOpenSessionEvent>;
   platformAdapterRunnerHandoff(manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, handoffOptions?: MeetingPlatformAdapterRunnerOptions): MeetingPlatformAdapterRunnerHandoff;
+  platformAdapterMessageBridge(manifestOrRunner?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterRunner | Record<string, unknown>, clientOrBridgeOptions?: MeetingPlatformAdapterSessionClient | MeetingPlatformAdapterMessageBridgeOptions, bridgeOptions?: MeetingPlatformAdapterMessageBridgeOptions): MeetingPlatformAdapterMessageBridge;
+  platformAdapterMessageBridgeHandoff(manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, handoffOptions?: MeetingPlatformAdapterMessageBridgeOptions): MeetingPlatformAdapterMessageBridgeHandoff;
   platformEvidencePackage(platformOrInput: string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, packageOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackage;
   platformEvidencePackageSummary(packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, summaryOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageSummary;
   platformEvidencePackageBuilder(platform: string, builderOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageBuilder;
