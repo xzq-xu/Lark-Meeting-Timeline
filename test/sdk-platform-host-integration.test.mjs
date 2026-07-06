@@ -35,6 +35,7 @@ assert.equal(plan.endpoints.platform_events, '/api/platform-events');
 assert.equal(plan.endpoints.adapter_contracts, '/api/meeting-platform/contracts');
 assert.equal(plan.endpoints.runtime_bundles, '/api/meeting-platform/runtime-bundles');
 assert.equal(plan.endpoints.platform_conformance, '/api/meeting-platform/conformance');
+assert.equal(plan.endpoints.consumer_handoff, '/api/meeting-platform/consumer-handoff');
 assert.equal(plan.endpoints.observer_plans, '/api/meeting-platform/observer-plans');
 assert.equal(plan.endpoints.runtime_event_plans, '/api/meeting-platform/runtime-event-plans');
 assert.equal(plan.endpoints.adapter_routes, '/api/meeting-platform/adapter-routes');
@@ -51,8 +52,10 @@ assert.equal(plan.endpoints.runtime_events, '/api/meeting-platform/runtime-event
 assert.equal(plan.commands.validate_integration_runtime_manifest, 'npm run meeting-platform:integration-runtime-run-manifest');
 assert.equal(plan.commands.validate_handoff_readiness, 'npm run meeting-platform:handoff-readiness');
 assert.equal(plan.commands.validate_platform_conformance, 'npm run meeting-platform:conformance');
+assert.equal(plan.commands.export_consumer_handoff, 'npm run meeting-platform:consumer-handoff');
 assert.equal(plan.sdk.runtime_event_module, '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event');
 assert.equal(plan.sdk.platform_conformance_module, '@ai-annotation/meeting-timeline-sdk/adapters/platform-conformance');
+assert.equal(plan.sdk.consumer_handoff_module, '@ai-annotation/meeting-timeline-sdk/adapters/platform-consumer-handoff');
 assert.equal(plan.handoff_bundle.platform_count, 3);
 assert.equal(plan.platform_conformance_report.accepted, true);
 assert.equal(plan.platform_conformance_report.accepted_count, 3);
@@ -99,6 +102,7 @@ assert.equal(plan.extension_install_plan.platforms.includes('google_meet'), true
 assert.equal(plan.integration_plans.google_meet.provider_events.endpoint, `${baseUrl}/api/platform-events/google-meet`);
 assert.equal(plan.next_actions.includes('run_meeting_platform_contract_acceptance_before_enabling_new_platform'), true);
 assert.equal(plan.next_actions.includes('run_meeting_platform_conformance_before_host_handoff'), true);
+assert.equal(plan.next_actions.includes('export_meeting_platform_consumer_handoff_for_downstream_project'), true);
 assert.equal(plan.next_actions.includes('wire_host_routes_to_handleMeetingPlatformRequest'), true);
 assert.equal(plan.next_actions.includes('wire_observer_plans_to_host_scheduler'), true);
 assert.equal(plan.next_actions.includes('run_meeting_platform_integration_runtime_manifest_before_host_handoff'), true);
@@ -111,7 +115,7 @@ const scaffold = buildMeetingPlatformHostIntegrationScaffold({
 });
 
 assert.equal(scaffold.schema, MEETING_PLATFORM_HOST_INTEGRATION_SCAFFOLD_SCHEMA);
-assert.equal(scaffold.files.length, 23);
+assert.equal(scaffold.files.length, 24);
 assert.equal(file(scaffold, 'package.json').mime, 'application/json');
 const manifest = JSON.parse(file(scaffold, 'package.json').content);
 assert.equal(manifest.name, 'timeline-host-consumer');
@@ -119,6 +123,7 @@ assert.equal(manifest.scripts['meeting-platform:strategy'], 'node ./scripts/prin
 assert.equal(manifest.scripts['meeting-platform:contracts'], 'node ./scripts/print-contracts.mjs');
 assert.equal(manifest.scripts['meeting-platform:contract-acceptance'], 'node ./scripts/verify-contracts.mjs');
 assert.equal(manifest.scripts['meeting-platform:conformance'], 'node ./scripts/verify-conformance.mjs');
+assert.equal(manifest.scripts['meeting-platform:consumer-handoff'], 'node ./scripts/print-consumer-handoff.mjs');
 assert.equal(manifest.scripts['meeting-platform:runtime-bundles'], 'node ./scripts/print-runtime-bundles.mjs');
 assert.equal(manifest.scripts['meeting-platform:observer-plans'], 'node ./scripts/print-observer-plans.mjs');
 assert.equal(manifest.scripts['meeting-platform:runtime-event-plans'], 'node ./scripts/print-runtime-event-plans.mjs');
@@ -142,6 +147,7 @@ assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('l
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformAdapterContractMatrix'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformAdapterContractAcceptanceMatrix'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformConformance'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('consumerHandoff'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformRuntimeBundleMatrix'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('meetingAppRuntimeObserverPlanMatrix'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformRuntimeEventPlanMatrix'), true);
@@ -158,6 +164,7 @@ assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('p
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('handleFetchRequest'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/contracts'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/conformance'), true);
+assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/consumer-handoff'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/runtime-bundles'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/observer-plans'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/runtime-event-plans'), true);
@@ -176,6 +183,7 @@ assert.equal(file(scaffold, 'scripts/print-handoff.mjs').content.includes('host.
 assert.equal(file(scaffold, 'scripts/print-contracts.mjs').content.includes('host.adapterContracts()'), true);
 assert.equal(file(scaffold, 'scripts/verify-contracts.mjs').content.includes('adapterContractAcceptance'), true);
 assert.equal(file(scaffold, 'scripts/verify-conformance.mjs').content.includes('host.platformConformance()'), true);
+assert.equal(file(scaffold, 'scripts/print-consumer-handoff.mjs').content.includes('host.consumerHandoff'), true);
 assert.equal(file(scaffold, 'scripts/print-runtime-bundles.mjs').content.includes('host.runtimeBundles()'), true);
 assert.equal(file(scaffold, 'scripts/print-observer-plans.mjs').content.includes('host.observerPlans()'), true);
 assert.equal(file(scaffold, 'scripts/print-runtime-event-plans.mjs').content.includes('host.runtimeEventPlans()'), true);
@@ -209,6 +217,8 @@ assert.equal(file(scaffold, 'README.md').content.includes('Meeting track contrac
 assert.equal(file(scaffold, 'README.md').content.includes('speaker_track_ready'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('Platform conformance'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('platformConformance'), true);
+assert.equal(file(scaffold, 'README.md').content.includes('Consumer handoff'), true);
+assert.equal(file(scaffold, 'README.md').content.includes('consumerHandoff'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('extensionInstallPlan'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('integrationRuntimeSummary'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('runIntegrationRuntimeManifest'), true);
@@ -237,6 +247,7 @@ assert.equal(acceptance.required_files.includes('src/http-routes.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-strategy.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/verify-contracts.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/verify-conformance.mjs'), true);
+assert.equal(acceptance.required_files.includes('scripts/print-consumer-handoff.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-runtime-bundles.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-observer-plans.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-runtime-event-plans.mjs'), true);

@@ -37,6 +37,8 @@ assert.equal(packedFiles.includes('adapters/platform-registry.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-registry.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-conformance.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-conformance.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-consumer-handoff.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-consumer-handoff.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
@@ -167,6 +169,10 @@ import {
   assertMeetingPlatformConformanceReport,
   buildMeetingPlatformConformanceReport,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-conformance';
+import {
+  assertMeetingPlatformConsumerHandoff,
+  buildMeetingPlatformConsumerHandoff,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-consumer-handoff';
 import {
   buildMeetingPlatformAdaptationRunbook,
   buildMeetingPlatformRolloutPlan,
@@ -535,6 +541,15 @@ assert.equal(assertMeetingPlatformConformanceReport({
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],
 }).rows[0].adapter_first_route, 'local_observer_axis');
+assert.equal(buildMeetingPlatformConsumerHandoff({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+}).consumer_ready_count, 1);
+assert.equal(assertMeetingPlatformConsumerHandoff({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+}).rows[0].adapter_first_route, 'local_observer_axis');
+assert.equal(kit.platformConsumerHandoff({ platforms: ['zoom'] }).entrypoints.kit_methods.includes('platformConsumerHandoff'), true);
 assert.equal(kit.platformLiveAdapterHandoff('zoom').sdk.factory, 'createMeetingPlatformLiveAdapter');
 assert.equal(kit.platformLiveAdapterHandoffBundle({
   platforms: ['zoom'],
@@ -557,6 +572,9 @@ assert.equal(kit.platformHostIntegrationScaffold({
 assert.equal(kit.platformHostIntegrationScaffold({
   platforms: ['zoom'],
 }).files.some((file) => file.path === 'scripts/print-integration-runtime.mjs'), true);
+assert.equal(kit.platformHostIntegrationScaffold({
+  platforms: ['zoom'],
+}).files.some((file) => file.path === 'scripts/print-consumer-handoff.mjs'), true);
 assert.equal(kit.platformProviderConnectionPack('zoom').security.verifier, 'verifyZoomWebhookEvent');
 assert.equal(kit.platformProviderConnectionMatrix({
   platforms: ['zoom'],

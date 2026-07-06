@@ -170,6 +170,18 @@ export function createMeetingPlatformHost(options = {}) {
         platforms: conformanceOptions.platforms ?? conformanceOptions.platform_keys ?? platforms,
       });
     },
+    consumerHandoff(handoffOptions = {}) {
+      return kit.platformConsumerHandoff({
+        ...handoffOptions,
+        platforms: handoffOptions.platforms ?? handoffOptions.platform_keys ?? platforms,
+      });
+    },
+    assertConsumerHandoff(handoffOptions = {}) {
+      return kit.assertPlatformConsumerHandoff({
+        ...handoffOptions,
+        platforms: handoffOptions.platforms ?? handoffOptions.platform_keys ?? platforms,
+      });
+    },
     runtimeBundles(bundleOptions = {}) {
       return kit.platformRuntimeBundleMatrix({
         ...bundleOptions,
@@ -328,6 +340,9 @@ function routesSource(options = {}) {
   if (url.pathname === '/api/meeting-platform/conformance') {
     return Response.json(host.platformConformance(options));
   }
+  if (url.pathname === '/api/meeting-platform/consumer-handoff') {
+    return Response.json(host.consumerHandoff(options));
+  }
   if (url.pathname === '/api/meeting-platform/runtime-bundles') {
     return Response.json(host.runtimeBundles(options));
   }
@@ -447,6 +462,12 @@ Platform conformance:
 - accepted count: ${plan.platform_conformance_report?.accepted_count ?? 0}
 - blocking count: ${plan.platform_conformance_report?.blocking_count ?? 0}
 
+Consumer handoff:
+
+- endpoint: ${plan.endpoints?.consumer_handoff ?? '/api/meeting-platform/consumer-handoff'}
+- script: npm run meeting-platform:consumer-handoff
+- purpose: one machine-readable SDK entrypoint index for downstream projects that need to plug marks into a meeting timeline across Google Meet, Teams, Zoom, Webex, and Lark.
+
 Minimal usage:
 
 \`\`\`js
@@ -462,6 +483,7 @@ await host.insertAnnotation('google_meet', {
 });
 
 const handoff = host.handoffBundle();
+const consumerHandoff = host.consumerHandoff();
 const conformance = host.platformConformance();
 const strategy = host.adaptationStrategyMatrix();
 const platformResolution = host.resolvePlatform({
@@ -505,6 +527,7 @@ npm run meeting-platform:live-readiness
 npm run meeting-platform:contracts
 npm run meeting-platform:contract-acceptance
 npm run meeting-platform:conformance
+npm run meeting-platform:consumer-handoff
 npm run meeting-platform:runtime-bundles
 npm run meeting-platform:observer-plans
 npm run meeting-platform:runtime-event-plans
@@ -701,6 +724,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       live_adapter_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter',
       host_integration_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-host-integration',
       platform_conformance_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-conformance',
+      consumer_handoff_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-consumer-handoff',
     },
     runtime_contract: {
       annotation_timestamp_field: 'captured_at_ms',
@@ -720,6 +744,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       adapter_contracts: '/api/meeting-platform/contracts',
       adapter_contract_acceptance: '/api/meeting-platform/contract-acceptance',
       platform_conformance: '/api/meeting-platform/conformance',
+      consumer_handoff: '/api/meeting-platform/consumer-handoff',
       runtime_bundles: '/api/meeting-platform/runtime-bundles',
       observer_plans: '/api/meeting-platform/observer-plans',
       runtime_event_plans: '/api/meeting-platform/runtime-event-plans',
@@ -738,6 +763,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     commands: {
       ...(handoff.commands ?? {}),
       validate_platform_conformance: 'npm run meeting-platform:conformance',
+      export_consumer_handoff: 'npm run meeting-platform:consumer-handoff',
       validate_integration_runtime_manifest: 'npm run meeting-platform:integration-runtime-run-manifest',
       validate_handoff_readiness: 'npm run meeting-platform:handoff-readiness',
     },
@@ -762,6 +788,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     platform_conformance_report: platformConformanceReport,
     next_actions: unique([
       ...(handoff.next_actions ?? []),
+      'export_meeting_platform_consumer_handoff_for_downstream_project',
       'run_meeting_platform_conformance_before_host_handoff',
       'run_meeting_platform_contract_acceptance_before_enabling_new_platform',
       'wire_host_routes_to_handleMeetingPlatformRequest',
@@ -790,6 +817,7 @@ export function buildMeetingPlatformHostIntegrationScaffold(options = {}) {
       'meeting-platform:contracts': 'node ./scripts/print-contracts.mjs',
       'meeting-platform:contract-acceptance': 'node ./scripts/verify-contracts.mjs',
       'meeting-platform:conformance': 'node ./scripts/verify-conformance.mjs',
+      'meeting-platform:consumer-handoff': 'node ./scripts/print-consumer-handoff.mjs',
       'meeting-platform:runtime-bundles': 'node ./scripts/print-runtime-bundles.mjs',
       'meeting-platform:observer-plans': 'node ./scripts/print-observer-plans.mjs',
       'meeting-platform:runtime-event-plans': 'node ./scripts/print-runtime-event-plans.mjs',
@@ -921,6 +949,23 @@ if (report.accepted !== true) {
   process.exitCode = 1;
 }
 `;
+  const consumerHandoffScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+const report = host.consumerHandoff({
+  requireHandoffReady: process.env.MEETING_PLATFORM_REQUIRE_HANDOFF_READY === '1',
+  requireProductionReady: process.env.MEETING_PLATFORM_REQUIRE_PRODUCTION_READY === '1',
+});
+
+console.log(JSON.stringify(report, null, 2));
+
+if (report.accepted !== true) {
+  process.exitCode = 1;
+}
+`;
   const runtimeBundlesScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
 
 const host = createMeetingPlatformHost({
@@ -1038,6 +1083,7 @@ if (
       sourceFile('scripts/print-contracts.mjs', contractsScript, 'adapter_contract_script', 'text/javascript'),
       sourceFile('scripts/verify-contracts.mjs', contractAcceptanceScript, 'adapter_contract_acceptance_script', 'text/javascript'),
       sourceFile('scripts/verify-conformance.mjs', conformanceScript, 'platform_conformance_script', 'text/javascript'),
+      sourceFile('scripts/print-consumer-handoff.mjs', consumerHandoffScript, 'consumer_handoff_script', 'text/javascript'),
       sourceFile('scripts/print-runtime-bundles.mjs', runtimeBundlesScript, 'runtime_bundle_script', 'text/javascript'),
       sourceFile('scripts/print-observer-plans.mjs', observerPlansScript, 'observer_plan_script', 'text/javascript'),
       sourceFile('scripts/print-runtime-event-plans.mjs', runtimeEventPlansScript, 'runtime_event_plan_script', 'text/javascript'),
@@ -1071,6 +1117,7 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     'scripts/print-contracts.mjs',
     'scripts/verify-contracts.mjs',
     'scripts/verify-conformance.mjs',
+    'scripts/print-consumer-handoff.mjs',
     'scripts/print-runtime-bundles.mjs',
     'scripts/print-observer-plans.mjs',
     'scripts/print-runtime-event-plans.mjs',
@@ -1120,6 +1167,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!host.includes('platformConformance')) {
     issues.push(issue('error', 'missing_platform_conformance', 'Host source must expose the platform conformance report.'));
   }
+  if (!host.includes('consumerHandoff')) {
+    issues.push(issue('error', 'missing_consumer_handoff', 'Host source must expose the consumer handoff index.'));
+  }
   if (!host.includes('platformRuntimeBundleMatrix')) {
     issues.push(issue('error', 'missing_runtime_bundle_matrix', 'Host source must expose the runtime bundle matrix.'));
   }
@@ -1164,6 +1214,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!routes.includes('/api/meeting-platform/conformance')) {
     issues.push(issue('error', 'missing_platform_conformance_route', 'Route source must expose the platform conformance endpoint.'));
+  }
+  if (!routes.includes('/api/meeting-platform/consumer-handoff')) {
+    issues.push(issue('error', 'missing_consumer_handoff_route', 'Route source must expose the consumer handoff endpoint.'));
   }
   if (!routes.includes('/api/meeting-platform/runtime-bundles')) {
     issues.push(issue('error', 'missing_runtime_bundle_route', 'Route source must expose the runtime bundle matrix endpoint.'));
@@ -1218,6 +1271,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!readme.includes('Platform conformance')) {
     issues.push(issue('warning', 'readme_missing_platform_conformance', 'README should state the platform conformance gate.'));
+  }
+  if (!readme.includes('Consumer handoff')) {
+    issues.push(issue('warning', 'readme_missing_consumer_handoff', 'README should state the consumer handoff index.'));
   }
   const platformConformanceReport = scaffold.plan?.platform_conformance_report;
   if (!platformConformanceReport) {

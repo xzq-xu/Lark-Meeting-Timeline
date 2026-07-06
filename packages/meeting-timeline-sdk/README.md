@@ -1643,6 +1643,32 @@ npm run meeting-platform:conformance -- \
   --report-file=data/meeting-platform-conformance-report.json
 ```
 
+如果要把 SDK 交给另一个项目接入，优先导出 `platform-consumer-handoff`。它不是单个平台 demo，而是一份机器可读的 consumer index：包含 Google Meet / Teams / Zoom / Webex / Lark 的 SDK module、kit/host 方法、HTTP endpoints、CLI 命令、启动顺序、硬契约、每个平台的静态 readiness，以及 production evidence/handoff readiness 是否还缺。默认只把静态 SDK 接入门禁作为硬失败；如果需要正式交付验收，可以打开 `requireHandoffReady` 或 `requireProductionReady`：
+
+```js
+import {
+  assertMeetingPlatformConsumerHandoff,
+  buildMeetingPlatformConsumerHandoff,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-consumer-handoff';
+
+const handoff = buildMeetingPlatformConsumerHandoff({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+assertMeetingPlatformConsumerHandoff(handoff);
+// handoff.entrypoints.http_endpoints.consumer_handoff
+// handoff.hard_contracts.timestamp_field === 'captured_at_ms'
+// handoff.rows[*].production_ready 用来提示还缺哪些真实会议证据。
+```
+
+```sh
+npm run meeting-platform:consumer-handoff -- \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --report-file=data/meeting-platform-consumer-handoff-report.json
+```
+
 如果外部项目只想“收到平台 webhook 后直接落到会议轴”，可以用更高层的 `platform-ingest`：
 
 ```js

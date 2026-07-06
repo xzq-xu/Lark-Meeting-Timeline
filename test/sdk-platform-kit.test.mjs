@@ -74,6 +74,9 @@ assert.equal(googleRegistryEntry.runtime.browser_matches.includes('https://meet.
 const registryManifest = kit.platformRegistryManifest({ platforms: ['google-meet', 'zoom'] });
 assert.equal(registryManifest.platform_count, 2);
 assert.equal(registryManifest.provider_required_for_realtime_count, 0);
+assert.equal(kit.platformConsumerHandoff({ platforms: ['google-meet'] }).schema, 'meeting_platform_consumer_handoff');
+assert.equal(kit.assertPlatformConsumerHandoff({ platforms: ['google-meet'] }).accepted, true);
+assert.equal(kit.report({ platforms: ['google-meet'] }).platform_consumer_handoff.consumer_ready_count, 1);
 
 const fixtureAcceptance = kit.fixtureAcceptance('google-meet', {
   requiredCoverage: ['meeting_start', 'meeting_end', 'participant_track', 'artifact_ready', 'subscription_lifecycle'],
