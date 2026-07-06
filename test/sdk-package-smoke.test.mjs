@@ -537,6 +537,12 @@ assert.equal(kit.platformRolloutPlan('google-meet').platform, 'google_meet');
 assert.equal(kit.platformAdaptationRunbook('zoom').platform, 'zoom');
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_rollout.type, 'meeting_platform_rollout_summary');
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_registry_manifest.platform_count, 1);
+assert.equal(kit.report({ platforms: ['google-meet'] }).platform_connector_matrix.platform_count, 1);
+assert.equal(kit.platformConnector('google-meet').schema, 'meeting_platform_connector');
+assert.equal(kit.platformConnectorMatrix({ platforms: ['google-meet', 'teams'] }).accepted_count, 2);
+assert.equal(kit.createPlatformConnectorRuntime('google-meet', {
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+}).supports('insert_annotation'), true);
 assert.equal(kit.meetingAppRuntimeAdapterProfile('https://meet.google.com/abc-defg-hij').platform, 'google_meet');
 assert.equal(kit.meetingAppRuntimeAdapterProfileMatrix({ platforms: ['google-meet', 'teams'] }).runtime_ready_count, 2);
 assert.equal(kit.meetingAppAdapterFit({

@@ -85,6 +85,13 @@ import {
   buildMeetingPlatformRegistryManifest,
 } from './platform-registry.mjs';
 import {
+  assertMeetingPlatformConnector,
+  buildMeetingPlatformConnector,
+  buildMeetingPlatformConnectorAcceptanceReport,
+  buildMeetingPlatformConnectorMatrix,
+  createMeetingPlatformConnectorRuntime,
+} from './meeting-platform-connector.mjs';
+import {
   assertMeetingPlatformConformanceReport,
   buildMeetingPlatformConformanceReport,
 } from './platform-conformance.mjs';
@@ -450,6 +457,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     supported_platforms: MEETING_PLATFORM_KEYS,
     supported_meeting_app_platforms: MEETING_APP_FIXTURE_PLATFORMS,
     platform_registry_manifest: buildMeetingPlatformRegistryManifest(options),
+    platform_connector_matrix: buildMeetingPlatformConnectorMatrix(options),
     platform_conformance_report: buildMeetingPlatformConformanceReport(options),
     platform_consumer_handoff: buildMeetingPlatformConsumerHandoff(options),
     capabilities: allPlatformCapabilityContracts(options),
@@ -1331,6 +1339,30 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
       return assertMeetingPlatformRegistryManifest(
         manifestOrOptions,
         withDefaults(defaults, registryOptions),
+      );
+    },
+    platformConnector(platform, connectorOptions = {}) {
+      return buildMeetingPlatformConnector(platform, withDefaults(defaults, connectorOptions));
+    },
+    platformConnectorMatrix(connectorOptions = {}) {
+      return buildMeetingPlatformConnectorMatrix(withDefaults(defaults, connectorOptions));
+    },
+    platformConnectorAcceptance(connectorOrOptions = {}, connectorOptions = {}) {
+      return buildMeetingPlatformConnectorAcceptanceReport(
+        connectorOrOptions,
+        withDefaults(defaults, connectorOptions),
+      );
+    },
+    assertPlatformConnector(connectorOrOptions = {}, connectorOptions = {}) {
+      return assertMeetingPlatformConnector(
+        connectorOrOptions,
+        withDefaults(defaults, connectorOptions),
+      );
+    },
+    createPlatformConnectorRuntime(platformOrConnector, connectorOptions = {}) {
+      return createMeetingPlatformConnectorRuntime(
+        platformOrConnector,
+        withDefaults(defaults, connectorOptions),
       );
     },
     capability(platform, platformOptions = {}) {

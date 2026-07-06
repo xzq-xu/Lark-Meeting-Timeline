@@ -74,6 +74,46 @@ assert.equal(googleRegistryEntry.runtime.browser_matches.includes('https://meet.
 const registryManifest = kit.platformRegistryManifest({ platforms: ['google-meet', 'zoom'] });
 assert.equal(registryManifest.platform_count, 2);
 assert.equal(registryManifest.provider_required_for_realtime_count, 0);
+const googleConnector = kit.platformConnector('google-meet');
+assert.equal(googleConnector.schema, 'meeting_platform_connector');
+assert.equal(googleConnector.platform, 'google_meet');
+assert.equal(googleConnector.runtime_events.endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);
+assert.equal(googleConnector.runtime_events.supported_actions.includes('insert_annotation'), true);
+assert.equal(googleConnector.readiness.realtime_annotation_ready, true);
+assert.equal(kit.platformConnectorAcceptance(googleConnector).accepted, true);
+assert.equal(kit.assertPlatformConnector(googleConnector).accepted, true);
+const connectorMatrix = kit.platformConnectorMatrix({ platforms: ['google-meet', 'teams', 'zoom'] });
+assert.equal(connectorMatrix.platform_count, 3);
+assert.equal(connectorMatrix.accepted_count, 3);
+assert.equal(connectorMatrix.realtime_ready_count, 3);
+assert.equal(connectorMatrix.rows.find((row) => row.platform === 'microsoft_teams').browser_observer_enabled, true);
+assert.equal(kit.report({ platforms: ['google-meet'] }).platform_connector_matrix.platform_count, 1);
+const connectorRuntimeCalls = [];
+const googleConnectorRuntime = kit.createPlatformConnectorRuntime(googleConnector, {
+  fetch: async (url, init) => {
+    const body = JSON.parse(init.body);
+    connectorRuntimeCalls.push({ url, body });
+    return new Response(JSON.stringify({ ok: true, accepted: body }), {
+      headers: { 'content-type': 'application/json' },
+    });
+  },
+  now: () => 1_782_614_400_000,
+});
+assert.equal(googleConnectorRuntime.platform, 'google_meet');
+assert.equal(googleConnectorRuntime.supports('insert_annotation'), true);
+assert.equal(googleConnectorRuntime.normalizeProviderEvent({
+  id: 'kit-google-event-001',
+  type: 'google.workspace.meet.conference.v2.started',
+  data: { conferenceRecord: { name: 'conferenceRecords/kit-google-record-001' } },
+}).at(0).type, 'meeting_started');
+await googleConnectorRuntime.insertAnnotation({
+  id: 'kit-mark-001',
+  label: 'why?',
+  captured_at_ms: 1_782_614_401_000,
+});
+assert.equal(connectorRuntimeCalls.at(-1).url, `${baseUrl}/api/meeting-platform/runtime-events`);
+assert.equal(connectorRuntimeCalls.at(-1).body.action, 'insert_annotation');
+assert.equal(connectorRuntimeCalls.at(-1).body.platform, 'google_meet');
 assert.equal(kit.platformConsumerHandoff({ platforms: ['google-meet'] }).schema, 'meeting_platform_consumer_handoff');
 assert.equal(kit.assertPlatformConsumerHandoff({ platforms: ['google-meet'] }).accepted, true);
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_consumer_handoff.consumer_ready_count, 1);

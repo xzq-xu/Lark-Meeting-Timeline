@@ -12,6 +12,13 @@ import type {
   MeetingPlatformRegistryManifest,
   MeetingPlatformRegistryOptions,
 } from './platform-registry.mjs';
+import type {
+  MeetingPlatformConnector,
+  MeetingPlatformConnectorAcceptanceReport,
+  MeetingPlatformConnectorMatrix,
+  MeetingPlatformConnectorOptions,
+  MeetingPlatformConnectorRuntime,
+} from './meeting-platform-connector.mjs';
 import type { PlatformCaptureOptions, PlatformCaptureRecord } from './platform-capture.mjs';
 import type { PlatformLaunchGateOptions } from './platform-gate.mjs';
 import type {
@@ -611,6 +618,20 @@ export interface MeetingPlatformTimelineKit {
     manifestOrOptions?: MeetingPlatformRegistryManifest | MeetingPlatformRegistryEntry | MeetingPlatformRegistryOptions,
     registryOptions?: MeetingPlatformRegistryOptions,
   ): MeetingPlatformRegistryAcceptanceReport;
+  platformConnector(platform: string, connectorOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnector;
+  platformConnectorMatrix(connectorOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorMatrix;
+  platformConnectorAcceptance(
+    connectorOrOptions?: MeetingPlatformConnector | string | MeetingPlatformConnectorOptions,
+    connectorOptions?: MeetingPlatformConnectorOptions,
+  ): MeetingPlatformConnectorAcceptanceReport;
+  assertPlatformConnector(
+    connectorOrOptions?: MeetingPlatformConnector | string | MeetingPlatformConnectorOptions,
+    connectorOptions?: MeetingPlatformConnectorOptions,
+  ): MeetingPlatformConnectorAcceptanceReport;
+  createPlatformConnectorRuntime(
+    platformOrConnector: string | MeetingPlatformConnector,
+    connectorOptions?: MeetingPlatformConnectorOptions,
+  ): MeetingPlatformConnectorRuntime;
   platformAdapterContract(platform: string, contractOptions?: MeetingPlatformAdapterContractOptions): MeetingPlatformAdapterContract;
   platformAdapterContractMatrix(contractOptions?: MeetingPlatformAdapterContractOptions): MeetingPlatformAdapterContractMatrix;
   platformAdapterContractAcceptance(

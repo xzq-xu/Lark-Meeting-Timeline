@@ -717,6 +717,8 @@ await runtime.insertAnnotation({
 const signals = runtime.normalizeProviderEvent(googleWorkspaceEventBody);
 ```
 
+`platform-kit` 也暴露同一入口：`kit.platformConnector('google-meet')`、`kit.platformConnectorMatrix()`、`kit.platformConnectorAcceptance(connector)` 和 `kit.createPlatformConnectorRuntime(connector, { fetch })`。这适合宿主项目已经统一使用 `createMeetingPlatformTimelineKit()`，但仍希望按平台懒加载 Google Meet / Teams / Zoom / Webex / Lark connector runtime。
+
 `platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。CI 里可以用 `assertMeetingAppAdapterIntegrationPackage()`、`assertMeetingAppAdapterIntegrationPackageMatrix()` 或 kit 上的同名方法做 gate；默认 target 是 `pilot`，如果传 `target: 'production'`，则必须补齐真实会议 evidence package、provider start/end reconcile 和 handoff readiness 之后才会通过。
 
 同一层也可以从 CLI 直接导出，默认覆盖 Google Meet、Teams、Zoom、Webex、Lark：
