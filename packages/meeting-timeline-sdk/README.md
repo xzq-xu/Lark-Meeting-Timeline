@@ -110,6 +110,8 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-extension`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-manifest`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-spec`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-runtime-config`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-handoff-package`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixture-tracks`
@@ -1039,7 +1041,24 @@ npm run meeting-app:adapter-runtime-config -- --spec-file=data/whereby-spec.json
 
 默认输出到 `data/meeting-app-adapter-runtime-configs/` 和 `data/meeting-app-adapter-runtime-config-report.json`。报告中的 `capture_ready_count`、`mutation_ready_count`、`content_script_ready_count` 用来确认配置是否已经能交给宿主运行时，但仍不替代真实 live snapshot evidence。
 
-同一份 `runtimeConfig.browser_runtime_options` 也可以直接传给 `createMeetingAppBrowserRuntime()`；`runtimeConfig.capture_options` 可以直接传给 `captureMeetingAppDomSnapshot()` 做手动采样。也就是说，新会议软件的接入路径是 `adapter spec -> runtime config -> live snapshot evidence -> handoff readiness`。
+如果要把 Google Meet / Teams / Zoom / Webex / Lark 或自定义会议软件交给另一个宿主项目落地，可以生成完整 handoff package：
+
+```js
+import {
+  buildMeetingAppAdapterHandoffPackage,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-handoff-package';
+
+const handoffPackage = buildMeetingAppAdapterHandoffPackage('google-meet');
+```
+
+```bash
+npm run meeting-app:adapter-handoff-package
+npm run meeting-app:adapter-handoff-package -- --spec-file=data/whereby-spec.json
+```
+
+默认输出到 `data/meeting-app-adapter-handoff-packages/` 和 `data/meeting-app-adapter-handoff-package-report.json`。每个平台目录里包含 `adapter-spec.json`、`runtime-config.json`、`extension-manifest-fragment.json`、`integration-readme.md`，内置平台还会包含 `adapter-manifest.json`。这份 package 的 `validation.required_live_evidence` 明确要求真实 DOM snapshot、candidate observation、speaker/participant track 和当前轴标注插入验证。
+
+同一份 `runtimeConfig.browser_runtime_options` 也可以直接传给 `createMeetingAppBrowserRuntime()`；`runtimeConfig.capture_options` 可以直接传给 `captureMeetingAppDomSnapshot()` 做手动采样。也就是说，新会议软件的接入路径是 `adapter spec -> runtime config -> handoff package -> live snapshot evidence -> handoff readiness`。
 
 如果宿主不想自己解释 `trigger_policy`，可以直接用 `meeting-app-observer-scheduler`。它消费 observer plan 和现有 runtime，把 DOM mutation、native snapshot change、keep-alive、active speaker follow-up、candidate missing end grace 统一映射为 `runtime.sample()` / `runtime.sampleTracks()` 调用：
 

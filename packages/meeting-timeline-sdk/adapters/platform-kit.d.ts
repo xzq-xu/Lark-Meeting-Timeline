@@ -232,6 +232,12 @@ import type {
   MeetingAppAdapterRuntimeConfigMatrixOptions,
   MeetingAppAdapterRuntimeConfigOptions,
 } from './meeting-app-adapter-runtime-config.mjs';
+import type {
+  MeetingAppAdapterHandoffPackage,
+  MeetingAppAdapterHandoffPackageMatrix,
+  MeetingAppAdapterHandoffPackageMatrixOptions,
+  MeetingAppAdapterHandoffPackageOptions,
+} from './meeting-app-adapter-handoff-package.mjs';
 import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type {
@@ -447,6 +453,19 @@ export interface MeetingPlatformTimelineKit {
     matrixOrOptions?: MeetingAppAdapterRuntimeConfigMatrix | MeetingAppAdapterRuntimeConfigMatrixOptions,
     configOptions?: MeetingAppAdapterRuntimeConfigMatrixOptions,
   ): MeetingAppAdapterRuntimeConfigMatrix;
+  meetingAppAdapterHandoffPackage(
+    specOrPlatform?: MeetingAppAdapterSpec | string | MeetingAppAdapterSpecInput,
+    packageOptions?: MeetingAppAdapterHandoffPackageOptions,
+  ): MeetingAppAdapterHandoffPackage;
+  meetingAppAdapterHandoffPackageMatrix(packageOptions?: MeetingAppAdapterHandoffPackageMatrixOptions): MeetingAppAdapterHandoffPackageMatrix;
+  assertMeetingAppAdapterHandoffPackage(
+    packageOrSpec?: MeetingAppAdapterHandoffPackage | MeetingAppAdapterSpec | string | MeetingAppAdapterSpecInput,
+    packageOptions?: MeetingAppAdapterHandoffPackageOptions,
+  ): MeetingAppAdapterHandoffPackage;
+  assertMeetingAppAdapterHandoffPackageMatrix(
+    matrixOrOptions?: MeetingAppAdapterHandoffPackageMatrix | MeetingAppAdapterHandoffPackageMatrixOptions,
+    packageOptions?: MeetingAppAdapterHandoffPackageMatrixOptions,
+  ): MeetingAppAdapterHandoffPackageMatrix;
   meetingAppTrackPipeline(
     input?: MeetingAppTrackPipelineInput | Record<string, unknown>[],
     trackOptions?: MeetingAppTrackPipelineOptions,

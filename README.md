@@ -93,6 +93,14 @@ npm run meeting-app:adapter-runtime-config
 
 它会写出 `data/meeting-app-adapter-runtime-configs/` 和 `data/meeting-app-adapter-runtime-config-report.json`。也支持传 `-- --spec-file=data/whereby-spec.json`，输出 `content_script_options`、`browser_runtime_options`、`capture_options`、扩展 manifest 片段和 `captured_at_ms` 非阻塞契约，供浏览器扩展、WebView preload 或 Electron content script 直接消费。
 
+如果要把适配工作交给另一个项目或另一个同事，可以直接导出完整 handoff package：
+
+```bash
+npm run meeting-app:adapter-handoff-package
+```
+
+它会写出 `data/meeting-app-adapter-handoff-packages/` 和 `data/meeting-app-adapter-handoff-package-report.json`。每个平台目录里包含 `adapter-spec.json`、`runtime-config.json`、`extension-manifest-fragment.json`、`integration-readme.md`，内置平台还会包含 `adapter-manifest.json`；这就是给 Google Meet、Teams、Zoom、Webex、Lark 或自定义会议软件宿主项目的最小接入包。
+
 如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
 
 ```bash
@@ -139,7 +147,7 @@ SDK 包级交付前再跑一次 package smoke：
 npm run sdk:package-smoke
 ```
 
-它会对 `packages/meeting-timeline-sdk` 执行 `npm pack`，并在临时 consumer 项目里按包名导入 core、`platform-kit`、`platform-rollout`、`platform-strategy`、`platform-adaptation-package`、`platform-runtime-bundle`、`meeting-platform-runtime-host-verifier`、`platform-evidence-correlation`、`platform-evidence-session`、`platform-live-adapter` 的 suite/readiness、Google Meet adapter、meeting app gate、`meeting-app-adapter-manifest`、`meeting-app-adapter-spec`、`meeting-app-adapter-runtime-config`、`meeting-app-track-pipeline` 和 `meeting-app-track-runtime`，确认外部项目不是依赖仓库内部相对路径。
+它会对 `packages/meeting-timeline-sdk` 执行 `npm pack`，并在临时 consumer 项目里按包名导入 core、`platform-kit`、`platform-rollout`、`platform-strategy`、`platform-adaptation-package`、`platform-runtime-bundle`、`meeting-platform-runtime-host-verifier`、`platform-evidence-correlation`、`platform-evidence-session`、`platform-live-adapter` 的 suite/readiness、Google Meet adapter、meeting app gate、`meeting-app-adapter-manifest`、`meeting-app-adapter-spec`、`meeting-app-adapter-runtime-config`、`meeting-app-adapter-handoff-package`、`meeting-app-track-pipeline` 和 `meeting-app-track-runtime`，确认外部项目不是依赖仓库内部相对路径。
 
 ## 启动
 

@@ -39,6 +39,12 @@ import {
   buildMeetingAppAdapterRuntimeConfigMatrix,
 } from './meeting-app-adapter-runtime-config.mjs';
 import {
+  assertMeetingAppAdapterHandoffPackage,
+  assertMeetingAppAdapterHandoffPackageMatrix,
+  buildMeetingAppAdapterHandoffPackage,
+  buildMeetingAppAdapterHandoffPackageMatrix,
+} from './meeting-app-adapter-handoff-package.mjs';
+import {
   buildMeetingAppTrackPipeline,
   createMeetingAppTrackPipeline,
 } from './meeting-app-track-pipeline.mjs';
@@ -445,6 +451,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_adapter_manifest_matrix: buildMeetingAppAdapterManifestMatrix(options),
     meeting_app_adapter_spec_matrix: buildMeetingAppAdapterSpecMatrix(options),
     meeting_app_adapter_runtime_config_matrix: buildMeetingAppAdapterRuntimeConfigMatrix(options),
+    meeting_app_adapter_handoff_package_matrix: buildMeetingAppAdapterHandoffPackageMatrix(options),
     meeting_app_integration_matrix: buildMeetingAppIntegrationMatrix(options),
     meeting_app_deployment_manifests: buildAllMeetingAppDeploymentManifests(options),
     meeting_app_deployment_manifest_acceptance: buildAllMeetingAppDeploymentManifestAcceptanceReports(options),
@@ -788,6 +795,18 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertMeetingAppAdapterRuntimeConfigMatrix(matrixOrOptions = {}, configOptions = {}) {
       return assertMeetingAppAdapterRuntimeConfigMatrix(matrixOrOptions, withDefaults(defaults, configOptions));
+    },
+    meetingAppAdapterHandoffPackage(specOrPlatform = {}, packageOptions = {}) {
+      return buildMeetingAppAdapterHandoffPackage(specOrPlatform, withDefaults(defaults, packageOptions));
+    },
+    meetingAppAdapterHandoffPackageMatrix(packageOptions = {}) {
+      return buildMeetingAppAdapterHandoffPackageMatrix(withDefaults(defaults, packageOptions));
+    },
+    assertMeetingAppAdapterHandoffPackage(packageOrSpec = {}, packageOptions = {}) {
+      return assertMeetingAppAdapterHandoffPackage(packageOrSpec, withDefaults(defaults, packageOptions));
+    },
+    assertMeetingAppAdapterHandoffPackageMatrix(matrixOrOptions = {}, packageOptions = {}) {
+      return assertMeetingAppAdapterHandoffPackageMatrix(matrixOrOptions, withDefaults(defaults, packageOptions));
     },
     meetingAppTrackPipeline(input = {}, trackOptions = {}) {
       return buildMeetingAppTrackPipeline(input, withDefaults(defaults, trackOptions));
