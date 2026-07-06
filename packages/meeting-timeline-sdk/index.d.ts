@@ -519,6 +519,26 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionOptions,
   ): import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionMatrix;
   assertAdapterDecisionMatrix: MeetingAppTimelineSdk['assertPlatformAdapterDecisionMatrix'];
+  platformAdapterStartupPlan(
+    input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-startup.mjs').MeetingPlatformAdapterStartupPlanOptions,
+  ): import('./adapters/platform-adapter-startup.mjs').MeetingPlatformAdapterStartupPlan;
+  adapterStartupPlan: MeetingAppTimelineSdk['platformAdapterStartupPlan'];
+  platformAdapterStartupPlanMatrix(
+    input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-startup.mjs').MeetingPlatformAdapterStartupPlanOptions,
+  ): import('./adapters/platform-adapter-startup.mjs').MeetingPlatformAdapterStartupPlanMatrix;
+  adapterStartupPlanMatrix: MeetingAppTimelineSdk['platformAdapterStartupPlanMatrix'];
+  assertPlatformAdapterStartupPlan(
+    input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-startup.mjs').MeetingPlatformAdapterStartupPlanOptions,
+  ): import('./adapters/platform-adapter-startup.mjs').MeetingPlatformAdapterStartupPlan;
+  assertAdapterStartupPlan: MeetingAppTimelineSdk['assertPlatformAdapterStartupPlan'];
+  assertPlatformAdapterStartupPlanMatrix(
+    input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-startup.mjs').MeetingPlatformAdapterStartupPlanOptions,
+  ): import('./adapters/platform-adapter-startup.mjs').MeetingPlatformAdapterStartupPlanMatrix;
+  assertAdapterStartupPlanMatrix: MeetingAppTimelineSdk['assertPlatformAdapterStartupPlanMatrix'];
   platformAdaptationStrategy(
     platformOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
@@ -587,4 +607,5 @@ export * from './adapters/platform-adapter-smoke.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-adapter-decision.mjs';
+export * from './adapters/platform-adapter-startup.mjs';
 export * from './adapters/platform-strategy.mjs';

@@ -77,6 +77,11 @@ import type {
   MeetingPlatformAdapterDecisionOptions,
 } from './platform-adapter-decision.mjs';
 import type {
+  MeetingPlatformAdapterStartupPlan,
+  MeetingPlatformAdapterStartupPlanMatrix,
+  MeetingPlatformAdapterStartupPlanOptions,
+} from './platform-adapter-startup.mjs';
+import type {
   MeetingPlatformHostIntegrationOptions,
   MeetingPlatformHostIntegrationPlan,
   MeetingPlatformHostIntegrationScaffold,
@@ -454,6 +459,10 @@ export interface MeetingPlatformTimelineKit {
   platformAdapterDecisionMatrix(input?: MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecisionMatrix;
   assertPlatformAdapterDecision(input?: string | URL | MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecision;
   assertPlatformAdapterDecisionMatrix(input?: MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecisionMatrix;
+  platformAdapterStartupPlan(input?: string | URL | MeetingPlatformAdapterDecisionInput, startupOptions?: MeetingPlatformAdapterStartupPlanOptions): MeetingPlatformAdapterStartupPlan;
+  platformAdapterStartupPlanMatrix(input?: MeetingPlatformAdapterDecisionInput, startupOptions?: MeetingPlatformAdapterStartupPlanOptions): MeetingPlatformAdapterStartupPlanMatrix;
+  assertPlatformAdapterStartupPlan(input?: string | URL | MeetingPlatformAdapterDecisionInput, startupOptions?: MeetingPlatformAdapterStartupPlanOptions): MeetingPlatformAdapterStartupPlan;
+  assertPlatformAdapterStartupPlanMatrix(input?: MeetingPlatformAdapterDecisionInput, startupOptions?: MeetingPlatformAdapterStartupPlanOptions): MeetingPlatformAdapterStartupPlanMatrix;
   platformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
   assertPlatformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
   platformConsumerHandoff(handoffOptions?: MeetingPlatformConsumerHandoffOptions): MeetingPlatformConsumerHandoff;
