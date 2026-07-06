@@ -339,7 +339,27 @@ const matrix = buildMeetingPlatformAdaptationStrategyMatrix({
 });
 
 console.log(matrix.rows);
+console.log(matrix.rows.map((row) => ({
+  platform: row.platform,
+  next: row.next_phase,
+  providerPath: row.provider_path,
+  permissionRisk: row.permission_risk,
+})));
+
+const googleStrategy = matrix.strategies.find((item) => item.platform === 'google_meet');
+console.log(googleStrategy.adaptation_playbook.phases.map((phase) => ({
+  id: phase.id,
+  priority: phase.priority,
+  status: phase.status,
+})));
 ```
+
+`adaptation_playbook` 是跨会议软件适配时最应该交给宿主项目看的字段：
+
+- `phases`：P0 本地轴、P0 实时标注写入、P1 provider reconcile、P1 发言人/参会者 marker、P2 会后 transcript/recording 回填、P3 production evidence gate。
+- `integration_path`：Google Meet 是 `google_workspace_events_pubsub`，Teams 是 `microsoft_graph_change_notifications`，Zoom/Webex 是 webhook，Lark 是长连接或事件回调。
+- `risk_profile`：权限风险、事件延迟风险、发言人实时缺口、会后转写可用性，以及对应 mitigation。
+- `matrix.rows`：给接入面板用的扁平字段，包括 `next_phase`、`provider_path`、`permission_risk`、`provider_reconcile_required`、`speaker_realtime_gap`、`post_meeting_backfill_supported`。
 
 如果另一个项目只想知道“这个会议软件应该接哪条链路”，优先用 `platform-adapter-route`。它把 strategy/runtime profile 收敛成宿主可直接消费的 route：第一优先级永远是本地观察或 host detector 建当前会议轴，第二步用 `captured_at_ms` 插入标注，发言人只写位置 marker，provider webhook 做非阻塞校准，会后 transcript/recording 只做回填：
 

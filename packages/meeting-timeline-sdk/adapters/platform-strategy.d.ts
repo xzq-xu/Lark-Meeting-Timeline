@@ -27,6 +27,56 @@ export interface MeetingPlatformAdaptationStrategy {
   provider_events?: Record<string, unknown>;
   speaker_activity?: Record<string, unknown>;
   post_meeting_transcript?: Record<string, unknown>;
+  adaptation_playbook: {
+    phases: Array<{
+      id: string;
+      priority: string;
+      purpose: string;
+      owner?: string;
+      source?: string;
+      transport?: string;
+      required_for_pilot: boolean;
+      required_for_production: boolean;
+      non_blocking_for_realtime?: boolean;
+      status: string;
+      timestamp_field?: string;
+      invariant?: string;
+      sdk_method?: string;
+      done_when?: string;
+      evidence_input?: string;
+      event_types?: string[];
+      lifecycle_event_types?: string[];
+      participant_support?: string;
+      speaker_support?: string;
+      fallback?: string;
+      realtime_dependency?: boolean;
+      availability?: string;
+      import_endpoint?: string;
+      sdk_normalizer?: string;
+      gate?: string;
+      requires?: string[];
+    }>;
+    next_phase?: string;
+    next_phase_priority?: string;
+    integration_path: {
+      path: string;
+      transport: string;
+      permission_risk: string;
+      setup_risk: string;
+    };
+    risk_profile: {
+      provider_path: string;
+      provider_transport: string;
+      permission_risk: string;
+      setup_risk: string;
+      event_latency_risk: string;
+      provider_axis_risk: string;
+      speaker_realtime_gap: boolean;
+      transcript_availability_risk: string;
+      current_rollout_status?: string;
+      mitigations: string[];
+    };
+  };
   evidence_contract: Record<string, unknown>;
   next_actions: string[];
   rollout_plan?: Record<string, unknown>;
@@ -41,6 +91,9 @@ export interface MeetingPlatformAdaptationStrategyMatrix {
   realtime_ready_count: number;
   local_first_count: number;
   non_blocking_provider_count: number;
+  provider_reconcile_required_count: number;
+  speaker_local_fallback_count: number;
+  post_meeting_backfill_count: number;
   platforms: string[];
   rows: Record<string, unknown>[];
   strategies: MeetingPlatformAdaptationStrategy[];

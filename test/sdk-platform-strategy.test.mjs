@@ -64,6 +64,13 @@ assert.equal(googleStrategy.provider_events.required_for_pilot, false);
 assert.equal(googleStrategy.provider_events.event_types.includes('google.workspace.meet.conference.v2.started'), true);
 assert.equal(googleStrategy.speaker_activity.realtime_primary, 'local_observer_or_detector');
 assert.equal(googleStrategy.post_meeting_transcript.realtime_dependency, false);
+assert.equal(googleStrategy.adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
+assert.equal(googleStrategy.adaptation_playbook.next_phase, 'axis_bootstrap');
+assert.equal(googleStrategy.adaptation_playbook.phases.find((phase) => phase.id === 'axis_bootstrap').priority, 'P0');
+assert.equal(googleStrategy.adaptation_playbook.phases.find((phase) => phase.id === 'provider_reconcile').non_blocking_for_realtime, true);
+assert.equal(googleStrategy.adaptation_playbook.risk_profile.provider_axis_risk, 'must_not_block_realtime_axis');
+assert.equal(googleStrategy.adaptation_playbook.risk_profile.mitigations.includes('create_local_axis_before_provider_event_arrives'), true);
+assert.equal(googleStrategy.adaptation_playbook.risk_profile.mitigations.includes('monitor_workspace_subscription_lifecycle_events'), true);
 assert.equal(googleStrategy.evidence_contract.production.requires.includes('meetingAppRecordSet'), true);
 assert.equal(googleStrategy.evidence_contract.production.requires.includes('providerRecords'), true);
 
@@ -76,6 +83,9 @@ assert.equal(zoomPilot.ready_for_realtime_annotations, true);
 assert.equal(zoomPilot.production_ready, false);
 assert.equal(zoomPilot.recommendation, 'enable_local_observer_pilot_collect_provider_evidence');
 assert.equal(zoomPilot.provider_events.latency.realtime_blocking, false);
+assert.equal(zoomPilot.adaptation_playbook.next_phase, 'provider_reconcile');
+assert.equal(zoomPilot.adaptation_playbook.phases.find((phase) => phase.id === 'realtime_annotation_intake').status, 'ready');
+assert.equal(zoomPilot.adaptation_playbook.phases.find((phase) => phase.id === 'provider_reconcile').status, 'pending_provider_evidence');
 assert.equal(zoomPilot.evidence_contract.pilot.current_passed, true);
 assert.equal(zoomPilot.evidence_contract.production.current_passed, false);
 
@@ -84,6 +94,8 @@ assert.equal(localDetector.platform, 'local_detector');
 assert.equal(localDetector.realtime_axis.primary_source, 'local_detector');
 assert.equal(localDetector.provider_events, undefined);
 assert.equal(localDetector.local_observer.role, 'primary_axis_source');
+assert.equal(localDetector.adaptation_playbook.integration_path.path, 'host_detector_runtime');
+assert.equal(localDetector.adaptation_playbook.phases.find((phase) => phase.id === 'provider_reconcile').status, 'not_applicable');
 assert.equal(localDetector.evidence_contract.production.requires.includes('local_detector_start_end_records'), true);
 
 const strategies = buildAllMeetingPlatformAdaptationStrategies({
@@ -100,8 +112,14 @@ const matrix = buildMeetingPlatformAdaptationStrategyMatrix({
 });
 assert.equal(matrix.type, 'meeting_platform_adaptation_strategy_matrix');
 assert.equal(matrix.strategy_count, 3);
+assert.equal(matrix.provider_reconcile_required_count, 2);
+assert.equal(matrix.speaker_local_fallback_count, 2);
+assert.equal(matrix.post_meeting_backfill_count, 2);
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').ready_for_realtime_annotations, true);
+assert.equal(matrix.rows.find((row) => row.platform === 'zoom').next_phase, 'provider_reconcile');
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').provider_blocks_realtime, false);
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').provider_path, 'google_workspace_events_pubsub');
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').post_meeting_backfill_supported, true);
 assert.equal(matrix.rows.find((row) => row.platform === 'local_detector').primary_axis_source, 'local_detector');
 
 const kit = createMeetingPlatformTimelineKit({ baseUrl, verify: false });
