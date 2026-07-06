@@ -78,6 +78,18 @@ assert.equal(handoff.surface_coverage_matrix.rows.find((row) => row.platform ===
 assert.equal(handoff.surface_coverage_matrix.rows.find((row) => row.platform === 'google_meet').provider_reconcile.provider_path, 'google_workspace_events_pubsub');
 assert.equal(handoff.surface_coverage_matrix.rows.find((row) => row.platform === 'microsoft_teams').provider_reconcile.provider_path, 'microsoft_graph_change_notifications');
 assert.equal(handoff.surface_coverage_matrix.rows.find((row) => row.platform === 'zoom').post_meeting_backfill.supported, true);
+assert.equal(handoff.adaptation_roadmap.schema, 'meeting_platform_adaptation_roadmap');
+assert.equal(handoff.adaptation_roadmap.platform_count, 5);
+assert.equal(handoff.adaptation_roadmap.pilot_ready_count, 5);
+assert.equal(handoff.adaptation_roadmap.production_ready_count, 0);
+assert.equal(handoff.adaptation_roadmap.recommended_first_platform, 'google_meet');
+assert.equal(handoff.adaptation_roadmap.recommended_first_surface, 'browser_extension');
+assert.deepEqual(handoff.adaptation_roadmap.priority_order.slice(0, 3), ['google_meet', 'zoom', 'microsoft_teams']);
+assert.equal(handoff.adaptation_roadmap.rows[0].platform, 'google_meet');
+assert.equal(handoff.adaptation_roadmap.rows[1].platform, 'zoom');
+assert.equal(handoff.adaptation_roadmap.rows.find((row) => row.platform === 'google_meet').provider_path, 'google_workspace_events_pubsub');
+assert.equal(handoff.adaptation_roadmap.rows.find((row) => row.platform === 'google_meet').production_gaps.includes('production_evidence_pending'), true);
+assert.equal(handoff.adaptation_roadmap.rows.find((row) => row.platform === 'microsoft_teams').provider_permission_risk, 'tenant_admin_consent_and_subscription_renewal');
 assert.equal(handoff.boot_order[0].action, 'run_static_consumer_handoff');
 assert.equal(handoff.boot_order.some((step) => step.action === 'choose_lightweight_connector_or_full_integration_runtime'), true);
 assert.equal(handoff.rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');

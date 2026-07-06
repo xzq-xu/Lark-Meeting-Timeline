@@ -10,6 +10,10 @@ export interface MeetingPlatformConsumerHandoffOptions {
   base_path?: string;
   platforms?: Iterable<string> | string[];
   platform_keys?: Iterable<string> | string[];
+  priorityPlatformOrder?: Iterable<string> | string[];
+  priority_platform_order?: Iterable<string> | string[];
+  priorityPlatforms?: Iterable<string> | string[];
+  priority_platforms?: Iterable<string> | string[];
   env?: Record<string, unknown>;
   requireHandoffReady?: boolean;
   require_handoff_ready?: boolean;
@@ -114,6 +118,33 @@ export interface MeetingPlatformSurfaceCoverageMatrix {
   }>;
 }
 
+export interface MeetingPlatformAdaptationRoadmap {
+  type: 'meeting_platform_adaptation_roadmap';
+  schema: 'meeting_platform_adaptation_roadmap';
+  schema_version: 1;
+  platform_count: number;
+  pilot_ready_count: number;
+  production_ready_count: number;
+  recommended_first_platform?: string;
+  recommended_first_surface?: string;
+  priority_order: string[];
+  rows: Array<{
+    platform: string;
+    display_name?: string;
+    rank_hint: number;
+    priority_tier: string;
+    recommended_first_surface: string;
+    next_phase?: string;
+    next_action?: string;
+    provider_path?: string;
+    provider_permission_risk?: string;
+    pilot_ready: boolean;
+    production_ready: boolean;
+    production_gaps: string[];
+    reasons: string[];
+  }>;
+}
+
 export interface MeetingPlatformConsumerHandoff {
   type: 'meeting_platform_consumer_handoff';
   schema: typeof MEETING_PLATFORM_CONSUMER_HANDOFF_SCHEMA;
@@ -144,6 +175,7 @@ export interface MeetingPlatformConsumerHandoff {
   lightweight_connector_handoff: Record<string, unknown>;
   sdk_facade_handoff: MeetingPlatformSdkFacadeHandoff;
   surface_coverage_matrix: MeetingPlatformSurfaceCoverageMatrix;
+  adaptation_roadmap: MeetingPlatformAdaptationRoadmap;
   boot_order: Array<Record<string, unknown>>;
   endpoints: Record<string, string>;
   commands: Record<string, string>;

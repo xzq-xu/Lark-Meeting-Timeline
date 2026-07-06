@@ -49,6 +49,14 @@ assert.equal(report.surface_coverage_matrix.browser_extension_ready_count, 3);
 assert.equal(report.surface_coverage_matrix.provider_reconcile_ready_count, 3);
 assert.equal(report.surface_coverage_matrix.rows.find((row) => row.platform === 'google_meet').webview_preload.ready, true);
 assert.equal(report.surface_coverage_matrix.rows.find((row) => row.platform === 'microsoft_teams').provider_reconcile.provider_path, 'microsoft_graph_change_notifications');
+assert.equal(report.adaptation_roadmap.schema, 'meeting_platform_adaptation_roadmap');
+assert.equal(report.adaptation_roadmap.platform_count, 3);
+assert.equal(report.adaptation_roadmap.recommended_first_platform, 'google_meet');
+assert.equal(report.adaptation_roadmap.recommended_first_surface, 'browser_extension');
+assert.deepEqual(report.adaptation_roadmap.priority_order.slice(0, 3), ['google_meet', 'zoom', 'microsoft_teams']);
+assert.equal(report.adaptation_roadmap.rows[0].platform, 'google_meet');
+assert.equal(report.adaptation_roadmap.rows[0].recommended_first_surface, 'browser_extension');
+assert.equal(report.adaptation_roadmap.rows.find((row) => row.platform === 'microsoft_teams').provider_permission_risk, 'tenant_admin_consent_and_subscription_renewal');
 assert.equal(report.rows.find((row) => row.platform === 'microsoft_teams').consumer_ready, true);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');
 

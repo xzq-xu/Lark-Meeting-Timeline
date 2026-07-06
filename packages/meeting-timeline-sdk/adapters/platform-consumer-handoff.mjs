@@ -29,6 +29,15 @@ const DEFAULT_CONSUMER_PLATFORMS = Object.freeze([
   'webex',
 ]);
 
+const DEFAULT_PRIORITY_ORDER = Object.freeze([
+  'google_meet',
+  'zoom',
+  'microsoft_teams',
+  'webex',
+  'lark',
+  'local_detector',
+]);
+
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
 }
@@ -61,6 +70,21 @@ function issue(severity, code, message, details = {}) {
 
 function boolOption(options = {}, camel, snake, defaultValue = false) {
   return firstNonEmpty(options[camel], options[snake], defaultValue) === true;
+}
+
+function priorityOrder(options = {}) {
+  return unique(asArray(firstNonEmpty(
+    options.priorityPlatformOrder,
+    options.priority_platform_order,
+    options.priorityPlatforms,
+    options.priority_platforms,
+    DEFAULT_PRIORITY_ORDER,
+  )).map((platform) => normalizeMeetingPlatform(platform)));
+}
+
+function priorityIndex(platform, order = []) {
+  const index = order.indexOf(platform);
+  return index >= 0 ? index : order.length + 10;
 }
 
 function commandWithBase(name, options = {}, extra = '') {
@@ -521,6 +545,99 @@ function buildSurfaceCoverageMatrix(platforms = [], inputs = {}) {
   };
 }
 
+function recommendedSurface(coverageRow = {}) {
+  if (coverageRow.browser_extension?.ready === true) return 'browser_extension';
+  if (coverageRow.webview_preload?.ready === true) return 'webview_preload';
+  if (coverageRow.native_detector?.ready === true) return 'native_detector';
+  if (coverageRow.provider_reconcile?.ready === true) return 'provider_reconcile';
+  return 'manual_or_local_detector';
+}
+
+function surfaceReady(surface, coverageRow = {}) {
+  if (surface === 'manual_or_local_detector') return false;
+  return coverageRow[surface]?.ready === true;
+}
+
+function priorityTierRank(tier) {
+  if (tier === 'production') return 0;
+  if (tier === 'pilot') return 1;
+  return 2;
+}
+
+function roadmapReasons(row = {}, coverageRow = {}, adaptation = {}) {
+  return [
+    coverageRow.browser_extension?.ready === true ? 'browser_extension_ready_for_local_axis' : undefined,
+    coverageRow.lightweight_connector?.ready === true ? 'lightweight_connector_ready' : undefined,
+    coverageRow.provider_reconcile?.ready === true ? `provider_reconcile_path:${coverageRow.provider_reconcile.provider_path}` : undefined,
+    coverageRow.post_meeting_backfill?.supported === true ? 'post_meeting_backfill_supported' : undefined,
+    row.provider_blocks_realtime === false ? 'provider_does_not_block_realtime_marks' : undefined,
+    row.transcript_blocks_realtime === false ? 'transcript_does_not_block_realtime_marks' : undefined,
+    adaptation.speaker_realtime_gap === true ? 'speaker_track_uses_local_observer_or_backfill' : undefined,
+  ].filter(Boolean);
+}
+
+function productionGaps(row = {}, adaptation = {}, coverageRow = {}) {
+  const gaps = [];
+  if (row.production_ready !== true) gaps.push('production_evidence_pending');
+  if (row.handoff_ready !== true) gaps.push('handoff_readiness_evidence_pending');
+  if (adaptation.ready_for_realtime_annotations !== true) gaps.push(adaptation.next_phase ?? 'axis_bootstrap_pending');
+  if (coverageRow.provider_reconcile?.ready !== true) gaps.push('provider_reconcile_not_ready');
+  return unique(gaps);
+}
+
+function buildAdaptationRoadmap(platforms = [], inputs = {}) {
+  const {
+    rowsByPlatform = {},
+    adaptationRows = {},
+    surfaceCoverageMatrix = {},
+    options = {},
+  } = inputs;
+  const order = priorityOrder(options);
+  const coverageRows = byPlatform(surfaceCoverageMatrix.rows);
+  const roadmapRows = platforms.map((platform) => {
+    const row = rowsByPlatform[platform] ?? {};
+    const adaptation = adaptationRows[platform] ?? {};
+    const coverage = coverageRows[platform] ?? {};
+    const surface = recommendedSurface(coverage);
+    const gaps = productionGaps(row, adaptation, coverage);
+    const productionReady = row.production_ready === true;
+    const pilotReady = row.consumer_ready === true
+      && surfaceReady(surface, coverage)
+      && row.provider_blocks_realtime === false
+      && row.transcript_blocks_realtime === false;
+    return compactObject({
+      platform,
+      display_name: row.display_name ?? adaptation.display_name,
+      rank_hint: priorityIndex(platform, order) + 1,
+      priority_tier: productionReady ? 'production' : pilotReady ? 'pilot' : 'blocked',
+      recommended_first_surface: surface,
+      next_phase: adaptation.next_phase ?? row.first_next_action,
+      next_action: row.first_next_action ?? adaptation.next_phase ?? gaps[0],
+      provider_path: adaptation.provider_path ?? coverage.provider_reconcile?.provider_path,
+      provider_permission_risk: adaptation.provider_permission_risk ?? coverage.provider_reconcile?.permission_risk,
+      pilot_ready: pilotReady,
+      production_ready: productionReady,
+      production_gaps: gaps,
+      reasons: roadmapReasons(row, coverage, adaptation),
+    });
+  }).sort((left, right) => (
+    priorityTierRank(left.priority_tier) - priorityTierRank(right.priority_tier)
+    || Number(left.rank_hint ?? 999) - Number(right.rank_hint ?? 999)
+  ));
+  return {
+    type: 'meeting_platform_adaptation_roadmap',
+    schema: 'meeting_platform_adaptation_roadmap',
+    schema_version: 1,
+    platform_count: roadmapRows.length,
+    pilot_ready_count: roadmapRows.filter((row) => row.pilot_ready).length,
+    production_ready_count: roadmapRows.filter((row) => row.production_ready).length,
+    recommended_first_platform: roadmapRows[0]?.platform,
+    recommended_first_surface: roadmapRows[0]?.recommended_first_surface,
+    priority_order: order,
+    rows: roadmapRows,
+  };
+}
+
 function hostPlanSummary(hostPlan = {}) {
   return compactObject({
     type: hostPlan.type,
@@ -686,6 +803,13 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
     routeRows,
     handoffRows,
   });
+  const rowsByPlatform = byPlatform(rows);
+  const adaptationRoadmap = buildAdaptationRoadmap(platforms, {
+    rowsByPlatform,
+    adaptationRows,
+    surfaceCoverageMatrix,
+    options: sharedOptions,
+  });
   const structuralIssues = [
     hostPlan.candidate_observation_contract?.all_ready === true
       ? undefined
@@ -748,6 +872,7 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
       connectorHub,
     }),
     surface_coverage_matrix: surfaceCoverageMatrix,
+    adaptation_roadmap: adaptationRoadmap,
     boot_order: buildBootOrder(hostPlan, commands),
     endpoints: hostPlan.endpoints,
     commands,
