@@ -22,6 +22,8 @@ import {
 import {
   buildMeetingAppAdapterCapabilityMatrix,
   buildMeetingAppAdapterCapabilityReport,
+  buildMeetingAppAdapterExecutionPlan,
+  buildMeetingAppAdapterExecutionPlanMatrix,
 } from './meeting-app-adapter-capability.mjs';
 import {
   assertMeetingAppAdapterManifest,
@@ -462,6 +464,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_adapter_handoff_package_matrix: buildMeetingAppAdapterHandoffPackageMatrix(options),
     meeting_app_adapter_verification_report_matrix: buildMeetingAppAdapterVerificationReportMatrix(options),
     meeting_app_adapter_capability_matrix: buildMeetingAppAdapterCapabilityMatrix(options),
+    meeting_app_adapter_execution_plan_matrix: buildMeetingAppAdapterExecutionPlanMatrix(options),
     meeting_app_integration_matrix: buildMeetingAppIntegrationMatrix(options),
     meeting_app_deployment_manifests: buildAllMeetingAppDeploymentManifests(options),
     meeting_app_deployment_manifest_acceptance: buildAllMeetingAppDeploymentManifestAcceptanceReports(options),
@@ -779,6 +782,21 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppAdapterCapabilityMatrix(capabilityOptions = {}) {
       return buildMeetingAppAdapterCapabilityMatrix(withDefaults(defaults, capabilityOptions));
+    },
+    meetingAppAdapterExecutionPlan(platformOrCapability, input = {}, planOptions = {}) {
+      if (platformOrCapability?.schema === 'meeting_app_adapter_capability_report') {
+        return buildMeetingAppAdapterExecutionPlan(platformOrCapability, withDefaults(defaults, input));
+      }
+      if (platformOrCapability && typeof platformOrCapability === 'object' && !Array.isArray(platformOrCapability)) {
+        return buildMeetingAppAdapterExecutionPlan(withDefaults(defaults, platformOrCapability));
+      }
+      return buildMeetingAppAdapterExecutionPlan(platformOrCapability, {
+        ...withDefaults(defaults, planOptions),
+        input,
+      });
+    },
+    meetingAppAdapterExecutionPlanMatrix(planOptions = {}) {
+      return buildMeetingAppAdapterExecutionPlanMatrix(withDefaults(defaults, planOptions));
     },
     meetingAppAdapterManifest(platform, manifestOptions = {}) {
       return buildMeetingAppAdapterManifest(platform, withDefaults(defaults, manifestOptions));

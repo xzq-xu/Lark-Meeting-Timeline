@@ -120,5 +120,8 @@ assert.equal(capabilityReport.ok, true);
 assert.equal(capabilityReport.platform_count, 2);
 assert.equal(capabilityReport.production_ready_count, 2);
 assert.equal(capabilityReport.rows.find((row) => row.platform === 'google_meet').recommended_mode, 'hybrid_local_observer_first');
+assert.equal(capabilityReport.execution_plan_matrix.schema, 'meeting_app_adapter_execution_plan_matrix');
+assert.equal(capabilityReport.execution_plan_matrix.realtime_ready_count, 2);
+assert.equal(capabilityReport.execution_plan_rows.find((row) => row.platform === 'zoom').first_blocked_step, undefined);
 
 console.log('ok meeting app adapter verify script');

@@ -1083,6 +1083,8 @@ CLI 默认读取 `data/meeting-app-adapter-handoff-packages/` 和 `data/meeting-
 import {
   buildMeetingAppAdapterCapabilityMatrix,
   buildMeetingAppAdapterCapabilityReport,
+  buildMeetingAppAdapterExecutionPlan,
+  buildMeetingAppAdapterExecutionPlanMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-capability';
 
 const googleCapability = buildMeetingAppAdapterCapabilityReport('google-meet', {
@@ -1090,14 +1092,22 @@ const googleCapability = buildMeetingAppAdapterCapabilityReport('google-meet', {
   evidence: googleLiveEvidence,
 });
 
+const googlePlan = buildMeetingAppAdapterExecutionPlan(googleCapability);
+
 const capabilityMatrix = buildMeetingAppAdapterCapabilityMatrix({
   platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
   inputs: liveSnapshotsByPlatform,
   evidenceByAdapter,
 });
+
+const executionPlanMatrix = buildMeetingAppAdapterExecutionPlanMatrix({
+  capabilityMatrix,
+});
 ```
 
 `recommended_mode` 会明确给出 `hybrid_local_observer_first`、`local_observer_axis_with_provider_backfill`、`provider_event_primary_with_local_snapshot_required` 或 `post_meeting_artifact_only`；`timeline_capabilities` 会分别列出 `realtime_axis`、`speaker_track`、`participant_track`、`annotation_timeline`、`post_meeting_transcript` 和 `recording` 的 provider/local 状态。
+
+`execution_plan` 则把状态翻译成可执行步骤：`capture_meeting_app_snapshot` 负责真实会议页/窗口 observation，`start_or_reconcile_meeting_axis` 负责本地低延迟建轴或 provider 事件校准，`insert_annotation_on_current_axis` 负责按 `captured_at_ms` 落标注，`emit_speaker_position_markers` / `track_visible_participants` 负责时间轴位置轨，`configure_provider_reconcile` 和 `import_post_meeting_artifacts` 只做回填和会后处理。
 
 ```bash
 npm run meeting-app:adapter-capability

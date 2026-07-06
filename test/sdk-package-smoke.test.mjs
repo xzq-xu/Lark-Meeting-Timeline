@@ -321,6 +321,8 @@ import {
 import {
   buildMeetingAppAdapterCapabilityMatrix,
   buildMeetingAppAdapterCapabilityReport,
+  buildMeetingAppAdapterExecutionPlan,
+  buildMeetingAppAdapterExecutionPlanMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-capability';
 import {
   assertMeetingAppRuntimeAdapterHandoff,
@@ -828,6 +830,29 @@ assert.equal(buildMeetingAppAdapterCapabilityMatrix({
     },
   },
 }).schema, 'meeting_app_adapter_capability_matrix');
+const packageExecutionPlan = buildMeetingAppAdapterExecutionPlan('google-meet', {
+  input: {
+    url: 'https://meet.google.com/abc-defg-hij',
+    page: {
+      controls: [{ label: 'Leave call' }],
+      participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+    },
+  },
+});
+assert.equal(packageExecutionPlan.schema, 'meeting_app_adapter_execution_plan');
+assert.equal(packageExecutionPlan.realtime_ready, true);
+assert.equal(buildMeetingAppAdapterExecutionPlanMatrix({
+  platforms: ['google-meet'],
+  inputs: {
+    google_meet: {
+      url: 'https://meet.google.com/abc-defg-hij',
+      page: {
+        controls: [{ label: 'Leave call' }],
+        participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+      },
+    },
+  },
+}).schema, 'meeting_app_adapter_execution_plan_matrix');
 assert.equal(buildMeetingAppRuntimeObserverPlan({
   url: 'https://meet.google.com/abc-defg-hij',
   page: {

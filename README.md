@@ -115,7 +115,7 @@ npm run meeting-app:adapter-verify
 npm run meeting-app:adapter-capability
 ```
 
-它会写出 `data/meeting-app-adapter-capability-report.json`，把 Google Meet、Teams、Zoom、Webex、Lark 的官方 provider 事件、本地/浏览器 observation、speaker/participant 轨道、会后 transcript backfill 和 live evidence 状态合成 `recommended_mode`、`pilot_ready`、`production_ready`。这个报告用于回答“这个会议软件应该走 hybrid local observer、provider event primary，还是只能先做会后 artifact”的接入问题。
+它会写出 `data/meeting-app-adapter-capability-report.json`，把 Google Meet、Teams、Zoom、Webex、Lark 的官方 provider 事件、本地/浏览器 observation、speaker/participant 轨道、会后 transcript backfill 和 live evidence 状态合成 `recommended_mode`、`pilot_ready`、`production_ready`。报告里还包含 `execution_plan_matrix`，把每个平台拆成 `capture_meeting_app_snapshot`、`start_or_reconcile_meeting_axis`、`insert_annotation_on_current_axis`、`emit_speaker_position_markers`、`configure_provider_reconcile` 等步骤，用来回答“外部项目下一步具体要实现哪条 runtime path”。
 
 如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
 

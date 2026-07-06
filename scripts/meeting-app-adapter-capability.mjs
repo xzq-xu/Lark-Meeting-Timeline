@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import {
   buildMeetingAppAdapterCapabilityMatrix,
+  buildMeetingAppAdapterExecutionPlanMatrix,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-adapter-capability.mjs';
 import {
   boolLabel,
@@ -41,6 +42,9 @@ const matrix = buildMeetingAppAdapterCapabilityMatrix({
   evidenceByAdapter,
   includeVerification: evidenceByAdapter != null || args.get('include-verification') === 'true',
 });
+const executionPlanMatrix = buildMeetingAppAdapterExecutionPlanMatrix({
+  capabilityMatrix: matrix,
+});
 
 const report = {
   type: 'meeting_app_adapter_capability_cli_report',
@@ -55,9 +59,14 @@ const report = {
   provider_axis_declared_count: matrix.provider_axis_declared_count,
   required_platforms: requiredPlatforms,
   rows: matrix.rows,
+  execution_plan_rows: executionPlanMatrix.rows,
   matrix: includeReports ? matrix : {
     ...matrix,
     reports: undefined,
+  },
+  execution_plan_matrix: includeReports ? executionPlanMatrix : {
+    ...executionPlanMatrix,
+    plans: undefined,
   },
   next_actions: matrix.next_actions,
 };
@@ -69,7 +78,8 @@ if (jsonOutput) {
 } else {
   console.log(`meeting_app_adapter_capability_report | ok=${boolLabel(report.ok)} | accepted=${report.accepted_count}/${report.platform_count} | pilot=${report.pilot_ready_count} | production=${report.production_ready_count} | local_axis=${report.local_axis_ready_count} | provider_axis=${report.provider_axis_declared_count}`);
   for (const row of report.rows) {
-    console.log(`${row.platform}: mode=${row.recommended_mode} pilot=${boolLabel(row.pilot_ready)} production=${boolLabel(row.production_ready)} realtime=${row.realtime_axis_status} speaker=${row.speaker_track_status} next=${row.first_next_action ?? 'none'}`);
+    const planRow = report.execution_plan_rows.find((item) => item.platform === row.platform);
+    console.log(`${row.platform}: mode=${row.recommended_mode} pilot=${boolLabel(row.pilot_ready)} production=${boolLabel(row.production_ready)} realtime=${row.realtime_axis_status} speaker=${row.speaker_track_status} blocked=${planRow?.first_blocked_step ?? 'none'} next=${row.first_next_action ?? 'none'}`);
   }
   if (report.next_actions.length > 0) console.log(`next_actions=${report.next_actions.join(',')}`);
 }

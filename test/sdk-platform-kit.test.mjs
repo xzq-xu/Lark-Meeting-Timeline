@@ -185,6 +185,32 @@ const appCapabilityMatrix = kit.meetingAppAdapterCapabilityMatrix({
 assert.equal(appCapabilityMatrix.platform_count, 2);
 assert.equal(appCapabilityMatrix.pilot_ready_count, 2);
 assert.equal(kit.report({ platforms: ['google-meet'] }).meeting_app_adapter_capability_matrix.platform_count, 1);
+const appExecutionPlan = kit.meetingAppAdapterExecutionPlan(appCapability);
+assert.equal(appExecutionPlan.schema, 'meeting_app_adapter_execution_plan');
+assert.equal(appExecutionPlan.realtime_ready, true);
+assert.equal(appExecutionPlan.steps.find((step) => step.id === 'configure_provider_reconcile').status, 'ready');
+const appExecutionPlanMatrix = kit.meetingAppAdapterExecutionPlanMatrix({
+  platforms: ['google-meet', 'zoom'],
+  inputs: {
+    google_meet: {
+      url: 'https://meet.google.com/abc-defg-hij',
+      title: 'Google Meet',
+      page: {
+        controls: [{ label: 'Leave call' }],
+        participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace speaking' }],
+      },
+    },
+    zoom: {
+      app: { name: 'Zoom Workplace' },
+      window: { title: 'Zoom Meeting', controls: [{ label: 'Leave Meeting' }] },
+      meeting_id: 'zoom-local',
+      tiles: [{ id: 'mira', ariaLabel: 'Mira Patel is speaking' }],
+    },
+  },
+});
+assert.equal(appExecutionPlanMatrix.platform_count, 2);
+assert.equal(appExecutionPlanMatrix.realtime_ready_count, 2);
+assert.equal(kit.report({ platforms: ['google-meet'] }).meeting_app_adapter_execution_plan_matrix.platform_count, 1);
 const appObserverPlan = kit.meetingAppRuntimeObserverPlan({
   url: 'https://meet.google.com/abc-defg-hij',
   page: {

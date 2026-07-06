@@ -14,8 +14,12 @@ import {
 import {
   MEETING_APP_ADAPTER_CAPABILITY_MATRIX_SCHEMA,
   MEETING_APP_ADAPTER_CAPABILITY_REPORT_SCHEMA,
+  MEETING_APP_ADAPTER_EXECUTION_PLAN_MATRIX_SCHEMA,
+  MEETING_APP_ADAPTER_EXECUTION_PLAN_SCHEMA,
   buildMeetingAppAdapterCapabilityMatrix,
   buildMeetingAppAdapterCapabilityReport,
+  buildMeetingAppAdapterExecutionPlan,
+  buildMeetingAppAdapterExecutionPlanMatrix,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-adapter-capability.mjs';
 import { createMeetingSourceAggregator } from '../packages/meeting-timeline-sdk/adapters/meeting-source.mjs';
 
@@ -103,6 +107,12 @@ assert.equal(googleCapability.recommended_mode, 'hybrid_local_observer_first');
 assert.equal(googleCapability.timeline_capabilities.realtime_axis.status, 'local_ready');
 assert.equal(googleCapability.timeline_capabilities.speaker_track.status, 'local_ready');
 assert.equal(googleCapability.timeline_capabilities.post_meeting_transcript.provider_declared, true);
+const googleExecutionPlan = buildMeetingAppAdapterExecutionPlan(googleCapability);
+assert.equal(googleExecutionPlan.schema, MEETING_APP_ADAPTER_EXECUTION_PLAN_SCHEMA);
+assert.equal(googleExecutionPlan.realtime_ready, true);
+assert.equal(googleExecutionPlan.first_blocked_step, undefined);
+assert.equal(googleExecutionPlan.steps.find((step) => step.id === 'insert_annotation_on_current_axis').status, 'ready');
+assert.equal(googleExecutionPlan.gates.find((gate) => gate.id === 'live_evidence_package').status, 'passed');
 
 const explicitPlatformNormalized = normalizeMeetingAppSnapshot({
   url: 'https://meet.google.com/abc-defg-hij',
@@ -221,6 +231,13 @@ assert.equal(capabilityMatrix.pilot_ready_count, 3);
 assert.equal(capabilityMatrix.local_axis_ready_count, 3);
 assert.equal(capabilityMatrix.production_ready_count, 0);
 assert.equal(capabilityMatrix.rows.find((row) => row.platform === 'zoom').recommended_mode, 'hybrid_local_observer_first');
+const executionPlanMatrix = buildMeetingAppAdapterExecutionPlanMatrix({
+  capabilityMatrix,
+});
+assert.equal(executionPlanMatrix.schema, MEETING_APP_ADAPTER_EXECUTION_PLAN_MATRIX_SCHEMA);
+assert.equal(executionPlanMatrix.platform_count, 3);
+assert.equal(executionPlanMatrix.realtime_ready_count, 3);
+assert.equal(executionPlanMatrix.rows.find((row) => row.platform === 'microsoft_teams').first_blocked_step, undefined);
 
 const zoomObserver = createMeetingAppObserver({
   source: 'desktop_observer',

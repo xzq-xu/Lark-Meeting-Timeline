@@ -10,6 +10,8 @@ import type {
 
 export const MEETING_APP_ADAPTER_CAPABILITY_REPORT_SCHEMA: 'meeting_app_adapter_capability_report';
 export const MEETING_APP_ADAPTER_CAPABILITY_MATRIX_SCHEMA: 'meeting_app_adapter_capability_matrix';
+export const MEETING_APP_ADAPTER_EXECUTION_PLAN_SCHEMA: 'meeting_app_adapter_execution_plan';
+export const MEETING_APP_ADAPTER_EXECUTION_PLAN_MATRIX_SCHEMA: 'meeting_app_adapter_execution_plan_matrix';
 export const MEETING_APP_ADAPTER_CAPABILITY_SCHEMA_VERSION: 1;
 
 export interface MeetingAppAdapterCapabilityOptions {
@@ -107,6 +109,61 @@ export interface MeetingAppAdapterCapabilityMatrix {
   next_actions: string[];
 }
 
+export interface MeetingAppAdapterExecutionStep {
+  id: string;
+  role?: string;
+  source?: string;
+  status?: string;
+  required_for_realtime?: boolean;
+  required_for_pilot?: boolean;
+  required_for_production?: boolean;
+  blocks_realtime_if_missing?: boolean;
+  sdk_modules?: string[];
+  evidence?: string[];
+  fallback?: string;
+}
+
+export interface MeetingAppAdapterExecutionGate {
+  id: string;
+  required_for: string[];
+  status: string;
+  missing_evidence_count?: number;
+}
+
+export interface MeetingAppAdapterExecutionPlan {
+  type: 'meeting_app_adapter_execution_plan';
+  schema: 'meeting_app_adapter_execution_plan';
+  schema_version: 1;
+  platform: string;
+  display_name?: string;
+  accepted: boolean;
+  production_ready: boolean;
+  recommended_mode: string;
+  risk_level: string;
+  first_blocked_step?: string;
+  realtime_ready: boolean;
+  steps: MeetingAppAdapterExecutionStep[];
+  gates: MeetingAppAdapterExecutionGate[];
+  commands: Record<string, string>;
+  handoff_requirements: string[];
+  next_actions: string[];
+  capability_report: MeetingAppAdapterCapabilityReport;
+}
+
+export interface MeetingAppAdapterExecutionPlanMatrix {
+  type: 'meeting_app_adapter_execution_plan_matrix';
+  schema: 'meeting_app_adapter_execution_plan_matrix';
+  schema_version: 1;
+  platform_count: number;
+  accepted_count: number;
+  production_ready_count: number;
+  realtime_ready_count: number;
+  platforms: string[];
+  rows: Array<Record<string, unknown>>;
+  plans: MeetingAppAdapterExecutionPlan[];
+  next_actions: string[];
+}
+
 export function buildMeetingAppAdapterCapabilityReport(
   platformOrOptions?: string | MeetingAppAdapterCapabilityOptions,
   options?: MeetingAppAdapterCapabilityOptions,
@@ -115,3 +172,12 @@ export function buildMeetingAppAdapterCapabilityReport(
 export function buildMeetingAppAdapterCapabilityMatrix(
   options?: MeetingAppAdapterCapabilityOptions,
 ): MeetingAppAdapterCapabilityMatrix;
+
+export function buildMeetingAppAdapterExecutionPlan(
+  capabilityOrPlatform?: string | MeetingAppAdapterCapabilityReport | MeetingAppAdapterCapabilityOptions,
+  options?: MeetingAppAdapterCapabilityOptions,
+): MeetingAppAdapterExecutionPlan;
+
+export function buildMeetingAppAdapterExecutionPlanMatrix(
+  options?: MeetingAppAdapterCapabilityOptions & { capabilityMatrix?: MeetingAppAdapterCapabilityMatrix },
+): MeetingAppAdapterExecutionPlanMatrix;
