@@ -302,6 +302,11 @@ import {
   createMeetingPlatformAdapterSession,
 } from './platform-adapter-session.mjs';
 import {
+  buildMeetingPlatformAdapterRunnerHandoff,
+  createMeetingPlatformAdapterRunner,
+  openMeetingPlatformAdapterSession,
+} from './platform-adapter-runner.mjs';
+import {
   assertMeetingPlatformAdapterSample,
   assertMeetingPlatformAdapterSampleMatrix,
   buildMeetingPlatformAdapterSamplePlan,
@@ -820,6 +825,19 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdapterSessionHandoff(launchPlanOrInput = {}, handoffOptions = {}) {
       return buildMeetingPlatformAdapterSessionHandoff(launchPlanOrInput, withDefaults(defaults, handoffOptions));
+    },
+    platformAdapterRunner(manifestOrInput = {}, clientOrRunnerOptions = {}, runnerOptions = {}) {
+      const mergedOptions = adapterSessionOptions(defaults, clientOrRunnerOptions, runnerOptions);
+      const client = adapterSessionClient(bridge, clientOrRunnerOptions, mergedOptions);
+      return createMeetingPlatformAdapterRunner(manifestOrInput, client, mergedOptions);
+    },
+    openPlatformAdapterSession(manifestOrInput = {}, launchInput = {}, openOptions = {}) {
+      const mergedOptions = withDefaults(defaults, openOptions);
+      const client = adapterSessionClient(bridge, openOptions, mergedOptions);
+      return openMeetingPlatformAdapterSession(manifestOrInput, client, launchInput, mergedOptions);
+    },
+    platformAdapterRunnerHandoff(manifestOrInput = {}, handoffOptions = {}) {
+      return buildMeetingPlatformAdapterRunnerHandoff(manifestOrInput, withDefaults(defaults, handoffOptions));
     },
     platformEvidencePackage(platformOrInput, input = {}, packageOptions = {}) {
       if (platformOrInput && typeof platformOrInput === 'object' && !Array.isArray(platformOrInput)) {

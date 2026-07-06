@@ -69,6 +69,8 @@ assert.equal(packedFiles.includes('adapters/platform-adapter-launch-plan.mjs'), 
 assert.equal(packedFiles.includes('adapters/platform-adapter-launch-plan.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-session.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-session.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-runner.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-runner.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
@@ -282,6 +284,7 @@ import {
   buildMeetingPlatformAdapterLaunchPlan as buildMeetingPlatformAdapterLaunchPlanFromRoot,
   buildMeetingPlatformAdapterPortfolio as buildMeetingPlatformAdapterPortfolioFromRoot,
   buildMeetingPlatformAdapterRoute as buildMeetingPlatformAdapterRouteFromRoot,
+  buildMeetingPlatformAdapterRunnerHandoff as buildMeetingPlatformAdapterRunnerHandoffFromRoot,
   buildMeetingPlatformAdapterSessionHandoff as buildMeetingPlatformAdapterSessionHandoffFromRoot,
   buildMeetingPlatformConsumerHandoff as buildMeetingPlatformConsumerHandoffFromRoot,
   buildMeetingPlatformConnector as buildMeetingPlatformConnectorFromRoot,
@@ -296,6 +299,8 @@ import {
   createMeetingPlatformConnectorHub as createMeetingPlatformConnectorHubFromRoot,
   createMeetingPlatformConnectorRuntime as createMeetingPlatformConnectorRuntimeFromRoot,
   createMeetingPlatformAdapterSession as createMeetingPlatformAdapterSessionFromRoot,
+  createMeetingPlatformAdapterRunner as createMeetingPlatformAdapterRunnerFromRoot,
+  openMeetingPlatformAdapterSession as openMeetingPlatformAdapterSessionFromRoot,
   createMeetingTimelineClient,
   createMeetingPlatformTimelineKit as createMeetingPlatformTimelineKitFromRoot,
   detectMeetingPlatformForBrowser as detectMeetingPlatformForBrowserFromRoot,
@@ -470,6 +475,11 @@ import {
   buildMeetingPlatformAdapterSessionHandoff,
   createMeetingPlatformAdapterSession,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-session';
+import {
+  buildMeetingPlatformAdapterRunnerHandoff,
+  createMeetingPlatformAdapterRunner,
+  openMeetingPlatformAdapterSession,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-runner';
 import {
   assertMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
@@ -696,6 +706,17 @@ assert.equal((await rootAdapterSession.observeAxis()).action, 'observe_axis');
 assert.equal((await rootAdapterSession.insertAnnotation({ label: 'smoke mark' })).payload.captured_at_ms, 777);
 assert.equal(rootAdapterSessionCalls[1][1], 'google_meet');
 assert.equal(rootMeetingAppSdk.adapterSessionHandoff(rootGoogleLaunchPlan).schema, 'meeting_platform_adapter_session_handoff');
+const rootAdapterRunner = rootMeetingAppSdk.platformAdapterRunner(rootInstallManifest, rootAdapterSessionClient, { clock: () => 778 });
+assert.equal(rootAdapterRunner.schema, 'meeting_platform_adapter_runner');
+assert.equal((await rootAdapterRunner.open({ url: 'https://meet.google.com/abc-defg-hij' })).schema, 'meeting_platform_adapter_open_session_event');
+assert.equal((await rootAdapterRunner.insertAnnotation({ label: 'runner smoke mark' })).payload.captured_at_ms, 778);
+assert.equal((await rootMeetingAppSdk.openPlatformAdapterSession(rootInstallManifest, {
+  url: 'https://meet.google.com/abc-defg-hij',
+}, {
+  client: rootAdapterSessionClient,
+  clock: () => 779,
+})).payload.observe_event.captured_at_ms, 779);
+assert.equal(rootMeetingAppSdk.adapterRunnerHandoff(rootInstallManifest).schema, 'meeting_platform_adapter_runner_handoff');
 assert.equal(rootMeetingAppSdk.platformRuntimeBundle('google-meet').runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
 assert.equal(rootMeetingAppSdk.runtimeBundleMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterRoute('google-meet').platform, 'google_meet');
@@ -1954,6 +1975,32 @@ assert.equal(createMeetingPlatformAdapterSessionFromRoot(directGoogleLaunchPlan,
     return { ok: true };
   },
 }).platform, 'google_meet');
+const directRunnerClient = {
+  async observePlatformCandidates() {
+    return { ok: true };
+  },
+  async insertAnnotation() {
+    return { ok: true };
+  },
+};
+assert.equal(buildMeetingPlatformAdapterRunnerHandoff(directInstallManifest).schema, 'meeting_platform_adapter_runner_handoff');
+assert.equal(buildMeetingPlatformAdapterRunnerHandoffFromRoot(directInstallManifest).runner_factory, 'createMeetingPlatformAdapterRunner');
+const directRunner = createMeetingPlatformAdapterRunner(directInstallManifest, directRunnerClient, {
+  clock: () => 901,
+});
+assert.equal(directRunner.schema, 'meeting_platform_adapter_runner');
+assert.equal((await directRunner.open({ url: 'https://meet.google.com/abc-defg-hij' })).payload.observe_event.captured_at_ms, 901);
+assert.equal(createMeetingPlatformAdapterRunnerFromRoot(directInstallManifest, directRunnerClient).schema, 'meeting_platform_adapter_runner');
+assert.equal((await openMeetingPlatformAdapterSession(directInstallManifest, directRunnerClient, {
+  url: 'https://meet.google.com/abc-defg-hij',
+}, {
+  clock: () => 902,
+})).payload.observe_event.captured_at_ms, 902);
+assert.equal((await openMeetingPlatformAdapterSessionFromRoot(directInstallManifest, directRunnerClient, {
+  url: 'https://meet.google.com/abc-defg-hij',
+}, {
+  clock: () => 903,
+})).payload.observe_event.captured_at_ms, 903);
 assert.equal(buildMeetingPlatformAdapterContract('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).annotations.endpoints.runtimeEvents, 'http://localhost:8787/api/meeting-platform/runtime-events');

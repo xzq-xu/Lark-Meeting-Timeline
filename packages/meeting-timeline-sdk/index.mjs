@@ -1108,6 +1108,35 @@ export function createMeetingAppTimelineSdk(options = {}) {
     adapterSessionHandoff(launchPlanOrInput = {}, handoffOptions = {}) {
       return sdk.platformAdapterSessionHandoff(launchPlanOrInput, handoffOptions);
     },
+    platformAdapterRunner(manifestOrInput = {}, clientOrRunnerOptions = {}, runnerOptions = {}) {
+      return runtime.kit.platformAdapterRunner(
+        manifestOrInput,
+        clientOrRunnerOptions,
+        sdkPlatformOptions(runtime, runnerOptions),
+      );
+    },
+    adapterRunner(manifestOrInput = {}, clientOrRunnerOptions = {}, runnerOptions = {}) {
+      return sdk.platformAdapterRunner(manifestOrInput, clientOrRunnerOptions, runnerOptions);
+    },
+    openPlatformAdapterSession(manifestOrInput = {}, launchInput = {}, openOptions = {}) {
+      return runtime.kit.openPlatformAdapterSession(
+        manifestOrInput,
+        launchInput,
+        sdkPlatformOptions(runtime, openOptions),
+      );
+    },
+    openAdapterSession(manifestOrInput = {}, launchInput = {}, openOptions = {}) {
+      return sdk.openPlatformAdapterSession(manifestOrInput, launchInput, openOptions);
+    },
+    platformAdapterRunnerHandoff(manifestOrInput = {}, handoffOptions = {}) {
+      return runtime.kit.platformAdapterRunnerHandoff(
+        manifestOrInput,
+        sdkPlatformOptions(runtime, handoffOptions),
+      );
+    },
+    adapterRunnerHandoff(manifestOrInput = {}, handoffOptions = {}) {
+      return sdk.platformAdapterRunnerHandoff(manifestOrInput, handoffOptions);
+    },
     platformRuntimeBundle(platformOrOptions = {}, bundleOptions = {}) {
       const resolved = singlePlatformInput(runtime, platformOrOptions, bundleOptions);
       return runtime.kit.platformRuntimeBundle(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
@@ -1241,6 +1270,7 @@ export * from './adapters/platform-adapter-import-plan.mjs';
 export * from './adapters/platform-adapter-install-manifest.mjs';
 export * from './adapters/platform-adapter-launch-plan.mjs';
 export * from './adapters/platform-adapter-session.mjs';
+export * from './adapters/platform-adapter-runner.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-strategy.mjs';

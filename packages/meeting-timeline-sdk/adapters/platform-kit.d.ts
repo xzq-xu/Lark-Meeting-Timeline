@@ -226,6 +226,12 @@ import type {
   MeetingPlatformAdapterSessionOptions,
 } from './platform-adapter-session.mjs';
 import type {
+  MeetingPlatformAdapterOpenSessionEvent,
+  MeetingPlatformAdapterRunner,
+  MeetingPlatformAdapterRunnerHandoff,
+  MeetingPlatformAdapterRunnerOptions,
+} from './platform-adapter-runner.mjs';
+import type {
   MeetingPlatformAdapterSample,
   MeetingPlatformAdapterSampleMatrix,
   MeetingPlatformAdapterSampleOptions,
@@ -452,6 +458,9 @@ export interface MeetingPlatformTimelineKit {
   assertPlatformAdapterLaunchPlan(planOrInput?: MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterInstallManifest | Record<string, unknown>, launchInput?: MeetingPlatformAdapterLaunchPlanOptions | string, launchOptions?: MeetingPlatformAdapterLaunchPlanOptions): MeetingPlatformAdapterLaunchPlan;
   platformAdapterSession(launchPlanOrInput?: MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, clientOrSessionOptions?: MeetingPlatformAdapterSessionClient | MeetingPlatformAdapterSessionOptions, sessionOptions?: MeetingPlatformAdapterSessionOptions): MeetingPlatformAdapterSession;
   platformAdapterSessionHandoff(launchPlanOrInput?: MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, handoffOptions?: MeetingPlatformAdapterSessionOptions): MeetingPlatformAdapterSessionHandoff;
+  platformAdapterRunner(manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, clientOrRunnerOptions?: MeetingPlatformAdapterSessionClient | MeetingPlatformAdapterRunnerOptions, runnerOptions?: MeetingPlatformAdapterRunnerOptions): MeetingPlatformAdapterRunner;
+  openPlatformAdapterSession(manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, launchInput?: MeetingPlatformAdapterLaunchPlanOptions | MeetingPlatformAdapterLaunchPlan | string | Record<string, unknown>, openOptions?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterOpenSessionEvent>;
+  platformAdapterRunnerHandoff(manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, handoffOptions?: MeetingPlatformAdapterRunnerOptions): MeetingPlatformAdapterRunnerHandoff;
   platformEvidencePackage(platformOrInput: string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, packageOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackage;
   platformEvidencePackageSummary(packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, summaryOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageSummary;
   platformEvidencePackageBuilder(platform: string, builderOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageBuilder;
