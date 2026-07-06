@@ -294,6 +294,10 @@ import {
   buildMeetingPlatformAdapterInstallManifest,
 } from './platform-adapter-install-manifest.mjs';
 import {
+  assertMeetingPlatformAdapterLaunchPlan,
+  buildMeetingPlatformAdapterLaunchPlan,
+} from './platform-adapter-launch-plan.mjs';
+import {
   assertMeetingPlatformAdapterSample,
   assertMeetingPlatformAdapterSampleMatrix,
   buildMeetingPlatformAdapterSamplePlan,
@@ -490,6 +494,9 @@ export function buildMeetingPlatformKitReport(options = {}) {
   const platformAdapterImportPlanMatrix = buildMeetingPlatformAdapterImportPlanMatrix({
     packages: platformAdapterExportPackageMatrix.packages,
   }, options);
+  const platformAdapterInstallManifest = buildMeetingPlatformAdapterInstallManifest({
+    plans: platformAdapterImportPlanMatrix.plans,
+  }, options);
   return {
     base_url: options.baseUrl ?? options.base_url,
     base_path: options.basePath ?? options.base_path ?? '/api/platform-events',
@@ -567,9 +574,8 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_adapter_acceptance_checklist_matrix: buildMeetingPlatformAdapterAcceptanceChecklistMatrix(options),
     platform_adapter_export_package_matrix: platformAdapterExportPackageMatrix,
     platform_adapter_import_plan_matrix: platformAdapterImportPlanMatrix,
-    platform_adapter_install_manifest: buildMeetingPlatformAdapterInstallManifest({
-      plans: platformAdapterImportPlanMatrix.plans,
-    }, options),
+    platform_adapter_install_manifest: platformAdapterInstallManifest,
+    platform_adapter_launch_plan: buildMeetingPlatformAdapterLaunchPlan(platformAdapterInstallManifest, options),
     platform_field_capture_matrix: buildMeetingPlatformFieldCaptureMatrix(options),
     platform_field_capture_manifest_matrix: buildMeetingPlatformFieldCaptureManifestMatrix(options),
     platform_field_collector_config_matrix: buildMeetingPlatformFieldCollectorConfigMatrix(options),
@@ -753,6 +759,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertPlatformAdapterInstallManifest(manifestOrInput = {}, installInput = {}, installOptions = {}) {
       return assertMeetingPlatformAdapterInstallManifest(manifestOrInput, installInput, withDefaults(defaults, installOptions));
+    },
+    platformAdapterLaunchPlan(manifestOrInput = {}, launchInput = {}, launchOptions = {}) {
+      return buildMeetingPlatformAdapterLaunchPlan(manifestOrInput, launchInput, withDefaults(defaults, launchOptions));
+    },
+    assertPlatformAdapterLaunchPlan(planOrInput = {}, launchInput = {}, launchOptions = {}) {
+      return assertMeetingPlatformAdapterLaunchPlan(planOrInput, launchInput, withDefaults(defaults, launchOptions));
     },
     platformEvidencePackage(platformOrInput, input = {}, packageOptions = {}) {
       if (platformOrInput && typeof platformOrInput === 'object' && !Array.isArray(platformOrInput)) {

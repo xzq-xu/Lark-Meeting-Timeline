@@ -32,11 +32,13 @@ assert.equal(packedFiles.includes('bin/meeting-app-connector-package.mjs'), true
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-export-package.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-import-plan.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-install-manifest.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-platform-adapter-launch-plan.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-connector-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-export-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-import-plan.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-install-manifest.mjs'), true);
+assert.equal(packedFiles.includes('cli/meeting-platform-adapter-launch-plan.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-integration-runtime.mjs'), true);
@@ -63,6 +65,8 @@ assert.equal(packedFiles.includes('adapters/platform-adapter-import-plan.mjs'), 
 assert.equal(packedFiles.includes('adapters/platform-adapter-import-plan.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-install-manifest.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-install-manifest.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-launch-plan.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-launch-plan.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
@@ -244,6 +248,21 @@ assert.equal(adapterInstallBinReport.type, 'meeting_platform_adapter_install_man
 assert.equal(adapterInstallBinReport.plan_count, 0);
 assert.equal(adapterInstallBinReport.ok, false);
 
+const { stdout: adapterLaunchBinStdout } = await execFileAsync(
+  join(consumerDir, 'node_modules', '.bin', 'meeting-platform-adapter-launch-plan'),
+  [
+    '--manifest-file=missing-adapter-install-manifest.json',
+    '--platform=google-meet',
+    '--json=true',
+  ],
+  {
+    cwd: consumerDir,
+  },
+);
+const adapterLaunchBinReport = JSON.parse(adapterLaunchBinStdout);
+assert.equal(adapterLaunchBinReport.type, 'meeting_platform_adapter_launch_plan_report');
+assert.equal(adapterLaunchBinReport.ok, false);
+
 await writeFile(join(consumerDir, 'smoke.mjs'), `
 import assert from 'node:assert/strict';
 import {
@@ -258,6 +277,7 @@ import {
   buildMeetingPlatformAdapterExportPackage as buildMeetingPlatformAdapterExportPackageFromRoot,
   buildMeetingPlatformAdapterImportPlan as buildMeetingPlatformAdapterImportPlanFromRoot,
   buildMeetingPlatformAdapterInstallManifest as buildMeetingPlatformAdapterInstallManifestFromRoot,
+  buildMeetingPlatformAdapterLaunchPlan as buildMeetingPlatformAdapterLaunchPlanFromRoot,
   buildMeetingPlatformAdapterPortfolio as buildMeetingPlatformAdapterPortfolioFromRoot,
   buildMeetingPlatformAdapterRoute as buildMeetingPlatformAdapterRouteFromRoot,
   buildMeetingPlatformConsumerHandoff as buildMeetingPlatformConsumerHandoffFromRoot,
@@ -438,6 +458,10 @@ import {
   assertMeetingPlatformAdapterInstallManifest,
   buildMeetingPlatformAdapterInstallManifest,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-install-manifest';
+import {
+  assertMeetingPlatformAdapterLaunchPlan,
+  buildMeetingPlatformAdapterLaunchPlan,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-launch-plan';
 import {
   assertMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
@@ -642,6 +666,10 @@ const rootGoogleImportPlan = rootMeetingAppSdk.platformAdapterImportPlan(rootGoo
 assert.equal(rootMeetingAppSdk.platformAdapterInstallManifest([rootGoogleImportPlan]).accepted, true);
 assert.equal(rootMeetingAppSdk.adapterInstallManifest([rootGoogleImportPlan]).browser_extension.platform_count, 1);
 assert.equal(rootMeetingAppSdk.assertPlatformAdapterInstallManifest(rootMeetingAppSdk.adapterInstallManifest([rootGoogleImportPlan])).accepted, true);
+const rootInstallManifest = rootMeetingAppSdk.adapterInstallManifest([rootGoogleImportPlan]);
+assert.equal(rootMeetingAppSdk.platformAdapterLaunchPlan(rootInstallManifest, { url: 'https://meet.google.com/abc-defg-hij' }).accepted, true);
+assert.equal(rootMeetingAppSdk.adapterLaunchPlan(rootInstallManifest, { platform: 'google-meet' }).platform, 'google_meet');
+assert.equal(rootMeetingAppSdk.assertPlatformAdapterLaunchPlan(rootMeetingAppSdk.adapterLaunchPlan(rootInstallManifest, { platform: 'google-meet' })).accepted, true);
 assert.equal(rootMeetingAppSdk.platformRuntimeBundle('google-meet').runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
 assert.equal(rootMeetingAppSdk.runtimeBundleMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterRoute('google-meet').platform, 'google_meet');
@@ -1869,6 +1897,16 @@ const directGoogleImportPlan = buildMeetingPlatformAdapterImportPlan(directGoogl
 assert.equal(buildMeetingPlatformAdapterInstallManifest([directGoogleImportPlan]).accepted, true);
 assert.equal(buildMeetingPlatformAdapterInstallManifestFromRoot([directGoogleImportPlan]).browser_extension.platform_count, 1);
 assert.equal(assertMeetingPlatformAdapterInstallManifest(buildMeetingPlatformAdapterInstallManifest([directGoogleImportPlan])).accepted, true);
+const directInstallManifest = buildMeetingPlatformAdapterInstallManifest([directGoogleImportPlan]);
+assert.equal(buildMeetingPlatformAdapterLaunchPlan(directInstallManifest, {
+  url: 'https://meet.google.com/abc-defg-hij',
+}).accepted, true);
+assert.equal(buildMeetingPlatformAdapterLaunchPlanFromRoot(directInstallManifest, {
+  platform: 'google-meet',
+}).runtime_actions[0].id, 'observe_platform_candidates');
+assert.equal(assertMeetingPlatformAdapterLaunchPlan(buildMeetingPlatformAdapterLaunchPlan(directInstallManifest, {
+  platform: 'google-meet',
+})).accepted, true);
 assert.equal(buildMeetingPlatformAdapterContract('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).annotations.endpoints.runtimeEvents, 'http://localhost:8787/api/meeting-platform/runtime-events');

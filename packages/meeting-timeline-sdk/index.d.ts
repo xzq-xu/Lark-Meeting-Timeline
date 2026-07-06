@@ -404,6 +404,18 @@ export interface MeetingAppTimelineSdk {
     options?: Record<string, unknown>,
   ): import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest;
   assertAdapterInstallManifest: MeetingAppTimelineSdk['assertPlatformAdapterInstallManifest'];
+  platformAdapterLaunchPlan(
+    manifestOrInput?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | Record<string, unknown>,
+    input?: Record<string, unknown> | string,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan;
+  adapterLaunchPlan: MeetingAppTimelineSdk['platformAdapterLaunchPlan'];
+  assertPlatformAdapterLaunchPlan(
+    planOrInput?: import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | Record<string, unknown>,
+    input?: Record<string, unknown> | string,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan;
+  assertAdapterLaunchPlan: MeetingAppTimelineSdk['assertPlatformAdapterLaunchPlan'];
   platformRuntimeBundle(
     platformOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
