@@ -29,6 +29,7 @@ assert.equal(report.ok, true);
 assert.equal(report.platform_count, 3);
 assert.equal(report.runtime_ready_count, 3);
 assert.equal(report.sdk_wiring_ready_count, 3);
+assert.equal(report.matrix.lightweight_connector_ready_count, 3);
 assert.equal(report.provider_required_for_realtime_count, 0);
 assert.equal(report.transcript_blocking_count, 0);
 assert.equal(report.written_files.length, 3);
@@ -44,6 +45,9 @@ const googleBundle = JSON.parse(await readFile(join(outDir, 'google_meet.json'),
 assert.equal(googleBundle.schema, 'meeting_platform_runtime_bundle');
 assert.equal(googleBundle.browser.matches.includes('https://meet.google.com/*'), true);
 assert.equal(googleBundle.host.endpoints.insertMark, `${baseUrl}/api/annotations`);
+assert.equal(googleBundle.runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
+assert.equal(googleBundle.runtime.lightweight_connector_bridge.options.baseUrl, baseUrl);
+assert.equal(googleBundle.messaging.lightweight_connector_message_types.includes('meeting_timeline.sample_tracks'), true);
 assert.equal(googleBundle.messaging.accepted_methods.includes('insertMark'), true);
 assert.equal(googleBundle.provider_reconcile.required_for_realtime, false);
 assert.equal(googleBundle.transcript.blocks_realtime_annotation, false);

@@ -60,6 +60,15 @@ export interface MeetingPlatformRuntimeBundle {
       install_function: string;
       options: Record<string, unknown>;
     };
+    lightweight_connector_bridge?: {
+      module: string;
+      create_hub_function: string;
+      create_browser_runtime_function: string;
+      create_function: string;
+      install_function: string;
+      options: Record<string, unknown>;
+      route_source_priority: string[];
+    };
     observer_plan?: MeetingAppRuntimeObserverPlan | null;
     observation_loop?: Record<string, unknown> | null;
     observer_scheduler?: {
@@ -77,6 +86,7 @@ export interface MeetingPlatformRuntimeBundle {
   messaging: {
     message_types: Record<string, string>;
     bridge_message_types?: string[];
+    lightweight_connector_message_types?: string[];
     accepted_methods: string[];
     runtime_event?: {
       schema: string;
@@ -101,6 +111,7 @@ export interface MeetingPlatformRuntimeBundle {
     observer_plan_ready?: boolean;
     observer_scheduler_ready?: boolean;
     runtime_host_ready?: boolean;
+    lightweight_connector_ready?: boolean;
     observer_preflight_status?: string;
     provider_required_for_realtime: boolean;
     transcript_blocks_realtime: boolean;
@@ -120,6 +131,7 @@ export interface MeetingPlatformRuntimeBundleMatrix {
   sdk_wiring_ready_count: number;
   observer_plan_ready_count?: number;
   runtime_host_ready_count?: number;
+  lightweight_connector_ready_count?: number;
   adapter_route_ready_count?: number;
   local_observer_first_count?: number;
   provider_non_blocking_route_count?: number;

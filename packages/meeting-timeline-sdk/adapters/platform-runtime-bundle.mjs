@@ -202,6 +202,19 @@ function contentScriptBridgeOptions(platform, start = {}, options = {}) {
   });
 }
 
+function lightweightConnectorBridgeOptions(platform, start = {}, options = {}) {
+  return compactObject({
+    baseUrl: firstNonEmpty(options.baseUrl, options.base_url),
+    platforms: platform === 'local_detector' ? [] : [platform],
+    extensionMessaging: firstNonEmpty(options.extensionMessaging, options.extension_messaging, true),
+    windowMessaging: firstNonEmpty(options.windowMessaging, options.window_messaging, false),
+    observeMutations: start.observeMutations,
+    mutationDebounceMs: start.mutationDebounceMs,
+    speakerStableFollowupMs: start.speakerStableFollowupMs,
+    startOptions: start,
+  });
+}
+
 function contentScriptManifest(platform, options = {}, js = []) {
   try {
     return buildMeetingAppContentScriptManifest({
@@ -266,6 +279,7 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
       runtime_event: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event',
       content_script: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script',
       browser_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime',
+      meeting_platform_connector: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector',
       timeline_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-runtime',
       live_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter',
       adaptation_package: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adaptation-package',
@@ -300,6 +314,20 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
         install_function: 'installMeetingPlatformIntegrationContentScriptBridge',
         options: contentScriptBridgeOptions(key, start, options),
       },
+      lightweight_connector_bridge: {
+        module: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector',
+        create_hub_function: 'createMeetingPlatformConnectorHub',
+        create_browser_runtime_function: 'createMeetingPlatformConnectorBrowserRuntime',
+        create_function: 'createMeetingPlatformConnectorContentScriptBridge',
+        install_function: 'installMeetingPlatformConnectorContentScriptBridge',
+        options: lightweightConnectorBridgeOptions(key, start, options),
+        route_source_priority: [
+          'explicit platform/provider',
+          'current location.href',
+          'message payload url',
+          'tab/window candidate url',
+        ],
+      },
       observer_plan: observerPlan,
       observation_loop: observerPlan ? {
         factory: observerPlan.observer_runtime?.factory,
@@ -327,6 +355,14 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
         'meeting_timeline.insert_mark',
         'meeting_timeline.insert_marks',
         'meeting_timeline.provider_event',
+      ],
+      lightweight_connector_message_types: [
+        'meeting_timeline.sample',
+        'meeting_timeline.sample_tracks',
+        'meeting_timeline.insert_mark',
+        'meeting_timeline.insert_marks',
+        'meeting_timeline.provider_event',
+        MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
       ],
       background_message_types: [
         MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
@@ -356,6 +392,7 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
       observer_plan_ready: observerPlan?.sdk_ready === true,
       observer_scheduler_ready: observerSchedulerConfig?.sdk_ready === true,
       runtime_host_ready: key !== 'local_detector' && observerSchedulerConfig?.sdk_ready === true,
+      lightweight_connector_ready: key !== 'local_detector',
       observer_preflight_status: observerPlan?.preflight_status,
       provider_required_for_realtime: adaptationPackage.provider_observer?.required_for_realtime === true,
       transcript_blocks_realtime: adaptationPackage.transcript?.blocks_realtime_annotation === true,
@@ -367,6 +404,7 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
       ...(observerPlan?.next_actions ?? []),
       'install_content_script_or_native_preload',
       'install_meeting_platform_integration_content_script_bridge',
+      'install_meeting_platform_connector_content_script_bridge',
       'start_meeting_app_content_script_bridge',
       'send_captured_at_ms_with_every_annotation',
       ...(adaptationPackage.next_actions ?? []),
@@ -389,6 +427,7 @@ export function buildMeetingPlatformRuntimeBundleMatrix(options = {}) {
     sdk_wiring_ready_count: bundles.filter((bundle) => bundle.readiness.sdk_wiring_ready).length,
     observer_plan_ready_count: bundles.filter((bundle) => bundle.readiness.observer_plan_ready).length,
     runtime_host_ready_count: bundles.filter((bundle) => bundle.readiness.runtime_host_ready).length,
+    lightweight_connector_ready_count: bundles.filter((bundle) => bundle.readiness.lightweight_connector_ready).length,
     adapter_route_ready_count: bundles.filter((bundle) => bundle.adapter_route?.route_count > 0).length,
     local_observer_first_count: bundles.filter((bundle) => bundle.adapter_route?.recommended_mode === 'local_observer_first_provider_reconcile').length,
     provider_non_blocking_route_count: bundles.filter((bundle) => bundle.adapter_route?.realtime_invariants?.provider_events_block_realtime === false).length,
@@ -415,6 +454,8 @@ export function buildMeetingPlatformRuntimeBundleMatrix(options = {}) {
       observer_factory: bundle.runtime?.observation_loop?.factory,
       observer_scheduler_ready: bundle.readiness.observer_scheduler_ready === true,
       runtime_host_ready: bundle.readiness.runtime_host_ready === true,
+      lightweight_connector_ready: bundle.readiness.lightweight_connector_ready === true,
+      lightweight_connector_install_function: bundle.runtime?.lightweight_connector_bridge?.install_function,
       observer_fallback_poll_interval_ms: bundle.runtime?.observation_loop?.cadence?.fallback_poll_interval_ms,
       observer_changed_debounce_ms: bundle.runtime?.observation_loop?.cadence?.changed_observe_every_ms,
       observer_meeting_end_grace_ms: bundle.runtime?.observation_loop?.cadence?.meeting_missing_end_grace_ms,

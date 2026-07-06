@@ -785,7 +785,7 @@ npx meeting-app-adapter-integration-package \
   --report-file=meeting-app-adapter-integration-package-report.json
 ```
 
-如果下游项目要直接启动浏览器扩展、WebView preload 或 native host runtime，用 `platform-runtime-bundle`。它在 `platform-adaptation-package` 基础上再补一层可执行运行时配置：content script manifest、浏览器 URL matches、adapter route、`meeting-app-browser-runtime` preset、`platform-integration-runtime` content-script bridge 安装参数、mutation observer / speaker filter 参数、extension message 示例、host ingest endpoints，以及 `captured_at_ms` 写入契约：
+如果下游项目要直接启动浏览器扩展、WebView preload 或 native host runtime，用 `platform-runtime-bundle`。它在 `platform-adaptation-package` 基础上再补一层可执行运行时配置：content script manifest、浏览器 URL matches、adapter route、`meeting-app-browser-runtime` preset、`platform-integration-runtime` content-script bridge 安装参数、轻量 `meeting-platform-connector` bridge 安装参数、mutation observer / speaker filter 参数、extension message 示例、host ingest endpoints，以及 `captured_at_ms` 写入契约：
 
 ```js
 import {
@@ -801,6 +801,8 @@ const googleRuntime = buildMeetingPlatformRuntimeBundle('google-meet', {
 // googleRuntime.adapter_route.routes[0].route === 'local_observer_axis'。
 // googleRuntime.browser.permissions 和 googleRuntime.messaging.background_message_types 包含候选会议观察所需的 tabs + meeting_timeline.observe_candidates。
 // googleRuntime.runtime.content_script_bridge.options 可直接传给平台级 content-script bridge。
+// googleRuntime.runtime.lightweight_connector_bridge.options 可直接传给 installMeetingPlatformConnectorContentScriptBridge。
+// googleRuntime.messaging.lightweight_connector_message_types 是轻量 bridge 接收的 meeting_timeline.* 消息集合。
 // googleRuntime.messaging.examples.content_script_insert_annotation 是外部插入标注的消息格式。
 // googleRuntime.messaging.examples.observe_candidates 是 background/native host 触发 observe_platform_candidates 的消息格式。
 // googleRuntime.host.endpoints.insertMark 是实时标注写入地址。
