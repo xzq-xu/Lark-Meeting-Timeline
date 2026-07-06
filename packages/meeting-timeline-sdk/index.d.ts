@@ -499,6 +499,26 @@ export interface MeetingAppTimelineSdk {
   adapterRoute: MeetingAppTimelineSdk['platformAdapterRoute'];
   platformAdapterRouteMatrix(options?: Record<string, unknown>): import('./adapters/platform-adapter-route.mjs').MeetingPlatformAdapterRouteMatrix;
   adapterRouteMatrix: MeetingAppTimelineSdk['platformAdapterRouteMatrix'];
+  platformAdapterDecision(
+    input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionOptions,
+  ): import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecision;
+  adapterDecision: MeetingAppTimelineSdk['platformAdapterDecision'];
+  platformAdapterDecisionMatrix(
+    input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionOptions,
+  ): import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionMatrix;
+  adapterDecisionMatrix: MeetingAppTimelineSdk['platformAdapterDecisionMatrix'];
+  assertPlatformAdapterDecision(
+    input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionOptions,
+  ): import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecision;
+  assertAdapterDecision: MeetingAppTimelineSdk['assertPlatformAdapterDecision'];
+  assertPlatformAdapterDecisionMatrix(
+    input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionOptions,
+  ): import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionMatrix;
+  assertAdapterDecisionMatrix: MeetingAppTimelineSdk['assertPlatformAdapterDecisionMatrix'];
   platformAdaptationStrategy(
     platformOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
@@ -566,4 +586,5 @@ export * from './adapters/platform-adapter-message-bridge.mjs';
 export * from './adapters/platform-adapter-smoke.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
+export * from './adapters/platform-adapter-decision.mjs';
 export * from './adapters/platform-strategy.mjs';

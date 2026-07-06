@@ -201,6 +201,20 @@ assert.equal(adapterRoute.platform, 'google_meet');
 assert.equal(sdk.adapterRoute('zoom').platform, 'zoom');
 assert.equal(sdk.platformAdapterRouteMatrix().platform_count, 2);
 
+const adapterDecision = sdk.platformAdapterDecision({
+  url: 'https://meet.google.com/abc-defg-hij',
+});
+assert.equal(adapterDecision.schema, 'meeting_platform_adapter_decision');
+assert.equal(adapterDecision.platform, 'google_meet');
+assert.equal(adapterDecision.selected_surface, 'browser_extension');
+assert.equal(adapterDecision.contracts.provider_events_block_realtime, false);
+assert.equal(sdk.adapterDecision({
+  url: 'https://zoom.us/j/987654321',
+}).platform, 'zoom');
+assert.equal(sdk.platformAdapterDecisionMatrix({}, {
+  platforms: ['google-meet', 'zoom'],
+}).accepted_count, 2);
+
 const adaptationStrategy = sdk.platformAdaptationStrategy('google-meet');
 assert.equal(adaptationStrategy.schema, 'meeting_platform_adaptation_strategy');
 assert.equal(adaptationStrategy.adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');

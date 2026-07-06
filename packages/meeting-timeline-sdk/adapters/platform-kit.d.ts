@@ -71,6 +71,12 @@ import type {
   MeetingPlatformAdapterRouteOptions,
 } from './platform-adapter-route.mjs';
 import type {
+  MeetingPlatformAdapterDecision,
+  MeetingPlatformAdapterDecisionInput,
+  MeetingPlatformAdapterDecisionMatrix,
+  MeetingPlatformAdapterDecisionOptions,
+} from './platform-adapter-decision.mjs';
+import type {
   MeetingPlatformHostIntegrationOptions,
   MeetingPlatformHostIntegrationPlan,
   MeetingPlatformHostIntegrationScaffold,
@@ -444,6 +450,10 @@ export interface MeetingPlatformTimelineKit {
   platformAdaptationStrategyMatrix(strategyOptions?: MeetingPlatformRolloutOptions): MeetingPlatformAdaptationStrategyMatrix;
   platformAdapterRoute(platform: string, routeOptions?: MeetingPlatformAdapterRouteOptions): MeetingPlatformAdapterRoute;
   platformAdapterRouteMatrix(routeOptions?: MeetingPlatformAdapterRouteOptions): MeetingPlatformAdapterRouteMatrix;
+  platformAdapterDecision(input?: string | URL | MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecision;
+  platformAdapterDecisionMatrix(input?: MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecisionMatrix;
+  assertPlatformAdapterDecision(input?: string | URL | MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecision;
+  assertPlatformAdapterDecisionMatrix(input?: MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecisionMatrix;
   platformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
   assertPlatformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
   platformConsumerHandoff(handoffOptions?: MeetingPlatformConsumerHandoffOptions): MeetingPlatformConsumerHandoff;

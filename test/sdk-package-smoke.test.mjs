@@ -85,6 +85,8 @@ assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-route.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-route.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-decision.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-decision.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-correlation.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-correlation.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-session.mjs'), true);
@@ -308,6 +310,8 @@ import {
   buildMeetingPlatformAdapterInstallManifest as buildMeetingPlatformAdapterInstallManifestFromRoot,
   buildMeetingPlatformAdapterLaunchPlan as buildMeetingPlatformAdapterLaunchPlanFromRoot,
   buildMeetingPlatformAdapterPortfolio as buildMeetingPlatformAdapterPortfolioFromRoot,
+  buildMeetingPlatformAdapterDecision as buildMeetingPlatformAdapterDecisionFromRoot,
+  buildMeetingPlatformAdapterDecisionMatrix as buildMeetingPlatformAdapterDecisionMatrixFromRoot,
   buildMeetingPlatformAdapterRoute as buildMeetingPlatformAdapterRouteFromRoot,
   buildMeetingPlatformAdapterMessageBridgeHandoff as buildMeetingPlatformAdapterMessageBridgeHandoffFromRoot,
   buildMeetingPlatformAdapterRunnerHandoff as buildMeetingPlatformAdapterRunnerHandoffFromRoot,
@@ -387,6 +391,10 @@ import {
   buildMeetingPlatformAdapterRoute,
   buildMeetingPlatformAdapterRouteMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-route';
+import {
+  buildMeetingPlatformAdapterDecision,
+  buildMeetingPlatformAdapterDecisionMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-decision';
 import {
   buildMeetingPlatformEvidenceCorrelation,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-correlation';
@@ -812,6 +820,15 @@ assert.equal(rootMeetingAppSdk.platformRuntimeBundle('google-meet').runtime.ligh
 assert.equal(rootMeetingAppSdk.runtimeBundleMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterRoute('google-meet').platform, 'google_meet');
 assert.equal(rootMeetingAppSdk.adapterRouteMatrix().platform_count, 1);
+assert.equal(rootMeetingAppSdk.platformAdapterDecision({
+  url: 'https://meet.google.com/abc-defg-hij',
+}).selected_surface, 'browser_extension');
+assert.equal(rootMeetingAppSdk.adapterDecision({
+  url: 'https://zoom.us/j/987654321',
+}).platform, 'zoom');
+assert.equal(rootMeetingAppSdk.platformAdapterDecisionMatrix({}, {
+  platforms: ['google-meet'],
+}).accepted_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdaptationStrategy('google-meet').adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
 assert.equal(rootMeetingAppSdk.adaptationStrategyMatrix().provider_reconcile_required_count, 1);
 assert.equal(rootMeetingAppSdk.connectorHub().accepted, true);
@@ -831,6 +848,15 @@ assert.equal(buildMeetingPlatformRuntimeBundleFromRoot('google-meet', {
 assert.equal(buildMeetingPlatformAdapterRouteFromRoot('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).platform, 'google_meet');
+assert.equal(buildMeetingPlatformAdapterDecisionFromRoot({
+  url: 'https://meet.google.com/abc-defg-hij',
+}, {
+  baseUrl: 'http://localhost:8787',
+}).selected_route, 'local_observer_axis');
+assert.equal(buildMeetingPlatformAdapterDecisionMatrixFromRoot({}, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+}).accepted_count, 1);
 assert.equal(buildMeetingPlatformAdaptationStrategyFromRoot('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
@@ -2189,8 +2215,23 @@ assert.equal(buildMeetingPlatformAdapterRouteMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).platform_count, 1);
+assert.equal(buildMeetingPlatformAdapterDecision({
+  url: 'https://meet.google.com/abc-defg-hij',
+}, {
+  baseUrl: 'http://localhost:8787',
+}).platform, 'google_meet');
+assert.equal(buildMeetingPlatformAdapterDecisionMatrix({}, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).rows[0].provider_events_block_realtime, false);
 assert.equal(kit.platformAdapterRoute('google-meet').realtime_invariants.provider_events_block_realtime, false);
 assert.equal(kit.platformAdapterRouteMatrix({ platforms: ['zoom'] }).rows[0].first_route, 'local_observer_axis');
+assert.equal(kit.platformAdapterDecision({
+  url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+}).platform, 'microsoft_teams');
+assert.equal(kit.platformAdapterDecisionMatrix({}, {
+  platforms: ['webex'],
+}).accepted_count, 1);
 assert.equal(kit.platformRealEvidenceIntakePlan('google-meet').schema, 'meeting_platform_real_evidence_intake_plan');
 assert.equal(kit.platformRealEvidenceIntake('google-meet', {}, {
   requireProductionReady: false,

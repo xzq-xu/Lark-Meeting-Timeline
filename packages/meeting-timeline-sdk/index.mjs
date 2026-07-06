@@ -1248,6 +1248,30 @@ export function createMeetingAppTimelineSdk(options = {}) {
     adapterRouteMatrix(routeOptions = {}) {
       return sdk.platformAdapterRouteMatrix(routeOptions);
     },
+    platformAdapterDecision(input = {}, decisionOptions = {}) {
+      return runtime.kit.platformAdapterDecision(input, sdkPlatformOptions(runtime, decisionOptions));
+    },
+    adapterDecision(input = {}, decisionOptions = {}) {
+      return sdk.platformAdapterDecision(input, decisionOptions);
+    },
+    platformAdapterDecisionMatrix(input = {}, decisionOptions = {}) {
+      return runtime.kit.platformAdapterDecisionMatrix(input, sdkPlatformOptions(runtime, decisionOptions));
+    },
+    adapterDecisionMatrix(input = {}, decisionOptions = {}) {
+      return sdk.platformAdapterDecisionMatrix(input, decisionOptions);
+    },
+    assertPlatformAdapterDecision(input = {}, decisionOptions = {}) {
+      return runtime.kit.assertPlatformAdapterDecision(input, sdkPlatformOptions(runtime, decisionOptions));
+    },
+    assertAdapterDecision(input = {}, decisionOptions = {}) {
+      return sdk.assertPlatformAdapterDecision(input, decisionOptions);
+    },
+    assertPlatformAdapterDecisionMatrix(input = {}, decisionOptions = {}) {
+      return runtime.kit.assertPlatformAdapterDecisionMatrix(input, sdkPlatformOptions(runtime, decisionOptions));
+    },
+    assertAdapterDecisionMatrix(input = {}, decisionOptions = {}) {
+      return sdk.assertPlatformAdapterDecisionMatrix(input, decisionOptions);
+    },
     platformAdaptationStrategy(platformOrOptions = {}, strategyOptions = {}) {
       const resolved = singlePlatformInput(runtime, platformOrOptions, strategyOptions);
       return runtime.kit.platformAdaptationStrategy(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
@@ -1361,4 +1385,5 @@ export * from './adapters/platform-adapter-message-bridge.mjs';
 export * from './adapters/platform-adapter-smoke.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
+export * from './adapters/platform-adapter-decision.mjs';
 export * from './adapters/platform-strategy.mjs';

@@ -174,6 +174,12 @@ import {
   buildMeetingPlatformAdapterRouteMatrix,
 } from './platform-adapter-route.mjs';
 import {
+  assertMeetingPlatformAdapterDecision,
+  assertMeetingPlatformAdapterDecisionMatrix,
+  buildMeetingPlatformAdapterDecision,
+  buildMeetingPlatformAdapterDecisionMatrix,
+} from './platform-adapter-decision.mjs';
+import {
   assertMeetingPlatformHostIntegrationScaffold,
   buildMeetingPlatformHostIntegrationPlan,
   buildMeetingPlatformHostIntegrationScaffold,
@@ -606,6 +612,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_adaptation_runbook: buildMeetingPlatformAdaptationRunbookSummary(options),
     platform_adaptation_strategy: buildMeetingPlatformAdaptationStrategyMatrix(options),
     platform_adapter_route_matrix: buildMeetingPlatformAdapterRouteMatrix(options),
+    platform_adapter_decision_matrix: buildMeetingPlatformAdapterDecisionMatrix(options),
     platform_live_adapter_matrix: buildMeetingPlatformLiveAdapterMatrix(options),
     platform_live_adapter_readiness_matrix: buildMeetingPlatformLiveAdapterReadinessMatrix(options),
     platform_live_adapter_handoff_bundle: buildMeetingPlatformLiveAdapterHandoffBundle(options),
@@ -762,6 +769,18 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdapterRouteMatrix(routeOptions = {}) {
       return buildMeetingPlatformAdapterRouteMatrix(withDefaults(defaults, routeOptions));
+    },
+    platformAdapterDecision(input = {}, decisionOptions = {}) {
+      return buildMeetingPlatformAdapterDecision(input, withDefaults(defaults, decisionOptions));
+    },
+    platformAdapterDecisionMatrix(input = {}, decisionOptions = {}) {
+      return buildMeetingPlatformAdapterDecisionMatrix(input, withDefaults(defaults, decisionOptions));
+    },
+    assertPlatformAdapterDecision(input = {}, decisionOptions = {}) {
+      return assertMeetingPlatformAdapterDecision(input, withDefaults(defaults, decisionOptions));
+    },
+    assertPlatformAdapterDecisionMatrix(input = {}, decisionOptions = {}) {
+      return assertMeetingPlatformAdapterDecisionMatrix(input, withDefaults(defaults, decisionOptions));
     },
     platformConformance(conformanceOptions = {}) {
       return buildMeetingPlatformConformanceReport(withDefaults(defaults, conformanceOptions));
