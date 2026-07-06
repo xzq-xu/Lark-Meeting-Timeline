@@ -13,6 +13,7 @@ import {
   buildMeetingAppExtensionBuildSource,
   buildMeetingAppExtensionClientCallMessage,
   buildMeetingAppExtensionContentScriptSource,
+  buildMeetingAppExtensionCurrentWindowPreflightMessage,
   buildMeetingAppExtensionInstallPlan,
   buildMeetingAppExtensionLiveCaptureSource,
   buildMeetingAppExtensionMatchPatterns,
@@ -283,12 +284,14 @@ assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call, 'meeting_timeline.
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached, 'meeting_timeline.extension_attached');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status, 'meeting_timeline.extension_status');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates, 'meeting_timeline.observe_candidates');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window, 'meeting_timeline.preflight_current_window');
 assert.equal(MEETING_APP_EXTENSION_STATUS_STORAGE_KEY, 'meeting_timeline_extension_status');
 assert.equal(MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS.insertMarks, '/api/annotations/batch');
 assert.equal(normalizeMeetingAppExtensionMessageType('client_call'), MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call);
 assert.equal(normalizeMeetingAppExtensionMessageType('attached'), MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached);
 assert.equal(normalizeMeetingAppExtensionMessageType('extension-status'), MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status);
 assert.equal(normalizeMeetingAppExtensionMessageType('observe-platform-candidates'), MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates);
+assert.equal(normalizeMeetingAppExtensionMessageType('current-window-preflight'), MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window);
 assert.equal(meetingAppExtensionTimelineEndpoint('insertMarks'), '/api/annotations/batch');
 assert.throws(
   () => meetingAppExtensionTimelineEndpoint('deleteEverything'),
@@ -319,6 +322,24 @@ assert.deepEqual(statusMessage, {
   type: MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status,
   request_id: 'status-001',
   captured_at_ms: 124,
+});
+
+const currentWindowPreflightMessage = buildMeetingAppExtensionCurrentWindowPreflightMessage({
+  platform: 'google-meet',
+  requestId: 'preflight-001',
+  capturedAtMs: 125,
+  href: 'https://meet.google.com/abc-defg-hij',
+  title: 'Design review',
+  options: { requireSpeakerTrack: true },
+});
+assert.deepEqual(currentWindowPreflightMessage, {
+  type: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+  request_id: 'preflight-001',
+  captured_at_ms: 125,
+  platform: 'google_meet',
+  url: 'https://meet.google.com/abc-defg-hij',
+  title: 'Design review',
+  options: { requireSpeakerTrack: true },
 });
 
 const observeCandidatesMessage = buildMeetingAppExtensionObserveCandidatesMessage({
@@ -414,6 +435,10 @@ assert.deepEqual(plan.runtime_contract.live_capture_methods, [
   'diagnose',
 ]);
 assert.deepEqual(plan.runtime_contract.message_types, MEETING_APP_EXTENSION_MESSAGE_TYPES);
+assert.equal(
+  plan.runtime_contract.local_content_script_messages.includes(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window),
+  true,
+);
 assert.equal(plan.runtime_contract.status_storage_key, MEETING_APP_EXTENSION_STATUS_STORAGE_KEY);
 assert.deepEqual(plan.runtime_contract.timeline_endpoints, MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS);
 assert.deepEqual(plan.manifest.content_scripts[0].js, ['content.js']);

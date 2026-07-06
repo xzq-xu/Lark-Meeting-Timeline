@@ -980,11 +980,11 @@ installMeetingPlatformConnectorContentScriptBridge({
 });
 ```
 
-安装后，background worker 或宿主 WebView 只要发送 `meeting_timeline.insert_mark` / `meeting_timeline.sample` / `meeting_timeline.sample_tracks` 消息；bridge 会从当前 `location.href` 识别 Google Meet、Teams、Zoom、Webex 或 Lark，并投递统一的 `insert_annotation`、`observe_meeting_app`、`speaker_track` 或 `participant_track` runtime event。
+安装后，background worker 或宿主 WebView 只要发送 `meeting_timeline.insert_mark` / `meeting_timeline.sample` / `meeting_timeline.sample_tracks` / `meeting_timeline.preflight_current_window` 消息；bridge 会从当前 `location.href` 识别 Google Meet、Teams、Zoom、Webex 或 Lark，并投递统一的 `insert_annotation`、`observe_meeting_app`、`speaker_track` 或 `participant_track` runtime event。`preflight_current_window` 不会访问服务端，它只在当前 content script / WebView preload 内捕获 DOM，并返回这一个会议窗口是否已经具备实时建轴和标注插入条件。
 
 `platform-kit` 也暴露同一入口：`kit.platformConnector('google-meet')`、`kit.platformConnectorMatrix()`、`kit.platformConnectorHub()`、`kit.resolvePlatformConnector(input)`、`kit.platformConnectorAcceptance(connector)`、`kit.createPlatformConnectorRuntime(connector, { fetch })`、`kit.createPlatformConnectorHub({ fetch })`、`kit.createPlatformConnectorBrowserRuntime({ fetch })` 和 `kit.createPlatformConnectorContentScriptBridge({ fetch })`。这适合宿主项目已经统一使用 `createMeetingPlatformTimelineKit()`，但仍希望按平台懒加载 Google Meet / Teams / Zoom / Webex / Lark connector runtime，或者直接把当前浏览器/会议窗口状态交给 SDK 自动分发。
 
-交付给其他项目时，`platform-consumer-handoff` 会把这条轻量路径写进 `lightweight_connector_handoff`：包括 `meeting-platform-connector` 模块名、hub/browser runtime/content-script bridge factory、`meeting_timeline.insert_mark` / `meeting_timeline.sample` / `meeting_timeline.sample_tracks` 消息类型、host runtime event endpoint 和 `captured_at_ms` 契约。这样接入方可以明确选择两条路线：完整 `platform-integration-runtime` 用于 host 级编排，或轻量 connector bridge 用于浏览器扩展、Electron WebView preload、移动端 WebView 的页面侧事件投递。
+交付给其他项目时，`platform-consumer-handoff` 会把这条轻量路径写进 `lightweight_connector_handoff`：包括 `meeting-platform-connector` 模块名、hub/browser runtime/content-script bridge factory、`meeting_timeline.insert_mark` / `meeting_timeline.sample` / `meeting_timeline.sample_tracks` / `meeting_timeline.preflight_current_window` 消息类型、host runtime event endpoint 和 `captured_at_ms` 契约。这样接入方可以明确选择两条路线：完整 `platform-integration-runtime` 用于 host 级编排，或轻量 connector bridge 用于浏览器扩展、Electron WebView preload、移动端 WebView 的页面侧事件投递。
 
 `platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。CI 里可以用 `assertMeetingAppAdapterIntegrationPackage()`、`assertMeetingAppAdapterIntegrationPackageMatrix()` 或 kit 上的同名方法做 gate；默认 target 是 `pilot`，如果传 `target: 'production'`，则必须补齐真实会议 evidence package、provider start/end reconcile 和 handoff readiness 之后才会通过。
 
@@ -1911,6 +1911,13 @@ const currentWindowPreflight = buildMeetingPlatformAdapterCurrentWindowPreflight
   requireSpeakerTrack: true,
 });
 // content script / WebView preload 可以直接用这个入口，SDK 会先 capture 当前 DOM 再 preflight。
+
+// 如果已经安装 connector bridge，也可以通过消息触发同一件事：
+const response = await bridge.dispatchMessage({
+  type: 'meeting_timeline.preflight_current_window',
+  payload: { options: { requireSpeakerTrack: true } },
+});
+// response.result.accepted 表示当前窗口是否能作为实时标注轴来源。
 ```
 
 如果希望 SDK 帮你管理轮询、去重和 keep-alive，可以直接用 `meeting-app-monitor`。它会高频低成本采集 DOM，但只有在页面状态变化、或到达 keep-alive 间隔时才把样本送给 `meeting-source`；即使 DOM 不变，也会按间隔继续送样本，避免 active speaker 的 `minStableMs` 因过度去重而无法触发：

@@ -212,6 +212,8 @@ export interface MeetingPlatformConnectorBrowserRuntime {
   sources: Record<string, unknown>;
   browserInput(input?: Record<string, unknown>): Record<string, unknown>;
   resolvePlatform(input?: Record<string, unknown>, resolveOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorResolution;
+  currentWindowPreflight(input?: Record<string, unknown>, preflightOptions?: MeetingPlatformConnectorOptions): Record<string, unknown> | undefined;
+  preflightCurrentWindow(input?: Record<string, unknown>, preflightOptions?: MeetingPlatformConnectorOptions): Record<string, unknown> | undefined;
   observePlatformCandidates(input?: Record<string, unknown>, observeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   observeMeetingApp(input?: Record<string, unknown>, observeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   insertAnnotation(input?: Record<string, unknown>, markOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
@@ -233,6 +235,8 @@ export interface MeetingPlatformConnectorContentScriptBridge {
   hub?: MeetingPlatformConnectorHubRuntime;
   connector_hub?: MeetingPlatformConnectorHubRuntime;
   resolvePlatform(input?: Record<string, unknown>, resolveOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorResolution | undefined;
+  currentWindowPreflight(input?: Record<string, unknown>, preflightOptions?: MeetingPlatformConnectorOptions): Record<string, unknown> | undefined;
+  preflightCurrentWindow(input?: Record<string, unknown>, preflightOptions?: MeetingPlatformConnectorOptions): Record<string, unknown> | undefined;
   observePlatformCandidates(input?: Record<string, unknown>, observeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown> | undefined;
   dispatchMessage(message?: Record<string, unknown>, messageOptions?: Record<string, unknown>): Promise<Record<string, unknown>>;
   start(startOptions?: Record<string, unknown>): Record<string, unknown>;

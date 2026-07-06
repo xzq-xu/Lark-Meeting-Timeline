@@ -58,8 +58,10 @@ assert.equal(google.runtime.runtime_host.create_function, 'createMeetingPlatform
 assert.equal(google.runtime.runtime_host.config_function, 'buildMeetingPlatformRuntimeHostConfig');
 assert.equal(google.messaging.message_types.client_call, 'meeting_timeline.client_call');
 assert.equal(google.messaging.bridge_message_types.includes('meeting_timeline.insert_mark'), true);
+assert.equal(google.messaging.bridge_message_types.includes('meeting_timeline.preflight_current_window'), true);
 assert.equal(google.messaging.lightweight_connector_message_types.includes('meeting_timeline.sample_tracks'), true);
 assert.equal(google.messaging.lightweight_connector_message_types.includes('meeting_timeline.observe_candidates'), true);
+assert.equal(google.messaging.lightweight_connector_message_types.includes('meeting_timeline.preflight_current_window'), true);
 assert.equal(google.messaging.background_message_types.includes('meeting_timeline.observe_candidates'), true);
 assert.equal(google.messaging.candidate_observation.message_type, 'meeting_timeline.observe_candidates');
 assert.equal(google.messaging.accepted_methods.includes('insertMark'), true);
@@ -74,6 +76,8 @@ assert.equal(google.messaging.runtime_event.plan.actions.find((row) => row.actio
 assert.equal(google.messaging.examples.insert_annotation.method, 'insertMark');
 assert.equal(google.messaging.examples.observe_candidates.type, 'meeting_timeline.observe_candidates');
 assert.equal(google.messaging.examples.observe_candidates.tabs[0].url, 'https://meet.google.com/');
+assert.equal(google.messaging.examples.preflight_current_window.type, 'meeting_timeline.preflight_current_window');
+assert.equal(google.messaging.examples.preflight_current_window.options.requireSpeakerTrack, true);
 assert.equal(google.messaging.examples.insert_annotation.input.captured_at_ms, 1_782_614_400_000);
 assert.equal(google.messaging.examples.content_script_insert_annotation.type, 'meeting_timeline.insert_mark');
 assert.equal(google.messaging.examples.content_script_insert_annotation.payload.mark.captured_at_ms, 1_782_614_400_000);

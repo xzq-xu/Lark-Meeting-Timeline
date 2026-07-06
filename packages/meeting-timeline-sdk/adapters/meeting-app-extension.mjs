@@ -15,6 +15,7 @@ export const MEETING_APP_EXTENSION_MESSAGE_TYPES = Object.freeze({
   extension_attached: 'meeting_timeline.extension_attached',
   extension_status: 'meeting_timeline.extension_status',
   observe_candidates: 'meeting_timeline.observe_candidates',
+  preflight_current_window: 'meeting_timeline.preflight_current_window',
 });
 
 export const MEETING_APP_EXTENSION_STATUS_STORAGE_KEY = 'meeting_timeline_extension_status';
@@ -62,6 +63,15 @@ const MESSAGE_TYPE_ALIASES = Object.freeze({
   observe_platform_candidates: MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
   observeplatformcandidates: MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
   'observe-platform-candidates': MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+  preflight_current_window: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+  preflightcurrentwindow: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+  'preflight-current-window': MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+  current_window_preflight: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+  currentwindowpreflight: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+  'current-window-preflight': MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+  adapter_preflight: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+  adapterpreflight: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+  'adapter-preflight': MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
 });
 
 export const MEETING_APP_EXTENSION_PROFILES = Object.freeze({
@@ -339,6 +349,30 @@ export function buildMeetingAppExtensionObserveCandidatesMessage(input = {}, opt
   });
 }
 
+export function buildMeetingAppExtensionCurrentWindowPreflightMessage(input = {}, options = {}) {
+  const merged = plainObject(input) ? { ...input, ...options } : options;
+  const preflightOptions = {
+    ...(plainObject(merged.options) ? merged.options : {}),
+    ...(plainObject(merged.preflightOptions) ? merged.preflightOptions : {}),
+    ...(plainObject(merged.preflight_options) ? merged.preflight_options : {}),
+  };
+  return compactObject({
+    type: normalizeMeetingAppExtensionMessageType(firstNonEmpty(
+      merged.type,
+      merged.messageType,
+      merged.message_type,
+      'preflight_current_window',
+    )),
+    request_id: firstNonEmpty(merged.request_id, merged.requestId),
+    captured_at_ms: firstNonEmpty(merged.captured_at_ms, merged.capturedAtMs, Date.now()),
+    platform: optionalPlatform(firstNonEmpty(merged.platform, merged.platform_key, merged.platformKey)),
+    url: firstNonEmpty(merged.url, merged.href, merged.meeting_url, merged.meetingUrl),
+    title: merged.title,
+    input: plainObject(merged.input) ? merged.input : undefined,
+    options: Object.keys(preflightOptions).length > 0 ? preflightOptions : undefined,
+  });
+}
+
 export function buildMeetingAppExtensionClientCallMessage(methodOrInput, input = {}, options = {}) {
   const objectInput = plainObject(methodOrInput);
   const merged = objectInput
@@ -466,6 +500,12 @@ export function buildMeetingAppExtensionInstallPlan(options = {}) {
     runtime_contract: {
       message_prefixes: ['meeting_timeline', 'meeting-timeline'],
       message_types: { ...MEETING_APP_EXTENSION_MESSAGE_TYPES },
+      local_content_script_messages: [
+        MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+        MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+        'meeting_timeline.insert_mark',
+        'meeting_timeline.sample_tracks',
+      ],
       status_storage_key: MEETING_APP_EXTENSION_STATUS_STORAGE_KEY,
       timeline_endpoints: { ...MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS },
       live_capture_global: '__meetingTimelineLiveCapture',

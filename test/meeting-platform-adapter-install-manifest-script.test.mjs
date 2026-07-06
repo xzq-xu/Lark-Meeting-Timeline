@@ -67,6 +67,7 @@ const manifest = JSON.parse(await readFile(manifestFile, 'utf8'));
 assert.equal(manifest.schema, 'meeting_platform_adapter_install_manifest');
 assert.equal(manifest.accepted, true);
 assert.equal(manifest.browser_extension.host_permissions.includes('https://meet.google.com/*'), true);
+assert.equal(manifest.browser_extension.message_types.includes('meeting_timeline.preflight_current_window'), true);
 assert.equal(manifest.install_sequence.find((step) => step.id === 'insert_marks_in_realtime').sdk_method, 'insertAnnotation');
 
 const { stdout: missingStdout } = await execFileAsync(process.execPath, [

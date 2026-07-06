@@ -123,6 +123,10 @@ const directTrackResponse = await bridge.dispatchMessage({ type: 'sample_tracks'
 assert.equal(directTrackResponse.handled, true);
 assert.equal(runtime.calls.at(-1).message.type, 'sample_tracks');
 
+const directPreflightResponse = await bridge.dispatchMessage({ type: 'preflight_current_window' });
+assert.equal(directPreflightResponse.handled, true);
+assert.equal(runtime.calls.at(-1).message.type, 'preflight_current_window');
+
 const removedExtension = bridge.removeMessaging('extension');
 assert.equal(removedExtension.removed, 1);
 assert.equal(extensionRuntime.listenerCount(), 0);

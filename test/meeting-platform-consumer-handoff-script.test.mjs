@@ -41,10 +41,12 @@ assert.equal(report.entrypoints.primary_modules.meeting_platform_connector, '@ai
 assert.equal(report.entrypoints.primary_modules.implementation_handoff, '@ai-annotation/meeting-timeline-sdk/adapters/platform-implementation-handoff');
 assert.equal(report.entrypoints.kit_methods.includes('platformImplementationHandoff'), true);
 assert.equal(report.lightweight_connector_handoff.content_script_bridge.message_types.includes('meeting_timeline.insert_mark'), true);
+assert.equal(report.lightweight_connector_handoff.content_script_bridge.message_types.includes('meeting_timeline.preflight_current_window'), true);
 assert.equal(report.lightweight_connector_handoff.host_requirements.timestamp_field, 'captured_at_ms');
 assert.equal(report.sdk_facade_handoff.create_function, 'createMeetingAppTimelineSdk');
 assert.equal(report.sdk_facade_handoff.required_facade_methods.includes('platformConsumerHandoff'), true);
 assert.equal(report.sdk_facade_handoff.surface_wiring.browser_extension.content_script_messages.includes('meeting_timeline.observe_candidates'), true);
+assert.equal(report.sdk_facade_handoff.surface_wiring.browser_extension.content_script_messages.includes('meeting_timeline.preflight_current_window'), true);
 assert.equal(report.sdk_facade_handoff.platform_rows.find((row) => row.platform === 'google_meet').provider_path, 'google_workspace_events_pubsub');
 assert.equal(report.surface_coverage_matrix.platform_count, 3);
 assert.equal(report.surface_coverage_matrix.browser_extension_ready_count, 3);

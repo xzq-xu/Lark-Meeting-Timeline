@@ -282,6 +282,7 @@ function buildLightweightConnectorHandoff(connectorHub = {}, hostPlan = {}) {
         'meeting_timeline.insert_marks',
         'meeting_timeline.sample',
         'meeting_timeline.sample_tracks',
+        'meeting_timeline.preflight_current_window',
         'meeting_timeline.provider_event',
         'meeting_timeline.observe_candidates',
       ],
@@ -325,6 +326,7 @@ function buildContracts(hostPlan = {}) {
       'meeting_timeline.insert_mark',
       'meeting_timeline.sample',
       'meeting_timeline.sample_tracks',
+      'meeting_timeline.preflight_current_window',
       'meeting_timeline.provider_event',
     ],
     host_runtime_contract: hostPlan.runtime_contract,
@@ -431,6 +433,7 @@ function buildSdkFacadeHandoff(platforms = [], inputs = {}) {
         content_script_messages: [
           'meeting_timeline.sample',
           'meeting_timeline.sample_tracks',
+          'meeting_timeline.preflight_current_window',
           'meeting_timeline.insert_mark',
           'meeting_timeline.provider_event',
           'meeting_timeline.observe_candidates',

@@ -143,6 +143,8 @@ export function createMeetingAppBrowserRuntime(
   tickTracks(options?: MeetingAppMonitorOptions): Promise<MeetingAppMonitorSampleResult>;
   startTracks(options?: MeetingAppMonitorOptions): MeetingAppMonitorState;
   stopTracks(): MeetingAppMonitorState;
+  currentWindowPreflight(input?: Record<string, unknown>, options?: Record<string, unknown>): Record<string, unknown>;
+  preflightCurrentWindow(input?: Record<string, unknown>, options?: Record<string, unknown>): Record<string, unknown>;
   observeMeetingAppTracks(input?: Record<string, unknown> | Record<string, unknown>[], options?: MeetingAppTrackRuntimeOptions): Promise<MeetingAppTrackRuntimeObservation>;
   previewMeetingAppTracks(input?: Record<string, unknown> | Record<string, unknown>[], options?: MeetingAppTrackRuntimeOptions): MeetingAppTrackRuntimePreview;
   handleMessage(message?: MeetingAppBrowserRuntimeMessage, options?: Record<string, unknown>): Promise<{

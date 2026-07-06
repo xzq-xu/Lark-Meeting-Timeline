@@ -1160,6 +1160,12 @@ export function createMeetingPlatformConnectorBrowserRuntime(options = {}) {
     resolvePlatform(input = {}, resolveOptions = {}) {
       return hub.resolvePlatform(connectorRouteInput(input, options), resolveOptions);
     },
+    currentWindowPreflight(input = {}, preflightOptions = {}) {
+      return browserRuntime.currentWindowPreflight?.(connectorRouteInput(input, options), preflightOptions);
+    },
+    preflightCurrentWindow(input = {}, preflightOptions = {}) {
+      return this.currentWindowPreflight(input, preflightOptions);
+    },
     observePlatformCandidates(input = {}, observeOptions = {}) {
       return hub.observePlatformCandidates(connectorRouteInput(input, options), observeOptions);
     },
@@ -1216,6 +1222,12 @@ export function createMeetingPlatformConnectorContentScriptBridge(options = {}) 
     connector_hub: runtime.hub,
     resolvePlatform(input = {}, resolveOptions = {}) {
       return runtime.resolvePlatform?.(input, resolveOptions);
+    },
+    currentWindowPreflight(input = {}, preflightOptions = {}) {
+      return runtime.currentWindowPreflight?.(input, preflightOptions);
+    },
+    preflightCurrentWindow(input = {}, preflightOptions = {}) {
+      return this.currentWindowPreflight(input, preflightOptions);
     },
     observePlatformCandidates(input = {}, observeOptions = {}) {
       return runtime.observePlatformCandidates?.(input, observeOptions);

@@ -17,6 +17,7 @@ import {
   buildMeetingAppContentScriptManifest,
   buildMeetingAppExtensionAttachedMessage,
   buildMeetingAppExtensionClientCallMessage,
+  buildMeetingAppExtensionCurrentWindowPreflightMessage,
   buildMeetingAppExtensionObserveCandidatesMessage,
   buildMeetingAppExtensionStatusMessage,
 } from './meeting-app-extension.mjs';
@@ -112,6 +113,15 @@ function messageExamples(platform, options = {}) {
         title: `${extensionPlatform ?? 'local'} meeting`,
         active: true,
       }],
+    }),
+    preflight_current_window: buildMeetingAppExtensionCurrentWindowPreflightMessage({
+      requestId: 'preflight-001',
+      platform: extensionPlatform,
+      capturedAtMs,
+      url,
+      options: {
+        requireSpeakerTrack: true,
+      },
     }),
     insert_annotation: buildMeetingAppExtensionClientCallMessage('insertMark', {
       id: 'note-001',
@@ -352,6 +362,7 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
       message_types: MEETING_APP_EXTENSION_MESSAGE_TYPES,
       bridge_message_types: [
         'meeting_timeline.sample',
+        MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
         'meeting_timeline.insert_mark',
         'meeting_timeline.insert_marks',
         'meeting_timeline.provider_event',
@@ -359,6 +370,7 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
       lightweight_connector_message_types: [
         'meeting_timeline.sample',
         'meeting_timeline.sample_tracks',
+        MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
         'meeting_timeline.insert_mark',
         'meeting_timeline.insert_marks',
         'meeting_timeline.provider_event',

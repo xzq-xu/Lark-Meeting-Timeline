@@ -55,7 +55,56 @@ function fakeExtensionRuntime() {
   };
 }
 
-function fakeBrowserWindow(url = 'https://meet.google.com/abc-defg-hij') {
+function node(tagName, attrs = {}, text = '') {
+  return {
+    tagName: tagName.toUpperCase(),
+    attributes: attrs,
+    dataset: Object.fromEntries(Object.entries(attrs)
+      .filter(([key]) => key.startsWith('data-'))
+      .map(([key, value]) => [
+        key.slice(5).replace(/-([a-z])/g, (_, char) => char.toUpperCase()),
+        value,
+      ])),
+    innerText: text,
+    textContent: text,
+    getAttribute(name) {
+      return attrs[name] ?? null;
+    },
+  };
+}
+
+function selectorAttrMatches(item, selector) {
+  if (selector === 'button') return item.tagName === 'BUTTON';
+  if (selector.startsWith('.')) {
+    return String(item.attributes.class ?? '').split(/\s+/).includes(selector.slice(1));
+  }
+  const attrParts = [...String(selector).matchAll(/\[([a-zA-Z0-9_-]+)([*]?=)?(?:"([^"]*)"|'([^']*)'|([^\]\s]+))?(?:\s+i)?\]/g)];
+  if (!attrParts.length) return false;
+  return attrParts.every((match) => {
+    const [, attrName, operator, doubleQuoted, singleQuoted, bare] = match;
+    const actual = item.attributes[attrName];
+    if (operator == null) return actual != null;
+    if (actual == null) return false;
+    const expected = doubleQuoted ?? singleQuoted ?? bare ?? '';
+    if (operator === '*=') return String(actual).toLowerCase().includes(String(expected).toLowerCase());
+    return String(actual) === String(expected);
+  });
+}
+
+function queryNodes(nodes, selector) {
+  const text = String(selector);
+  if (text === '*') return nodes;
+  const generic = nodes.filter((item) => selectorAttrMatches(item, text));
+  if (generic.length) return generic;
+  if (text.includes('speaking')) {
+    return nodes.filter((item) => /speaking|active speaker|正在发言|正在讲话|正在说话/i.test(item.attributes['aria-label'] ?? ''));
+  }
+  if (text.includes('aria-live')) return nodes.filter((item) => item.attributes['aria-live']);
+  if (text.includes('role="status"')) return nodes.filter((item) => item.attributes.role === 'status');
+  return [];
+}
+
+function fakeBrowserWindow(url = 'https://meet.google.com/abc-defg-hij', nodes = []) {
   const document = {
     nodeType: 9,
     title: 'Connector browser runtime',
@@ -63,8 +112,8 @@ function fakeBrowserWindow(url = 'https://meet.google.com/abc-defg-hij') {
     location: { href: url },
     body: { nodeType: 1 },
     documentElement: { nodeType: 1 },
-    querySelectorAll() {
-      return [];
+    querySelectorAll(selector) {
+      return queryNodes(nodes, selector);
     },
   };
   return {
@@ -320,7 +369,16 @@ const rootHubRuntime = createMeetingPlatformConnectorHubFromRoot({
 });
 assert.equal(rootHubRuntime.connectorFor('google-meet').platform, 'google_meet');
 
-const browserWindow = fakeBrowserWindow();
+const browserWindow = fakeBrowserWindow('https://meet.google.com/abc-defg-hij', [
+  node('button', { 'aria-label': 'Turn off microphone' }),
+  node('button', { 'aria-label': 'Leave call' }),
+  node('div', {
+    'data-participant-id': 'ada',
+    'aria-label': 'Ada Lovelace is speaking',
+    'data-audio-level': '0.84',
+  }),
+  node('div', { role: 'status', 'aria-live': 'polite' }, 'You are presenting'),
+]);
 const browserRuntime = createMeetingPlatformConnectorBrowserRuntime({
   baseUrl,
   fetch: fetchImpl,
@@ -345,6 +403,14 @@ await browserRuntime.observePlatformCandidates({
 });
 assert.equal(calls.at(-1).body.action, 'observe_platform_candidates');
 assert.equal(calls.at(-1).body.tabs[0].url, 'https://zoom.us/j/987654321');
+const browserPreflight = browserRuntime.currentWindowPreflight({}, {
+  requireSpeakerTrack: true,
+  observedAtMs: 1_782_614_433_000,
+});
+assert.equal(browserPreflight.accepted, true);
+assert.equal(browserPreflight.platform, 'google_meet');
+assert.equal(browserPreflight.readiness.realtime_annotation_ready, true);
+assert.equal(browserRuntime.preflightCurrentWindow({}, { requireSpeakerTrack: true }).accepted, true);
 
 const connectorBridge = createMeetingPlatformConnectorContentScriptBridge({
   baseUrl,
@@ -368,6 +434,69 @@ assert.equal(bridgeResponse.handled, true);
 assert.equal(bridgeResponse.action, 'insertMark');
 assert.equal(calls.at(-1).body.platform, 'google_meet');
 assert.equal(calls.at(-1).body.annotation.id, 'bridge-mark-001');
+const bridgePreflight = connectorBridge.currentWindowPreflight({}, {
+  requireSpeakerTrack: true,
+  observedAtMs: 1_782_614_434_000,
+});
+assert.equal(bridgePreflight.accepted, true);
+assert.equal(bridgePreflight.platform, 'google_meet');
+const bridgePreflightResponse = await connectorBridge.dispatchMessage({
+  type: 'meeting_timeline.preflight_current_window',
+  payload: {
+    options: {
+      requireSpeakerTrack: true,
+      observedAtMs: 1_782_614_435_000,
+    },
+  },
+});
+assert.equal(bridgePreflightResponse.handled, true);
+assert.equal(bridgePreflightResponse.action, 'preflightCurrentWindow');
+assert.equal(bridgePreflightResponse.result.accepted, true);
+assert.equal(bridgePreflightResponse.result.platform, 'google_meet');
+
+const platformPreflightCases = [
+  {
+    platform: 'microsoft_teams',
+    url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+    nodes: [
+      node('button', { 'aria-label': 'Leave' }),
+      node('button', { 'aria-label': 'Share content' }),
+      node('div', {
+        'data-tid': 'participant-ada',
+        'data-user-id': 'ada',
+        'data-display-name': 'Ada Lovelace',
+        'aria-label': 'Ada Lovelace speaking',
+      }),
+    ],
+  },
+  {
+    platform: 'zoom',
+    url: 'https://us06web.zoom.us/wc/987654321/start',
+    nodes: [
+      node('button', { 'aria-label': 'Leave Meeting' }),
+      node('button', { 'aria-label': 'Participants' }),
+      node('div', {
+        'data-user-id': 'mira',
+        'aria-label': 'Mira Patel is speaking',
+      }),
+    ],
+  },
+];
+for (const item of platformPreflightCases) {
+  const platformBridge = createMeetingPlatformConnectorContentScriptBridge({
+    baseUrl,
+    fetch: fetchImpl,
+    window: fakeBrowserWindow(item.url, item.nodes),
+    now: () => 1_782_614_400_000,
+  });
+  const response = await platformBridge.dispatchMessage({
+    type: 'meeting_timeline.preflight_current_window',
+    payload: { options: { requireSpeakerTrack: true } },
+  });
+  assert.equal(response.handled, true);
+  assert.equal(response.result.platform, item.platform);
+  assert.equal(response.result.accepted, true);
+}
 
 const extensionRuntime = fakeExtensionRuntime();
 const installedBridge = installMeetingPlatformConnectorContentScriptBridge({

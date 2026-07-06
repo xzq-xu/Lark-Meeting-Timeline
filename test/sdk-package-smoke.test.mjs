@@ -155,6 +155,8 @@ assert.equal(packedFiles.includes('adapters/meeting-platform-connector.mjs'), tr
 assert.equal(packedFiles.includes('adapters/meeting-platform-connector.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-extension.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-extension.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-profile.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-profile.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-observer-scheduler.mjs'), true);
@@ -658,6 +660,10 @@ import {
   buildMeetingAppAdapterVerificationReportMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-handoff-package';
 import {
+  MEETING_APP_EXTENSION_MESSAGE_TYPES,
+  buildMeetingAppExtensionCurrentWindowPreflightMessage,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-extension';
+import {
   buildMeetingAppFixtureTrackReadinessReport,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixture-tracks';
 import {
@@ -1000,6 +1006,11 @@ assert.equal(buildMeetingPlatformConnectorAcceptanceReport(rootPlatformConnector
 assert.equal(buildMeetingPlatformConnectorMatrix({ platforms: ['google-meet', 'teams'] }).accepted_count, 2);
 assert.equal(buildMeetingPlatformConnectorHubFromRoot({ platforms: ['google-meet', 'teams'] }).schema, 'meeting_platform_connector_hub');
 assert.equal(buildMeetingPlatformConnectorHub({ platforms: ['google-meet', 'teams'] }).accepted, true);
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window, 'meeting_timeline.preflight_current_window');
+assert.equal(buildMeetingAppExtensionCurrentWindowPreflightMessage({
+  platform: 'google-meet',
+  capturedAtMs: 123,
+}).type, 'meeting_timeline.preflight_current_window');
 assert.equal(resolveMeetingPlatformConnectorInput('https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample', {
   platforms: ['google-meet', 'teams'],
 }).platform, 'microsoft_teams');
@@ -1828,7 +1839,9 @@ assert.equal(smokeGoogleRuntimeBundle.adapter_route.routes[0].route, 'local_obse
 assert.equal(smokeGoogleRuntimeBundle.runtime.content_script_bridge.install_function, 'installMeetingPlatformIntegrationContentScriptBridge');
 assert.equal(smokeGoogleRuntimeBundle.runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
 assert.equal(smokeGoogleRuntimeBundle.messaging.lightweight_connector_message_types.includes('meeting_timeline.sample_tracks'), true);
+assert.equal(smokeGoogleRuntimeBundle.messaging.lightweight_connector_message_types.includes('meeting_timeline.preflight_current_window'), true);
 assert.equal(smokeGoogleRuntimeBundle.messaging.runtime_event.plan.realtime_contract.transcript_required_for_realtime, false);
+assert.equal(smokeGoogleRuntimeBundle.messaging.examples.preflight_current_window.type, 'meeting_timeline.preflight_current_window');
 assert.equal(smokeGoogleRuntimeBundle.messaging.examples.content_script_insert_annotation.type, 'meeting_timeline.insert_mark');
 assert.equal(buildMeetingPlatformRuntimeBundleMatrix({
   baseUrl: 'http://localhost:8787',

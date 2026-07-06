@@ -2,6 +2,7 @@ import { createMeetingAppTimelineRuntime } from './meeting-app-runtime.mjs';
 import {
   meetingAppDomCaptureProfile,
 } from './meeting-app-capture.mjs';
+import { buildMeetingPlatformAdapterCurrentWindowPreflight } from './platform-adapter-preflight.mjs';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -415,6 +416,40 @@ function messagePayload(message = {}) {
   return message?.payload ?? message?.data ?? message;
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function payloadInput(payload = {}) {
+  if (!isPlainObject(payload)) return {};
+  if (!isPlainObject(payload.input)) return payload;
+  const {
+    input,
+    options,
+    preflightOptions,
+    preflight_options: preflightOptionsSnake,
+    ...routeFields
+  } = payload;
+  void options;
+  void preflightOptions;
+  void preflightOptionsSnake;
+  return {
+    ...routeFields,
+    ...input,
+  };
+}
+
+function payloadOptions(payload = {}, runtimeOptions = {}) {
+  if (!isPlainObject(payload)) return runtimeOptions;
+  return {
+    ...payload,
+    ...(payload.options ?? {}),
+    ...(payload.preflightOptions ?? {}),
+    ...(payload.preflight_options ?? {}),
+    ...runtimeOptions,
+  };
+}
+
 export function meetingAppBrowserInput(options = {}) {
   const win = browserWindow(options);
   const doc = browserDocument(options);
@@ -759,6 +794,21 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
       return { handled: true, action: 'sampleTracks', result: await sampleTracks(messageOptions) };
     }
     if ([
+      'meeting_timeline.preflight_current_window',
+      'meeting_timeline_preflight_current_window',
+      'meeting_timeline.current_window_preflight',
+      'meeting_timeline_current_window_preflight',
+      'preflight_current_window',
+      'current_window_preflight',
+      'adapter_preflight',
+    ].includes(type)) {
+      return {
+        handled: true,
+        action: 'preflightCurrentWindow',
+        result: currentWindowPreflight(payloadInput(payload), payloadOptions(payload, messageOptions)),
+      };
+    }
+    if ([
       'meeting_timeline.start_tracks',
       'meeting_timeline_start_tracks',
       'start_tracks',
@@ -835,6 +885,13 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
     return runtime.startTracks(() => inputProvider(), startOptions);
   }
 
+  function currentWindowPreflight(input = {}, preflightOptions = {}) {
+    return buildMeetingPlatformAdapterCurrentWindowPreflight(inputProvider(input), {
+      ...mergedOptions,
+      ...preflightOptions,
+    });
+  }
+
   return {
     ...runtime,
     inputProvider,
@@ -852,6 +909,8 @@ export function createMeetingAppBrowserRuntime(clientOrOptions, options = {}) {
     stopTracks() {
       return runtime.stopTracks();
     },
+    currentWindowPreflight,
+    preflightCurrentWindow: currentWindowPreflight,
     handleMessage,
     installLifecycleHandlers,
     removeLifecycleHandlers,
