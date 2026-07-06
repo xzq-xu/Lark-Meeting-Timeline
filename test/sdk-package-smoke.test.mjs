@@ -27,6 +27,8 @@ assert.equal(packInfo.name, '@ai-annotation/meeting-timeline-sdk');
 const packedFiles = packInfo.files.map((item) => item.path).sort();
 assert.equal(packedFiles.includes('index.mjs'), true);
 assert.equal(packedFiles.includes('index.d.ts'), true);
+assert.equal(packedFiles.includes('bin/meeting-app-adapter-integration-package.mjs'), true);
+assert.equal(packedFiles.includes('cli/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-integration-runtime.mjs'), true);
@@ -137,6 +139,22 @@ await execFileAsync('npm', [
 ], {
   cwd: consumerDir,
 });
+
+const { stdout: binStdout } = await execFileAsync(
+  join(consumerDir, 'node_modules', '.bin', 'meeting-app-adapter-integration-package'),
+  [
+    '--platforms=google-meet',
+    '--json=true',
+  ],
+  {
+    cwd: consumerDir,
+  },
+);
+const binReport = JSON.parse(binStdout);
+assert.equal(binReport.type, 'meeting_app_adapter_integration_package_report');
+assert.equal(binReport.platform_count, 1);
+assert.equal(binReport.required_platforms[0], 'google-meet');
+assert.equal(binReport.runtime_ready_count, 1);
 
 await writeFile(join(consumerDir, 'smoke.mjs'), `
 import assert from 'node:assert/strict';

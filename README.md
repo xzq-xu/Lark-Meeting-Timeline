@@ -125,6 +125,8 @@ npm run meeting-app:adapter-integration-package
 
 它会写出 `data/meeting-app-adapter-integration-packages/` 和 `data/meeting-app-adapter-integration-package-report.json`。每个平台目录都会带 `runtime-delivery.json` 和 `integration-package.json`，下游宿主工程可以直接读取 adapter route、content-script bridge、runtime event endpoint、host endpoints 和 `captured_at_ms` 契约。
 
+同一个命令也随 SDK 包发布为 `meeting-app-adapter-integration-package`，宿主项目安装 `@ai-annotation/meeting-timeline-sdk` 后可以直接从 `node_modules/.bin` 或 `npx` 生成接入包，不需要复制本仓库的 `scripts/`。
+
 如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
 
 ```bash

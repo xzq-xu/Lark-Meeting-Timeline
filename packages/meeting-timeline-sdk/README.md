@@ -635,6 +635,16 @@ npm run meeting-app:adapter-integration-package -- \
 
 每个平台目录会包含 `runtime-delivery.json` 和 `integration-package.json`；报告里的 `target_accepted_count` 可用来区分 pilot / realtime / production gate。
 
+安装 SDK 包以后，这个导出能力也可以直接作为 npm bin 使用：
+
+```sh
+npx meeting-app-adapter-integration-package \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --base-url=https://timeline.example.com \
+  --out-dir=meeting-app-adapter-integration-packages \
+  --report-file=meeting-app-adapter-integration-package-report.json
+```
+
 如果下游项目要直接启动浏览器扩展、WebView preload 或 native host runtime，用 `platform-runtime-bundle`。它在 `platform-adaptation-package` 基础上再补一层可执行运行时配置：content script manifest、浏览器 URL matches、adapter route、`meeting-app-browser-runtime` preset、`platform-integration-runtime` content-script bridge 安装参数、mutation observer / speaker filter 参数、extension message 示例、host ingest endpoints，以及 `captured_at_ms` 写入契约：
 
 ```js
