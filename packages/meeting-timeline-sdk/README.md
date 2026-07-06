@@ -848,6 +848,20 @@ npx meeting-platform-adapter-launch-plan \
 
 把 SDK 交给另一个宿主项目时，可以先跑 `platformAdapterSmoke(adapterInstallManifest)` 或子模块的 `runMeetingPlatformAdapterSmoke()`。它会为 Google Meet / Teams / Zoom / Webex / Lark 生成 fixture 会议 URL，创建 message bridge，按顺序发送 `meeting_timeline.observe_candidates`、`meeting_timeline.insert_mark`、`meeting_timeline.speaker_track`、`meeting_timeline.participant_track` 和 `meeting_timeline.provider_event`，并返回 `meeting_platform_adapter_smoke_report`。这个报告只验证本地实时标注链路：已先建轴、`captured_at_ms` 未丢失、speaker/participant 位置可写、provider reconcile 不阻塞实时标注；它不要求真实会议开始/结束事件，也不要求转写内容。
 
+同一条 smoke 也有 CLI，适合宿主 CI 直接跑。没有 `--manifest-file` 时，CLI 会按 `--platforms` 生成静态 install manifest；有 manifest 时会用真实交付清单验收：
+
+```sh
+npx meeting-platform-adapter-smoke \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --target=static \
+  --json=true
+
+npx meeting-platform-adapter-smoke \
+  --manifest-file=meeting-platform-adapter-install-manifest.json \
+  --platforms=google-meet,zoom \
+  --fail-on-blocked=true
+```
+
 需要把这份 connector package 直接落盘给另一个宿主项目时，可以用 SDK 自带 CLI：
 
 ```sh

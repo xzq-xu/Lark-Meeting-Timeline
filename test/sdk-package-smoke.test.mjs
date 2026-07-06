@@ -33,12 +33,14 @@ assert.equal(packedFiles.includes('bin/meeting-platform-adapter-export-package.m
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-import-plan.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-install-manifest.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-launch-plan.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-platform-adapter-smoke.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-connector-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-export-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-import-plan.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-install-manifest.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-launch-plan.mjs'), true);
+assert.equal(packedFiles.includes('cli/meeting-platform-adapter-smoke.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-integration-runtime.mjs'), true);
@@ -270,6 +272,21 @@ const { stdout: adapterLaunchBinStdout } = await execFileAsync(
 const adapterLaunchBinReport = JSON.parse(adapterLaunchBinStdout);
 assert.equal(adapterLaunchBinReport.type, 'meeting_platform_adapter_launch_plan_report');
 assert.equal(adapterLaunchBinReport.ok, false);
+
+const { stdout: adapterSmokeBinStdout } = await execFileAsync(
+  join(consumerDir, 'node_modules', '.bin', 'meeting-platform-adapter-smoke'),
+  [
+    '--platforms=google-meet,zoom',
+    '--json=true',
+  ],
+  {
+    cwd: consumerDir,
+  },
+);
+const adapterSmokeBinReport = JSON.parse(adapterSmokeBinStdout);
+assert.equal(adapterSmokeBinReport.type, 'meeting_platform_adapter_smoke_cli_report');
+assert.equal(adapterSmokeBinReport.ok, true);
+assert.equal(adapterSmokeBinReport.accepted_count, 2);
 
 await writeFile(join(consumerDir, 'smoke.mjs'), `
 import assert from 'node:assert/strict';
