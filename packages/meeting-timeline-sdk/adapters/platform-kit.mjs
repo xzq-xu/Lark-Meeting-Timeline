@@ -41,8 +41,12 @@ import {
 import {
   assertMeetingAppAdapterHandoffPackage,
   assertMeetingAppAdapterHandoffPackageMatrix,
+  assertMeetingAppAdapterVerificationReport,
+  assertMeetingAppAdapterVerificationReportMatrix,
   buildMeetingAppAdapterHandoffPackage,
   buildMeetingAppAdapterHandoffPackageMatrix,
+  buildMeetingAppAdapterVerificationReport,
+  buildMeetingAppAdapterVerificationReportMatrix,
 } from './meeting-app-adapter-handoff-package.mjs';
 import {
   buildMeetingAppTrackPipeline,
@@ -452,6 +456,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_adapter_spec_matrix: buildMeetingAppAdapterSpecMatrix(options),
     meeting_app_adapter_runtime_config_matrix: buildMeetingAppAdapterRuntimeConfigMatrix(options),
     meeting_app_adapter_handoff_package_matrix: buildMeetingAppAdapterHandoffPackageMatrix(options),
+    meeting_app_adapter_verification_report_matrix: buildMeetingAppAdapterVerificationReportMatrix(options),
     meeting_app_integration_matrix: buildMeetingAppIntegrationMatrix(options),
     meeting_app_deployment_manifests: buildAllMeetingAppDeploymentManifests(options),
     meeting_app_deployment_manifest_acceptance: buildAllMeetingAppDeploymentManifestAcceptanceReports(options),
@@ -807,6 +812,18 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertMeetingAppAdapterHandoffPackageMatrix(matrixOrOptions = {}, packageOptions = {}) {
       return assertMeetingAppAdapterHandoffPackageMatrix(matrixOrOptions, withDefaults(defaults, packageOptions));
+    },
+    meetingAppAdapterVerificationReport(packageOrSpec = {}, verificationOptions = {}) {
+      return buildMeetingAppAdapterVerificationReport(packageOrSpec, withDefaults(defaults, verificationOptions));
+    },
+    meetingAppAdapterVerificationReportMatrix(verificationOptions = {}) {
+      return buildMeetingAppAdapterVerificationReportMatrix(withDefaults(defaults, verificationOptions));
+    },
+    assertMeetingAppAdapterVerificationReport(reportOrPackage = {}, verificationOptions = {}) {
+      return assertMeetingAppAdapterVerificationReport(reportOrPackage, withDefaults(defaults, verificationOptions));
+    },
+    assertMeetingAppAdapterVerificationReportMatrix(matrixOrOptions = {}, verificationOptions = {}) {
+      return assertMeetingAppAdapterVerificationReportMatrix(matrixOrOptions, withDefaults(defaults, verificationOptions));
     },
     meetingAppTrackPipeline(input = {}, trackOptions = {}) {
       return buildMeetingAppTrackPipeline(input, withDefaults(defaults, trackOptions));

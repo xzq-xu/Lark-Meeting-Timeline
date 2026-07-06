@@ -237,6 +237,10 @@ import type {
   MeetingAppAdapterHandoffPackageMatrix,
   MeetingAppAdapterHandoffPackageMatrixOptions,
   MeetingAppAdapterHandoffPackageOptions,
+  MeetingAppAdapterVerificationMatrixOptions,
+  MeetingAppAdapterVerificationOptions,
+  MeetingAppAdapterVerificationReport,
+  MeetingAppAdapterVerificationReportMatrix,
 } from './meeting-app-adapter-handoff-package.mjs';
 import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
@@ -466,6 +470,19 @@ export interface MeetingPlatformTimelineKit {
     matrixOrOptions?: MeetingAppAdapterHandoffPackageMatrix | MeetingAppAdapterHandoffPackageMatrixOptions,
     packageOptions?: MeetingAppAdapterHandoffPackageMatrixOptions,
   ): MeetingAppAdapterHandoffPackageMatrix;
+  meetingAppAdapterVerificationReport(
+    packageOrSpec?: MeetingAppAdapterHandoffPackage | MeetingAppAdapterSpec | string | MeetingAppAdapterSpecInput,
+    verificationOptions?: MeetingAppAdapterVerificationOptions,
+  ): MeetingAppAdapterVerificationReport;
+  meetingAppAdapterVerificationReportMatrix(verificationOptions?: MeetingAppAdapterVerificationMatrixOptions): MeetingAppAdapterVerificationReportMatrix;
+  assertMeetingAppAdapterVerificationReport(
+    reportOrPackage?: MeetingAppAdapterVerificationReport | MeetingAppAdapterHandoffPackage | MeetingAppAdapterSpec | string | MeetingAppAdapterSpecInput,
+    verificationOptions?: MeetingAppAdapterVerificationOptions,
+  ): MeetingAppAdapterVerificationReport;
+  assertMeetingAppAdapterVerificationReportMatrix(
+    matrixOrOptions?: MeetingAppAdapterVerificationReportMatrix | MeetingAppAdapterVerificationMatrixOptions,
+    verificationOptions?: MeetingAppAdapterVerificationMatrixOptions,
+  ): MeetingAppAdapterVerificationReportMatrix;
   meetingAppTrackPipeline(
     input?: MeetingAppTrackPipelineInput | Record<string, unknown>[],
     trackOptions?: MeetingAppTrackPipelineOptions,

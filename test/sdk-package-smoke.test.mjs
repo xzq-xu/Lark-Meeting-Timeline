@@ -352,8 +352,12 @@ import {
 import {
   assertMeetingAppAdapterHandoffPackage,
   assertMeetingAppAdapterHandoffPackageMatrix,
+  assertMeetingAppAdapterVerificationReport,
+  assertMeetingAppAdapterVerificationReportMatrix,
   buildMeetingAppAdapterHandoffPackage,
   buildMeetingAppAdapterHandoffPackageMatrix,
+  buildMeetingAppAdapterVerificationReport,
+  buildMeetingAppAdapterVerificationReportMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-handoff-package';
 import {
   buildMeetingAppFixtureTrackReadinessReport,
@@ -848,6 +852,28 @@ assert.equal(assertMeetingAppAdapterHandoffPackage('zoom').contracts.timestamp_f
 assert.equal(assertMeetingAppAdapterHandoffPackageMatrix({ platforms: ['google-meet'] }).package_count, 1);
 assert.equal(kit.meetingAppAdapterHandoffPackage('google-meet').validation.content_script_ready, true);
 assert.equal(kit.meetingAppAdapterHandoffPackageMatrix({ platforms: ['google-meet'] }).schema, 'meeting_app_adapter_handoff_package_matrix');
+const appAdapterEvidence = {
+  live_dom_snapshot_count: 1,
+  candidate_observation_count: 1,
+  speaker_segments: [{ captured_at_ms: 1_782_614_401_000, speaker_label: 'Ada' }],
+  participant_segments: [{ captured_at_ms: 1_782_614_401_000, participant_label: 'Ada' }],
+  annotations: [{ captured_at_ms: 1_782_614_402_000, meeting_id: 'gm', axis_id: 'axis-1' }],
+};
+assert.equal(buildMeetingAppAdapterVerificationReport('google-meet', { evidence: appAdapterEvidence }).accepted, true);
+assert.equal(buildMeetingAppAdapterVerificationReportMatrix({
+  platforms: ['google-meet'],
+  evidenceByAdapter: { google_meet: appAdapterEvidence },
+}).production_ready_count, 1);
+assert.equal(assertMeetingAppAdapterVerificationReport('zoom', { evidence: appAdapterEvidence }).production_ready, true);
+assert.equal(assertMeetingAppAdapterVerificationReportMatrix({
+  platforms: ['google-meet'],
+  evidenceByAdapter: { google_meet: appAdapterEvidence },
+}).accepted_count, 1);
+assert.equal(kit.meetingAppAdapterVerificationReport('google-meet', { evidence: appAdapterEvidence }).pilot_ready, true);
+assert.equal(kit.meetingAppAdapterVerificationReportMatrix({
+  platforms: ['google-meet'],
+  evidenceByAdapter: { google_meet: appAdapterEvidence },
+}).schema, 'meeting_app_adapter_verification_report_matrix');
 assert.equal(buildMeetingAppObserverSchedulerConfig('google-meet').schema, 'meeting_app_observer_scheduler_config');
 assert.equal(buildMeetingAppObserverSchedulerConfigMatrix({ platforms: ['google-meet'] }).schema, 'meeting_app_observer_scheduler_config_matrix');
 assert.equal(typeof createMeetingAppObserverScheduler({

@@ -14,6 +14,8 @@ import {
 export const MEETING_APP_ADAPTER_HANDOFF_PACKAGE_SCHEMA = 'meeting_app_adapter_handoff_package';
 export const MEETING_APP_ADAPTER_HANDOFF_PACKAGE_MATRIX_SCHEMA = 'meeting_app_adapter_handoff_package_matrix';
 export const MEETING_APP_ADAPTER_VERIFICATION_PLAN_SCHEMA = 'meeting_app_adapter_verification_plan';
+export const MEETING_APP_ADAPTER_VERIFICATION_REPORT_SCHEMA = 'meeting_app_adapter_verification_report';
+export const MEETING_APP_ADAPTER_VERIFICATION_REPORT_MATRIX_SCHEMA = 'meeting_app_adapter_verification_report_matrix';
 export const MEETING_APP_ADAPTER_HANDOFF_PACKAGE_SCHEMA_VERSION = 1;
 
 function firstNonEmpty(...values) {
@@ -38,6 +40,11 @@ function packageInputs(options = {}) {
   const specs = asArray(firstNonEmpty(options.packages, options.configs, options.adapters, options.adapter_specs, options.adapterSpecs, options.specs));
   const platforms = asArray(firstNonEmpty(options.platforms, options.platform_keys, options.platformKeys, []));
   return [...platforms, ...specs];
+}
+
+function packageOrReportInputs(options = {}) {
+  const reports = asArray(firstNonEmpty(options.reports, options.verification_reports, options.verificationReports, []));
+  return reports.length > 0 ? reports : packageInputs(options);
 }
 
 function cleanOptions(options = {}) {
@@ -233,6 +240,94 @@ function verificationPlan({ spec, runtimeConfig, manifest }) {
   };
 }
 
+function signalCount(value) {
+  if (value === true) return 1;
+  if (value === false || value == null || value === '') return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.max(0, value) : 0;
+  if (Array.isArray(value)) return value.length;
+  if (typeof value === 'object') {
+    if (typeof value.count === 'number') return Math.max(0, value.count);
+    if (typeof value.record_count === 'number') return Math.max(0, value.record_count);
+    if (typeof value.accepted_count === 'number') return Math.max(0, value.accepted_count);
+    if (typeof value.length === 'number') return Math.max(0, value.length);
+    if (Array.isArray(value.records)) return value.records.length;
+    if (Array.isArray(value.segments)) return value.segments.length;
+    if (Array.isArray(value.annotations)) return value.annotations.length;
+  }
+  return 0;
+}
+
+function evidenceSource(options = {}) {
+  return firstNonEmpty(
+    options.evidence,
+    options.evidence_package,
+    options.evidencePackage,
+    options.live_evidence,
+    options.liveEvidence,
+    {},
+  );
+}
+
+function explicitEvidence(evidence = {}, id) {
+  return firstNonEmpty(
+    evidence[id],
+    evidence.evidence?.[id],
+    evidence.evidence_by_id?.[id],
+    evidence.evidenceById?.[id],
+    evidence.signals?.[id],
+  );
+}
+
+function countRuntimeEvents(evidence = {}, matcher = () => false) {
+  return asArray(firstNonEmpty(evidence.runtime_events, evidence.runtimeEvents, evidence.events))
+    .filter((event) => matcher(event)).length;
+}
+
+function countEvidence(evidence = {}, id) {
+  const explicit = explicitEvidence(evidence, id);
+  if (explicit != null) return signalCount(explicit);
+  switch (id) {
+    case 'live_dom_snapshot':
+      return Math.max(
+        signalCount(firstNonEmpty(evidence.live_dom_snapshot_count, evidence.liveDomSnapshotCount, evidence.snapshot_count, evidence.snapshotCount)),
+        signalCount(evidence.snapshot_records ?? evidence.snapshotRecords),
+        signalCount(evidence.record_set ?? evidence.recordSet),
+        signalCount(evidence.meeting_app_record_set ?? evidence.meetingAppRecordSet),
+        signalCount(evidence.records),
+      );
+    case 'candidate_observation':
+      return Math.max(
+        signalCount(firstNonEmpty(evidence.candidate_observation_count, evidence.candidateObservationCount)),
+        signalCount(evidence.candidate_observations ?? evidence.candidateObservations),
+        signalCount(evidence.observe_candidates ?? evidence.observeCandidates),
+        countRuntimeEvents(evidence, (event) => String(event?.type ?? event?.message_type ?? event?.action ?? '').includes('candidate')),
+      );
+    case 'speaker_track':
+      return Math.max(
+        signalCount(firstNonEmpty(evidence.speaker_track_count, evidence.speakerTrackCount)),
+        signalCount(evidence.speaker_segments ?? evidence.speakerSegments),
+        signalCount(evidence.speaker_track ?? evidence.speakerTrack),
+        signalCount(evidence.tracks?.speaker),
+      );
+    case 'participant_track':
+      return Math.max(
+        signalCount(firstNonEmpty(evidence.participant_track_count, evidence.participantTrackCount)),
+        signalCount(evidence.participant_segments ?? evidence.participantSegments),
+        signalCount(evidence.participant_track ?? evidence.participantTrack),
+        signalCount(evidence.tracks?.participant),
+      );
+    case 'annotation_insert_current_axis':
+      return Math.max(
+        signalCount(firstNonEmpty(evidence.annotation_insert_current_axis_count, evidence.annotationInsertCurrentAxisCount)),
+        signalCount(evidence.current_axis_annotations ?? evidence.currentAxisAnnotations),
+        signalCount(evidence.annotations),
+        evidence.runtime_replay_accepted === true || evidence.runtimeHostReplayAccepted === true ? 1 : 0,
+      );
+    default:
+      return 0;
+  }
+}
+
 function packageIssues({ spec, runtimeConfig, files }) {
   return [
     spec.schema === MEETING_APP_ADAPTER_SPEC_SCHEMA
@@ -420,6 +515,140 @@ export function buildMeetingAppAdapterHandoffPackageMatrix(options = {}) {
   };
 }
 
+export function buildMeetingAppAdapterVerificationReport(packageOrSpec = {}, options = {}) {
+  const handoffPackage = packageOrSpec?.schema === MEETING_APP_ADAPTER_HANDOFF_PACKAGE_SCHEMA
+    ? packageOrSpec
+    : buildMeetingAppAdapterHandoffPackage(packageOrSpec, options);
+  const evidence = evidenceSource(options);
+  const target = firstNonEmpty(
+    options.target,
+    options.acceptance_target,
+    options.acceptanceTarget,
+    options.requireProductionReady === false || options.require_production_ready === false ? 'pilot' : 'production',
+  );
+  const plan = handoffPackage.verification_plan ?? verificationPlan({
+    spec: handoffPackage.adapter_spec,
+    runtimeConfig: handoffPackage.runtime_config,
+    manifest: handoffPackage.adapter_manifest,
+  });
+  const checks = plan.acceptance_checks.map((check) => {
+    if (!String(check.id).startsWith('verify_')) return check;
+    const evidenceId = String(check.id).replace(/^verify_/, '');
+    const required = plan.required_evidence.find((item) => item.id === evidenceId) ?? {};
+    const count = countEvidence(evidence, evidenceId);
+    const minimum = Number(required.minimum_count ?? 1);
+    return {
+      ...check,
+      evidence_id: evidenceId,
+      observed_count: count,
+      minimum_count: minimum,
+      status: count >= minimum ? 'passed' : 'missing_evidence',
+    };
+  });
+  const staticChecks = checks.filter((check) => !String(check.id).startsWith('verify_'));
+  const liveChecks = checks.filter((check) => String(check.id).startsWith('verify_'));
+  const staticPassed = staticChecks.every((check) => check.status === 'passed');
+  const livePassed = liveChecks.every((check) => check.status === 'passed');
+  const pilotReady = staticPassed && livePassed;
+  const productionReady = pilotReady;
+  const accepted = target === 'pilot' ? pilotReady : productionReady;
+  const issues = [
+    ...staticChecks
+      .filter((check) => check.blocking && check.status !== 'passed')
+      .map((check) => issue('error', check.id, 'Static adapter verification check failed.', {
+        adapter_key: handoffPackage.adapter_key,
+        check_status: check.status,
+      })),
+    ...liveChecks
+      .filter((check) => check.blocking && check.status !== 'passed')
+      .map((check) => issue('error', check.id, 'Required live evidence is missing for adapter verification.', {
+        adapter_key: handoffPackage.adapter_key,
+        evidence_id: check.evidence_id,
+        observed_count: check.observed_count,
+        minimum_count: check.minimum_count,
+      })),
+  ];
+  return {
+    type: 'meeting_app_adapter_verification_report',
+    schema: MEETING_APP_ADAPTER_VERIFICATION_REPORT_SCHEMA,
+    schema_version: MEETING_APP_ADAPTER_HANDOFF_PACKAGE_SCHEMA_VERSION,
+    accepted,
+    target,
+    adapter_key: handoffPackage.adapter_key,
+    display_name: handoffPackage.display_name,
+    static_ready: staticPassed,
+    live_evidence_ready: livePassed,
+    pilot_ready: pilotReady,
+    production_ready: productionReady,
+    check_count: checks.length,
+    passed_check_count: checks.filter((check) => check.status === 'passed').length,
+    missing_evidence_count: liveChecks.filter((check) => check.status !== 'passed').length,
+    checks,
+    evidence_summary: {
+      live_dom_snapshot: countEvidence(evidence, 'live_dom_snapshot'),
+      candidate_observation: countEvidence(evidence, 'candidate_observation'),
+      speaker_track: countEvidence(evidence, 'speaker_track'),
+      participant_track: countEvidence(evidence, 'participant_track'),
+      annotation_insert_current_axis: countEvidence(evidence, 'annotation_insert_current_axis'),
+    },
+    handoff_package: {
+      schema: handoffPackage.schema,
+      accepted: handoffPackage.accepted,
+      file_paths: handoffPackage.file_paths,
+    },
+    verification_plan: plan,
+    issue_count: issues.length,
+    blocking_count: issues.filter((item) => item.severity === 'error').length,
+    warning_count: issues.filter((item) => item.severity === 'warning').length,
+    issues,
+    next_actions: accepted
+      ? ['handoff_adapter_to_host_project']
+      : unique([
+        ...issues.map((item) => item.code),
+        ...plan.next_actions,
+      ]),
+  };
+}
+
+export function buildMeetingAppAdapterVerificationReportMatrix(options = {}) {
+  const evidenceByAdapter = options.evidence_by_adapter ?? options.evidenceByAdapter ?? {};
+  const reports = packageOrReportInputs(options).map((input) => {
+    if (input?.schema === MEETING_APP_ADAPTER_VERIFICATION_REPORT_SCHEMA) return input;
+    const key = typeof input === 'string' ? input : firstNonEmpty(input.adapter_key, input.platform, input.provider, input.key);
+    const evidence = firstNonEmpty(evidenceByAdapter[key], evidenceByAdapter[String(key ?? '').replace(/-/g, '_')], evidenceSource(options));
+    return buildMeetingAppAdapterVerificationReport(input, {
+      ...options,
+      evidence,
+      reports: undefined,
+    });
+  });
+  return {
+    type: 'meeting_app_adapter_verification_report_matrix',
+    schema: MEETING_APP_ADAPTER_VERIFICATION_REPORT_MATRIX_SCHEMA,
+    schema_version: MEETING_APP_ADAPTER_HANDOFF_PACKAGE_SCHEMA_VERSION,
+    accepted: reports.every((report) => report.accepted === true),
+    target: firstNonEmpty(options.target, options.acceptance_target, options.acceptanceTarget, 'production'),
+    report_count: reports.length,
+    accepted_count: reports.filter((report) => report.accepted === true).length,
+    pilot_ready_count: reports.filter((report) => report.pilot_ready === true).length,
+    production_ready_count: reports.filter((report) => report.production_ready === true).length,
+    missing_evidence_count: reports.reduce((total, report) => total + report.missing_evidence_count, 0),
+    rows: reports.map((report) => ({
+      adapter_key: report.adapter_key,
+      accepted: report.accepted,
+      target: report.target,
+      static_ready: report.static_ready,
+      live_evidence_ready: report.live_evidence_ready,
+      pilot_ready: report.pilot_ready,
+      production_ready: report.production_ready,
+      missing_evidence_count: report.missing_evidence_count,
+      first_next_action: report.next_actions?.[0],
+    })),
+    reports,
+    next_actions: unique(reports.flatMap((report) => report.next_actions ?? [])),
+  };
+}
+
 export function assertMeetingAppAdapterHandoffPackage(packageOrSpec = {}, options = {}) {
   const handoffPackage = packageOrSpec?.schema === MEETING_APP_ADAPTER_HANDOFF_PACKAGE_SCHEMA
     ? packageOrSpec
@@ -433,6 +662,35 @@ export function assertMeetingAppAdapterHandoffPackage(packageOrSpec = {}, option
     });
   }
   return handoffPackage;
+}
+
+export function assertMeetingAppAdapterVerificationReport(reportOrPackage = {}, options = {}) {
+  const report = reportOrPackage?.schema === MEETING_APP_ADAPTER_VERIFICATION_REPORT_SCHEMA
+    ? reportOrPackage
+    : buildMeetingAppAdapterVerificationReport(reportOrPackage, options);
+  if (report.accepted !== true) {
+    throw new MeetingTimelineSdkError('Meeting app adapter verification failed', {
+      code: 'meeting_app_adapter_verification_failed',
+      adapter_key: report.adapter_key,
+      issues: report.issues,
+      next_actions: report.next_actions,
+    });
+  }
+  return report;
+}
+
+export function assertMeetingAppAdapterVerificationReportMatrix(matrixOrOptions = {}, options = {}) {
+  const matrix = matrixOrOptions?.schema === MEETING_APP_ADAPTER_VERIFICATION_REPORT_MATRIX_SCHEMA
+    ? matrixOrOptions
+    : buildMeetingAppAdapterVerificationReportMatrix({ ...matrixOrOptions, ...options });
+  if (matrix.accepted !== true) {
+    throw new MeetingTimelineSdkError('Meeting app adapter verification matrix failed', {
+      code: 'meeting_app_adapter_verification_matrix_failed',
+      rows: matrix.rows,
+      next_actions: matrix.next_actions,
+    });
+  }
+  return matrix;
 }
 
 export function assertMeetingAppAdapterHandoffPackageMatrix(matrixOrOptions = {}, options = {}) {

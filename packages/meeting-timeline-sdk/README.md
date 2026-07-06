@@ -1058,7 +1058,25 @@ npm run meeting-app:adapter-handoff-package -- --spec-file=data/whereby-spec.jso
 
 默认输出到 `data/meeting-app-adapter-handoff-packages/` 和 `data/meeting-app-adapter-handoff-package-report.json`。每个平台目录里包含 `adapter-spec.json`、`runtime-config.json`、`extension-manifest-fragment.json`、`verification-plan.json`、`integration-readme.md`，内置平台还会包含 `adapter-manifest.json`。这份 package 的 `validation.required_live_evidence` 和 `verification-plan.json` 明确要求真实 DOM snapshot、candidate observation、speaker/participant track 和当前轴标注插入验证。
 
-同一份 `runtimeConfig.browser_runtime_options` 也可以直接传给 `createMeetingAppBrowserRuntime()`；`runtimeConfig.capture_options` 可以直接传给 `captureMeetingAppDomSnapshot()` 做手动采样。也就是说，新会议软件的接入路径是 `adapter spec -> runtime config -> handoff package -> live snapshot evidence -> handoff readiness`。
+宿主项目补齐 evidence 后，可以用 SDK 或 CLI 复验 package：
+
+```js
+import {
+  buildMeetingAppAdapterVerificationReport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-handoff-package';
+
+const report = buildMeetingAppAdapterVerificationReport(handoffPackage, {
+  evidence,
+});
+```
+
+```bash
+npm run meeting-app:adapter-verify
+```
+
+CLI 默认读取 `data/meeting-app-adapter-handoff-packages/` 和 `data/meeting-app-adapter-evidence/`，输出 `data/meeting-app-adapter-verification-report.json`。报告会给出 `static_ready`、`live_evidence_ready`、`pilot_ready`、`production_ready` 和每个缺失证据项。
+
+同一份 `runtimeConfig.browser_runtime_options` 也可以直接传给 `createMeetingAppBrowserRuntime()`；`runtimeConfig.capture_options` 可以直接传给 `captureMeetingAppDomSnapshot()` 做手动采样。也就是说，新会议软件的接入路径是 `adapter spec -> runtime config -> handoff package -> verification report -> handoff readiness`。
 
 如果宿主不想自己解释 `trigger_policy`，可以直接用 `meeting-app-observer-scheduler`。它消费 observer plan 和现有 runtime，把 DOM mutation、native snapshot change、keep-alive、active speaker follow-up、candidate missing end grace 统一映射为 `runtime.sample()` / `runtime.sampleTracks()` 调用：
 
