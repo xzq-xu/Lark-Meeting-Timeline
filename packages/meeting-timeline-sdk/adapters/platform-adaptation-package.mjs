@@ -35,6 +35,9 @@ import {
 import {
   buildMeetingPlatformHandoffReadiness,
 } from './platform-handoff-readiness.mjs';
+import {
+  buildMeetingPlatformAdaptationStrategy,
+} from './platform-strategy.mjs';
 
 export const MEETING_PLATFORM_ADAPTATION_PACKAGE_SCHEMA = 'meeting_platform_adaptation_package';
 export const MEETING_PLATFORM_ADAPTATION_PACKAGE_MATRIX_SCHEMA = 'meeting_platform_adaptation_package_matrix';
@@ -297,6 +300,7 @@ export function buildMeetingPlatformAdaptationPackage(platform, options = {}) {
   const extensionPlan = safeExtensionInstallPlan(key, options);
   const liveReadiness = safeLiveReadiness(key, options);
   const handoffReadiness = safeHandoffReadiness(key, options);
+  const strategy = buildMeetingPlatformAdaptationStrategy(key, options);
   const candidateObservation = candidateObservationSummary(runtimeAdapter, runtimeEventPlan, extensionPlan);
 
   const base = compactObject({
@@ -312,6 +316,8 @@ export function buildMeetingPlatformAdaptationPackage(platform, options = {}) {
     runtime_contract: runtime.runtime_contract,
     local_observer: localObserverSummary(collector, runtimeAdapter, runtimeEventPlan, extensionPlan),
     provider_observer: providerEventSummary(provider, runtime),
+    adaptation_strategy: strategy,
+    adaptation_playbook: strategy.adaptation_playbook,
     annotation_pipeline: annotationSummary(contract, collector, runtimeEventPlan),
     candidate_observation: candidateObservation,
     runtime_event_plan: runtimeEventPlan,
@@ -374,6 +380,12 @@ export function buildMeetingPlatformAdaptationPackageMatrix(options = {}) {
       sdk_wiring_ready: item.readiness.sdk_wiring_ready,
       production_ready: item.readiness.production_ready,
       ready_for_realtime_annotations: item.readiness.ready_for_realtime_annotations,
+      next_phase: item.adaptation_playbook?.next_phase,
+      next_phase_priority: item.adaptation_playbook?.next_phase_priority,
+      provider_path: item.adaptation_playbook?.integration_path?.path,
+      provider_permission_risk: item.adaptation_playbook?.risk_profile?.permission_risk,
+      speaker_realtime_gap: item.adaptation_playbook?.risk_profile?.speaker_realtime_gap,
+      post_meeting_backfill_supported: item.adaptation_playbook?.risk_profile?.transcript_availability_risk === 'post_meeting_only',
       browser_match_count: item.extension.matches.length,
       candidate_observation_ready: item.candidate_observation?.runtime_event_action === 'observe_platform_candidates',
       candidate_observer_message_type: item.candidate_observation?.message_type,

@@ -597,6 +597,9 @@ const googlePackage = buildMeetingPlatformAdaptationPackage('google-meet', {
 // googlePackage.annotation_pipeline.insert_endpoint 是设备端实时标注写入地址。
 // googlePackage.annotation_pipeline.runtime_event_plan 是 observe/provider/annotation/speaker/view/run gate 的动作契约。
 // googlePackage.runtime_event_plan.examples.insert_annotation 是外部项目插入标注的样例 envelope。
+// googlePackage.adaptation_playbook.next_phase 是接入面板下一步应该做的阶段。
+// googlePackage.adaptation_playbook.integration_path.path 是 provider 侧接法，例如 google_workspace_events_pubsub。
+// googlePackage.adaptation_playbook.risk_profile 描述权限、延迟、发言人 marker 和会后回填风险。
 // googlePackage.provider_observer.required_for_realtime === false。
 // googlePackage.transcript.blocks_realtime_annotation === false。
 
@@ -606,7 +609,12 @@ const packageMatrix = buildMeetingPlatformAdaptationPackageMatrix({
 });
 
 // packageMatrix.candidate_observer_count 表示多少平台已经暴露 observe_platform_candidates 候选观察契约。
-console.log(packageMatrix.rows);
+console.log(packageMatrix.rows.map((row) => ({
+  platform: row.platform,
+  next: row.next_phase,
+  provider: row.provider_path,
+  backfill: row.post_meeting_backfill_supported,
+})));
 ```
 
 `platform-kit` 也暴露同一层：`kit.platformAdaptationPackage('google-meet')` 和 `kit.platformAdaptationPackageMatrix()`。CLI 可直接导出每个平台的 package JSON：

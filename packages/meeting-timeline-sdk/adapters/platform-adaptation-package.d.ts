@@ -7,6 +7,7 @@ import type { MeetingPlatformRuntimeProfile } from './platform-runtime-profile.m
 import type { MeetingPlatformRuntimeEventPlan } from './platform-runtime-event.mjs';
 import type { MeetingPlatformLiveAdapterReadiness } from './platform-live-adapter.mjs';
 import type { MeetingPlatformHandoffReadiness } from './platform-handoff-readiness.mjs';
+import type { MeetingPlatformAdaptationStrategy } from './platform-strategy.mjs';
 
 export const MEETING_PLATFORM_ADAPTATION_PACKAGE_SCHEMA: 'meeting_platform_adaptation_package';
 export const MEETING_PLATFORM_ADAPTATION_PACKAGE_MATRIX_SCHEMA: 'meeting_platform_adaptation_package_matrix';
@@ -34,6 +35,8 @@ export interface MeetingPlatformAdaptationPackage {
   runtime_contract: Record<string, unknown>;
   local_observer: Record<string, unknown>;
   provider_observer?: Record<string, unknown>;
+  adaptation_strategy: MeetingPlatformAdaptationStrategy;
+  adaptation_playbook: MeetingPlatformAdaptationStrategy['adaptation_playbook'];
   annotation_pipeline: Record<string, unknown>;
   runtime_event_plan: MeetingPlatformRuntimeEventPlan;
   speaker_markers?: Record<string, unknown>;
