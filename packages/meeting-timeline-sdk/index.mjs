@@ -1296,6 +1296,30 @@ export function createMeetingAppTimelineSdk(options = {}) {
     assertAdapterStartupPlanMatrix(input = {}, startupOptions = {}) {
       return sdk.assertPlatformAdapterStartupPlanMatrix(input, startupOptions);
     },
+    platformAdapterPreflight(input = {}, preflightOptions = {}) {
+      return runtime.kit.platformAdapterPreflight(input, sdkPlatformOptions(runtime, preflightOptions));
+    },
+    adapterPreflight(input = {}, preflightOptions = {}) {
+      return sdk.platformAdapterPreflight(input, preflightOptions);
+    },
+    platformAdapterPreflightMatrix(input = {}, preflightOptions = {}) {
+      return runtime.kit.platformAdapterPreflightMatrix(input, sdkPlatformOptions(runtime, preflightOptions));
+    },
+    adapterPreflightMatrix(input = {}, preflightOptions = {}) {
+      return sdk.platformAdapterPreflightMatrix(input, preflightOptions);
+    },
+    assertPlatformAdapterPreflight(input = {}, preflightOptions = {}) {
+      return runtime.kit.assertPlatformAdapterPreflight(input, sdkPlatformOptions(runtime, preflightOptions));
+    },
+    assertAdapterPreflight(input = {}, preflightOptions = {}) {
+      return sdk.assertPlatformAdapterPreflight(input, preflightOptions);
+    },
+    assertPlatformAdapterPreflightMatrix(input = {}, preflightOptions = {}) {
+      return runtime.kit.assertPlatformAdapterPreflightMatrix(input, sdkPlatformOptions(runtime, preflightOptions));
+    },
+    assertAdapterPreflightMatrix(input = {}, preflightOptions = {}) {
+      return sdk.assertPlatformAdapterPreflightMatrix(input, preflightOptions);
+    },
     platformAdaptationStrategy(platformOrOptions = {}, strategyOptions = {}) {
       const resolved = singlePlatformInput(runtime, platformOrOptions, strategyOptions);
       return runtime.kit.platformAdaptationStrategy(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
@@ -1411,4 +1435,5 @@ export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-adapter-decision.mjs';
 export * from './adapters/platform-adapter-startup.mjs';
+export * from './adapters/platform-adapter-preflight.mjs';
 export * from './adapters/platform-strategy.mjs';

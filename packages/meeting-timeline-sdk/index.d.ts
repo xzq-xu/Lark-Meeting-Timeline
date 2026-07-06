@@ -539,6 +539,26 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-startup.mjs').MeetingPlatformAdapterStartupPlanOptions,
   ): import('./adapters/platform-adapter-startup.mjs').MeetingPlatformAdapterStartupPlanMatrix;
   assertAdapterStartupPlanMatrix: MeetingAppTimelineSdk['assertPlatformAdapterStartupPlanMatrix'];
+  platformAdapterPreflight(
+    input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
+  ): import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflight;
+  adapterPreflight: MeetingAppTimelineSdk['platformAdapterPreflight'];
+  platformAdapterPreflightMatrix(
+    input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
+  ): import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightMatrix;
+  adapterPreflightMatrix: MeetingAppTimelineSdk['platformAdapterPreflightMatrix'];
+  assertPlatformAdapterPreflight(
+    input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
+  ): import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflight;
+  assertAdapterPreflight: MeetingAppTimelineSdk['assertPlatformAdapterPreflight'];
+  assertPlatformAdapterPreflightMatrix(
+    input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
+  ): import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightMatrix;
+  assertAdapterPreflightMatrix: MeetingAppTimelineSdk['assertPlatformAdapterPreflightMatrix'];
   platformAdaptationStrategy(
     platformOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
@@ -608,4 +628,5 @@ export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-adapter-decision.mjs';
 export * from './adapters/platform-adapter-startup.mjs';
+export * from './adapters/platform-adapter-preflight.mjs';
 export * from './adapters/platform-strategy.mjs';

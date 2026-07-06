@@ -1885,6 +1885,25 @@ const diagnosis = buildMeetingAppDomAdaptationDiagnosisMatrix({
 // 对应本地 observer 是否能产生时间轴 start、speaker marker 和 end。
 ```
 
+如果宿主项目只需要在当前会议窗口启动前做一次低成本检查，用 `platform-adapter-preflight`。它会先跑 URL/title/platform 的 startup plan，再把 live DOM snapshots 喂给 DOM diagnosis，最后压成 `static_startup_ready`、`live_evidence_ready`、`meeting_start_ready`、`speaker_track_ready`、`meeting_end_ready` 和 `realtime_annotation_ready`。没有真实 snapshots 时不会宣称 realtime ready；provider events 和 transcript 都只作为非阻塞回填。
+
+```js
+import {
+  buildMeetingPlatformAdapterPreflight,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight';
+
+const preflight = buildMeetingPlatformAdapterPreflight({
+  url: 'https://meet.google.com/abc-defg-hij',
+  snapshots: currentWindowLiveSnapshots,
+}, {
+  requireSpeakerTrack: true,
+});
+
+// preflight.status === 'ready_for_realtime_annotations'
+// preflight.readiness.realtime_annotation_ready === true
+// preflight.readiness.meeting_end_ready 可以单独提示“结束态还没验证”。
+```
+
 如果希望 SDK 帮你管理轮询、去重和 keep-alive，可以直接用 `meeting-app-monitor`。它会高频低成本采集 DOM，但只有在页面状态变化、或到达 keep-alive 间隔时才把样本送给 `meeting-source`；即使 DOM 不变，也会按间隔继续送样本，避免 active speaker 的 `minStableMs` 因过度去重而无法触发：
 
 ```js

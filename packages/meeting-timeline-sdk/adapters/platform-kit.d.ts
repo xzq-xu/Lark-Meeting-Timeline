@@ -82,6 +82,11 @@ import type {
   MeetingPlatformAdapterStartupPlanOptions,
 } from './platform-adapter-startup.mjs';
 import type {
+  MeetingPlatformAdapterPreflight,
+  MeetingPlatformAdapterPreflightMatrix,
+  MeetingPlatformAdapterPreflightOptions,
+} from './platform-adapter-preflight.mjs';
+import type {
   MeetingPlatformHostIntegrationOptions,
   MeetingPlatformHostIntegrationPlan,
   MeetingPlatformHostIntegrationScaffold,
@@ -463,6 +468,10 @@ export interface MeetingPlatformTimelineKit {
   platformAdapterStartupPlanMatrix(input?: MeetingPlatformAdapterDecisionInput, startupOptions?: MeetingPlatformAdapterStartupPlanOptions): MeetingPlatformAdapterStartupPlanMatrix;
   assertPlatformAdapterStartupPlan(input?: string | URL | MeetingPlatformAdapterDecisionInput, startupOptions?: MeetingPlatformAdapterStartupPlanOptions): MeetingPlatformAdapterStartupPlan;
   assertPlatformAdapterStartupPlanMatrix(input?: MeetingPlatformAdapterDecisionInput, startupOptions?: MeetingPlatformAdapterStartupPlanOptions): MeetingPlatformAdapterStartupPlanMatrix;
+  platformAdapterPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
+  platformAdapterPreflightMatrix(input?: MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflightMatrix;
+  assertPlatformAdapterPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
+  assertPlatformAdapterPreflightMatrix(input?: MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflightMatrix;
   platformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
   assertPlatformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
   platformConsumerHandoff(handoffOptions?: MeetingPlatformConsumerHandoffOptions): MeetingPlatformConsumerHandoff;

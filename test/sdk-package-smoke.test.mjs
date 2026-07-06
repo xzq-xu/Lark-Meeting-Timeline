@@ -89,6 +89,8 @@ assert.equal(packedFiles.includes('adapters/platform-adapter-decision.mjs'), tru
 assert.equal(packedFiles.includes('adapters/platform-adapter-decision.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-startup.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-startup.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-preflight.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-preflight.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-correlation.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-correlation.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-session.mjs'), true);
@@ -316,6 +318,8 @@ import {
   buildMeetingPlatformAdapterDecisionMatrix as buildMeetingPlatformAdapterDecisionMatrixFromRoot,
   buildMeetingPlatformAdapterStartupPlan as buildMeetingPlatformAdapterStartupPlanFromRoot,
   buildMeetingPlatformAdapterStartupPlanMatrix as buildMeetingPlatformAdapterStartupPlanMatrixFromRoot,
+  buildMeetingPlatformAdapterPreflight as buildMeetingPlatformAdapterPreflightFromRoot,
+  buildMeetingPlatformAdapterPreflightMatrix as buildMeetingPlatformAdapterPreflightMatrixFromRoot,
   buildMeetingPlatformAdapterRoute as buildMeetingPlatformAdapterRouteFromRoot,
   buildMeetingPlatformAdapterMessageBridgeHandoff as buildMeetingPlatformAdapterMessageBridgeHandoffFromRoot,
   buildMeetingPlatformAdapterRunnerHandoff as buildMeetingPlatformAdapterRunnerHandoffFromRoot,
@@ -403,6 +407,13 @@ import {
   buildMeetingPlatformAdapterStartupPlan,
   buildMeetingPlatformAdapterStartupPlanMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-startup';
+import {
+  buildMeetingPlatformAdapterPreflight,
+  buildMeetingPlatformAdapterPreflightMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight';
+import {
+  buildMeetingAppFixtureSnapshot,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures';
 import {
   buildMeetingPlatformEvidenceCorrelation,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-correlation';
@@ -717,6 +728,10 @@ const rootMeetingAppSdk = createMeetingAppTimelineSdk({
   fetch: async () => new Response(JSON.stringify({ ok: true })),
   platforms: ['google-meet'],
 });
+const rootGoogleActiveSnapshot = buildMeetingAppFixtureSnapshot('google-meet', {
+  state: 'active',
+  observedAtMs: 1_783_356_000_000,
+});
 assert.equal(rootMeetingAppSdk.schema, 'meeting_app_timeline_sdk');
 assert.equal(rootMeetingAppSdk.hostPackage({ surfaces: ['browser-extension'] }).schema, 'meeting_app_runtime_adapter_host_package');
 const rootConnectorPackage = rootMeetingAppSdk.connectorPackage({ surfaces: ['browser-extension'] });
@@ -846,6 +861,20 @@ assert.equal(rootMeetingAppSdk.adapterStartupPlan({
 assert.equal(rootMeetingAppSdk.platformAdapterStartupPlanMatrix({}, {
   platforms: ['google-meet'],
 }).realtime_startup_ready_count, 1);
+assert.equal(rootMeetingAppSdk.platformAdapterPreflight({
+  url: 'https://meet.google.com/abc-defg-hij',
+  snapshots: [rootGoogleActiveSnapshot],
+}).accepted, true);
+assert.equal(rootMeetingAppSdk.adapterPreflight({
+  platform: 'google-meet',
+  snapshots: [rootGoogleActiveSnapshot],
+}).readiness.realtime_annotation_ready, true);
+assert.equal(rootMeetingAppSdk.platformAdapterPreflightMatrix({}, {
+  platforms: ['google-meet'],
+  snapshots: {
+    'google-meet': [rootGoogleActiveSnapshot],
+  },
+}).realtime_ready_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdaptationStrategy('google-meet').adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
 assert.equal(rootMeetingAppSdk.adaptationStrategyMatrix().provider_reconcile_required_count, 1);
 assert.equal(rootMeetingAppSdk.connectorHub().accepted, true);
@@ -883,6 +912,19 @@ assert.equal(buildMeetingPlatformAdapterStartupPlanMatrixFromRoot({}, {
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],
 }).realtime_startup_ready_count, 1);
+assert.equal(buildMeetingPlatformAdapterPreflightFromRoot({
+  url: 'https://meet.google.com/abc-defg-hij',
+  snapshots: [rootGoogleActiveSnapshot],
+}, {
+  baseUrl: 'http://localhost:8787',
+}).status, 'ready_for_realtime_annotations');
+assert.equal(buildMeetingPlatformAdapterPreflightMatrixFromRoot({}, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+  snapshots: {
+    'google-meet': [rootGoogleActiveSnapshot],
+  },
+}).accepted_count, 1);
 assert.equal(buildMeetingPlatformAdaptationStrategyFromRoot('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
@@ -2259,6 +2301,19 @@ assert.equal(buildMeetingPlatformAdapterStartupPlanMatrix({}, {
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).rows[0].insert_action, 'insertAnnotation');
+assert.equal(buildMeetingPlatformAdapterPreflight({
+  url: 'https://meet.google.com/abc-defg-hij',
+  snapshots: [rootGoogleActiveSnapshot],
+}, {
+  baseUrl: 'http://localhost:8787',
+}).readiness.realtime_annotation_ready, true);
+assert.equal(buildMeetingPlatformAdapterPreflightMatrix({}, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+  snapshots: {
+    'google-meet': [rootGoogleActiveSnapshot],
+  },
+}).live_evidence_ready_count, 1);
 assert.equal(kit.platformAdapterRoute('google-meet').realtime_invariants.provider_events_block_realtime, false);
 assert.equal(kit.platformAdapterRouteMatrix({ platforms: ['zoom'] }).rows[0].first_route, 'local_observer_axis');
 assert.equal(kit.platformAdapterDecision({
@@ -2273,6 +2328,16 @@ assert.equal(kit.platformAdapterStartupPlan({
 assert.equal(kit.platformAdapterStartupPlanMatrix({}, {
   platforms: ['webex'],
 }).realtime_startup_ready_count, 1);
+assert.equal(kit.platformAdapterPreflight({
+  platform: 'google-meet',
+  snapshots: [rootGoogleActiveSnapshot],
+}).accepted, true);
+assert.equal(kit.platformAdapterPreflightMatrix({}, {
+  platforms: ['google-meet'],
+  snapshots: {
+    'google-meet': [rootGoogleActiveSnapshot],
+  },
+}).meeting_start_ready_count, 1);
 assert.equal(kit.platformRealEvidenceIntakePlan('google-meet').schema, 'meeting_platform_real_evidence_intake_plan');
 assert.equal(kit.platformRealEvidenceIntake('google-meet', {}, {
   requireProductionReady: false,
