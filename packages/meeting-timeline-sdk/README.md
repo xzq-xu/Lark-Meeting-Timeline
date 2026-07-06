@@ -694,6 +694,29 @@ await runtime.insertAnnotation('google-meet', {
 
 `createMeetingAppTimelineConnectorRuntimeClient()` 会从 connector package 读取 runtime event endpoint 和各平台支持的 action，发送前先校验 action/platform 是否在 package 的 runtime plan 中。外部项目可以把它用于 Google Meet content script、Teams WebView preload、Zoom/Webex native helper 或 Lark 长连接代理，统一发 `observe_meeting_app`、`observe_platform_candidates`、`insert_annotation`、`speaker_track` 和 `participant_track`，不用手写 action 路由表。
 
+如果宿主项目已经确定只接一个会议平台，可以用更轻的 `meeting-platform-connector` façade。它把 registry、provider connection、browser observer、adapter route、runtime event endpoint 和 normalizer 压成单个平台对象；`createMeetingPlatformConnectorRuntime()` 会固定平台名，所以 Google Meet/Teams/Zoom/Webex/Lark 的接入侧只需要调用 `insertAnnotation(mark)`、`observeMeetingApp(snapshot)`、`observePlatformCandidates(env)` 或 `normalizeProviderEvent(raw)`：
+
+```js
+import {
+  assertMeetingPlatformConnector,
+  buildMeetingPlatformConnector,
+  createMeetingPlatformConnectorRuntime,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector';
+
+const connector = buildMeetingPlatformConnector('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+});
+assertMeetingPlatformConnector(connector);
+
+const runtime = createMeetingPlatformConnectorRuntime(connector, { fetch });
+await runtime.insertAnnotation({
+  id: 'mark-001',
+  label: 'why?',
+  captured_at_ms: Date.now(),
+});
+const signals = runtime.normalizeProviderEvent(googleWorkspaceEventBody);
+```
+
 `platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。CI 里可以用 `assertMeetingAppAdapterIntegrationPackage()`、`assertMeetingAppAdapterIntegrationPackageMatrix()` 或 kit 上的同名方法做 gate；默认 target 是 `pilot`，如果传 `target: 'production'`，则必须补齐真实会议 evidence package、provider start/end reconcile 和 handoff readiness 之后才会通过。
 
 同一层也可以从 CLI 直接导出，默认覆盖 Google Meet、Teams、Zoom、Webex、Lark：

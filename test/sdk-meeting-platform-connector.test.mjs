@@ -1,0 +1,193 @@
+import assert from 'node:assert/strict';
+
+import {
+  MEETING_PLATFORM_CONNECTOR_ACCEPTANCE_SCHEMA,
+  MEETING_PLATFORM_CONNECTOR_MATRIX_SCHEMA,
+  MEETING_PLATFORM_CONNECTOR_RUNTIME_SCHEMA,
+  MEETING_PLATFORM_CONNECTOR_SCHEMA,
+  assertMeetingPlatformConnector,
+  buildDefaultMeetingPlatformConnectorMatrix,
+  buildMeetingPlatformConnector,
+  buildMeetingPlatformConnectorAcceptanceReport,
+  buildMeetingPlatformConnectorMatrix,
+  createMeetingPlatformConnectorRuntime,
+} from '../packages/meeting-timeline-sdk/adapters/meeting-platform-connector.mjs';
+import {
+  createMeetingPlatformConnectorRuntime as createMeetingPlatformConnectorRuntimeFromRoot,
+} from '../packages/meeting-timeline-sdk/index.mjs';
+
+const baseUrl = 'https://timeline.example.com';
+
+const google = buildMeetingPlatformConnector('google-meet', { baseUrl });
+assert.equal(google.schema, MEETING_PLATFORM_CONNECTOR_SCHEMA);
+assert.equal(google.platform, 'google_meet');
+assert.equal(google.display_name, 'Google Meet');
+assert.equal(google.event_adapter.normalize_available, true);
+assert.equal(google.provider.required_for_realtime, false);
+assert.equal(google.provider.transport, 'Google Workspace Events API -> Google Cloud Pub/Sub push');
+assert.equal(google.provider.start_events.includes('google.workspace.meet.conference.v2.started'), true);
+assert.equal(google.browser_observer.enabled, true);
+assert.equal(google.browser_observer.matches.includes('https://meet.google.com/*'), true);
+assert.equal(google.browser_observer.candidate_observation_ready, true);
+assert.equal(google.browser_observer.candidate_message_type, 'meeting_timeline.observe_candidates');
+assert.equal(google.browser_observer.required_permission, 'tabs');
+assert.equal(google.runtime_events.endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);
+assert.equal(google.runtime_events.supported_actions.includes('insert_annotation'), true);
+assert.equal(google.runtime_events.supported_actions.includes('observe_platform_candidates'), true);
+assert.equal(google.timeline_ingest.insert_endpoint, `${baseUrl}/api/annotations`);
+assert.equal(google.timeline_ingest.timestamp_field, 'captured_at_ms');
+assert.equal(google.realtime_policy.provider_events_block_realtime, false);
+assert.equal(google.realtime_policy.transcript_blocks_realtime, false);
+assert.equal(google.realtime_policy.primary_axis, 'local_observer_axis');
+assert.equal(google.sdk.imports.connector, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector');
+assert.equal(google.sdk.factories.create_runtime, 'createMeetingPlatformConnectorRuntime');
+assert.equal(google.readiness.realtime_annotation_ready, true);
+
+const googleAcceptance = buildMeetingPlatformConnectorAcceptanceReport(google);
+assert.equal(googleAcceptance.schema, MEETING_PLATFORM_CONNECTOR_ACCEPTANCE_SCHEMA);
+assert.equal(googleAcceptance.accepted, true);
+assert.equal(assertMeetingPlatformConnector(google).accepted, true);
+
+const matrix = buildMeetingPlatformConnectorMatrix({
+  baseUrl,
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+assert.equal(matrix.schema, MEETING_PLATFORM_CONNECTOR_MATRIX_SCHEMA);
+assert.equal(matrix.platform_count, 5);
+assert.equal(matrix.accepted_count, 5);
+assert.equal(matrix.realtime_ready_count, 5);
+assert.equal(matrix.candidate_observer_count, 5);
+assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').browser_observer_enabled, true);
+assert.equal(matrix.rows.find((row) => row.platform === 'zoom').runtime_action_count, 16);
+assert.equal(matrix.registry_manifest.platform_count, 5);
+
+const defaultMatrix = buildDefaultMeetingPlatformConnectorMatrix({ baseUrl });
+assert.equal(defaultMatrix.platforms.includes('local_detector'), false);
+assert.equal(defaultMatrix.platforms.includes('google_meet'), true);
+
+const broken = {
+  ...google,
+  runtime_events: {
+    ...google.runtime_events,
+    supported_actions: google.runtime_events.supported_actions.filter((action) => action !== 'speaker_track'),
+  },
+};
+const brokenAcceptance = buildMeetingPlatformConnectorAcceptanceReport(broken);
+assert.equal(brokenAcceptance.accepted, false);
+assert.equal(brokenAcceptance.issues.some((item) => item.code === 'missing_runtime_action' && item.action === 'speaker_track'), true);
+assert.throws(
+  () => assertMeetingPlatformConnector(broken),
+  /Meeting platform connector failed acceptance/,
+);
+
+const calls = [];
+const fetchImpl = async (url, init) => {
+  const body = JSON.parse(init.body);
+  calls.push({ url, init, body });
+  return new Response(JSON.stringify({ ok: true, accepted: body }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+};
+
+const runtime = createMeetingPlatformConnectorRuntime(google, {
+  fetch: fetchImpl,
+  now: () => 1_782_614_400_000,
+});
+assert.equal(runtime.schema, MEETING_PLATFORM_CONNECTOR_RUNTIME_SCHEMA);
+assert.equal(runtime.platform, 'google_meet');
+assert.equal(runtime.endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);
+assert.equal(runtime.supports('insert_mark'), true);
+assert.equal(runtime.supports('unknown-action'), false);
+
+const builtEvent = runtime.buildEvent({
+  action: 'insert_annotation',
+  annotation: {
+    id: 'mark-001',
+    label: 'why?',
+    captured_at_ms: 1_782_614_401_000,
+  },
+});
+assert.equal(builtEvent.action, 'insert_annotation');
+assert.equal(builtEvent.platform, 'google_meet');
+assert.equal(builtEvent.sent_at_ms, 1_782_614_400_000);
+
+const providerSignals = runtime.normalizeProviderEvent({
+  id: 'google-event-001',
+  type: 'google.workspace.meet.conference.v2.started',
+  time: '2026-06-30T06:45:28.000Z',
+  data: {
+    conferenceRecord: { name: 'conferenceRecords/google-record-001' },
+    meetingUri: 'https://meet.google.com/abc-defg-hij',
+    title: 'Weekly review',
+  },
+});
+assert.equal(providerSignals.length, 1);
+assert.equal(providerSignals[0].type, 'meeting_started');
+assert.equal(providerSignals[0].meeting.platform, 'google_meet');
+assert.equal(providerSignals[0].meeting.meeting_id, 'google-record-001');
+
+const insertResult = await runtime.insertAnnotation({
+  id: 'mark-002',
+  label: 'follow up',
+  captured_at_ms: 1_782_614_402_000,
+});
+assert.equal(insertResult.ok, true);
+assert.equal(calls.at(-1).url, `${baseUrl}/api/meeting-platform/runtime-events`);
+assert.equal(calls.at(-1).body.action, 'insert_annotation');
+assert.equal(calls.at(-1).body.platform, 'google_meet');
+assert.equal(calls.at(-1).body.annotation.label, 'follow up');
+
+await runtime.observeMeetingApp({
+  url: 'https://meet.google.com/abc-defg-hij',
+  title: 'Weekly review',
+  observed_at_ms: 1_782_614_403_000,
+  in_meeting: true,
+});
+assert.equal(calls.at(-1).body.action, 'observe_meeting_app');
+assert.equal(calls.at(-1).body.platform, 'google_meet');
+
+await runtime.observePlatformCandidates({
+  tabs: [{ url: 'https://meet.google.com/abc-defg-hij', title: 'Weekly review', active: true }],
+});
+assert.equal(calls.at(-1).body.action, 'observe_platform_candidates');
+assert.equal(calls.at(-1).body.platform, undefined);
+assert.equal(calls.at(-1).body.tabs[0].active, true);
+
+await runtime.ingestProvider({
+  type: 'google.workspace.meet.conference.v2.ended',
+  data: {
+    conferenceRecord: { name: 'conferenceRecords/google-record-001' },
+  },
+});
+assert.equal(calls.at(-1).body.action, 'provider_event');
+assert.equal(calls.at(-1).body.platform, 'google_meet');
+
+await runtime.speakerTrack({
+  signals: [{
+    type: 'speaker_started',
+    occurred_at_ms: 1_782_614_410_000,
+    speaker: { display_name: 'Alex' },
+  }],
+});
+assert.equal(calls.at(-1).body.action, 'speaker_track');
+assert.equal(calls.at(-1).body.platform, 'google_meet');
+
+const rootRuntime = createMeetingPlatformConnectorRuntimeFromRoot('teams', {
+  baseUrl,
+  fetch: fetchImpl,
+  now: () => 1_782_614_400_000,
+});
+assert.equal(rootRuntime.platform, 'microsoft_teams');
+assert.equal(rootRuntime.supports('participant_track'), true);
+
+const brokenRuntime = createMeetingPlatformConnectorRuntime(broken, {
+  assertConnector: false,
+  fetch: fetchImpl,
+});
+assert.throws(
+  () => brokenRuntime.assertSupported('speaker_track'),
+  /Runtime action is not present in meeting platform connector/,
+);
+
+console.log('ok meeting platform connector facade');

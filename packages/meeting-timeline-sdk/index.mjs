@@ -989,5 +989,6 @@ export function createMeetingAppTimelineSdk(options = {}) {
 export * from './adapters/platform-kit.mjs';
 export * from './adapters/meeting-app-adapter-integration-package.mjs';
 export * from './adapters/meeting-app-connector-package.mjs';
+export * from './adapters/meeting-platform-connector.mjs';
 export * from './adapters/platform-integration-runtime.mjs';
 export * from './adapters/platform-runtime-event.mjs';

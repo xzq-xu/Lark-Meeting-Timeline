@@ -109,6 +109,8 @@ assert.equal(packedFiles.includes('adapters/meeting-app-adapter-integration-pack
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-integration-package.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-connector-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-connector-package.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-platform-connector.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-platform-connector.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-profile.mjs'), true);
@@ -184,9 +186,11 @@ import {
   SDK_VERSION,
   buildMeetingAppAdapterIntegrationPackageMatrix as buildMeetingAppAdapterIntegrationPackageMatrixFromRoot,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport as buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot,
+  buildMeetingPlatformConnector as buildMeetingPlatformConnectorFromRoot,
   buildMeetingPlatformIntegrationRuntimeManifest as buildMeetingPlatformIntegrationRuntimeManifestFromRoot,
   createMeetingAppTimelineSdk,
   createMeetingAppTimelineConnectorRuntimeClient as createMeetingAppTimelineConnectorRuntimeClientFromRoot,
+  createMeetingPlatformConnectorRuntime as createMeetingPlatformConnectorRuntimeFromRoot,
   createMeetingTimelineClient,
   createMeetingPlatformTimelineKit as createMeetingPlatformTimelineKitFromRoot,
   detectMeetingPlatformForBrowser as detectMeetingPlatformForBrowserFromRoot,
@@ -386,6 +390,12 @@ import {
   createMeetingAppTimelineConnectorRuntimeClient,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package';
 import {
+  buildMeetingPlatformConnector,
+  buildMeetingPlatformConnectorAcceptanceReport,
+  buildMeetingPlatformConnectorMatrix,
+  createMeetingPlatformConnectorRuntime,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector';
+import {
   assertMeetingAppRuntimeAdapterHandoff,
   buildMeetingAppDomAdaptationDiagnosisMatrix,
   buildMeetingAppRuntimeAdapterHandoffAcceptanceReport,
@@ -497,6 +507,19 @@ assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot(roo
 assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReport(rootConnectorPackage).accepted, true);
 assert.equal(buildMeetingAppTimelineConnectorHandoff(rootConnectorPackage).schema, 'meeting_app_timeline_connector_handoff');
 assert.equal(assertMeetingAppTimelineConnectorPackage(rootConnectorPackage), rootConnectorPackage);
+const rootPlatformConnector = buildMeetingPlatformConnectorFromRoot('google-meet', { baseUrl: 'http://localhost:8787' });
+assert.equal(rootPlatformConnector.schema, 'meeting_platform_connector');
+assert.equal(rootPlatformConnector.readiness.realtime_annotation_ready, true);
+assert.equal(buildMeetingPlatformConnector('google-meet', { baseUrl: 'http://localhost:8787' }).platform, 'google_meet');
+assert.equal(buildMeetingPlatformConnectorAcceptanceReport(rootPlatformConnector).accepted, true);
+assert.equal(buildMeetingPlatformConnectorMatrix({ platforms: ['google-meet', 'teams'] }).accepted_count, 2);
+assert.equal(createMeetingPlatformConnectorRuntime(rootPlatformConnector, {
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+}).supports('insert_annotation'), true);
+assert.equal(createMeetingPlatformConnectorRuntimeFromRoot('google-meet', {
+  baseUrl: 'http://localhost:8787',
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+}).platform, 'google_meet');
 const connectorRuntimeClientFromRoot = createMeetingAppTimelineConnectorRuntimeClientFromRoot(rootConnectorPackage, {
   fetch: async () => new Response(JSON.stringify({ ok: true })),
 });
