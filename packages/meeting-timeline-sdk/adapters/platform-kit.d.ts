@@ -207,6 +207,11 @@ import type {
   MeetingPlatformAdapterExportPackageOptions,
 } from './platform-adapter-export-package.mjs';
 import type {
+  MeetingPlatformAdapterImportPlan,
+  MeetingPlatformAdapterImportPlanMatrix,
+  MeetingPlatformAdapterImportPlanOptions,
+} from './platform-adapter-import-plan.mjs';
+import type {
   MeetingPlatformAdapterSample,
   MeetingPlatformAdapterSampleMatrix,
   MeetingPlatformAdapterSampleOptions,
@@ -424,6 +429,9 @@ export interface MeetingPlatformTimelineKit {
   platformAdapterAcceptanceChecklistMatrix(checklistInput?: MeetingPlatformAdapterAcceptanceChecklistOptions, checklistOptions?: MeetingPlatformAdapterAcceptanceChecklistOptions): MeetingPlatformAdapterAcceptanceChecklistMatrix;
   platformAdapterExportPackage(platform: string, exportInput?: MeetingPlatformAdapterExportPackageOptions, exportOptions?: MeetingPlatformAdapterExportPackageOptions): MeetingPlatformAdapterExportPackage;
   platformAdapterExportPackageMatrix(exportInput?: MeetingPlatformAdapterExportPackageOptions, exportOptions?: MeetingPlatformAdapterExportPackageOptions): MeetingPlatformAdapterExportPackageMatrix;
+  platformAdapterImportPlan(exportPackage: MeetingPlatformAdapterExportPackage | Record<string, unknown>, importInput?: MeetingPlatformAdapterImportPlanOptions, importOptions?: MeetingPlatformAdapterImportPlanOptions): MeetingPlatformAdapterImportPlan;
+  assertPlatformAdapterImportPlan(planOrPackage: MeetingPlatformAdapterImportPlan | MeetingPlatformAdapterExportPackage | Record<string, unknown>, importInput?: MeetingPlatformAdapterImportPlanOptions, importOptions?: MeetingPlatformAdapterImportPlanOptions): MeetingPlatformAdapterImportPlan;
+  platformAdapterImportPlanMatrix(packagesOrInput?: MeetingPlatformAdapterExportPackage[] | Record<string, unknown>, importInput?: MeetingPlatformAdapterImportPlanOptions, importOptions?: MeetingPlatformAdapterImportPlanOptions): MeetingPlatformAdapterImportPlanMatrix;
   platformEvidencePackage(platformOrInput: string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, packageOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackage;
   platformEvidencePackageSummary(packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, summaryOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageSummary;
   platformEvidencePackageBuilder(platform: string, builderOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageBuilder;

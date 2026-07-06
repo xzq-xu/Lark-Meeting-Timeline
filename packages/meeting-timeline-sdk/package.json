@@ -8,7 +8,8 @@
   "bin": {
     "meeting-app-adapter-integration-package": "./bin/meeting-app-adapter-integration-package.mjs",
     "meeting-app-connector-package": "./bin/meeting-app-connector-package.mjs",
-    "meeting-platform-adapter-export-package": "./bin/meeting-platform-adapter-export-package.mjs"
+    "meeting-platform-adapter-export-package": "./bin/meeting-platform-adapter-export-package.mjs",
+    "meeting-platform-adapter-import-plan": "./bin/meeting-platform-adapter-import-plan.mjs"
   },
   "exports": {
     ".": {

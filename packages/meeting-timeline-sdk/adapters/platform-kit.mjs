@@ -285,6 +285,11 @@ import {
   buildMeetingPlatformAdapterExportPackageMatrix,
 } from './platform-adapter-export-package.mjs';
 import {
+  assertMeetingPlatformAdapterImportPlan,
+  buildMeetingPlatformAdapterImportPlan,
+  buildMeetingPlatformAdapterImportPlanMatrix,
+} from './platform-adapter-import-plan.mjs';
+import {
   assertMeetingPlatformAdapterSample,
   assertMeetingPlatformAdapterSampleMatrix,
   buildMeetingPlatformAdapterSamplePlan,
@@ -477,6 +482,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
   const fixtureInput = buildPlatformFixtureAcceptanceInput(options);
   const meetingAppFixtureAcceptance = buildMeetingAppFixtureAcceptanceReport(options);
   const meetingAppLaunchGateSummary = buildMeetingAppLaunchGateSummary(options);
+  const platformAdapterExportPackageMatrix = buildMeetingPlatformAdapterExportPackageMatrix(options);
   return {
     base_url: options.baseUrl ?? options.base_url,
     base_path: options.basePath ?? options.base_path ?? '/api/platform-events',
@@ -552,7 +558,10 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_adapter_authoring_matrix: buildMeetingPlatformAdapterAuthoringMatrix(options),
     platform_adapter_portfolio: buildMeetingPlatformAdapterPortfolio(options),
     platform_adapter_acceptance_checklist_matrix: buildMeetingPlatformAdapterAcceptanceChecklistMatrix(options),
-    platform_adapter_export_package_matrix: buildMeetingPlatformAdapterExportPackageMatrix(options),
+    platform_adapter_export_package_matrix: platformAdapterExportPackageMatrix,
+    platform_adapter_import_plan_matrix: buildMeetingPlatformAdapterImportPlanMatrix({
+      packages: platformAdapterExportPackageMatrix.packages,
+    }, options),
     platform_field_capture_matrix: buildMeetingPlatformFieldCaptureMatrix(options),
     platform_field_capture_manifest_matrix: buildMeetingPlatformFieldCaptureManifestMatrix(options),
     platform_field_collector_config_matrix: buildMeetingPlatformFieldCollectorConfigMatrix(options),
@@ -721,6 +730,15 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdapterExportPackageMatrix(exportInput = {}, exportOptions = {}) {
       return buildMeetingPlatformAdapterExportPackageMatrix(exportInput, withDefaults(defaults, exportOptions));
+    },
+    platformAdapterImportPlan(exportPackage, importInput = {}, importOptions = {}) {
+      return buildMeetingPlatformAdapterImportPlan(exportPackage, importInput, withDefaults(defaults, importOptions));
+    },
+    assertPlatformAdapterImportPlan(planOrPackage, importInput = {}, importOptions = {}) {
+      return assertMeetingPlatformAdapterImportPlan(planOrPackage, importInput, withDefaults(defaults, importOptions));
+    },
+    platformAdapterImportPlanMatrix(packagesOrInput = {}, importInput = {}, importOptions = {}) {
+      return buildMeetingPlatformAdapterImportPlanMatrix(packagesOrInput, importInput, withDefaults(defaults, importOptions));
     },
     platformEvidencePackage(platformOrInput, input = {}, packageOptions = {}) {
       if (platformOrInput && typeof platformOrInput === 'object' && !Array.isArray(platformOrInput)) {

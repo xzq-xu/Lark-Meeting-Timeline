@@ -683,6 +683,9 @@ const adaptationPackage = meetingSdk.platformAdaptationPackage('google-meet');
 const consumerHandoff = meetingSdk.platformConsumerHandoff();
 const implementationHandoff = meetingSdk.platformImplementationHandoff('google-meet');
 const adapterExportPackage = meetingSdk.platformAdapterExportPackage('google-meet');
+const adapterImportPlan = meetingSdk.platformAdapterImportPlan(adapterExportPackage, {
+  availableFiles: adapterExportPackage.host_files.map((file) => file.path),
+});
 const runtimeBundle = meetingSdk.platformRuntimeBundle('google-meet');
 const routeMatrix = meetingSdk.platformAdapterRouteMatrix();
 
@@ -692,9 +695,10 @@ console.log(consumerHandoff.surface_coverage_matrix.rows);
 console.log(consumerHandoff.adaptation_roadmap.rows);
 console.log(implementationHandoff.implementation_flow);
 console.log(adapterExportPackage.host_files);
+console.log(adapterImportPlan.install_steps);
 ```
 
-这个 facade 也直接暴露宿主集成需要的机器可读适配产物：`adapterProfile()`、`observerPlan()`、`selectAdapter()`、`handoff()`、`handoffMatrix()`、`handoffAcceptance()`、`hostPackage()`、`connectorPackage()`、`platformAdaptationPackage()`、`platformConsumerHandoff()`、`platformImplementationHandoff()`、`platformAdapterAuthoringPlan()`、`platformAdapterPortfolio()`、`platformAdapterAcceptanceChecklist()`、`platformAdapterExportPackage()`、`platformRuntimeBundle()`、`platformAdapterRoute()`、`platformAdaptationStrategy()` 和 `platformConnectorHub()`。外部项目可以先用 `hostPackage()` 拿到 Google Meet / Teams / Zoom / Webex / Lark 的 content-script/WebView/native detector 安装目标、runtime options、speaker/participant track 参数、CI gates 和 `captured_at_ms` 非阻塞标注契约，再按当前会议 URL 用 `handoff()` 选择单场会议的启动配置。`platformAdaptationPackage()` 是单平台接入包，包含 adaptation playbook、provider path、runtime event plan 和风险画像；`platformConsumerHandoff()` 是多平台宿主验收包；`platformImplementationHandoff()` 是单平台落地执行单，直接列出安装 surface、bridge、runtime events、provider reconcile、验收命令和 production gaps；`platformAdapterAuthoringPlan()` 是新会议软件接入前的作者计划，会给出平台 key、browser match、provider normalizer、fixture、测试和验收命令；`platformAdapterPortfolio()` 是多会议软件接入组合表，把 P0 本地实时轴、P1 provider reconcile、P2 会后 artifact、官方文档、证据要求和第一条命令压成一张下游项目可读的总表；`platformAdapterAcceptanceChecklist()` 是面向 CI / 接入面板的目标清单，按 `static`、`pilot`、`production` 明确哪些条目已过、哪些证据缺失；`platformAdapterExportPackage()` 是把单个平台交给另一个项目落地时的文件索引和 artifact 交付包；`platformRuntimeBundle()` 是扩展/WebView/native runtime 可执行配置；`connectorPackage()` 会把 host package、按 surface 拆分的 observer plan、scheduler config、浏览器扩展 scaffold、runtime event plan 和硬契约收在一起，适合直接给另一个项目落地。
+这个 facade 也直接暴露宿主集成需要的机器可读适配产物：`adapterProfile()`、`observerPlan()`、`selectAdapter()`、`handoff()`、`handoffMatrix()`、`handoffAcceptance()`、`hostPackage()`、`connectorPackage()`、`platformAdaptationPackage()`、`platformConsumerHandoff()`、`platformImplementationHandoff()`、`platformAdapterAuthoringPlan()`、`platformAdapterPortfolio()`、`platformAdapterAcceptanceChecklist()`、`platformAdapterExportPackage()`、`platformAdapterImportPlan()`、`platformRuntimeBundle()`、`platformAdapterRoute()`、`platformAdaptationStrategy()` 和 `platformConnectorHub()`。外部项目可以先用 `hostPackage()` 拿到 Google Meet / Teams / Zoom / Webex / Lark 的 content-script/WebView/native detector 安装目标、runtime options、speaker/participant track 参数、CI gates 和 `captured_at_ms` 非阻塞标注契约，再按当前会议 URL 用 `handoff()` 选择单场会议的启动配置。`platformAdaptationPackage()` 是单平台接入包，包含 adaptation playbook、provider path、runtime event plan 和风险画像；`platformConsumerHandoff()` 是多平台宿主验收包；`platformImplementationHandoff()` 是单平台落地执行单，直接列出安装 surface、bridge、runtime events、provider reconcile、验收命令和 production gaps；`platformAdapterAuthoringPlan()` 是新会议软件接入前的作者计划，会给出平台 key、browser match、provider normalizer、fixture、测试和验收命令；`platformAdapterPortfolio()` 是多会议软件接入组合表，把 P0 本地实时轴、P1 provider reconcile、P2 会后 artifact、官方文档、证据要求和第一条命令压成一张下游项目可读的总表；`platformAdapterAcceptanceChecklist()` 是面向 CI / 接入面板的目标清单，按 `static`、`pilot`、`production` 明确哪些条目已过、哪些证据缺失；`platformAdapterExportPackage()` 是把单个平台交给另一个项目落地时的文件索引和 artifact 交付包；`platformAdapterImportPlan()` 是下游项目拿到 export package 后的导入校验和安装步骤；`platformRuntimeBundle()` 是扩展/WebView/native runtime 可执行配置；`connectorPackage()` 会把 host package、按 surface 拆分的 observer plan、scheduler config、浏览器扩展 scaffold、runtime event plan 和硬契约收在一起，适合直接给另一个项目落地。
 
 `platformConsumerHandoff().sdk_facade_handoff` 是给下游工程师看的最小接线清单：它只假设对方 import 包根并创建 `createMeetingAppTimelineSdk({ baseUrl, platforms })`，然后列出 `observePlatformCandidates()`、`insertAnnotation()`、`speakerTrack()`、`ingestProvider()` 的调用顺序，以及 browser extension、Electron WebView、native detector、provider adapter 四类接入面的消息/方法映射。Google Meet 的 provider path 会显示为 `google_workspace_events_pubsub`，Teams 为 `microsoft_graph_change_notifications`，Zoom/Webex 为 webhook，但实时标注仍统一走本地轴和 `captured_at_ms`。
 
@@ -765,6 +769,18 @@ npx meeting-platform-adapter-export-package \
   --base-url=https://timeline.example.com \
   --out-dir=meeting-platform-adapter-export-packages
 ```
+
+下游项目拿到这份目录后，用 `platformAdapterImportPlan()` 或 CLI 做导入校验。它会确认 `adapter-export-package.json` 的硬约束、所选 surface 是否可用、`host_files` 是否齐全，并输出实际安装步骤：
+
+```sh
+npx meeting-platform-adapter-import-plan \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --target=static \
+  --dir=meeting-platform-adapter-export-packages \
+  --out-dir=meeting-platform-adapter-import-plans
+```
+
+`adapter-import-plan.json` 的关键字段是 `selected_surface`、`host_file_coverage`、`readiness.issues` 和 `install_steps`。对于 Google Meet / Teams / Zoom / Webex / Lark，默认 surface 会优先选择本地可观测路径；如果接入方明确要 Electron WebView 或 native host，可以传 `--surface=webview-preload` 或 `--surface=native-host`。如果是尚未内置的新会议软件，默认不会把它当成可运行适配器；只有显式 `allowCustomAuthoring` 时，import plan 才会把它视为“可继续作者接入”的计划。
 
 需要把这份 connector package 直接落盘给另一个宿主项目时，可以用 SDK 自带 CLI：
 

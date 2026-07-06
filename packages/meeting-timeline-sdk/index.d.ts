@@ -374,6 +374,24 @@ export interface MeetingAppTimelineSdk {
     options?: Record<string, unknown>,
   ): import('./adapters/platform-adapter-export-package.mjs').MeetingPlatformAdapterExportPackageMatrix;
   adapterExportPackageMatrix: MeetingAppTimelineSdk['platformAdapterExportPackageMatrix'];
+  platformAdapterImportPlan(
+    exportPackage?: import('./adapters/platform-adapter-export-package.mjs').MeetingPlatformAdapterExportPackage | Record<string, unknown>,
+    input?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-import-plan.mjs').MeetingPlatformAdapterImportPlan;
+  adapterImportPlan: MeetingAppTimelineSdk['platformAdapterImportPlan'];
+  assertPlatformAdapterImportPlan(
+    planOrPackage?: import('./adapters/platform-adapter-import-plan.mjs').MeetingPlatformAdapterImportPlan | import('./adapters/platform-adapter-export-package.mjs').MeetingPlatformAdapterExportPackage | Record<string, unknown>,
+    input?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-import-plan.mjs').MeetingPlatformAdapterImportPlan;
+  assertAdapterImportPlan: MeetingAppTimelineSdk['assertPlatformAdapterImportPlan'];
+  platformAdapterImportPlanMatrix(
+    packagesOrInput?: import('./adapters/platform-adapter-export-package.mjs').MeetingPlatformAdapterExportPackage[] | Record<string, unknown>,
+    input?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-import-plan.mjs').MeetingPlatformAdapterImportPlanMatrix;
+  adapterImportPlanMatrix: MeetingAppTimelineSdk['platformAdapterImportPlanMatrix'];
   platformRuntimeBundle(
     platformOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
@@ -445,6 +463,7 @@ export * from './adapters/platform-adapter-authoring.mjs';
 export * from './adapters/platform-adapter-portfolio.mjs';
 export * from './adapters/platform-adapter-acceptance-checklist.mjs';
 export * from './adapters/platform-adapter-export-package.mjs';
+export * from './adapters/platform-adapter-import-plan.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-strategy.mjs';
