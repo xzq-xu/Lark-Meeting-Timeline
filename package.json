@@ -64,7 +64,8 @@
     "meeting-app:adapter-spec": "node scripts/meeting-app-adapter-spec.mjs --platforms=google-meet,teams,zoom,webex,lark --base-url=http://localhost:8787 --out-dir=data/meeting-app-adapter-specs --report-file=data/meeting-app-adapter-spec-report.json",
     "meeting-app:adapter-runtime-config": "node scripts/meeting-app-adapter-runtime-config.mjs --platforms=google-meet,teams,zoom,webex,lark --base-url=http://localhost:8787 --out-dir=data/meeting-app-adapter-runtime-configs --report-file=data/meeting-app-adapter-runtime-config-report.json",
     "meeting-app:adapter-handoff-package": "node scripts/meeting-app-adapter-handoff-package.mjs --platforms=google-meet,teams,zoom,webex,lark --base-url=http://localhost:8787 --out-dir=data/meeting-app-adapter-handoff-packages --report-file=data/meeting-app-adapter-handoff-package-report.json",
-    "meeting-app:adapter-verify": "node scripts/meeting-app-adapter-verify.mjs --platforms=google-meet,teams,zoom,webex,lark --package-dir=data/meeting-app-adapter-handoff-packages --evidence-dir=data/meeting-app-adapter-evidence --report-file=data/meeting-app-adapter-verification-report.json"
+    "meeting-app:adapter-verify": "node scripts/meeting-app-adapter-verify.mjs --platforms=google-meet,teams,zoom,webex,lark --package-dir=data/meeting-app-adapter-handoff-packages --evidence-dir=data/meeting-app-adapter-evidence --report-file=data/meeting-app-adapter-verification-report.json",
+    "meeting-app:adapter-capability": "node scripts/meeting-app-adapter-capability.mjs --platforms=google-meet,teams,zoom,webex,lark --report-file=data/meeting-app-adapter-capability-report.json"
   },
   "engines": {
     "node": ">=20"

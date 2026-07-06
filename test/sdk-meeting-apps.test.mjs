@@ -11,6 +11,12 @@ import {
   normalizeMeetingAppSnapshots,
   observeMeetingAppSample,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-apps.mjs';
+import {
+  MEETING_APP_ADAPTER_CAPABILITY_MATRIX_SCHEMA,
+  MEETING_APP_ADAPTER_CAPABILITY_REPORT_SCHEMA,
+  buildMeetingAppAdapterCapabilityMatrix,
+  buildMeetingAppAdapterCapabilityReport,
+} from '../packages/meeting-timeline-sdk/adapters/meeting-app-adapter-capability.mjs';
 import { createMeetingSourceAggregator } from '../packages/meeting-timeline-sdk/adapters/meeting-source.mjs';
 
 const startMs = 1_783_010_400_000;
@@ -76,6 +82,27 @@ assert.equal(googleFit.coverage.meeting_identity, true);
 assert.equal(googleFit.coverage.meeting_start_candidate, true);
 assert.equal(googleFit.rows[0].active_speaker_name, 'Ada Lovelace');
 assert.equal(googleFit.issues.some((item) => item.code === 'missing_meeting_end_candidate'), true);
+
+const fullEvidence = {
+  live_dom_snapshot: true,
+  candidate_observation: true,
+  speaker_track: true,
+  participant_track: true,
+  annotation_insert_current_axis: true,
+};
+const googleCapability = buildMeetingAppAdapterCapabilityReport('google-meet', {
+  input: googleMeetDomSnapshot(),
+  evidence: fullEvidence,
+});
+assert.equal(googleCapability.schema, MEETING_APP_ADAPTER_CAPABILITY_REPORT_SCHEMA);
+assert.equal(googleCapability.platform, 'google_meet');
+assert.equal(googleCapability.static_ready, true);
+assert.equal(googleCapability.pilot_ready, true);
+assert.equal(googleCapability.production_ready, true);
+assert.equal(googleCapability.recommended_mode, 'hybrid_local_observer_first');
+assert.equal(googleCapability.timeline_capabilities.realtime_axis.status, 'local_ready');
+assert.equal(googleCapability.timeline_capabilities.speaker_track.status, 'local_ready');
+assert.equal(googleCapability.timeline_capabilities.post_meeting_transcript.provider_declared, true);
 
 const explicitPlatformNormalized = normalizeMeetingAppSnapshot({
   url: 'https://meet.google.com/abc-defg-hij',
@@ -156,6 +183,44 @@ assert.equal(fitMatrix.realtime_axis_ready_count, 3);
 assert.equal(fitMatrix.speaker_track_ready_count, 3);
 assert.equal(fitMatrix.participant_track_ready_count, 3);
 assert.equal(fitMatrix.rows.find((row) => row.platform === 'microsoft_teams').recommended_surface, 'native_detector');
+
+const capabilityMatrix = buildMeetingAppAdapterCapabilityMatrix({
+  platforms: ['google-meet', 'teams', 'zoom'],
+  inputs: {
+    google_meet: googleMeetDomSnapshot(),
+    microsoft_teams: {
+      application: { name: 'Microsoft Teams' },
+      window: { title: 'Weekly sync | Microsoft Teams', focused: true },
+      accessibility: {
+        controls: [{ label: 'Leave' }, { label: 'Mute microphone' }],
+        participants: [
+          { id: 'sam', label: 'Sam Carter speaking' },
+          { id: 'lin', label: 'Lin Zhang muted' },
+        ],
+      },
+      meeting_id: 'teams-local-window',
+      observedAtMs: startMs + 1_000,
+    },
+    zoom: {
+      app: { name: 'Zoom Workplace' },
+      window: {
+        title: 'Zoom Meeting',
+        focused: true,
+        controls: [{ label: 'Leave Meeting' }, { label: 'Participants' }],
+      },
+      meeting_id: 'zoom-local-123',
+      tiles: [{ id: 'mira', ariaLabel: 'Mira Patel is speaking' }],
+      observedAtMs: startMs + 2_000,
+    },
+  },
+});
+assert.equal(capabilityMatrix.schema, MEETING_APP_ADAPTER_CAPABILITY_MATRIX_SCHEMA);
+assert.equal(capabilityMatrix.platform_count, 3);
+assert.equal(capabilityMatrix.accepted_count, 3);
+assert.equal(capabilityMatrix.pilot_ready_count, 3);
+assert.equal(capabilityMatrix.local_axis_ready_count, 3);
+assert.equal(capabilityMatrix.production_ready_count, 0);
+assert.equal(capabilityMatrix.rows.find((row) => row.platform === 'zoom').recommended_mode, 'hybrid_local_observer_first');
 
 const zoomObserver = createMeetingAppObserver({
   source: 'desktop_observer',

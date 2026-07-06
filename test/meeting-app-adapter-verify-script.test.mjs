@@ -11,6 +11,9 @@ const tmpDir = await mkdtemp(join(tmpdir(), 'meeting-app-adapter-verify-'));
 const specDir = join(tmpDir, 'specs');
 const evidenceDir = join(tmpDir, 'evidence');
 const reportFile = join(tmpDir, 'report.json');
+const capabilityInputFile = join(tmpDir, 'capability-input.json');
+const capabilityEvidenceFile = join(tmpDir, 'capability-evidence.json');
+const capabilityReportFile = join(tmpDir, 'capability-report.json');
 await mkdir(specDir, { recursive: true });
 await mkdir(evidenceDir, { recursive: true });
 
@@ -39,6 +42,25 @@ const completeEvidence = (adapterKey) => ({
 await writeFile(join(specDir, 'whereby.json'), `${JSON.stringify(wherebySpec, null, 2)}\n`, 'utf8');
 await writeFile(join(evidenceDir, 'whereby.json'), `${JSON.stringify(completeEvidence('whereby'), null, 2)}\n`, 'utf8');
 await writeFile(join(evidenceDir, 'google_meet.json'), `${JSON.stringify(completeEvidence('google_meet'), null, 2)}\n`, 'utf8');
+await writeFile(capabilityInputFile, `${JSON.stringify({
+  google_meet: {
+    url: 'https://meet.google.com/abc-defg-hij',
+    page: {
+      controls: [{ label: 'Leave call' }],
+      participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace speaking' }],
+    },
+  },
+  zoom: {
+    app: { name: 'Zoom Workplace' },
+    window: { title: 'Zoom Meeting', controls: [{ label: 'Leave Meeting' }] },
+    meeting_id: 'zoom-local',
+    tiles: [{ id: 'mira', ariaLabel: 'Mira Patel speaking' }],
+  },
+}, null, 2)}\n`, 'utf8');
+await writeFile(capabilityEvidenceFile, `${JSON.stringify({
+  google_meet: completeEvidence('google_meet'),
+  zoom: completeEvidence('zoom'),
+}, null, 2)}\n`, 'utf8');
 
 const { stdout } = await execFileAsync(process.execPath, [
   'scripts/meeting-app-adapter-verify.mjs',
@@ -76,5 +98,27 @@ const { stdout: missingStdout } = await execFileAsync(process.execPath, [
 const missingReport = JSON.parse(missingStdout);
 assert.equal(missingReport.ok, false);
 assert.equal(missingReport.rows[0].missing_evidence_count, 5);
+
+const { stdout: capabilityStdout } = await execFileAsync(process.execPath, [
+  'scripts/meeting-app-adapter-capability.mjs',
+  '--platforms=google-meet,zoom',
+  `--input-file=${capabilityInputFile}`,
+  `--evidence-file=${capabilityEvidenceFile}`,
+  `--report-file=${capabilityReportFile}`,
+], {
+  cwd: repoRoot,
+});
+assert.match(capabilityStdout, /meeting_app_adapter_capability_report/);
+assert.match(capabilityStdout, /ok=yes/);
+assert.match(capabilityStdout, /accepted=2\/2/);
+assert.match(capabilityStdout, /pilot=2/);
+assert.match(capabilityStdout, /production=2/);
+
+const capabilityReport = JSON.parse(await readFile(capabilityReportFile, 'utf8'));
+assert.equal(capabilityReport.type, 'meeting_app_adapter_capability_cli_report');
+assert.equal(capabilityReport.ok, true);
+assert.equal(capabilityReport.platform_count, 2);
+assert.equal(capabilityReport.production_ready_count, 2);
+assert.equal(capabilityReport.rows.find((row) => row.platform === 'google_meet').recommended_mode, 'hybrid_local_observer_first');
 
 console.log('ok meeting app adapter verify script');

@@ -109,6 +109,14 @@ npm run meeting-app:adapter-verify
 
 它会写出 `data/meeting-app-adapter-verification-report.json`，按每个平台的 `verification-plan.json` 检查静态契约、真实 DOM snapshot、candidate observation、speaker/participant track 和当前轴标注插入是否齐全。这个报告比 handoff package 更接近“是否可以把某个会议软件打开给用户试用”的判断。
 
+如果要给外部项目做多会议软件接入决策，可以生成 capability 矩阵：
+
+```bash
+npm run meeting-app:adapter-capability
+```
+
+它会写出 `data/meeting-app-adapter-capability-report.json`，把 Google Meet、Teams、Zoom、Webex、Lark 的官方 provider 事件、本地/浏览器 observation、speaker/participant 轨道、会后 transcript backfill 和 live evidence 状态合成 `recommended_mode`、`pilot_ready`、`production_ready`。这个报告用于回答“这个会议软件应该走 hybrid local observer、provider event primary，还是只能先做会后 artifact”的接入问题。
+
 如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
 
 ```bash

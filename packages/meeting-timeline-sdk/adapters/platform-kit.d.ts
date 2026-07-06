@@ -299,6 +299,11 @@ import type {
   MeetingAppSnapshot,
 } from './meeting-apps.mjs';
 import type {
+  MeetingAppAdapterCapabilityMatrix,
+  MeetingAppAdapterCapabilityOptions,
+  MeetingAppAdapterCapabilityReport,
+} from './meeting-app-adapter-capability.mjs';
+import type {
   MeetingAppTrackPipeline,
   MeetingAppTrackPipelineAccumulator,
   MeetingAppTrackPipelineInput,
@@ -420,6 +425,12 @@ export interface MeetingPlatformTimelineKit {
     input?: MeetingAppSnapshot | MeetingAppSnapshot[] | Record<string, unknown>,
     fitOptions?: Record<string, unknown>,
   ): MeetingAppAdapterFitMatrix;
+  meetingAppAdapterCapability(
+    platformOrOptions?: string | MeetingAppAdapterCapabilityOptions,
+    input?: MeetingAppSnapshot | MeetingAppSnapshot[] | Record<string, unknown>,
+    capabilityOptions?: MeetingAppAdapterCapabilityOptions,
+  ): MeetingAppAdapterCapabilityReport;
+  meetingAppAdapterCapabilityMatrix(capabilityOptions?: MeetingAppAdapterCapabilityOptions): MeetingAppAdapterCapabilityMatrix;
   meetingAppAdapterManifest(platform: string, manifestOptions?: MeetingAppAdapterManifestOptions): MeetingAppAdapterManifest;
   meetingAppAdapterManifestMatrix(manifestOptions?: MeetingAppAdapterManifestOptions): MeetingAppAdapterManifestMatrix;
   assertMeetingAppAdapterManifest(

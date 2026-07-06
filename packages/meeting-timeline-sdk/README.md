@@ -112,6 +112,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-spec`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-runtime-config`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-handoff-package`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-capability`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixture-tracks`
@@ -1076,7 +1077,35 @@ npm run meeting-app:adapter-verify
 
 CLI 默认读取 `data/meeting-app-adapter-handoff-packages/` 和 `data/meeting-app-adapter-evidence/`，输出 `data/meeting-app-adapter-verification-report.json`。报告会给出 `static_ready`、`live_evidence_ready`、`pilot_ready`、`production_ready` 和每个缺失证据项。
 
-同一份 `runtimeConfig.browser_runtime_options` 也可以直接传给 `createMeetingAppBrowserRuntime()`；`runtimeConfig.capture_options` 可以直接传给 `captureMeetingAppDomSnapshot()` 做手动采样。也就是说，新会议软件的接入路径是 `adapter spec -> runtime config -> handoff package -> verification report -> handoff readiness`。
+面向 Google Meet、Teams、Zoom、Webex、Lark 这类多会议软件接入面板时，优先用 capability report 判断每个平台该走哪条路径：官方 provider 事件、本地/浏览器 observation、会后 transcript backfill，还是混合模式。
+
+```js
+import {
+  buildMeetingAppAdapterCapabilityMatrix,
+  buildMeetingAppAdapterCapabilityReport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-capability';
+
+const googleCapability = buildMeetingAppAdapterCapabilityReport('google-meet', {
+  input: liveGoogleMeetSnapshot,
+  evidence: googleLiveEvidence,
+});
+
+const capabilityMatrix = buildMeetingAppAdapterCapabilityMatrix({
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+  inputs: liveSnapshotsByPlatform,
+  evidenceByAdapter,
+});
+```
+
+`recommended_mode` 会明确给出 `hybrid_local_observer_first`、`local_observer_axis_with_provider_backfill`、`provider_event_primary_with_local_snapshot_required` 或 `post_meeting_artifact_only`；`timeline_capabilities` 会分别列出 `realtime_axis`、`speaker_track`、`participant_track`、`annotation_timeline`、`post_meeting_transcript` 和 `recording` 的 provider/local 状态。
+
+```bash
+npm run meeting-app:adapter-capability
+```
+
+CLI 默认输出 `data/meeting-app-adapter-capability-report.json`。如果传 `-- --input-file=live-snapshots.json --evidence-file=evidence-by-adapter.json`，报告会把现场 observation 和 verification evidence 一起纳入 `pilot_ready` / `production_ready` 判断。
+
+同一份 `runtimeConfig.browser_runtime_options` 也可以直接传给 `createMeetingAppBrowserRuntime()`；`runtimeConfig.capture_options` 可以直接传给 `captureMeetingAppDomSnapshot()` 做手动采样。也就是说，新会议软件的接入路径是 `adapter spec -> runtime config -> handoff package -> verification report -> capability matrix -> handoff readiness`。
 
 如果宿主不想自己解释 `trigger_policy`，可以直接用 `meeting-app-observer-scheduler`。它消费 observer plan 和现有 runtime，把 DOM mutation、native snapshot change、keep-alive、active speaker follow-up、candidate missing end grace 统一映射为 `runtime.sample()` / `runtime.sampleTracks()` 调用：
 

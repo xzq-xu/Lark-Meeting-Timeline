@@ -20,6 +20,10 @@ import {
   buildMeetingAppAdapterFitReport,
 } from './meeting-apps.mjs';
 import {
+  buildMeetingAppAdapterCapabilityMatrix,
+  buildMeetingAppAdapterCapabilityReport,
+} from './meeting-app-adapter-capability.mjs';
+import {
   assertMeetingAppAdapterManifest,
   assertMeetingAppAdapterManifestMatrix,
   buildMeetingAppAdapterManifest,
@@ -457,6 +461,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_adapter_runtime_config_matrix: buildMeetingAppAdapterRuntimeConfigMatrix(options),
     meeting_app_adapter_handoff_package_matrix: buildMeetingAppAdapterHandoffPackageMatrix(options),
     meeting_app_adapter_verification_report_matrix: buildMeetingAppAdapterVerificationReportMatrix(options),
+    meeting_app_adapter_capability_matrix: buildMeetingAppAdapterCapabilityMatrix(options),
     meeting_app_integration_matrix: buildMeetingAppIntegrationMatrix(options),
     meeting_app_deployment_manifests: buildAllMeetingAppDeploymentManifests(options),
     meeting_app_deployment_manifest_acceptance: buildAllMeetingAppDeploymentManifestAcceptanceReports(options),
@@ -761,6 +766,19 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppAdapterFitMatrix(input = {}, fitOptions = {}) {
       return buildMeetingAppAdapterFitMatrix(input, withDefaults(defaults, fitOptions));
+    },
+    meetingAppAdapterCapability(platform, input = {}, capabilityOptions = {}) {
+      const mergedOptions = withDefaults(defaults, capabilityOptions);
+      if (platform && typeof platform === 'object' && !Array.isArray(platform)) {
+        return buildMeetingAppAdapterCapabilityReport(withDefaults(defaults, platform));
+      }
+      return buildMeetingAppAdapterCapabilityReport(platform, {
+        ...mergedOptions,
+        input,
+      });
+    },
+    meetingAppAdapterCapabilityMatrix(capabilityOptions = {}) {
+      return buildMeetingAppAdapterCapabilityMatrix(withDefaults(defaults, capabilityOptions));
     },
     meetingAppAdapterManifest(platform, manifestOptions = {}) {
       return buildMeetingAppAdapterManifest(platform, withDefaults(defaults, manifestOptions));

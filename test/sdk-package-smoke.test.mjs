@@ -99,6 +99,8 @@ assert.equal(packedFiles.includes('adapters/meeting-app-adapter-runtime-config.m
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-runtime-config.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-handoff-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-handoff-package.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-adapter-capability.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-adapter-capability.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-profile.mjs'), true);
@@ -316,6 +318,10 @@ import {
   buildMeetingAppAdapterFitMatrix,
   buildMeetingAppAdapterFitReport,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-apps';
+import {
+  buildMeetingAppAdapterCapabilityMatrix,
+  buildMeetingAppAdapterCapabilityReport,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-capability';
 import {
   assertMeetingAppRuntimeAdapterHandoff,
   buildMeetingAppDomAdaptationDiagnosisMatrix,
@@ -801,6 +807,27 @@ assert.equal(buildMeetingAppAdapterFitMatrix({
     },
   },
 }).schema, 'meeting_app_adapter_fit_matrix');
+assert.equal(buildMeetingAppAdapterCapabilityReport('google-meet', {
+  input: {
+    url: 'https://meet.google.com/abc-defg-hij',
+    page: {
+      controls: [{ label: 'Leave call' }],
+      participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+    },
+  },
+}).pilot_ready, true);
+assert.equal(buildMeetingAppAdapterCapabilityMatrix({
+  platforms: ['google-meet'],
+  inputs: {
+    google_meet: {
+      url: 'https://meet.google.com/abc-defg-hij',
+      page: {
+        controls: [{ label: 'Leave call' }],
+        participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+      },
+    },
+  },
+}).schema, 'meeting_app_adapter_capability_matrix');
 assert.equal(buildMeetingAppRuntimeObserverPlan({
   url: 'https://meet.google.com/abc-defg-hij',
   page: {
