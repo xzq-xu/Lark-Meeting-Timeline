@@ -979,6 +979,26 @@ export function createMeetingAppTimelineSdk(options = {}) {
     adapterPortfolio(portfolioOptions = {}) {
       return sdk.platformAdapterPortfolio(portfolioOptions);
     },
+    platformAdapterAcceptanceChecklist(platformOrOptions = {}, checklistInput = {}, checklistOptions = {}) {
+      const resolved = singlePlatformInput(runtime, platformOrOptions, checklistOptions);
+      return runtime.kit.platformAdapterAcceptanceChecklist(
+        resolved.platform,
+        checklistInput,
+        sdkPlatformOptions(runtime, resolved.options),
+      );
+    },
+    adapterAcceptanceChecklist(platformOrOptions = {}, checklistInput = {}, checklistOptions = {}) {
+      return sdk.platformAdapterAcceptanceChecklist(platformOrOptions, checklistInput, checklistOptions);
+    },
+    platformAdapterAcceptanceChecklistMatrix(checklistInput = {}, checklistOptions = {}) {
+      return runtime.kit.platformAdapterAcceptanceChecklistMatrix(
+        checklistInput,
+        sdkPlatformOptions(runtime, checklistOptions),
+      );
+    },
+    adapterAcceptanceChecklistMatrix(checklistInput = {}, checklistOptions = {}) {
+      return sdk.platformAdapterAcceptanceChecklistMatrix(checklistInput, checklistOptions);
+    },
     platformRuntimeBundle(platformOrOptions = {}, bundleOptions = {}) {
       const resolved = singlePlatformInput(runtime, platformOrOptions, bundleOptions);
       return runtime.kit.platformRuntimeBundle(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
@@ -1106,6 +1126,7 @@ export * from './adapters/platform-consumer-handoff.mjs';
 export * from './adapters/platform-implementation-handoff.mjs';
 export * from './adapters/platform-adapter-authoring.mjs';
 export * from './adapters/platform-adapter-portfolio.mjs';
+export * from './adapters/platform-adapter-acceptance-checklist.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-strategy.mjs';

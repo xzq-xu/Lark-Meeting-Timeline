@@ -197,6 +197,11 @@ import type {
   MeetingPlatformAdapterPortfolioOptions,
 } from './platform-adapter-portfolio.mjs';
 import type {
+  MeetingPlatformAdapterAcceptanceChecklist,
+  MeetingPlatformAdapterAcceptanceChecklistMatrix,
+  MeetingPlatformAdapterAcceptanceChecklistOptions,
+} from './platform-adapter-acceptance-checklist.mjs';
+import type {
   MeetingPlatformAdapterSample,
   MeetingPlatformAdapterSampleMatrix,
   MeetingPlatformAdapterSampleOptions,
@@ -410,6 +415,8 @@ export interface MeetingPlatformTimelineKit {
   platformAdapterAuthoringMatrix(authoringOptions?: MeetingPlatformAdapterAuthoringOptions): MeetingPlatformAdapterAuthoringMatrix;
   platformAdapterPortfolioItem(platform: string, portfolioOptions?: MeetingPlatformAdapterPortfolioOptions): MeetingPlatformAdapterPortfolioItem;
   platformAdapterPortfolio(portfolioOptions?: MeetingPlatformAdapterPortfolioOptions): MeetingPlatformAdapterPortfolio;
+  platformAdapterAcceptanceChecklist(platform: string, checklistInput?: MeetingPlatformAdapterAcceptanceChecklistOptions, checklistOptions?: MeetingPlatformAdapterAcceptanceChecklistOptions): MeetingPlatformAdapterAcceptanceChecklist;
+  platformAdapterAcceptanceChecklistMatrix(checklistInput?: MeetingPlatformAdapterAcceptanceChecklistOptions, checklistOptions?: MeetingPlatformAdapterAcceptanceChecklistOptions): MeetingPlatformAdapterAcceptanceChecklistMatrix;
   platformEvidencePackage(platformOrInput: string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, packageOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackage;
   platformEvidencePackageSummary(packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, summaryOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageSummary;
   platformEvidencePackageBuilder(platform: string, builderOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageBuilder;

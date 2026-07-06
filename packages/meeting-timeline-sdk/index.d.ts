@@ -352,6 +352,17 @@ export interface MeetingAppTimelineSdk {
   adapterPortfolioItem: MeetingAppTimelineSdk['platformAdapterPortfolioItem'];
   platformAdapterPortfolio(options?: Record<string, unknown>): import('./adapters/platform-adapter-portfolio.mjs').MeetingPlatformAdapterPortfolio;
   adapterPortfolio: MeetingAppTimelineSdk['platformAdapterPortfolio'];
+  platformAdapterAcceptanceChecklist(
+    platformOrOptions?: string | Record<string, unknown>,
+    input?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-acceptance-checklist.mjs').MeetingPlatformAdapterAcceptanceChecklist;
+  adapterAcceptanceChecklist: MeetingAppTimelineSdk['platformAdapterAcceptanceChecklist'];
+  platformAdapterAcceptanceChecklistMatrix(
+    input?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-acceptance-checklist.mjs').MeetingPlatformAdapterAcceptanceChecklistMatrix;
+  adapterAcceptanceChecklistMatrix: MeetingAppTimelineSdk['platformAdapterAcceptanceChecklistMatrix'];
   platformRuntimeBundle(
     platformOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
@@ -421,6 +432,7 @@ export * from './adapters/platform-consumer-handoff.mjs';
 export * from './adapters/platform-implementation-handoff.mjs';
 export * from './adapters/platform-adapter-authoring.mjs';
 export * from './adapters/platform-adapter-portfolio.mjs';
+export * from './adapters/platform-adapter-acceptance-checklist.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-strategy.mjs';
