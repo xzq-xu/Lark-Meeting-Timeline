@@ -1,4 +1,4 @@
-import { compactObject } from '../index.mjs';
+import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
 import {
   buildMeetingAppAdapterCapabilityMatrix,
   buildMeetingAppAdapterCapabilityReport,
@@ -207,6 +207,41 @@ function readiness({ capabilityReport, handoffPackage, executionPlan }) {
   };
 }
 
+function acceptanceTarget(options = {}) {
+  return String(firstNonEmpty(
+    options.target,
+    options.acceptance_target,
+    options.acceptanceTarget,
+    options.requireProductionReady === true || options.require_production_ready === true ? 'production' : undefined,
+    options.requireRealtimeReady === true || options.require_realtime_ready === true ? 'realtime' : undefined,
+    'pilot',
+  ));
+}
+
+function targetAccepted(pkg = {}, target = 'pilot') {
+  switch (target) {
+    case 'static':
+      return pkg.static_ready === true;
+    case 'realtime':
+      return pkg.accepted === true && pkg.realtime_ready === true;
+    case 'production':
+      return pkg.production_ready === true;
+    case 'pilot':
+    default:
+      return pkg.accepted === true && pkg.pilot_ready === true;
+  }
+}
+
+function targetMissingGates(pkg = {}, target = 'pilot') {
+  const missing = [];
+  if (!pkg.static_ready) missing.push('static_ready');
+  if ((target === 'pilot' || target === 'realtime' || target === 'production') && !pkg.pilot_ready) missing.push('pilot_ready');
+  if ((target === 'realtime' || target === 'production') && !pkg.realtime_ready) missing.push('realtime_ready');
+  if (target === 'production' && !pkg.production_ready) missing.push('production_ready');
+  if (pkg.first_blocked_step) missing.push(pkg.first_blocked_step);
+  return unique(missing);
+}
+
 export function buildMeetingAppAdapterIntegrationPackage(platformOrCapability = {}, options = {}) {
   const capabilityReport = capabilityForInput(platformOrCapability, options);
   const platform = capabilityReport.platform;
@@ -238,6 +273,14 @@ export function buildMeetingAppAdapterIntegrationPackage(platformOrCapability = 
     integration_steps: integrationSteps(executionPlan),
     gates: executionPlan.gates,
     readiness: packageReadiness,
+    acceptance: {
+      default_target: 'pilot',
+      static_ready: targetAccepted(packageReadiness, 'static'),
+      pilot_ready: targetAccepted(packageReadiness, 'pilot'),
+      realtime_ready: targetAccepted(packageReadiness, 'realtime'),
+      production_ready: targetAccepted(packageReadiness, 'production'),
+      missing_for_production: targetMissingGates(packageReadiness, 'production'),
+    },
     handoff_package: handoffPackage,
     capability_report: capabilityReport,
     execution_plan: executionPlan,
@@ -295,4 +338,45 @@ export function buildMeetingAppAdapterIntegrationPackageMatrix(options = {}) {
     packages,
     next_actions: unique(packages.flatMap((pkg) => pkg.next_actions ?? [])),
   };
+}
+
+export function assertMeetingAppAdapterIntegrationPackage(packageOrPlatform = {}, options = {}) {
+  const pkg = packageOrPlatform?.schema === MEETING_APP_ADAPTER_INTEGRATION_PACKAGE_SCHEMA
+    ? packageOrPlatform
+    : buildMeetingAppAdapterIntegrationPackage(packageOrPlatform, options);
+  const target = acceptanceTarget(options);
+  if (!targetAccepted(pkg, target)) {
+    throw new MeetingTimelineSdkError('Meeting app adapter integration package acceptance failed', {
+      code: 'meeting_app_adapter_integration_package_rejected',
+      platform: pkg.platform,
+      target,
+      accepted: pkg.accepted,
+      static_ready: pkg.static_ready,
+      pilot_ready: pkg.pilot_ready,
+      realtime_ready: pkg.realtime_ready,
+      production_ready: pkg.production_ready,
+      first_blocked_step: pkg.first_blocked_step,
+      missing_gates: targetMissingGates(pkg, target),
+      next_actions: pkg.next_actions,
+    });
+  }
+  return pkg;
+}
+
+export function assertMeetingAppAdapterIntegrationPackageMatrix(matrixOrOptions = {}, options = {}) {
+  const matrix = matrixOrOptions?.schema === MEETING_APP_ADAPTER_INTEGRATION_PACKAGE_MATRIX_SCHEMA
+    ? matrixOrOptions
+    : buildMeetingAppAdapterIntegrationPackageMatrix({ ...matrixOrOptions, ...options });
+  const target = acceptanceTarget(options);
+  const rejected = matrix.packages.filter((pkg) => !targetAccepted(pkg, target));
+  if (rejected.length > 0) {
+    throw new MeetingTimelineSdkError('Meeting app adapter integration package matrix acceptance failed', {
+      code: 'meeting_app_adapter_integration_package_matrix_rejected',
+      target,
+      rejected_platforms: rejected.map((pkg) => pkg.platform),
+      rows: matrix.rows,
+      next_actions: matrix.next_actions,
+    });
+  }
+  return matrix;
 }

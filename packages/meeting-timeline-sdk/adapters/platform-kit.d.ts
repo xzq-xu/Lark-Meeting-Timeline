@@ -449,6 +449,15 @@ export interface MeetingPlatformTimelineKit {
     packageOptions?: MeetingAppAdapterCapabilityOptions,
   ): MeetingAppAdapterIntegrationPackage;
   meetingAppAdapterIntegrationPackageMatrix(packageOptions?: MeetingAppAdapterCapabilityOptions): MeetingAppAdapterIntegrationPackageMatrix;
+  assertMeetingAppAdapterIntegrationPackage(
+    packageOrPlatform?: MeetingAppAdapterIntegrationPackage | string | MeetingAppAdapterCapabilityReport | MeetingAppAdapterExecutionPlan | MeetingAppAdapterCapabilityOptions,
+    input?: MeetingAppSnapshot | MeetingAppSnapshot[] | Record<string, unknown> | MeetingAppAdapterCapabilityOptions,
+    packageOptions?: MeetingAppAdapterCapabilityOptions,
+  ): MeetingAppAdapterIntegrationPackage;
+  assertMeetingAppAdapterIntegrationPackageMatrix(
+    matrixOrOptions?: MeetingAppAdapterIntegrationPackageMatrix | MeetingAppAdapterCapabilityOptions,
+    packageOptions?: MeetingAppAdapterCapabilityOptions,
+  ): MeetingAppAdapterIntegrationPackageMatrix;
   meetingAppAdapterManifest(platform: string, manifestOptions?: MeetingAppAdapterManifestOptions): MeetingAppAdapterManifest;
   meetingAppAdapterManifestMatrix(manifestOptions?: MeetingAppAdapterManifestOptions): MeetingAppAdapterManifestMatrix;
   assertMeetingAppAdapterManifest(

@@ -26,6 +26,8 @@ import {
   buildMeetingAppAdapterExecutionPlanMatrix,
 } from './meeting-app-adapter-capability.mjs';
 import {
+  assertMeetingAppAdapterIntegrationPackage,
+  assertMeetingAppAdapterIntegrationPackageMatrix,
   buildMeetingAppAdapterIntegrationPackage,
   buildMeetingAppAdapterIntegrationPackageMatrix,
 } from './meeting-app-adapter-integration-package.mjs';
@@ -820,6 +822,30 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppAdapterIntegrationPackageMatrix(packageOptions = {}) {
       return buildMeetingAppAdapterIntegrationPackageMatrix(withDefaults(defaults, packageOptions));
+    },
+    assertMeetingAppAdapterIntegrationPackage(packageOrPlatform = {}, input = {}, packageOptions = {}) {
+      if (packageOrPlatform?.schema === 'meeting_app_adapter_integration_package') {
+        return assertMeetingAppAdapterIntegrationPackage(packageOrPlatform, withDefaults(defaults, input));
+      }
+      if (
+        packageOrPlatform?.schema === 'meeting_app_adapter_capability_report'
+        || packageOrPlatform?.schema === 'meeting_app_adapter_execution_plan'
+      ) {
+        return assertMeetingAppAdapterIntegrationPackage(packageOrPlatform, withDefaults(defaults, input));
+      }
+      if (packageOrPlatform && typeof packageOrPlatform === 'object' && !Array.isArray(packageOrPlatform)) {
+        return assertMeetingAppAdapterIntegrationPackage(withDefaults(defaults, packageOrPlatform));
+      }
+      return assertMeetingAppAdapterIntegrationPackage(packageOrPlatform, {
+        ...withDefaults(defaults, packageOptions),
+        input,
+      });
+    },
+    assertMeetingAppAdapterIntegrationPackageMatrix(matrixOrOptions = {}, packageOptions = {}) {
+      if (matrixOrOptions?.schema === 'meeting_app_adapter_integration_package_matrix') {
+        return assertMeetingAppAdapterIntegrationPackageMatrix(matrixOrOptions, withDefaults(defaults, packageOptions));
+      }
+      return assertMeetingAppAdapterIntegrationPackageMatrix(withDefaults(defaults, matrixOrOptions), packageOptions);
     },
     meetingAppAdapterManifest(platform, manifestOptions = {}) {
       return buildMeetingAppAdapterManifest(platform, withDefaults(defaults, manifestOptions));

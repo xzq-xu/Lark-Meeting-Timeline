@@ -24,6 +24,8 @@ import {
 import {
   MEETING_APP_ADAPTER_INTEGRATION_PACKAGE_MATRIX_SCHEMA,
   MEETING_APP_ADAPTER_INTEGRATION_PACKAGE_SCHEMA,
+  assertMeetingAppAdapterIntegrationPackage,
+  assertMeetingAppAdapterIntegrationPackageMatrix,
   buildMeetingAppAdapterIntegrationPackage,
   buildMeetingAppAdapterIntegrationPackageMatrix,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-adapter-integration-package.mjs';
@@ -130,6 +132,8 @@ assert.equal(googleIntegrationPackage.file_paths.includes('execution-plan.json')
 assert.equal(googleIntegrationPackage.entrypoints.adapter_integration_package, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-integration-package');
 assert.equal(googleIntegrationPackage.evidence_contract.required_for_realtime.includes('annotation_insert_current_axis'), true);
 assert.equal(googleIntegrationPackage.integration_steps.some((step) => step.id === 'capture_meeting_app_snapshot'), true);
+assert.equal(googleIntegrationPackage.acceptance.production_ready, true);
+assert.equal(assertMeetingAppAdapterIntegrationPackage(googleIntegrationPackage, { target: 'production' }).platform, 'google_meet');
 
 const explicitPlatformNormalized = normalizeMeetingAppSnapshot({
   url: 'https://meet.google.com/abc-defg-hij',
@@ -263,6 +267,11 @@ assert.equal(integrationPackageMatrix.platform_count, 3);
 assert.equal(integrationPackageMatrix.pilot_ready_count, 3);
 assert.equal(integrationPackageMatrix.realtime_ready_count, 3);
 assert.equal(integrationPackageMatrix.rows.find((row) => row.platform === 'zoom').recommended_mode, 'hybrid_local_observer_first');
+assert.equal(assertMeetingAppAdapterIntegrationPackageMatrix(integrationPackageMatrix).accepted, true);
+assert.throws(
+  () => assertMeetingAppAdapterIntegrationPackageMatrix(integrationPackageMatrix, { target: 'production' }),
+  /Meeting app adapter integration package matrix acceptance failed/,
+);
 
 const zoomObserver = createMeetingAppObserver({
   source: 'desktop_observer',

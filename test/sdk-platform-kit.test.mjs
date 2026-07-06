@@ -217,6 +217,7 @@ assert.equal(appIntegrationPackage.platform, 'google_meet');
 assert.equal(appIntegrationPackage.pilot_ready, true);
 assert.equal(appIntegrationPackage.realtime_ready, true);
 assert.equal(appIntegrationPackage.entrypoints.platform_kit, '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit');
+assert.equal(kit.assertMeetingAppAdapterIntegrationPackage(appIntegrationPackage).platform, 'google_meet');
 const appIntegrationPackageMatrix = kit.meetingAppAdapterIntegrationPackageMatrix({
   platforms: ['google-meet', 'zoom'],
   inputs: {
@@ -238,6 +239,11 @@ const appIntegrationPackageMatrix = kit.meetingAppAdapterIntegrationPackageMatri
 });
 assert.equal(appIntegrationPackageMatrix.platform_count, 2);
 assert.equal(appIntegrationPackageMatrix.realtime_ready_count, 2);
+assert.equal(kit.assertMeetingAppAdapterIntegrationPackageMatrix(appIntegrationPackageMatrix).accepted, true);
+assert.throws(
+  () => kit.assertMeetingAppAdapterIntegrationPackageMatrix(appIntegrationPackageMatrix, { target: 'production' }),
+  /Meeting app adapter integration package matrix acceptance failed/,
+);
 assert.equal(kit.report({ platforms: ['google-meet'] }).meeting_app_adapter_integration_package_matrix.platform_count, 1);
 const appObserverPlan = kit.meetingAppRuntimeObserverPlan({
   url: 'https://meet.google.com/abc-defg-hij',

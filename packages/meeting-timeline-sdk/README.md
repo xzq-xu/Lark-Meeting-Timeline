@@ -622,7 +622,7 @@ const matrix = buildMeetingAppAdapterIntegrationPackageMatrix({
 console.log(pkg.entrypoints, pkg.integration_steps, matrix.rows);
 ```
 
-`platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。它只回答“宿主工程怎么接、缺哪些证据、下一步跑什么命令”；生产可用性仍以后续真实会议 evidence package、provider start/end reconcile 和 handoff readiness 为准。
+`platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。CI 里可以用 `assertMeetingAppAdapterIntegrationPackage()`、`assertMeetingAppAdapterIntegrationPackageMatrix()` 或 kit 上的同名方法做 gate；默认 target 是 `pilot`，如果传 `target: 'production'`，则必须补齐真实会议 evidence package、provider start/end reconcile 和 handoff readiness 之后才会通过。
 
 如果下游项目要直接启动浏览器扩展、WebView preload 或 native host runtime，用 `platform-runtime-bundle`。它在 `platform-adaptation-package` 基础上再补一层可执行运行时配置：content script manifest、浏览器 URL matches、adapter route、`meeting-app-browser-runtime` preset、`platform-integration-runtime` content-script bridge 安装参数、mutation observer / speaker filter 参数、extension message 示例、host ingest endpoints，以及 `captured_at_ms` 写入契约：
 

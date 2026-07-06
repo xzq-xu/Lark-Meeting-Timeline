@@ -61,6 +61,14 @@ export interface MeetingAppAdapterIntegrationPackage {
   integration_steps: MeetingAppAdapterIntegrationStep[];
   gates: MeetingAppAdapterExecutionGate[];
   readiness: MeetingAppAdapterIntegrationReadiness;
+  acceptance: {
+    default_target: 'pilot';
+    static_ready: boolean;
+    pilot_ready: boolean;
+    realtime_ready: boolean;
+    production_ready: boolean;
+    missing_for_production: string[];
+  };
   handoff_package: MeetingAppAdapterHandoffPackage;
   capability_report: MeetingAppAdapterCapabilityReport;
   execution_plan: MeetingAppAdapterExecutionPlan;
@@ -92,4 +100,30 @@ export function buildMeetingAppAdapterIntegrationPackage(
 
 export function buildMeetingAppAdapterIntegrationPackageMatrix(
   options?: MeetingAppAdapterCapabilityOptions & { capabilityMatrix?: MeetingAppAdapterCapabilityMatrix },
+): MeetingAppAdapterIntegrationPackageMatrix;
+
+export function assertMeetingAppAdapterIntegrationPackage(
+  packageOrPlatform?: MeetingAppAdapterIntegrationPackage | string | MeetingAppAdapterCapabilityReport | MeetingAppAdapterExecutionPlan | MeetingAppAdapterCapabilityOptions,
+  options?: MeetingAppAdapterCapabilityOptions & {
+    target?: 'static' | 'pilot' | 'realtime' | 'production' | string;
+    acceptance_target?: string;
+    acceptanceTarget?: string;
+    requireProductionReady?: boolean;
+    require_production_ready?: boolean;
+    requireRealtimeReady?: boolean;
+    require_realtime_ready?: boolean;
+  },
+): MeetingAppAdapterIntegrationPackage;
+
+export function assertMeetingAppAdapterIntegrationPackageMatrix(
+  matrixOrOptions?: MeetingAppAdapterIntegrationPackageMatrix | (MeetingAppAdapterCapabilityOptions & { capabilityMatrix?: MeetingAppAdapterCapabilityMatrix }),
+  options?: MeetingAppAdapterCapabilityOptions & {
+    target?: 'static' | 'pilot' | 'realtime' | 'production' | string;
+    acceptance_target?: string;
+    acceptanceTarget?: string;
+    requireProductionReady?: boolean;
+    require_production_ready?: boolean;
+    requireRealtimeReady?: boolean;
+    require_realtime_ready?: boolean;
+  },
 ): MeetingAppAdapterIntegrationPackageMatrix;

@@ -327,6 +327,8 @@ import {
   buildMeetingAppAdapterExecutionPlanMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-capability';
 import {
+  assertMeetingAppAdapterIntegrationPackage,
+  assertMeetingAppAdapterIntegrationPackageMatrix,
   buildMeetingAppAdapterIntegrationPackage,
   buildMeetingAppAdapterIntegrationPackageMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-integration-package';
@@ -871,7 +873,8 @@ const packageIntegration = buildMeetingAppAdapterIntegrationPackage('google-meet
 assert.equal(packageIntegration.schema, 'meeting_app_adapter_integration_package');
 assert.equal(packageIntegration.realtime_ready, true);
 assert.equal(packageIntegration.entrypoints.adapter_integration_package, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-integration-package');
-assert.equal(buildMeetingAppAdapterIntegrationPackageMatrix({
+assert.equal(assertMeetingAppAdapterIntegrationPackage(packageIntegration).platform, 'google_meet');
+const packageIntegrationMatrix = buildMeetingAppAdapterIntegrationPackageMatrix({
   platforms: ['google-meet'],
   inputs: {
     google_meet: {
@@ -882,7 +885,9 @@ assert.equal(buildMeetingAppAdapterIntegrationPackageMatrix({
       },
     },
   },
-}).schema, 'meeting_app_adapter_integration_package_matrix');
+});
+assert.equal(packageIntegrationMatrix.schema, 'meeting_app_adapter_integration_package_matrix');
+assert.equal(assertMeetingAppAdapterIntegrationPackageMatrix(packageIntegrationMatrix).accepted, true);
 assert.equal(buildMeetingAppRuntimeObserverPlan({
   url: 'https://meet.google.com/abc-defg-hij',
   page: {
