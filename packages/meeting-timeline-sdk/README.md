@@ -624,6 +624,17 @@ console.log(pkg.runtime_delivery.adapter_route, pkg.entrypoints, pkg.integration
 
 `platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。CI 里可以用 `assertMeetingAppAdapterIntegrationPackage()`、`assertMeetingAppAdapterIntegrationPackageMatrix()` 或 kit 上的同名方法做 gate；默认 target 是 `pilot`，如果传 `target: 'production'`，则必须补齐真实会议 evidence package、provider start/end reconcile 和 handoff readiness 之后才会通过。
 
+同一层也可以从 CLI 直接导出，默认覆盖 Google Meet、Teams、Zoom、Webex、Lark：
+
+```sh
+npm run meeting-app:adapter-integration-package -- \
+  --base-url=https://timeline.example.com \
+  --out-dir=data/meeting-app-adapter-integration-packages \
+  --report-file=data/meeting-app-adapter-integration-package-report.json
+```
+
+每个平台目录会包含 `runtime-delivery.json` 和 `integration-package.json`；报告里的 `target_accepted_count` 可用来区分 pilot / realtime / production gate。
+
 如果下游项目要直接启动浏览器扩展、WebView preload 或 native host runtime，用 `platform-runtime-bundle`。它在 `platform-adaptation-package` 基础上再补一层可执行运行时配置：content script manifest、浏览器 URL matches、adapter route、`meeting-app-browser-runtime` preset、`platform-integration-runtime` content-script bridge 安装参数、mutation observer / speaker filter 参数、extension message 示例、host ingest endpoints，以及 `captured_at_ms` 写入契约：
 
 ```js

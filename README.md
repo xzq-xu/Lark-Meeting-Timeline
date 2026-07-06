@@ -119,6 +119,12 @@ npm run meeting-app:adapter-capability
 
 给宿主项目真正接入时，SDK 还提供 `buildMeetingAppAdapterIntegrationPackage()` / `buildMeetingAppAdapterIntegrationPackageMatrix()` 和 `kit.meetingAppAdapterIntegrationPackage()` / `kit.meetingAppAdapterIntegrationPackageMatrix()`。这一层把 handoff package、capability report、execution plan、runtime delivery、SDK entrypoints、验收命令和 evidence contract 合成单个平台或多平台接入包，适合直接交给 Google Meet、Teams、Zoom、Webex、Lark 的宿主工程消费；配套的 `assertMeetingAppAdapterIntegrationPackage()` / `assertMeetingAppAdapterIntegrationPackageMatrix()` 默认检查 pilot 接入，传 `target: 'production'` 才会要求真实会议证据齐全，因此不会把静态可接入误判为正式可上线。
 
+```bash
+npm run meeting-app:adapter-integration-package
+```
+
+它会写出 `data/meeting-app-adapter-integration-packages/` 和 `data/meeting-app-adapter-integration-package-report.json`。每个平台目录都会带 `runtime-delivery.json` 和 `integration-package.json`，下游宿主工程可以直接读取 adapter route、content-script bridge、runtime event endpoint、host endpoints 和 `captured_at_ms` 契约。
+
 如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
 
 ```bash
