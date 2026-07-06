@@ -226,6 +226,12 @@ import type {
   MeetingAppAdapterSpecMatrix,
   MeetingAppAdapterSpecMatrixOptions,
 } from './meeting-app-adapter-spec.mjs';
+import type {
+  MeetingAppAdapterRuntimeConfig,
+  MeetingAppAdapterRuntimeConfigMatrix,
+  MeetingAppAdapterRuntimeConfigMatrixOptions,
+  MeetingAppAdapterRuntimeConfigOptions,
+} from './meeting-app-adapter-runtime-config.mjs';
 import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type {
@@ -428,6 +434,19 @@ export interface MeetingPlatformTimelineKit {
     matrixOrOptions?: MeetingAppAdapterSpecMatrix | MeetingAppAdapterSpecMatrixOptions,
     specOptions?: MeetingAppAdapterSpecMatrixOptions,
   ): MeetingAppAdapterSpecMatrix;
+  meetingAppAdapterRuntimeConfig(
+    specOrPlatform?: MeetingAppAdapterSpec | string | MeetingAppAdapterSpecInput,
+    configOptions?: MeetingAppAdapterRuntimeConfigOptions,
+  ): MeetingAppAdapterRuntimeConfig;
+  meetingAppAdapterRuntimeConfigMatrix(configOptions?: MeetingAppAdapterRuntimeConfigMatrixOptions): MeetingAppAdapterRuntimeConfigMatrix;
+  assertMeetingAppAdapterRuntimeConfig(
+    configOrSpec?: MeetingAppAdapterRuntimeConfig | MeetingAppAdapterSpec | string | MeetingAppAdapterSpecInput,
+    configOptions?: MeetingAppAdapterRuntimeConfigOptions,
+  ): MeetingAppAdapterRuntimeConfig;
+  assertMeetingAppAdapterRuntimeConfigMatrix(
+    matrixOrOptions?: MeetingAppAdapterRuntimeConfigMatrix | MeetingAppAdapterRuntimeConfigMatrixOptions,
+    configOptions?: MeetingAppAdapterRuntimeConfigMatrixOptions,
+  ): MeetingAppAdapterRuntimeConfigMatrix;
   meetingAppTrackPipeline(
     input?: MeetingAppTrackPipelineInput | Record<string, unknown>[],
     trackOptions?: MeetingAppTrackPipelineOptions,

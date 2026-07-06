@@ -33,6 +33,12 @@ import {
   buildMeetingAppAdapterSpecTemplate,
 } from './meeting-app-adapter-spec.mjs';
 import {
+  assertMeetingAppAdapterRuntimeConfig,
+  assertMeetingAppAdapterRuntimeConfigMatrix,
+  buildMeetingAppAdapterRuntimeConfig,
+  buildMeetingAppAdapterRuntimeConfigMatrix,
+} from './meeting-app-adapter-runtime-config.mjs';
+import {
   buildMeetingAppTrackPipeline,
   createMeetingAppTrackPipeline,
 } from './meeting-app-track-pipeline.mjs';
@@ -438,6 +444,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_extension_acceptance: buildMeetingAppExtensionScaffoldAcceptanceReport(options),
     meeting_app_adapter_manifest_matrix: buildMeetingAppAdapterManifestMatrix(options),
     meeting_app_adapter_spec_matrix: buildMeetingAppAdapterSpecMatrix(options),
+    meeting_app_adapter_runtime_config_matrix: buildMeetingAppAdapterRuntimeConfigMatrix(options),
     meeting_app_integration_matrix: buildMeetingAppIntegrationMatrix(options),
     meeting_app_deployment_manifests: buildAllMeetingAppDeploymentManifests(options),
     meeting_app_deployment_manifest_acceptance: buildAllMeetingAppDeploymentManifestAcceptanceReports(options),
@@ -769,6 +776,18 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertMeetingAppAdapterSpecMatrix(matrixOrOptions = {}, specOptions = {}) {
       return assertMeetingAppAdapterSpecMatrix(matrixOrOptions, withDefaults(defaults, specOptions));
+    },
+    meetingAppAdapterRuntimeConfig(specOrPlatform = {}, configOptions = {}) {
+      return buildMeetingAppAdapterRuntimeConfig(specOrPlatform, withDefaults(defaults, configOptions));
+    },
+    meetingAppAdapterRuntimeConfigMatrix(configOptions = {}) {
+      return buildMeetingAppAdapterRuntimeConfigMatrix(withDefaults(defaults, configOptions));
+    },
+    assertMeetingAppAdapterRuntimeConfig(configOrSpec = {}, configOptions = {}) {
+      return assertMeetingAppAdapterRuntimeConfig(configOrSpec, withDefaults(defaults, configOptions));
+    },
+    assertMeetingAppAdapterRuntimeConfigMatrix(matrixOrOptions = {}, configOptions = {}) {
+      return assertMeetingAppAdapterRuntimeConfigMatrix(matrixOrOptions, withDefaults(defaults, configOptions));
     },
     meetingAppTrackPipeline(input = {}, trackOptions = {}) {
       return buildMeetingAppTrackPipeline(input, withDefaults(defaults, trackOptions));

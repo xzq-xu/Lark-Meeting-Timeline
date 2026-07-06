@@ -95,6 +95,8 @@ assert.equal(packedFiles.includes('adapters/meeting-app-adapter-manifest.mjs'), 
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-manifest.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-spec.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-spec.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-adapter-runtime-config.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-adapter-runtime-config.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-profile.mjs'), true);
@@ -339,6 +341,12 @@ import {
   buildMeetingAppAdapterSpecMatrix,
   buildMeetingAppAdapterSpecTemplate,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-spec';
+import {
+  assertMeetingAppAdapterRuntimeConfig,
+  assertMeetingAppAdapterRuntimeConfigMatrix,
+  buildMeetingAppAdapterRuntimeConfig,
+  buildMeetingAppAdapterRuntimeConfigMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-runtime-config';
 import {
   buildMeetingAppFixtureTrackReadinessReport,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixture-tracks';
@@ -817,6 +825,13 @@ assert.equal(assertMeetingAppAdapterSpec('zoom').adapter_key, 'zoom');
 assert.equal(assertMeetingAppAdapterSpecMatrix({ platforms: ['google-meet'] }).spec_count, 1);
 assert.equal(kit.meetingAppAdapterSpec('google-meet').source, 'built_in_manifest');
 assert.equal(kit.meetingAppAdapterSpecMatrix({ platforms: ['google-meet'] }).schema, 'meeting_app_adapter_spec_matrix');
+assert.equal(buildMeetingAppAdapterRuntimeConfig('google-meet').accepted, true);
+assert.equal(buildMeetingAppAdapterRuntimeConfig('google-meet').browser_runtime_options.runtimePreset, false);
+assert.equal(buildMeetingAppAdapterRuntimeConfigMatrix({ platforms: ['google-meet', 'zoom'] }).accepted_count, 2);
+assert.equal(assertMeetingAppAdapterRuntimeConfig('zoom').contracts.timestamp_field, 'captured_at_ms');
+assert.equal(assertMeetingAppAdapterRuntimeConfigMatrix({ platforms: ['google-meet'] }).config_count, 1);
+assert.equal(kit.meetingAppAdapterRuntimeConfig('google-meet').capture_options.participantSelectors.length > 0, true);
+assert.equal(kit.meetingAppAdapterRuntimeConfigMatrix({ platforms: ['google-meet'] }).schema, 'meeting_app_adapter_runtime_config_matrix');
 assert.equal(buildMeetingAppObserverSchedulerConfig('google-meet').schema, 'meeting_app_observer_scheduler_config');
 assert.equal(buildMeetingAppObserverSchedulerConfigMatrix({ platforms: ['google-meet'] }).schema, 'meeting_app_observer_scheduler_config_matrix');
 assert.equal(typeof createMeetingAppObserverScheduler({

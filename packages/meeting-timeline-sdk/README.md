@@ -1014,6 +1014,24 @@ npm run meeting-app:adapter-spec -- --template-adapter-key=slack-huddle --templa
 
 默认输出到 `data/meeting-app-adapter-specs/` 和 `data/meeting-app-adapter-spec-report.json`。报告中的 `custom_count`、`capture_selector_ready_count`、`mutation_observer_ready_count` 可以作为新增会议软件进入真实采样前的静态 gate。
 
+spec 通过后，用 `meeting-app-adapter-runtime-config` 把它转成真正可交给浏览器扩展、WebView preload 或 Electron content script 的 runtime options。这个转换会关闭内置 `runtimePreset`，保留自定义 selector、MutationObserver 参数、`captured_at_ms` 契约和 provider/transcript 非阻塞规则：
+
+```js
+import {
+  buildMeetingAppAdapterRuntimeConfig,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-runtime-config';
+import { installMeetingAppContentScriptBridge } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script';
+
+const runtimeConfig = buildMeetingAppAdapterRuntimeConfig(spec, {
+  windowMessaging: true,
+  allowedOrigins: ['https://whereby.com'],
+});
+
+installMeetingAppContentScriptBridge(timeline, runtimeConfig.content_script_options);
+```
+
+同一份 `runtimeConfig.browser_runtime_options` 也可以直接传给 `createMeetingAppBrowserRuntime()`；`runtimeConfig.capture_options` 可以直接传给 `captureMeetingAppDomSnapshot()` 做手动采样。也就是说，新会议软件的接入路径是 `adapter spec -> runtime config -> live snapshot evidence -> handoff readiness`。
+
 如果宿主不想自己解释 `trigger_policy`，可以直接用 `meeting-app-observer-scheduler`。它消费 observer plan 和现有 runtime，把 DOM mutation、native snapshot change、keep-alive、active speaker follow-up、candidate missing end grace 统一映射为 `runtime.sample()` / `runtime.sampleTracks()` 调用：
 
 ```js
