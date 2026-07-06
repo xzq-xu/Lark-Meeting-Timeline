@@ -345,6 +345,13 @@ export interface MeetingAppTimelineSdk {
   adapterAuthoringPlan: MeetingAppTimelineSdk['platformAdapterAuthoringPlan'];
   platformAdapterAuthoringMatrix(options?: Record<string, unknown>): import('./adapters/platform-adapter-authoring.mjs').MeetingPlatformAdapterAuthoringMatrix;
   adapterAuthoringMatrix: MeetingAppTimelineSdk['platformAdapterAuthoringMatrix'];
+  platformAdapterPortfolioItem(
+    platformOrOptions?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-portfolio.mjs').MeetingPlatformAdapterPortfolioItem;
+  adapterPortfolioItem: MeetingAppTimelineSdk['platformAdapterPortfolioItem'];
+  platformAdapterPortfolio(options?: Record<string, unknown>): import('./adapters/platform-adapter-portfolio.mjs').MeetingPlatformAdapterPortfolio;
+  adapterPortfolio: MeetingAppTimelineSdk['platformAdapterPortfolio'];
   platformRuntimeBundle(
     platformOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
@@ -413,6 +420,7 @@ export * from './adapters/platform-adaptation-package.mjs';
 export * from './adapters/platform-consumer-handoff.mjs';
 export * from './adapters/platform-implementation-handoff.mjs';
 export * from './adapters/platform-adapter-authoring.mjs';
+export * from './adapters/platform-adapter-portfolio.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-strategy.mjs';

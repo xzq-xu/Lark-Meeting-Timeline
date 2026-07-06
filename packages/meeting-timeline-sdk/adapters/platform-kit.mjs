@@ -273,6 +273,10 @@ import {
   buildMeetingPlatformAdapterAuthoringPlan,
 } from './platform-adapter-authoring.mjs';
 import {
+  buildMeetingPlatformAdapterPortfolio,
+  buildMeetingPlatformAdapterPortfolioItem,
+} from './platform-adapter-portfolio.mjs';
+import {
   assertMeetingPlatformAdapterSample,
   assertMeetingPlatformAdapterSampleMatrix,
   buildMeetingPlatformAdapterSamplePlan,
@@ -538,6 +542,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_adapter_contract_matrix: buildMeetingPlatformAdapterContractMatrix(options),
     platform_adapter_contract_acceptance_matrix: buildMeetingPlatformAdapterContractAcceptanceMatrix(options),
     platform_adapter_authoring_matrix: buildMeetingPlatformAdapterAuthoringMatrix(options),
+    platform_adapter_portfolio: buildMeetingPlatformAdapterPortfolio(options),
     platform_field_capture_matrix: buildMeetingPlatformFieldCaptureMatrix(options),
     platform_field_capture_manifest_matrix: buildMeetingPlatformFieldCaptureManifestMatrix(options),
     platform_field_collector_config_matrix: buildMeetingPlatformFieldCollectorConfigMatrix(options),
@@ -688,6 +693,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdapterAuthoringMatrix(authoringOptions = {}) {
       return buildMeetingPlatformAdapterAuthoringMatrix(withDefaults(defaults, authoringOptions));
+    },
+    platformAdapterPortfolioItem(platform, portfolioOptions = {}) {
+      return buildMeetingPlatformAdapterPortfolioItem(platform, withDefaults(defaults, portfolioOptions));
+    },
+    platformAdapterPortfolio(portfolioOptions = {}) {
+      return buildMeetingPlatformAdapterPortfolio(withDefaults(defaults, portfolioOptions));
     },
     platformEvidencePackage(platformOrInput, input = {}, packageOptions = {}) {
       if (platformOrInput && typeof platformOrInput === 'object' && !Array.isArray(platformOrInput)) {

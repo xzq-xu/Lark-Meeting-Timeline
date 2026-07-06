@@ -192,6 +192,11 @@ import type {
   MeetingPlatformAdapterAuthoringPlan,
 } from './platform-adapter-authoring.mjs';
 import type {
+  MeetingPlatformAdapterPortfolio,
+  MeetingPlatformAdapterPortfolioItem,
+  MeetingPlatformAdapterPortfolioOptions,
+} from './platform-adapter-portfolio.mjs';
+import type {
   MeetingPlatformAdapterSample,
   MeetingPlatformAdapterSampleMatrix,
   MeetingPlatformAdapterSampleOptions,
@@ -403,6 +408,8 @@ export interface MeetingPlatformTimelineKit {
   platformImplementationHandoffMatrix(handoffOptions?: MeetingPlatformImplementationHandoffOptions): MeetingPlatformImplementationHandoffMatrix;
   platformAdapterAuthoringPlan(platform: string, authoringOptions?: MeetingPlatformAdapterAuthoringOptions): MeetingPlatformAdapterAuthoringPlan;
   platformAdapterAuthoringMatrix(authoringOptions?: MeetingPlatformAdapterAuthoringOptions): MeetingPlatformAdapterAuthoringMatrix;
+  platformAdapterPortfolioItem(platform: string, portfolioOptions?: MeetingPlatformAdapterPortfolioOptions): MeetingPlatformAdapterPortfolioItem;
+  platformAdapterPortfolio(portfolioOptions?: MeetingPlatformAdapterPortfolioOptions): MeetingPlatformAdapterPortfolio;
   platformEvidencePackage(platformOrInput: string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, packageOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackage;
   platformEvidencePackageSummary(packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, summaryOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageSummary;
   platformEvidencePackageBuilder(platform: string, builderOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageBuilder;

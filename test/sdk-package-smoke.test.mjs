@@ -47,6 +47,8 @@ assert.equal(packedFiles.includes('adapters/platform-implementation-handoff.mjs'
 assert.equal(packedFiles.includes('adapters/platform-implementation-handoff.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-authoring.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-authoring.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-portfolio.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-portfolio.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
@@ -193,6 +195,7 @@ import {
   buildMeetingPlatformAdaptationPackage as buildMeetingPlatformAdaptationPackageFromRoot,
   buildMeetingPlatformAdaptationStrategy as buildMeetingPlatformAdaptationStrategyFromRoot,
   buildMeetingPlatformAdapterAuthoringPlan as buildMeetingPlatformAdapterAuthoringPlanFromRoot,
+  buildMeetingPlatformAdapterPortfolio as buildMeetingPlatformAdapterPortfolioFromRoot,
   buildMeetingPlatformAdapterRoute as buildMeetingPlatformAdapterRouteFromRoot,
   buildMeetingPlatformConsumerHandoff as buildMeetingPlatformConsumerHandoffFromRoot,
   buildMeetingPlatformConnector as buildMeetingPlatformConnectorFromRoot,
@@ -351,6 +354,10 @@ import {
   buildMeetingPlatformAdapterAuthoringMatrix,
   buildMeetingPlatformAdapterAuthoringPlan,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-authoring';
+import {
+  buildMeetingPlatformAdapterPortfolio,
+  buildMeetingPlatformAdapterPortfolioItem,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-portfolio';
 import {
   assertMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
@@ -541,6 +548,8 @@ assert.equal(rootMeetingAppSdk.platformImplementationHandoffMatrix().platform_co
 assert.equal(rootMeetingAppSdk.implementationHandoffMatrix().implementation_ready_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterAuthoringPlan('google-meet').built_in, true);
 assert.equal(rootMeetingAppSdk.adapterAuthoringMatrix({ platforms: ['google-meet', 'Acme Rooms'] }).external_authoring_count, 1);
+assert.equal(rootMeetingAppSdk.platformAdapterPortfolioItem('google-meet').p1_provider_reconcile.path, 'google_workspace_events_pubsub');
+assert.equal(rootMeetingAppSdk.adapterPortfolio({ platforms: ['google-meet', 'Acme Rooms'] }).external_authoring_count, 1);
 assert.equal(rootMeetingAppSdk.platformRuntimeBundle('google-meet').runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
 assert.equal(rootMeetingAppSdk.runtimeBundleMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterRoute('google-meet').platform, 'google_meet');
@@ -832,6 +841,8 @@ assert.equal(kit.platformImplementationHandoff('zoom').provider_reconcile.path, 
 assert.equal(kit.platformImplementationHandoffMatrix({ platforms: ['zoom'] }).implementation_ready_count, 1);
 assert.equal(kit.platformAdapterAuthoringPlan('zoom').provider_reconcile.path, 'zoom_meeting_webhooks');
 assert.equal(kit.platformAdapterAuthoringMatrix({ platforms: ['zoom'] }).built_in_count, 1);
+assert.equal(kit.platformAdapterPortfolioItem('zoom').p1_provider_reconcile.path, 'zoom_meeting_webhooks');
+assert.equal(kit.platformAdapterPortfolio({ platforms: ['zoom'] }).pilot_ready_count, 1);
 assert.equal(kit.platformLiveAdapterHandoff('zoom').sdk.factory, 'createMeetingPlatformLiveAdapter');
 assert.equal(kit.platformLiveAdapterHandoffBundle({
   platforms: ['zoom'],
@@ -1696,6 +1707,17 @@ assert.equal(buildMeetingPlatformAdapterAuthoringMatrix({
 assert.equal(buildMeetingPlatformAdapterAuthoringPlanFromRoot('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).provider_reconcile.path, 'google_workspace_events_pubsub');
+assert.equal(buildMeetingPlatformAdapterPortfolioItem('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).p1_provider_reconcile.official_doc_count, 3);
+assert.equal(buildMeetingPlatformAdapterPortfolio({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet', 'Acme Rooms'],
+}).external_authoring_count, 1);
+assert.equal(buildMeetingPlatformAdapterPortfolioFromRoot({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+}).pilot_ready_count, 1);
 assert.equal(buildMeetingPlatformAdapterContract('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).annotations.endpoints.runtimeEvents, 'http://localhost:8787/api/meeting-platform/runtime-events');
