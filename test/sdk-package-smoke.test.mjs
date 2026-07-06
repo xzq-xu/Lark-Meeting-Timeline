@@ -187,9 +187,11 @@ import {
   buildMeetingAppAdapterIntegrationPackageMatrix as buildMeetingAppAdapterIntegrationPackageMatrixFromRoot,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport as buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot,
   buildMeetingPlatformConnector as buildMeetingPlatformConnectorFromRoot,
+  buildMeetingPlatformConnectorHub as buildMeetingPlatformConnectorHubFromRoot,
   buildMeetingPlatformIntegrationRuntimeManifest as buildMeetingPlatformIntegrationRuntimeManifestFromRoot,
   createMeetingAppTimelineSdk,
   createMeetingAppTimelineConnectorRuntimeClient as createMeetingAppTimelineConnectorRuntimeClientFromRoot,
+  createMeetingPlatformConnectorHub as createMeetingPlatformConnectorHubFromRoot,
   createMeetingPlatformConnectorRuntime as createMeetingPlatformConnectorRuntimeFromRoot,
   createMeetingTimelineClient,
   createMeetingPlatformTimelineKit as createMeetingPlatformTimelineKitFromRoot,
@@ -392,8 +394,11 @@ import {
 import {
   buildMeetingPlatformConnector,
   buildMeetingPlatformConnectorAcceptanceReport,
+  buildMeetingPlatformConnectorHub,
   buildMeetingPlatformConnectorMatrix,
+  createMeetingPlatformConnectorHub,
   createMeetingPlatformConnectorRuntime,
+  resolveMeetingPlatformConnectorInput,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector';
 import {
   assertMeetingAppRuntimeAdapterHandoff,
@@ -513,6 +518,11 @@ assert.equal(rootPlatformConnector.readiness.realtime_annotation_ready, true);
 assert.equal(buildMeetingPlatformConnector('google-meet', { baseUrl: 'http://localhost:8787' }).platform, 'google_meet');
 assert.equal(buildMeetingPlatformConnectorAcceptanceReport(rootPlatformConnector).accepted, true);
 assert.equal(buildMeetingPlatformConnectorMatrix({ platforms: ['google-meet', 'teams'] }).accepted_count, 2);
+assert.equal(buildMeetingPlatformConnectorHubFromRoot({ platforms: ['google-meet', 'teams'] }).schema, 'meeting_platform_connector_hub');
+assert.equal(buildMeetingPlatformConnectorHub({ platforms: ['google-meet', 'teams'] }).accepted, true);
+assert.equal(resolveMeetingPlatformConnectorInput('https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample', {
+  platforms: ['google-meet', 'teams'],
+}).platform, 'microsoft_teams');
 assert.equal(createMeetingPlatformConnectorRuntime(rootPlatformConnector, {
   fetch: async () => new Response(JSON.stringify({ ok: true })),
 }).supports('insert_annotation'), true);
@@ -520,6 +530,14 @@ assert.equal(createMeetingPlatformConnectorRuntimeFromRoot('google-meet', {
   baseUrl: 'http://localhost:8787',
   fetch: async () => new Response(JSON.stringify({ ok: true })),
 }).platform, 'google_meet');
+assert.equal(createMeetingPlatformConnectorHub({
+  baseUrl: 'http://localhost:8787',
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+}).connectorFor({ url: 'https://zoom.us/j/987654321' }).platform, 'zoom');
+assert.equal(createMeetingPlatformConnectorHubFromRoot({
+  baseUrl: 'http://localhost:8787',
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+}).resolvePlatform({ url: 'https://meet.google.com/abc-defg-hij' }).platform, 'google_meet');
 const connectorRuntimeClientFromRoot = createMeetingAppTimelineConnectorRuntimeClientFromRoot(rootConnectorPackage, {
   fetch: async () => new Response(JSON.stringify({ ok: true })),
 });
@@ -538,11 +556,17 @@ assert.equal(kit.platformAdaptationRunbook('zoom').platform, 'zoom');
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_rollout.type, 'meeting_platform_rollout_summary');
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_registry_manifest.platform_count, 1);
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_connector_matrix.platform_count, 1);
+assert.equal(kit.report({ platforms: ['google-meet'] }).platform_connector_hub.schema, 'meeting_platform_connector_hub');
 assert.equal(kit.platformConnector('google-meet').schema, 'meeting_platform_connector');
 assert.equal(kit.platformConnectorMatrix({ platforms: ['google-meet', 'teams'] }).accepted_count, 2);
+assert.equal(kit.platformConnectorHub({ platforms: ['google-meet', 'teams'] }).accepted, true);
+assert.equal(kit.resolvePlatformConnector({ url: 'https://meet.google.com/abc-defg-hij' }).platform, 'google_meet');
 assert.equal(kit.createPlatformConnectorRuntime('google-meet', {
   fetch: async () => new Response(JSON.stringify({ ok: true })),
 }).supports('insert_annotation'), true);
+assert.equal(kit.createPlatformConnectorHub({
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+}).connectorFor({ url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample' }).platform, 'microsoft_teams');
 assert.equal(kit.meetingAppRuntimeAdapterProfile('https://meet.google.com/abc-defg-hij').platform, 'google_meet');
 assert.equal(kit.meetingAppRuntimeAdapterProfileMatrix({ platforms: ['google-meet', 'teams'] }).runtime_ready_count, 2);
 assert.equal(kit.meetingAppAdapterFit({

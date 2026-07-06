@@ -88,6 +88,14 @@ assert.equal(connectorMatrix.accepted_count, 3);
 assert.equal(connectorMatrix.realtime_ready_count, 3);
 assert.equal(connectorMatrix.rows.find((row) => row.platform === 'microsoft_teams').browser_observer_enabled, true);
 assert.equal(kit.report({ platforms: ['google-meet'] }).platform_connector_matrix.platform_count, 1);
+assert.equal(kit.report({ platforms: ['google-meet'] }).platform_connector_hub.accepted, true);
+const connectorHub = kit.platformConnectorHub({ platforms: ['google-meet', 'teams', 'zoom'] });
+assert.equal(connectorHub.schema, 'meeting_platform_connector_hub');
+assert.equal(connectorHub.platform_count, 3);
+assert.equal(connectorHub.accepted, true);
+assert.equal(kit.resolvePlatformConnector({
+  tabs: [{ active: true, url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample' }],
+}).platform, 'microsoft_teams');
 const connectorRuntimeCalls = [];
 const googleConnectorRuntime = kit.createPlatformConnectorRuntime(googleConnector, {
   fetch: async (url, init) => {
@@ -112,6 +120,26 @@ await googleConnectorRuntime.insertAnnotation({
   captured_at_ms: 1_782_614_401_000,
 });
 assert.equal(connectorRuntimeCalls.at(-1).url, `${baseUrl}/api/meeting-platform/runtime-events`);
+assert.equal(connectorRuntimeCalls.at(-1).body.action, 'insert_annotation');
+assert.equal(connectorRuntimeCalls.at(-1).body.platform, 'google_meet');
+const connectorHubRuntime = kit.createPlatformConnectorHub({
+  fetch: async (url, init) => {
+    const body = JSON.parse(init.body);
+    connectorRuntimeCalls.push({ url, body });
+    return new Response(JSON.stringify({ ok: true, accepted: body }), {
+      headers: { 'content-type': 'application/json' },
+    });
+  },
+  now: () => 1_782_614_400_000,
+});
+assert.equal(connectorHubRuntime.connectorFor({ url: 'https://zoom.us/j/987654321' }).platform, 'zoom');
+await connectorHubRuntime.insertAnnotation({
+  url: 'https://meet.google.com/abc-defg-hij',
+}, {
+  id: 'kit-hub-mark-001',
+  label: 'follow-up',
+  captured_at_ms: 1_782_614_401_000,
+});
 assert.equal(connectorRuntimeCalls.at(-1).body.action, 'insert_annotation');
 assert.equal(connectorRuntimeCalls.at(-1).body.platform, 'google_meet');
 assert.equal(kit.platformConsumerHandoff({ platforms: ['google-meet'] }).schema, 'meeting_platform_consumer_handoff');

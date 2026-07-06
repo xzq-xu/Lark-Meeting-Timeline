@@ -15,8 +15,11 @@ import type {
 import type {
   MeetingPlatformConnector,
   MeetingPlatformConnectorAcceptanceReport,
+  MeetingPlatformConnectorHub,
+  MeetingPlatformConnectorHubRuntime,
   MeetingPlatformConnectorMatrix,
   MeetingPlatformConnectorOptions,
+  MeetingPlatformConnectorResolution,
   MeetingPlatformConnectorRuntime,
 } from './meeting-platform-connector.mjs';
 import type { PlatformCaptureOptions, PlatformCaptureRecord } from './platform-capture.mjs';
@@ -620,6 +623,8 @@ export interface MeetingPlatformTimelineKit {
   ): MeetingPlatformRegistryAcceptanceReport;
   platformConnector(platform: string, connectorOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnector;
   platformConnectorMatrix(connectorOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorMatrix;
+  platformConnectorHub(connectorOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorHub;
+  resolvePlatformConnector(input?: unknown, connectorOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorResolution;
   platformConnectorAcceptance(
     connectorOrOptions?: MeetingPlatformConnector | string | MeetingPlatformConnectorOptions,
     connectorOptions?: MeetingPlatformConnectorOptions,
@@ -632,6 +637,7 @@ export interface MeetingPlatformTimelineKit {
     platformOrConnector: string | MeetingPlatformConnector,
     connectorOptions?: MeetingPlatformConnectorOptions,
   ): MeetingPlatformConnectorRuntime;
+  createPlatformConnectorHub(connectorOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorHubRuntime;
   platformAdapterContract(platform: string, contractOptions?: MeetingPlatformAdapterContractOptions): MeetingPlatformAdapterContract;
   platformAdapterContractMatrix(contractOptions?: MeetingPlatformAdapterContractOptions): MeetingPlatformAdapterContractMatrix;
   platformAdapterContractAcceptance(

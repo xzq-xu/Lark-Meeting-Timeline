@@ -88,8 +88,11 @@ import {
   assertMeetingPlatformConnector,
   buildMeetingPlatformConnector,
   buildMeetingPlatformConnectorAcceptanceReport,
+  buildMeetingPlatformConnectorHub,
   buildMeetingPlatformConnectorMatrix,
+  createMeetingPlatformConnectorHub,
   createMeetingPlatformConnectorRuntime,
+  resolveMeetingPlatformConnectorInput,
 } from './meeting-platform-connector.mjs';
 import {
   assertMeetingPlatformConformanceReport,
@@ -458,6 +461,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     supported_meeting_app_platforms: MEETING_APP_FIXTURE_PLATFORMS,
     platform_registry_manifest: buildMeetingPlatformRegistryManifest(options),
     platform_connector_matrix: buildMeetingPlatformConnectorMatrix(options),
+    platform_connector_hub: buildMeetingPlatformConnectorHub(options),
     platform_conformance_report: buildMeetingPlatformConformanceReport(options),
     platform_consumer_handoff: buildMeetingPlatformConsumerHandoff(options),
     capabilities: allPlatformCapabilityContracts(options),
@@ -1347,6 +1351,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     platformConnectorMatrix(connectorOptions = {}) {
       return buildMeetingPlatformConnectorMatrix(withDefaults(defaults, connectorOptions));
     },
+    platformConnectorHub(connectorOptions = {}) {
+      return buildMeetingPlatformConnectorHub(withDefaults(defaults, connectorOptions));
+    },
+    resolvePlatformConnector(input = {}, connectorOptions = {}) {
+      return resolveMeetingPlatformConnectorInput(input, withDefaults(defaults, connectorOptions));
+    },
     platformConnectorAcceptance(connectorOrOptions = {}, connectorOptions = {}) {
       return buildMeetingPlatformConnectorAcceptanceReport(
         connectorOrOptions,
@@ -1364,6 +1374,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
         platformOrConnector,
         withDefaults(defaults, connectorOptions),
       );
+    },
+    createPlatformConnectorHub(connectorOptions = {}) {
+      return createMeetingPlatformConnectorHub(withDefaults(defaults, connectorOptions));
     },
     capability(platform, platformOptions = {}) {
       return platformCapabilityContract(platform, withDefaults(defaults, platformOptions));

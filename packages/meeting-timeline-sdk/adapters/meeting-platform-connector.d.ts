@@ -9,6 +9,8 @@ export const MEETING_PLATFORM_CONNECTOR_SCHEMA: 'meeting_platform_connector';
 export const MEETING_PLATFORM_CONNECTOR_MATRIX_SCHEMA: 'meeting_platform_connector_matrix';
 export const MEETING_PLATFORM_CONNECTOR_ACCEPTANCE_SCHEMA: 'meeting_platform_connector_acceptance';
 export const MEETING_PLATFORM_CONNECTOR_RUNTIME_SCHEMA: 'meeting_platform_connector_runtime';
+export const MEETING_PLATFORM_CONNECTOR_HUB_SCHEMA: 'meeting_platform_connector_hub';
+export const MEETING_PLATFORM_CONNECTOR_RESOLUTION_SCHEMA: 'meeting_platform_connector_resolution';
 export const MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION: 1;
 
 export interface MeetingPlatformConnectorOptions {
@@ -92,6 +94,44 @@ export interface MeetingPlatformConnectorMatrix {
   next_actions: string[];
 }
 
+export interface MeetingPlatformConnectorResolution {
+  type: 'meeting_platform_connector_resolution';
+  schema: typeof MEETING_PLATFORM_CONNECTOR_RESOLUTION_SCHEMA;
+  schema_version: typeof MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION;
+  detected: boolean;
+  supported: boolean;
+  platform?: string;
+  reason?: string;
+  current_platforms: string[];
+  meeting?: Record<string, unknown>;
+  browser?: Record<string, unknown>;
+  candidate_count?: number;
+  next_actions?: string[];
+}
+
+export interface MeetingPlatformConnectorHub {
+  type: 'meeting_platform_connector_hub';
+  schema: typeof MEETING_PLATFORM_CONNECTOR_HUB_SCHEMA;
+  schema_version: typeof MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION;
+  objective: string;
+  accepted: boolean;
+  blocking_count: number;
+  warning_count: number;
+  platform_count: number;
+  accepted_count: number;
+  realtime_ready_count: number;
+  candidate_observer_count: number;
+  platforms: string[];
+  default_platform: string;
+  runtime_event_endpoint?: string;
+  routing: Record<string, unknown>;
+  matrix: MeetingPlatformConnectorMatrix;
+  connectors: MeetingPlatformConnector[];
+  readiness: Record<string, unknown>;
+  issues: Array<Record<string, unknown>>;
+  next_actions: string[];
+}
+
 export interface MeetingPlatformConnectorRuntime {
   type: 'meeting_platform_connector_runtime';
   schema: typeof MEETING_PLATFORM_CONNECTOR_RUNTIME_SCHEMA;
@@ -125,6 +165,42 @@ export interface MeetingPlatformConnectorRuntime {
   runHandoffReadiness(readinessOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
 }
 
+export interface MeetingPlatformConnectorHubRuntime {
+  type: 'meeting_platform_connector_hub_runtime';
+  schema: typeof MEETING_PLATFORM_CONNECTOR_HUB_SCHEMA;
+  schema_version: typeof MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION;
+  hub: MeetingPlatformConnectorHub;
+  matrix: MeetingPlatformConnectorMatrix;
+  platforms: readonly string[];
+  default_platform: string;
+  endpoint?: string;
+  connectors: MeetingPlatformConnector[];
+  resolvePlatform(input?: unknown, resolveOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorResolution;
+  connectorFor(input?: unknown, connectorOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnector;
+  runtimeFor(input?: unknown, runtimeOptions?: MeetingPlatformConnectorOptions): MeetingPlatformConnectorRuntime;
+  supports(input: unknown, action: string): boolean;
+  normalizeProviderEvent(input?: unknown, raw?: unknown, normalizeOptions?: MeetingPlatformConnectorOptions): NormalizedMeetingSignal[];
+  buildEvent(input?: Record<string, unknown>, eventOptions?: MeetingPlatformConnectorOptions): MeetingPlatformRuntimeEvent;
+  send(input?: Record<string, unknown>, sendOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  observeMeetingApp(snapshot?: Record<string, unknown>, observeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  observePlatformCandidates(input?: Record<string, unknown>, observeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  ingestProvider(input?: unknown, payload?: unknown, ingestOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  insertAnnotation(input?: Record<string, unknown>, annotation?: Record<string, unknown>, markOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  insertMark(input?: Record<string, unknown>, annotation?: Record<string, unknown>, markOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  speakerTrack(input?: Record<string, unknown>, track?: Record<string, unknown>, trackOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  participantTrack(input?: Record<string, unknown>, track?: Record<string, unknown>, trackOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  timelineView(input?: Record<string, unknown>, view?: Record<string, unknown>, viewOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  adapterRoute(input?: unknown, routeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  adapterRoutes(routeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  runtimeBundles(bundleOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  registry(registryOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  manifest(manifestOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  readiness(readinessOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  handoffReadiness(readinessOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  runManifest(manifestOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  runHandoffReadiness(readinessOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+}
+
 export function buildMeetingPlatformConnector(
   platformOrOptions?: string | MeetingPlatformConnectorOptions,
   options?: MeetingPlatformConnectorOptions,
@@ -144,11 +220,28 @@ export function buildMeetingPlatformConnectorMatrix(
   options?: MeetingPlatformConnectorOptions,
 ): MeetingPlatformConnectorMatrix;
 
+export function resolveMeetingPlatformConnectorInput(
+  input?: unknown,
+  options?: MeetingPlatformConnectorOptions,
+): MeetingPlatformConnectorResolution;
+
+export function buildMeetingPlatformConnectorHub(
+  options?: MeetingPlatformConnectorOptions,
+): MeetingPlatformConnectorHub;
+
 export function createMeetingPlatformConnectorRuntime(
   platformOrConnector: string | MeetingPlatformConnector,
   options?: MeetingPlatformConnectorOptions,
 ): MeetingPlatformConnectorRuntime;
 
+export function createMeetingPlatformConnectorHub(
+  options?: MeetingPlatformConnectorOptions,
+): MeetingPlatformConnectorHubRuntime;
+
 export function buildDefaultMeetingPlatformConnectorMatrix(
   options?: MeetingPlatformConnectorOptions,
 ): MeetingPlatformConnectorMatrix;
+
+export function buildDefaultMeetingPlatformConnectorHub(
+  options?: MeetingPlatformConnectorOptions,
+): MeetingPlatformConnectorHub;

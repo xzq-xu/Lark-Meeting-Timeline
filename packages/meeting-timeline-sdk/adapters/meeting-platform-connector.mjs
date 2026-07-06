@@ -14,11 +14,14 @@ import {
   MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
+import { detectMeetingFromUrl } from './meeting-url.mjs';
 
 export const MEETING_PLATFORM_CONNECTOR_SCHEMA = 'meeting_platform_connector';
 export const MEETING_PLATFORM_CONNECTOR_MATRIX_SCHEMA = 'meeting_platform_connector_matrix';
 export const MEETING_PLATFORM_CONNECTOR_ACCEPTANCE_SCHEMA = 'meeting_platform_connector_acceptance';
 export const MEETING_PLATFORM_CONNECTOR_RUNTIME_SCHEMA = 'meeting_platform_connector_runtime';
+export const MEETING_PLATFORM_CONNECTOR_HUB_SCHEMA = 'meeting_platform_connector_hub';
+export const MEETING_PLATFORM_CONNECTOR_RESOLUTION_SCHEMA = 'meeting_platform_connector_resolution';
 export const MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION = 1;
 
 const DEFAULT_CONNECTOR_PLATFORMS = Object.freeze([
@@ -51,6 +54,10 @@ function asArray(value) {
   return value == null ? [] : [value];
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
+}
+
 function unique(values = []) {
   return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
 }
@@ -66,6 +73,15 @@ function issue(severity, code, message, details = {}) {
 
 function runtimeActionSet(connector = {}) {
   return new Set(connector.runtime_events?.supported_actions ?? []);
+}
+
+function maybeNormalizePlatform(value) {
+  if (value == null || value === '') return undefined;
+  try {
+    return normalizeMeetingPlatform(value);
+  } catch {
+    return undefined;
+  }
 }
 
 function connectorPlatform(input, options = {}) {
@@ -93,6 +109,183 @@ function connectorFrom(input, options = {}) {
   if (isConnector(input)) return input;
   if (isConnector(options.connector)) return options.connector;
   return buildMeetingPlatformConnector(input, options);
+}
+
+function getPath(raw, path) {
+  const parts = path.split('.');
+  let node = raw;
+  for (const part of parts) node = node?.[part];
+  return node;
+}
+
+function firstPath(raw, paths = []) {
+  return firstNonEmpty(...paths.map((path) => getPath(raw, path)));
+}
+
+function explicitPlatformFrom(input = {}, options = {}) {
+  return maybeNormalizePlatform(firstNonEmpty(
+    options.platform,
+    options.platform_key,
+    options.provider,
+    typeof input === 'string' ? undefined : input?.platform,
+    typeof input === 'string' ? undefined : input?.platform_key,
+    typeof input === 'string' ? undefined : input?.provider,
+    typeof input === 'string' ? undefined : input?.adapter,
+    typeof input === 'string' ? undefined : input?.meeting?.platform,
+    typeof input === 'string' ? undefined : input?.current_meeting?.platform,
+    typeof input === 'string' ? undefined : input?.currentMeeting?.platform,
+    typeof input === 'string' ? undefined : input?.detectedMeeting?.platform,
+    typeof input === 'string' ? undefined : input?.detected_meeting?.platform,
+    typeof input === 'string' ? undefined : input?.snapshot?.platform,
+  ));
+}
+
+function scoreCandidate(candidate = {}, index = 0) {
+  const active = candidate.active === true || candidate.current === true || candidate.selected === true ? 100 : 0;
+  const inMeeting = candidate.in_meeting === true || candidate.inMeeting === true || candidate.meeting?.in_meeting === true ? 40 : 0;
+  const audible = candidate.audible === true || candidate.has_audio === true || candidate.hasAudio === true ? 10 : 0;
+  return active + inMeeting + audible - index;
+}
+
+function compactCandidate(value = {}) {
+  if (typeof value === 'string' || value instanceof URL) return { url: String(value) };
+  if (!isPlainObject(value)) return {};
+  return compactObject({
+    platform: firstPath(value, ['platform', 'provider', 'adapter', 'meeting.platform']),
+    url: firstPath(value, [
+      'meeting.meeting_url',
+      'meeting.meetingUrl',
+      'meeting.url',
+      'meeting.join_url',
+      'meeting.joinUrl',
+      'meeting_url',
+      'meetingUrl',
+      'join_url',
+      'joinUrl',
+      'url',
+      'href',
+      'window.url',
+      'browser.url',
+      'tab.url',
+    ]),
+    title: firstPath(value, [
+      'meeting.title',
+      'meeting.topic',
+      'meeting.name',
+      'title',
+      'topic',
+      'name',
+      'window.title',
+      'browser.title',
+      'tab.title',
+    ]),
+    active: firstPath(value, ['active', 'current', 'selected', 'tab.active', 'window.active']),
+    audible: firstPath(value, ['audible', 'has_audio', 'hasAudio', 'tab.audible']),
+    in_meeting: firstPath(value, ['in_meeting', 'inMeeting', 'meeting.in_meeting', 'meeting.inMeeting']),
+  });
+}
+
+function routeCandidates(input = {}, options = {}) {
+  const candidates = [];
+  const push = (value) => {
+    const candidate = compactCandidate(value);
+    if (candidate.url || candidate.platform || candidate.title) candidates.push(candidate);
+  };
+  push(input);
+  push(options);
+  if (isPlainObject(input)) {
+    push(input.tab);
+    push(input.window);
+    push(input.browser);
+    push(input.meeting);
+    push(input.current_meeting);
+    push(input.currentMeeting);
+    for (const tab of asArray(input.tabs)) push(tab);
+    for (const window of asArray(input.windows)) {
+      push(window);
+      for (const tab of asArray(window?.tabs)) push({
+        ...tab,
+        window: compactCandidate(window),
+      });
+    }
+  }
+  return candidates
+    .map((candidate, index) => ({ ...candidate, score: scoreCandidate(candidate, index) }))
+    .sort((left, right) => right.score - left.score);
+}
+
+function supportedPlatformSet(options = {}) {
+  return new Set(selectedPlatforms(options));
+}
+
+export function resolveMeetingPlatformConnectorInput(input = {}, options = {}) {
+  const supportedPlatforms = supportedPlatformSet(options);
+  const explicitPlatform = explicitPlatformFrom(input, options);
+  if (explicitPlatform) {
+    return compactObject({
+      type: 'meeting_platform_connector_resolution',
+      schema: MEETING_PLATFORM_CONNECTOR_RESOLUTION_SCHEMA,
+      schema_version: MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION,
+      detected: true,
+      supported: supportedPlatforms.has(explicitPlatform),
+      platform: explicitPlatform,
+      reason: 'explicit_platform',
+      current_platforms: [...supportedPlatforms],
+    });
+  }
+
+  if (typeof input === 'string') {
+    const stringPlatform = maybeNormalizePlatform(input);
+    if (stringPlatform) {
+      return compactObject({
+        type: 'meeting_platform_connector_resolution',
+        schema: MEETING_PLATFORM_CONNECTOR_RESOLUTION_SCHEMA,
+        schema_version: MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION,
+        detected: true,
+        supported: supportedPlatforms.has(stringPlatform),
+        platform: stringPlatform,
+        reason: 'platform_string',
+        current_platforms: [...supportedPlatforms],
+      });
+    }
+  }
+
+  const candidates = routeCandidates(input, options);
+  for (const candidate of candidates) {
+    const detectedMeeting = detectMeetingFromUrl(candidate);
+    const platform = maybeNormalizePlatform(detectedMeeting?.platform);
+    if (!platform) continue;
+    return compactObject({
+      type: 'meeting_platform_connector_resolution',
+      schema: MEETING_PLATFORM_CONNECTOR_RESOLUTION_SCHEMA,
+      schema_version: MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION,
+      detected: true,
+      supported: supportedPlatforms.has(platform),
+      platform,
+      reason: 'meeting_url',
+      current_platforms: [...supportedPlatforms],
+      meeting: detectedMeeting,
+      browser: {
+        url: candidate.url,
+        title: candidate.title,
+        active: candidate.active,
+        audible: candidate.audible,
+        in_meeting: candidate.in_meeting,
+      },
+      candidate_count: candidates.length,
+    });
+  }
+
+  return compactObject({
+    type: 'meeting_platform_connector_resolution',
+    schema: MEETING_PLATFORM_CONNECTOR_RESOLUTION_SCHEMA,
+    schema_version: MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION,
+    detected: false,
+    supported: false,
+    current_platforms: [...supportedPlatforms],
+    candidate_count: candidates.length,
+    next_actions: ['pass_explicit_platform_or_supported_meeting_url'],
+  });
 }
 
 function runtimeEventEndpoint(entry = {}, options = {}) {
@@ -379,6 +572,101 @@ export function buildMeetingPlatformConnectorMatrix(options = {}) {
   };
 }
 
+function connectorsByPlatform(connectors = []) {
+  return new Map(asArray(connectors).map((connector) => [connector.platform, connector]));
+}
+
+function connectorHubIssues(hub = {}) {
+  const issues = [];
+  if (hub.matrix?.accepted_count !== hub.matrix?.platform_count) {
+    issues.push(issue('error', 'connector_matrix_not_accepted', 'Every selected platform connector must pass acceptance.', {
+      accepted_count: hub.matrix?.accepted_count,
+      platform_count: hub.matrix?.platform_count,
+    }));
+  }
+  if (hub.matrix?.realtime_ready_count !== hub.matrix?.platform_count) {
+    issues.push(issue('error', 'realtime_connector_not_ready', 'Every selected platform connector must be ready for realtime annotation insertion.', {
+      realtime_ready_count: hub.matrix?.realtime_ready_count,
+      platform_count: hub.matrix?.platform_count,
+    }));
+  }
+  if (hub.matrix?.candidate_observer_count !== hub.matrix?.platform_count) {
+    issues.push(issue('error', 'candidate_observer_not_ready', 'Every selected platform connector must expose candidate observation.', {
+      candidate_observer_count: hub.matrix?.candidate_observer_count,
+      platform_count: hub.matrix?.platform_count,
+    }));
+  }
+  return issues;
+}
+
+export function buildMeetingPlatformConnectorHub(options = {}) {
+  const matrix = buildMeetingPlatformConnectorMatrix(options);
+  const defaultPlatform = firstNonEmpty(options.defaultPlatform, options.default_platform, matrix.platforms[0]);
+  const hub = compactObject({
+    type: 'meeting_platform_connector_hub',
+    schema: MEETING_PLATFORM_CONNECTOR_HUB_SCHEMA,
+    schema_version: MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION,
+    objective: 'multi_platform_connector_router_for_realtime_meeting_timeline_annotations',
+    platform_count: matrix.platform_count,
+    accepted_count: matrix.accepted_count,
+    realtime_ready_count: matrix.realtime_ready_count,
+    candidate_observer_count: matrix.candidate_observer_count,
+    platforms: matrix.platforms,
+    default_platform: maybeNormalizePlatform(defaultPlatform) ?? matrix.platforms[0],
+    runtime_event_endpoint: firstNonEmpty(
+      options.endpoint,
+      options.runtimeEventEndpoint,
+      options.runtime_event_endpoint,
+      matrix.connectors[0]?.runtime_events?.endpoint,
+    ),
+    routing: {
+      input_priority: [
+        'explicit platform/provider',
+        'meeting URL on input',
+        'active tab URL',
+        'active window tab URL',
+      ],
+      supported_input_fields: [
+        'platform',
+        'provider',
+        'meeting.platform',
+        'url',
+        'meeting_url',
+        'tab.url',
+        'tabs[].url',
+        'windows[].tabs[].url',
+      ],
+      url_detection_ready: true,
+      detected_platforms: ['google_meet', 'microsoft_teams', 'zoom', 'webex', 'lark']
+        .filter((platform) => matrix.platforms.includes(platform)),
+      browser_observer_required_permission: 'tabs',
+    },
+    matrix,
+    connectors: matrix.connectors,
+    readiness: {
+      accepted: matrix.accepted_count === matrix.platform_count,
+      realtime_annotation_ready: matrix.realtime_ready_count === matrix.platform_count,
+      candidate_observation_ready: matrix.candidate_observer_count === matrix.platform_count,
+      provider_required_for_realtime: false,
+      transcript_blocks_realtime: false,
+    },
+    next_actions: unique([
+      'create_connector_hub_in_host_project',
+      'route_insert_annotation_by_current_meeting_url_or_platform',
+      'wire_observe_platform_candidates_for_browser_tabs',
+      ...matrix.next_actions,
+    ]),
+  });
+  const issues = connectorHubIssues(hub);
+  return {
+    ...hub,
+    accepted: issues.filter((item) => item.severity === 'error').length === 0,
+    blocking_count: issues.filter((item) => item.severity === 'error').length,
+    warning_count: issues.filter((item) => item.severity !== 'error').length,
+    issues,
+  };
+}
+
 function runtimeEndpointFrom(connector = {}, options = {}) {
   return firstNonEmpty(
     options.endpoint,
@@ -550,8 +838,168 @@ export function createMeetingPlatformConnectorRuntime(platformOrConnector, optio
   };
 }
 
+function runtimeOptionsWithoutRoute(options = {}) {
+  const {
+    platform,
+    platform_key: platformKey,
+    provider,
+    adapter,
+    connector,
+    ...rest
+  } = options;
+  void platform;
+  void platformKey;
+  void provider;
+  void adapter;
+  void connector;
+  return rest;
+}
+
+export function createMeetingPlatformConnectorHub(options = {}) {
+  const hub = buildMeetingPlatformConnectorHub(options);
+  const connectorMap = connectorsByPlatform(hub.connectors);
+  const runtimeCache = new Map();
+
+  function resolutionFor(input = {}, resolveOptions = {}) {
+    return resolveMeetingPlatformConnectorInput(input, {
+      ...options,
+      ...resolveOptions,
+      platforms: hub.platforms,
+      platform_keys: undefined,
+    });
+  }
+
+  function connectorFor(input = {}, connectorOptions = {}) {
+    if (isConnector(input)) return input;
+    const platform = maybeNormalizePlatform(typeof input === 'string' ? input : undefined)
+      ?? resolutionFor(input, connectorOptions).platform
+      ?? maybeNormalizePlatform(connectorOptions.platform);
+    if (!platform) {
+      throw new MeetingTimelineSdkError('Unable to resolve meeting platform connector', {
+        input,
+        resolution: resolutionFor(input, connectorOptions),
+      });
+    }
+    const connector = connectorMap.get(platform);
+    if (!connector) {
+      throw new MeetingTimelineSdkError('Meeting platform connector is not enabled in hub', {
+        platform,
+        platforms: hub.platforms,
+      });
+    }
+    return connector;
+  }
+
+  function runtimeFor(input = {}, runtimeOptions = {}) {
+    const connector = connectorFor(input, runtimeOptions);
+    const cacheable = Object.keys(runtimeOptions).length === 0;
+    if (cacheable && runtimeCache.has(connector.platform)) return runtimeCache.get(connector.platform);
+    const runtime = createMeetingPlatformConnectorRuntime(connector, {
+      ...runtimeOptionsWithoutRoute(options),
+      ...runtimeOptionsWithoutRoute(runtimeOptions),
+    });
+    if (cacheable) runtimeCache.set(connector.platform, runtime);
+    return runtime;
+  }
+
+  function defaultRuntime(runtimeOptions = {}) {
+    return runtimeFor(hub.default_platform, runtimeOptions);
+  }
+
+  return {
+    type: 'meeting_platform_connector_hub_runtime',
+    schema: MEETING_PLATFORM_CONNECTOR_HUB_SCHEMA,
+    schema_version: MEETING_PLATFORM_CONNECTOR_SCHEMA_VERSION,
+    hub,
+    matrix: hub.matrix,
+    platforms: hub.platforms,
+    default_platform: hub.default_platform,
+    endpoint: hub.runtime_event_endpoint,
+    connectors: hub.connectors,
+    resolvePlatform: resolutionFor,
+    connectorFor,
+    runtimeFor,
+    supports(input = {}, action) {
+      const connector = connectorFor(input);
+      return runtimeActionSet(connector).has(normalizeMeetingPlatformRuntimeEventAction(action));
+    },
+    normalizeProviderEvent(input = {}, raw = {}, normalizeOptions = {}) {
+      return runtimeFor(input, normalizeOptions).normalizeProviderEvent(raw, normalizeOptions);
+    },
+    buildEvent(input = {}, eventOptions = {}) {
+      return runtimeFor(input, eventOptions).buildEvent(input, eventOptions);
+    },
+    send(input = {}, sendOptions = {}) {
+      return runtimeFor(input, sendOptions).send(input, sendOptions);
+    },
+    observeMeetingApp(snapshot = {}, observeOptions = {}) {
+      return runtimeFor(snapshot, observeOptions).observeMeetingApp(snapshot, observeOptions);
+    },
+    observePlatformCandidates(input = {}, observeOptions = {}) {
+      return defaultRuntime(observeOptions).observePlatformCandidates(input, observeOptions);
+    },
+    ingestProvider(input = {}, payload = undefined, ingestOptions = {}) {
+      const providerPayload = payload === undefined ? input : payload;
+      return runtimeFor(input, ingestOptions).ingestProvider(providerPayload, ingestOptions);
+    },
+    insertAnnotation(input = {}, annotation = undefined, markOptions = {}) {
+      const annotationInput = annotation === undefined ? input : annotation;
+      return runtimeFor(input, markOptions).insertAnnotation(annotationInput, markOptions);
+    },
+    insertMark(input = {}, annotation = undefined, markOptions = {}) {
+      return this.insertAnnotation(input, annotation, markOptions);
+    },
+    speakerTrack(input = {}, track = undefined, trackOptions = {}) {
+      const trackInput = track === undefined ? input : track;
+      return runtimeFor(input, trackOptions).speakerTrack(trackInput, trackOptions);
+    },
+    participantTrack(input = {}, track = undefined, trackOptions = {}) {
+      const trackInput = track === undefined ? input : track;
+      return runtimeFor(input, trackOptions).participantTrack(trackInput, trackOptions);
+    },
+    timelineView(input = {}, view = undefined, viewOptions = {}) {
+      const viewInput = view === undefined ? input : view;
+      return runtimeFor(input, viewOptions).timelineView(viewInput, viewOptions);
+    },
+    adapterRoute(input = {}, routeOptions = {}) {
+      return runtimeFor(input, routeOptions).adapterRoute(routeOptions);
+    },
+    adapterRoutes(routeOptions = {}) {
+      return defaultRuntime(routeOptions).adapterRoutes(routeOptions);
+    },
+    runtimeBundles(bundleOptions = {}) {
+      return defaultRuntime(bundleOptions).runtimeBundles(bundleOptions);
+    },
+    registry(registryOptions = {}) {
+      return defaultRuntime(registryOptions).registry(registryOptions);
+    },
+    manifest(manifestOptions = {}) {
+      return defaultRuntime(manifestOptions).manifest(manifestOptions);
+    },
+    readiness(readinessOptions = {}) {
+      return defaultRuntime(readinessOptions).readiness(readinessOptions);
+    },
+    handoffReadiness(readinessOptions = {}) {
+      return defaultRuntime(readinessOptions).handoffReadiness(readinessOptions);
+    },
+    runManifest(manifestOptions = {}) {
+      return defaultRuntime(manifestOptions).runManifest(manifestOptions);
+    },
+    runHandoffReadiness(readinessOptions = {}) {
+      return defaultRuntime(readinessOptions).runHandoffReadiness(readinessOptions);
+    },
+  };
+}
+
 export function buildDefaultMeetingPlatformConnectorMatrix(options = {}) {
   return buildMeetingPlatformConnectorMatrix({
+    platforms: MEETING_PLATFORM_KEYS.filter((platform) => platform !== 'local_detector'),
+    ...options,
+  });
+}
+
+export function buildDefaultMeetingPlatformConnectorHub(options = {}) {
+  return buildMeetingPlatformConnectorHub({
     platforms: MEETING_PLATFORM_KEYS.filter((platform) => platform !== 'local_detector'),
     ...options,
   });

@@ -2,17 +2,24 @@ import assert from 'node:assert/strict';
 
 import {
   MEETING_PLATFORM_CONNECTOR_ACCEPTANCE_SCHEMA,
+  MEETING_PLATFORM_CONNECTOR_HUB_SCHEMA,
   MEETING_PLATFORM_CONNECTOR_MATRIX_SCHEMA,
+  MEETING_PLATFORM_CONNECTOR_RESOLUTION_SCHEMA,
   MEETING_PLATFORM_CONNECTOR_RUNTIME_SCHEMA,
   MEETING_PLATFORM_CONNECTOR_SCHEMA,
   assertMeetingPlatformConnector,
+  buildDefaultMeetingPlatformConnectorHub,
   buildDefaultMeetingPlatformConnectorMatrix,
   buildMeetingPlatformConnector,
   buildMeetingPlatformConnectorAcceptanceReport,
+  buildMeetingPlatformConnectorHub,
   buildMeetingPlatformConnectorMatrix,
+  createMeetingPlatformConnectorHub,
   createMeetingPlatformConnectorRuntime,
+  resolveMeetingPlatformConnectorInput,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-platform-connector.mjs';
 import {
+  createMeetingPlatformConnectorHub as createMeetingPlatformConnectorHubFromRoot,
   createMeetingPlatformConnectorRuntime as createMeetingPlatformConnectorRuntimeFromRoot,
 } from '../packages/meeting-timeline-sdk/index.mjs';
 
@@ -64,6 +71,42 @@ assert.equal(matrix.registry_manifest.platform_count, 5);
 const defaultMatrix = buildDefaultMeetingPlatformConnectorMatrix({ baseUrl });
 assert.equal(defaultMatrix.platforms.includes('local_detector'), false);
 assert.equal(defaultMatrix.platforms.includes('google_meet'), true);
+
+const hub = buildMeetingPlatformConnectorHub({
+  baseUrl,
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+assert.equal(hub.schema, MEETING_PLATFORM_CONNECTOR_HUB_SCHEMA);
+assert.equal(hub.accepted, true);
+assert.equal(hub.platform_count, 5);
+assert.equal(hub.default_platform, 'google_meet');
+assert.equal(hub.routing.url_detection_ready, true);
+assert.equal(hub.routing.detected_platforms.includes('microsoft_teams'), true);
+assert.equal(hub.matrix.accepted_count, 5);
+
+const defaultHub = buildDefaultMeetingPlatformConnectorHub({ baseUrl });
+assert.equal(defaultHub.platforms.includes('local_detector'), false);
+assert.equal(defaultHub.accepted, true);
+
+const googleResolution = resolveMeetingPlatformConnectorInput('https://meet.google.com/abc-defg-hij', {
+  platforms: ['google-meet', 'teams'],
+});
+assert.equal(googleResolution.schema, MEETING_PLATFORM_CONNECTOR_RESOLUTION_SCHEMA);
+assert.equal(googleResolution.detected, true);
+assert.equal(googleResolution.supported, true);
+assert.equal(googleResolution.platform, 'google_meet');
+assert.equal(googleResolution.reason, 'meeting_url');
+
+const teamsResolution = resolveMeetingPlatformConnectorInput({
+  tabs: [
+    { active: false, url: 'https://example.com/' },
+    { active: true, url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample', title: 'Teams meeting' },
+  ],
+}, {
+  platforms: ['google-meet', 'teams'],
+});
+assert.equal(teamsResolution.platform, 'microsoft_teams');
+assert.equal(teamsResolution.browser.active, true);
 
 const broken = {
   ...google,
@@ -172,6 +215,59 @@ await runtime.speakerTrack({
 });
 assert.equal(calls.at(-1).body.action, 'speaker_track');
 assert.equal(calls.at(-1).body.platform, 'google_meet');
+
+const hubRuntime = createMeetingPlatformConnectorHub({
+  baseUrl,
+  fetch: fetchImpl,
+  now: () => 1_782_614_400_000,
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+assert.equal(hubRuntime.schema, MEETING_PLATFORM_CONNECTOR_HUB_SCHEMA);
+assert.equal(hubRuntime.platforms.length, 5);
+assert.equal(hubRuntime.resolvePlatform({ url: 'https://zoom.us/j/987654321' }).platform, 'zoom');
+assert.equal(hubRuntime.connectorFor({ url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample' }).platform, 'microsoft_teams');
+assert.equal(hubRuntime.runtimeFor({ url: 'https://meet.google.com/abc-defg-hij' }).platform, 'google_meet');
+assert.equal(hubRuntime.supports({ url: 'https://meet.google.com/abc-defg-hij' }, 'insert_annotation'), true);
+
+await hubRuntime.insertAnnotation({
+  url: 'https://meet.google.com/abc-defg-hij',
+  title: 'Weekly review',
+}, {
+  id: 'hub-mark-001',
+  label: 'why?',
+  captured_at_ms: 1_782_614_420_000,
+});
+assert.equal(calls.at(-1).body.action, 'insert_annotation');
+assert.equal(calls.at(-1).body.platform, 'google_meet');
+assert.equal(calls.at(-1).body.annotation.id, 'hub-mark-001');
+
+await hubRuntime.observeMeetingApp({
+  url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+  title: 'Teams meeting',
+  in_meeting: true,
+});
+assert.equal(calls.at(-1).body.action, 'observe_meeting_app');
+assert.equal(calls.at(-1).body.platform, 'microsoft_teams');
+
+await hubRuntime.observePlatformCandidates({
+  tabs: [{ active: true, url: 'https://meet.google.com/abc-defg-hij', title: 'Weekly review' }],
+});
+assert.equal(calls.at(-1).body.action, 'observe_platform_candidates');
+assert.equal(calls.at(-1).body.platform, undefined);
+
+const hubSignals = hubRuntime.normalizeProviderEvent('google-meet', {
+  id: 'hub-google-event-001',
+  type: 'google.workspace.meet.conference.v2.started',
+  data: { conferenceRecord: { name: 'conferenceRecords/hub-google-record-001' } },
+});
+assert.equal(hubSignals[0].type, 'meeting_started');
+assert.equal(hubSignals[0].meeting.platform, 'google_meet');
+
+const rootHubRuntime = createMeetingPlatformConnectorHubFromRoot({
+  baseUrl,
+  fetch: fetchImpl,
+});
+assert.equal(rootHubRuntime.connectorFor('google-meet').platform, 'google_meet');
 
 const rootRuntime = createMeetingPlatformConnectorRuntimeFromRoot('teams', {
   baseUrl,
