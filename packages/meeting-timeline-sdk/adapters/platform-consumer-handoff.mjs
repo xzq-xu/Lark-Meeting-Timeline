@@ -1,6 +1,5 @@
 import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
 import {
-  MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
 import {
@@ -19,7 +18,13 @@ import {
 export const MEETING_PLATFORM_CONSUMER_HANDOFF_SCHEMA = 'meeting_platform_consumer_handoff';
 export const MEETING_PLATFORM_CONSUMER_HANDOFF_SCHEMA_VERSION = 1;
 
-const DEFAULT_CONSUMER_PLATFORMS = Object.freeze(MEETING_PLATFORM_KEYS.filter((platform) => platform !== 'local_detector'));
+const DEFAULT_CONSUMER_PLATFORMS = Object.freeze([
+  'lark',
+  'google_meet',
+  'microsoft_teams',
+  'zoom',
+  'webex',
+]);
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');

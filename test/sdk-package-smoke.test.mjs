@@ -159,8 +159,13 @@ assert.equal(binReport.runtime_ready_count, 1);
 await writeFile(join(consumerDir, 'smoke.mjs'), `
 import assert from 'node:assert/strict';
 import {
+  MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA as ROOT_MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
   SDK_VERSION,
+  buildMeetingAppAdapterIntegrationPackageMatrix as buildMeetingAppAdapterIntegrationPackageMatrixFromRoot,
+  buildMeetingPlatformIntegrationRuntimeManifest as buildMeetingPlatformIntegrationRuntimeManifestFromRoot,
   createMeetingTimelineClient,
+  createMeetingPlatformTimelineKit as createMeetingPlatformTimelineKitFromRoot,
+  detectMeetingPlatformForBrowser as detectMeetingPlatformForBrowserFromRoot,
 } from '@ai-annotation/meeting-timeline-sdk';
 import {
   createMeetingPlatformTimelineKit,
@@ -434,6 +439,21 @@ const client = createMeetingTimelineClient({
   }),
 });
 assert.equal(typeof client.startMeeting, 'function');
+assert.equal(ROOT_MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA, 'meeting_platform_runtime_event');
+assert.equal(createMeetingPlatformTimelineKitFromRoot(client, {
+  baseUrl: 'http://localhost:8787',
+  verify: false,
+}).platformRegistryManifest({ platforms: ['google-meet'] }).platform_count, 1);
+assert.equal(detectMeetingPlatformForBrowserFromRoot({
+  url: 'https://meet.google.com/abc-defg-hij',
+}).platform, 'google_meet');
+assert.equal(buildMeetingPlatformIntegrationRuntimeManifestFromRoot({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+}).platform_count, 1);
+assert.equal(buildMeetingAppAdapterIntegrationPackageMatrixFromRoot({
+  platforms: ['google-meet'],
+}).platform_count, 1);
 
 const kit = createMeetingPlatformTimelineKit(client, {
   baseUrl: 'http://localhost:8787',

@@ -1,6 +1,5 @@
 import { compactObject } from '../index.mjs';
 import {
-  MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
 import {
@@ -37,7 +36,13 @@ export const MEETING_PLATFORM_RUNTIME_BUNDLE_SCHEMA = 'meeting_platform_runtime_
 export const MEETING_PLATFORM_RUNTIME_BUNDLE_MATRIX_SCHEMA = 'meeting_platform_runtime_bundle_matrix';
 export const MEETING_PLATFORM_RUNTIME_BUNDLE_SCHEMA_VERSION = 1;
 
-const DEFAULT_RUNTIME_BUNDLE_PLATFORMS = MEETING_PLATFORM_KEYS.filter((platform) => platform !== 'local_detector');
+const DEFAULT_RUNTIME_BUNDLE_PLATFORMS = Object.freeze([
+  'lark',
+  'google_meet',
+  'microsoft_teams',
+  'zoom',
+  'webex',
+]);
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');

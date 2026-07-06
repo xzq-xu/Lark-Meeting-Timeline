@@ -8,7 +8,6 @@ import {
 } from './meeting-app-capture.mjs';
 import {
   MEETING_APP_EXTENSION_MESSAGE_TYPES,
-  MEETING_APP_EXTENSION_PLATFORM_KEYS,
   MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS,
   buildMeetingAppContentScriptManifest,
   buildMeetingAppExtensionInstallPlan,
@@ -28,7 +27,13 @@ export const MEETING_APP_ADAPTER_MANIFEST_SCHEMA = 'meeting_app_adapter_manifest
 export const MEETING_APP_ADAPTER_MANIFEST_MATRIX_SCHEMA = 'meeting_app_adapter_manifest_matrix';
 export const MEETING_APP_ADAPTER_MANIFEST_SCHEMA_VERSION = 1;
 
-const DEFAULT_APP_ADAPTER_PLATFORMS = Object.freeze([...MEETING_APP_EXTENSION_PLATFORM_KEYS]);
+const DEFAULT_APP_ADAPTER_PLATFORMS = Object.freeze([
+  'google_meet',
+  'microsoft_teams',
+  'zoom',
+  'lark',
+  'webex',
+]);
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');

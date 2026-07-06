@@ -8,7 +8,6 @@ import {
   buildMeetingAppAdapterVerificationReport,
 } from './meeting-app-adapter-handoff-package.mjs';
 import {
-  MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
   platformCapabilityContract,
 } from './platform-setup.mjs';
@@ -18,6 +17,14 @@ export const MEETING_APP_ADAPTER_CAPABILITY_MATRIX_SCHEMA = 'meeting_app_adapter
 export const MEETING_APP_ADAPTER_EXECUTION_PLAN_SCHEMA = 'meeting_app_adapter_execution_plan';
 export const MEETING_APP_ADAPTER_EXECUTION_PLAN_MATRIX_SCHEMA = 'meeting_app_adapter_execution_plan_matrix';
 export const MEETING_APP_ADAPTER_CAPABILITY_SCHEMA_VERSION = 1;
+
+const DEFAULT_MEETING_APP_ADAPTER_PLATFORMS = Object.freeze([
+  'lark',
+  'google_meet',
+  'microsoft_teams',
+  'zoom',
+  'webex',
+]);
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -452,7 +459,7 @@ export function buildMeetingAppAdapterCapabilityMatrix(options = {}) {
     options.platforms,
     options.platform_keys,
     options.platformKeys,
-    MEETING_PLATFORM_KEYS.filter((platform) => platform !== 'local_detector'),
+    DEFAULT_MEETING_APP_ADAPTER_PLATFORMS,
   )).map((platform) => normalizeMeetingPlatform(platform)));
   const reports = platforms.map((platform) => buildMeetingAppAdapterCapabilityReport(platform, options));
   const fitMatrix = buildMeetingAppAdapterFitMatrix({

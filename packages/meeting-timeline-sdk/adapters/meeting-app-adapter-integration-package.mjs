@@ -8,7 +8,6 @@ import {
   buildMeetingAppAdapterHandoffPackage,
 } from './meeting-app-adapter-handoff-package.mjs';
 import {
-  MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
 import {
@@ -18,6 +17,14 @@ import {
 export const MEETING_APP_ADAPTER_INTEGRATION_PACKAGE_SCHEMA = 'meeting_app_adapter_integration_package';
 export const MEETING_APP_ADAPTER_INTEGRATION_PACKAGE_MATRIX_SCHEMA = 'meeting_app_adapter_integration_package_matrix';
 export const MEETING_APP_ADAPTER_INTEGRATION_PACKAGE_SCHEMA_VERSION = 1;
+
+const DEFAULT_MEETING_APP_ADAPTER_PLATFORMS = Object.freeze([
+  'lark',
+  'google_meet',
+  'microsoft_teams',
+  'zoom',
+  'webex',
+]);
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -50,7 +57,7 @@ function selectedPlatforms(options = {}) {
     options.platforms,
     options.platform_keys,
     options.platformKeys,
-    MEETING_PLATFORM_KEYS.filter((platform) => platform !== 'local_detector'),
+    DEFAULT_MEETING_APP_ADAPTER_PLATFORMS,
   )).map((platform) => normalizeMeetingPlatform(platform)));
 }
 

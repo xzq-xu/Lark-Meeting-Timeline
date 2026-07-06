@@ -14,7 +14,6 @@ import {
   buildMeetingPlatformRuntimeBundleMatrix,
 } from './platform-runtime-bundle.mjs';
 import {
-  MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
 
@@ -25,7 +24,13 @@ export const MEETING_PLATFORM_RUNTIME_HOST_HANDOFF_MATRIX_SCHEMA = 'meeting_plat
 export const MEETING_PLATFORM_RUNTIME_HOST_STATE_SCHEMA = 'meeting_platform_runtime_host_state';
 export const MEETING_PLATFORM_RUNTIME_HOST_SCHEMA_VERSION = 1;
 
-const DEFAULT_RUNTIME_HOST_PLATFORMS = MEETING_PLATFORM_KEYS.filter((platform) => platform !== 'local_detector');
+const DEFAULT_RUNTIME_HOST_PLATFORMS = Object.freeze([
+  'lark',
+  'google_meet',
+  'microsoft_teams',
+  'zoom',
+  'webex',
+]);
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');

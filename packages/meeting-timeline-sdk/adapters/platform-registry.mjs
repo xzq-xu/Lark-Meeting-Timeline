@@ -20,8 +20,6 @@ import {
   buildMeetingPlatformAdapterRoute,
 } from './platform-adapter-route.mjs';
 import {
-  MEETING_PLATFORM_ALIASES,
-  MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
   platformCapabilityContract,
 } from './platform-setup.mjs';
@@ -46,8 +44,42 @@ const sourceByPlatform = Object.freeze({
   local_detector: 'local_detector',
 });
 
+const DEFAULT_REGISTRY_PLATFORMS = Object.freeze([
+  'local_detector',
+  'lark',
+  'google_meet',
+  'microsoft_teams',
+  'zoom',
+  'webex',
+]);
+
+const REGISTRY_PLATFORM_ALIASES = Object.freeze({
+  'local-detector': 'local_detector',
+  local_detector: 'local_detector',
+  detector: 'local_detector',
+  'desktop-observer': 'local_detector',
+  desktop_observer: 'local_detector',
+  observer: 'local_detector',
+  manual: 'local_detector',
+  lark: 'lark',
+  feishu: 'lark',
+  'fei-shu': 'lark',
+  larksuite: 'lark',
+  'lark-suite': 'lark',
+  'google-meet': 'google_meet',
+  google_meet: 'google_meet',
+  meet: 'google_meet',
+  'microsoft-teams': 'microsoft_teams',
+  microsoft_teams: 'microsoft_teams',
+  teams: 'microsoft_teams',
+  zoom: 'zoom',
+  webex: 'webex',
+  'cisco-webex': 'webex',
+  cisco_webex: 'webex',
+});
+
 function aliasesFor(platform) {
-  return Object.entries(MEETING_PLATFORM_ALIASES)
+  return Object.entries(REGISTRY_PLATFORM_ALIASES)
     .filter(([, key]) => key === platform)
     .map(([alias]) => alias);
 }
@@ -71,12 +103,12 @@ function issue(severity, code, message, details = {}) {
 }
 
 function selectedPlatforms(options = {}) {
-  return unique(asArray(firstNonEmpty(options.platforms, options.platform_keys, MEETING_PLATFORM_KEYS))
+  return unique(asArray(firstNonEmpty(options.platforms, options.platform_keys, DEFAULT_REGISTRY_PLATFORMS))
     .map((platform) => normalizeMeetingPlatform(platform)));
 }
 
 export const MEETING_PLATFORM_EVENT_ADAPTERS = Object.freeze(
-  MEETING_PLATFORM_KEYS.map((platform) => Object.freeze({
+  DEFAULT_REGISTRY_PLATFORMS.map((platform) => Object.freeze({
     key: platform,
     aliases: Object.freeze(aliasesFor(platform)),
     source: sourceByPlatform[platform] ?? `${platform}_webhook`,

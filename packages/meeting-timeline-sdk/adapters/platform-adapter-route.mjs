@@ -1,6 +1,5 @@
 import { compactObject } from '../index.mjs';
 import {
-  MEETING_PLATFORM_KEYS,
   buildPlatformIntegrationPlan,
   normalizeMeetingPlatform,
   platformCapabilityContract,
@@ -23,7 +22,13 @@ export const MEETING_PLATFORM_ADAPTER_ROUTE_SCHEMA = 'meeting_platform_adapter_r
 export const MEETING_PLATFORM_ADAPTER_ROUTE_MATRIX_SCHEMA = 'meeting_platform_adapter_route_matrix';
 export const MEETING_PLATFORM_ADAPTER_ROUTE_SCHEMA_VERSION = 1;
 
-const DEFAULT_ROUTE_PLATFORMS = MEETING_PLATFORM_KEYS.filter((platform) => platform !== 'local_detector');
+const DEFAULT_ROUTE_PLATFORMS = Object.freeze([
+  'lark',
+  'google_meet',
+  'microsoft_teams',
+  'zoom',
+  'webex',
+]);
 
 const NATIVE_ENTRYPOINTS = Object.freeze({
   lark: Object.freeze({

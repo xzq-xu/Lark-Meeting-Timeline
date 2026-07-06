@@ -1,7 +1,6 @@
 import { MeetingTimelineSdkError, compactObject, normalizeAbsoluteMs } from '../index.mjs';
 import { meetingAppBrowserRuntimePreset } from './meeting-app-browser-runtime.mjs';
 import { meetingAppDomCaptureProfile } from './meeting-app-capture.mjs';
-import { MEETING_APP_FIXTURE_PLATFORMS } from './meeting-app-fixtures.mjs';
 import { buildMeetingAppLaunchGate } from './meeting-app-gate.mjs';
 import {
   buildMeetingAppSnapshotRecordSet,
@@ -27,7 +26,13 @@ import {
 
 export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA = 'meeting_app_integration_profile';
 export const MEETING_APP_INTEGRATION_PROFILE_SCHEMA_VERSION = 1;
-export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS = MEETING_APP_FIXTURE_PLATFORMS;
+export const MEETING_APP_INTEGRATION_PROFILE_PLATFORMS = Object.freeze([
+  'google_meet',
+  'microsoft_teams',
+  'zoom',
+  'lark',
+  'webex',
+]);
 export const MEETING_APP_RUNTIME_ADAPTER_CONFIG_SCHEMA = 'meeting_app_runtime_adapter_config';
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_RESOLUTION_SCHEMA = 'meeting_app_runtime_adapter_profile_resolution';
 export const MEETING_APP_RUNTIME_ADAPTER_PROFILE_MATRIX_SCHEMA = 'meeting_app_runtime_adapter_profile_matrix';

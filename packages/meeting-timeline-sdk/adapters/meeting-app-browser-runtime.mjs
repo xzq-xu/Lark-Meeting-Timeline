@@ -1,6 +1,5 @@
 import { createMeetingAppTimelineRuntime } from './meeting-app-runtime.mjs';
 import {
-  MEETING_APP_DOM_CAPTURE_PROFILES,
   meetingAppDomCaptureProfile,
 } from './meeting-app-capture.mjs';
 
@@ -131,7 +130,6 @@ const COMMON_MUTATION_IGNORE_SELECTORS = Object.freeze([
 ]);
 
 function runtimePresetForPlatform(platform, timing = {}) {
-  const profile = MEETING_APP_DOM_CAPTURE_PROFILES[platform];
   return Object.freeze({
     platform,
     captureOptions: Object.freeze({ platform }),
@@ -145,16 +143,8 @@ function runtimePresetForPlatform(platform, timing = {}) {
     sample_interval_ms: timing.sampleIntervalMs ?? 10_000,
     unchangedObserveEveryMs: timing.unchangedObserveEveryMs ?? 10_000,
     unchanged_observe_every_ms: timing.unchangedObserveEveryMs ?? 10_000,
-    mutationTrackSelectors: Object.freeze(compactStrings([
-      profile?.controlSelectors,
-      profile?.participantSelectors,
-      profile?.textSelectors,
-    ])),
-    mutation_track_selectors: Object.freeze(compactStrings([
-      profile?.controlSelectors,
-      profile?.participantSelectors,
-      profile?.textSelectors,
-    ])),
+    mutationTrackSelectors: Object.freeze([]),
+    mutation_track_selectors: Object.freeze([]),
     mutationIgnoreSelectors: COMMON_MUTATION_IGNORE_SELECTORS,
     mutation_ignore_selectors: COMMON_MUTATION_IGNORE_SELECTORS,
   });
@@ -183,14 +173,28 @@ export const MEETING_APP_BROWSER_RUNTIME_PRESETS = Object.freeze({
   }),
 });
 
+function runtimePresetProfileSelectors(platform) {
+  const profile = meetingAppDomCaptureProfile(platform);
+  return compactStrings([
+    profile?.controlSelectors,
+    profile?.participantSelectors,
+    profile?.textSelectors,
+  ]);
+}
+
 function copyRuntimePreset(preset) {
   if (!preset) return null;
+  const mutationTrackSelectors = compactStrings([
+    preset.mutationTrackSelectors,
+    preset.mutation_track_selectors,
+    runtimePresetProfileSelectors(preset.platform),
+  ]);
   return {
     ...preset,
     captureOptions: { ...(preset.captureOptions ?? {}) },
     capture_options: { ...(preset.captureOptions ?? {}) },
-    mutationTrackSelectors: [...(preset.mutationTrackSelectors ?? [])],
-    mutation_track_selectors: [...(preset.mutationTrackSelectors ?? [])],
+    mutationTrackSelectors,
+    mutation_track_selectors: mutationTrackSelectors,
     mutationIgnoreSelectors: [...(preset.mutationIgnoreSelectors ?? [])],
     mutation_ignore_selectors: [...(preset.mutationIgnoreSelectors ?? [])],
   };
