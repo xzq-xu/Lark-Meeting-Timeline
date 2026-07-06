@@ -85,6 +85,14 @@ npm run meeting-app:adapter-spec
 
 它会写出 `data/meeting-app-adapter-specs/` 和 `data/meeting-app-adapter-spec-report.json`。也可以传 `-- --spec-file=whereby.json` 或 `-- --template-adapter-key=slack-huddle --template-file=data/slack-huddle-spec-template.json`，先把新平台的 URL match、权限、selector、MutationObserver 和非阻塞规则固化成可验收 contract。
 
+如果接入方已经有 adapter spec，可以进一步导出可运行配置：
+
+```bash
+npm run meeting-app:adapter-runtime-config
+```
+
+它会写出 `data/meeting-app-adapter-runtime-configs/` 和 `data/meeting-app-adapter-runtime-config-report.json`。也支持传 `-- --spec-file=data/whereby-spec.json`，输出 `content_script_options`、`browser_runtime_options`、`capture_options`、扩展 manifest 片段和 `captured_at_ms` 非阻塞契约，供浏览器扩展、WebView preload 或 Electron content script 直接消费。
+
 如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
 
 ```bash

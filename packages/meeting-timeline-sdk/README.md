@@ -1030,6 +1030,15 @@ const runtimeConfig = buildMeetingAppAdapterRuntimeConfig(spec, {
 installMeetingAppContentScriptBridge(timeline, runtimeConfig.content_script_options);
 ```
 
+CLI 入口可以把内置平台和自定义 spec 批量转成 runtime config：
+
+```bash
+npm run meeting-app:adapter-runtime-config
+npm run meeting-app:adapter-runtime-config -- --spec-file=data/whereby-spec.json
+```
+
+默认输出到 `data/meeting-app-adapter-runtime-configs/` 和 `data/meeting-app-adapter-runtime-config-report.json`。报告中的 `capture_ready_count`、`mutation_ready_count`、`content_script_ready_count` 用来确认配置是否已经能交给宿主运行时，但仍不替代真实 live snapshot evidence。
+
 同一份 `runtimeConfig.browser_runtime_options` 也可以直接传给 `createMeetingAppBrowserRuntime()`；`runtimeConfig.capture_options` 可以直接传给 `captureMeetingAppDomSnapshot()` 做手动采样。也就是说，新会议软件的接入路径是 `adapter spec -> runtime config -> live snapshot evidence -> handoff readiness`。
 
 如果宿主不想自己解释 `trigger_policy`，可以直接用 `meeting-app-observer-scheduler`。它消费 observer plan 和现有 runtime，把 DOM mutation、native snapshot change、keep-alive、active speaker follow-up、candidate missing end grace 统一映射为 `runtime.sample()` / `runtime.sampleTracks()` 调用：
