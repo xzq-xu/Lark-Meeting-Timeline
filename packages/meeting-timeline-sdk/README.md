@@ -109,6 +109,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-extension`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-manifest`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-spec`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixture-tracks`
@@ -974,6 +975,34 @@ npm run meeting-app:adapter-manifest
 ```
 
 默认输出到 `data/meeting-app-adapter-manifests/` 和 `data/meeting-app-adapter-manifest-report.json`。这个清单不要求 provider webhook 或实时转写；provider 事件和 transcript 仍然只作为校准/会后处理，不能阻塞实时标注。
+
+如果要适配一个 SDK 暂未内置的会议软件，不要先改核心归一化器，先用 `meeting-app-adapter-spec` 把新增平台的接入边界描述清楚。spec 会检查 URL match、扩展权限、控制按钮 selector、参会人/发言人 selector、MutationObserver track selector、`captured_at_ms` 时间戳、provider/transcript 非阻塞规则和必要信号：
+
+```js
+import {
+  assertMeetingAppAdapterSpec,
+  buildMeetingAppAdapterSpec,
+  buildMeetingAppAdapterSpecTemplate,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-spec';
+
+const template = buildMeetingAppAdapterSpecTemplate({
+  adapter_key: 'whereby',
+  display_name: 'Whereby',
+  matches: ['https://whereby.com/*'],
+});
+
+const spec = buildMeetingAppAdapterSpec({
+  ...template,
+  control_selectors: ['[aria-label*="Leave" i]', '[data-testid*="toolbar" i]'],
+  participant_selectors: ['[data-participant-id]', '[aria-label*="speaking" i]'],
+  text_selectors: ['[role="status"]', '[aria-live]'],
+  mutation_track_selectors: ['[data-participant-id]', '[role="status"]'],
+});
+
+assertMeetingAppAdapterSpec(spec);
+```
+
+spec 通过只表示“这个会议软件有可实现的本地观察 contract”；它不会假装我们已经支持真实 DOM。下一步仍然要用 content script / WebView / Accessibility 采样，把 live snapshot 喂给 `meetingAppAdapterFit()`、runtime host replay 和 handoff readiness。
 
 如果宿主不想自己解释 `trigger_policy`，可以直接用 `meeting-app-observer-scheduler`。它消费 observer plan 和现有 runtime，把 DOM mutation、native snapshot change、keep-alive、active speaker follow-up、candidate missing end grace 统一映射为 `runtime.sample()` / `runtime.sampleTracks()` 调用：
 

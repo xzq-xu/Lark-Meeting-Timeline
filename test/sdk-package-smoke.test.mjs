@@ -93,6 +93,8 @@ assert.equal(packedFiles.includes('adapters/meeting-app-fixture-tracks.mjs'), tr
 assert.equal(packedFiles.includes('adapters/meeting-app-fixture-tracks.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-manifest.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-manifest.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-adapter-spec.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-adapter-spec.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-profile.mjs'), true);
@@ -330,6 +332,13 @@ import {
   buildMeetingAppAdapterManifest,
   buildMeetingAppAdapterManifestMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-manifest';
+import {
+  assertMeetingAppAdapterSpec,
+  assertMeetingAppAdapterSpecMatrix,
+  buildMeetingAppAdapterSpec,
+  buildMeetingAppAdapterSpecMatrix,
+  buildMeetingAppAdapterSpecTemplate,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-spec';
 import {
   buildMeetingAppFixtureTrackReadinessReport,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixture-tracks';
@@ -798,6 +807,16 @@ assert.equal(assertMeetingAppAdapterManifest('zoom').runtime.observe_mutations, 
 assert.equal(assertMeetingAppAdapterManifestMatrix({ platforms: ['google-meet'] }).platform_count, 1);
 assert.equal(kit.meetingAppAdapterManifest('google-meet').capture.selector_counts.participant > 0, true);
 assert.equal(kit.meetingAppAdapterManifestMatrix({ platforms: ['google-meet'] }).schema, 'meeting_app_adapter_manifest_matrix');
+assert.equal(buildMeetingAppAdapterSpec('google-meet').accepted, true);
+assert.equal(buildMeetingAppAdapterSpecTemplate({ adapter_key: 'whereby' }).adapter_key, 'whereby');
+assert.equal(buildMeetingAppAdapterSpecMatrix({
+  platforms: ['google-meet'],
+  adapters: [buildMeetingAppAdapterSpecTemplate({ adapter_key: 'whereby', matches: ['https://whereby.com/*'] })],
+}).accepted_count, 2);
+assert.equal(assertMeetingAppAdapterSpec('zoom').adapter_key, 'zoom');
+assert.equal(assertMeetingAppAdapterSpecMatrix({ platforms: ['google-meet'] }).spec_count, 1);
+assert.equal(kit.meetingAppAdapterSpec('google-meet').source, 'built_in_manifest');
+assert.equal(kit.meetingAppAdapterSpecMatrix({ platforms: ['google-meet'] }).schema, 'meeting_app_adapter_spec_matrix');
 assert.equal(buildMeetingAppObserverSchedulerConfig('google-meet').schema, 'meeting_app_observer_scheduler_config');
 assert.equal(buildMeetingAppObserverSchedulerConfigMatrix({ platforms: ['google-meet'] }).schema, 'meeting_app_observer_scheduler_config_matrix');
 assert.equal(typeof createMeetingAppObserverScheduler({
