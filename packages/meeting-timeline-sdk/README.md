@@ -113,6 +113,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-runtime-config`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-handoff-package`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-capability`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-integration-package`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixture-tracks`
@@ -599,6 +600,29 @@ npm run meeting-platform:adaptation-package -- \
 ```
 
 这份 package 的定位是“交给另一个项目开始接入”的 SDK 汇总，不替代真实会议采样；`readiness.sdk_wiring_ready=true` 只说明协议和 SDK 调用面可接，是否能 production 仍要看 evidence package / handoff readiness。
+
+如果宿主项目只关心会议软件页面侧适配，可以直接用 `meeting-app-adapter-integration-package`。它把静态 handoff package、capability report、execution plan、entrypoints、命令和 evidence contract 合成一个对象，适合作为 Google Meet、Teams、Zoom、Webex、Lark 适配任务的交接输入：
+
+```js
+import {
+  buildMeetingAppAdapterIntegrationPackage,
+  buildMeetingAppAdapterIntegrationPackageMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-integration-package';
+
+const pkg = buildMeetingAppAdapterIntegrationPackage('google-meet', {
+  input: liveDomSnapshot,
+  evidence: liveEvidence,
+});
+const matrix = buildMeetingAppAdapterIntegrationPackageMatrix({
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+  inputs: liveDomSnapshotsByPlatform,
+  evidenceByPlatform,
+});
+
+console.log(pkg.entrypoints, pkg.integration_steps, matrix.rows);
+```
+
+`platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。它只回答“宿主工程怎么接、缺哪些证据、下一步跑什么命令”；生产可用性仍以后续真实会议 evidence package、provider start/end reconcile 和 handoff readiness 为准。
 
 如果下游项目要直接启动浏览器扩展、WebView preload 或 native host runtime，用 `platform-runtime-bundle`。它在 `platform-adaptation-package` 基础上再补一层可执行运行时配置：content script manifest、浏览器 URL matches、adapter route、`meeting-app-browser-runtime` preset、`platform-integration-runtime` content-script bridge 安装参数、mutation observer / speaker filter 参数、extension message 示例、host ingest endpoints，以及 `captured_at_ms` 写入契约：
 

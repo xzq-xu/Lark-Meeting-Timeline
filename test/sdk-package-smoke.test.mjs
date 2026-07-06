@@ -101,6 +101,8 @@ assert.equal(packedFiles.includes('adapters/meeting-app-adapter-handoff-package.
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-handoff-package.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-capability.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-capability.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-adapter-integration-package.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-adapter-integration-package.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-runtime.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-profile.mjs'), true);
@@ -324,6 +326,10 @@ import {
   buildMeetingAppAdapterExecutionPlan,
   buildMeetingAppAdapterExecutionPlanMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-capability';
+import {
+  buildMeetingAppAdapterIntegrationPackage,
+  buildMeetingAppAdapterIntegrationPackageMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-integration-package';
 import {
   assertMeetingAppRuntimeAdapterHandoff,
   buildMeetingAppDomAdaptationDiagnosisMatrix,
@@ -853,6 +859,30 @@ assert.equal(buildMeetingAppAdapterExecutionPlanMatrix({
     },
   },
 }).schema, 'meeting_app_adapter_execution_plan_matrix');
+const packageIntegration = buildMeetingAppAdapterIntegrationPackage('google-meet', {
+  input: {
+    url: 'https://meet.google.com/abc-defg-hij',
+    page: {
+      controls: [{ label: 'Leave call' }],
+      participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+    },
+  },
+});
+assert.equal(packageIntegration.schema, 'meeting_app_adapter_integration_package');
+assert.equal(packageIntegration.realtime_ready, true);
+assert.equal(packageIntegration.entrypoints.adapter_integration_package, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-integration-package');
+assert.equal(buildMeetingAppAdapterIntegrationPackageMatrix({
+  platforms: ['google-meet'],
+  inputs: {
+    google_meet: {
+      url: 'https://meet.google.com/abc-defg-hij',
+      page: {
+        controls: [{ label: 'Leave call' }],
+        participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+      },
+    },
+  },
+}).schema, 'meeting_app_adapter_integration_package_matrix');
 assert.equal(buildMeetingAppRuntimeObserverPlan({
   url: 'https://meet.google.com/abc-defg-hij',
   page: {

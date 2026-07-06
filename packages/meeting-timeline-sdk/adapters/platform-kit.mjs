@@ -26,6 +26,10 @@ import {
   buildMeetingAppAdapterExecutionPlanMatrix,
 } from './meeting-app-adapter-capability.mjs';
 import {
+  buildMeetingAppAdapterIntegrationPackage,
+  buildMeetingAppAdapterIntegrationPackageMatrix,
+} from './meeting-app-adapter-integration-package.mjs';
+import {
   assertMeetingAppAdapterManifest,
   assertMeetingAppAdapterManifestMatrix,
   buildMeetingAppAdapterManifest,
@@ -465,6 +469,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     meeting_app_adapter_verification_report_matrix: buildMeetingAppAdapterVerificationReportMatrix(options),
     meeting_app_adapter_capability_matrix: buildMeetingAppAdapterCapabilityMatrix(options),
     meeting_app_adapter_execution_plan_matrix: buildMeetingAppAdapterExecutionPlanMatrix(options),
+    meeting_app_adapter_integration_package_matrix: buildMeetingAppAdapterIntegrationPackageMatrix(options),
     meeting_app_integration_matrix: buildMeetingAppIntegrationMatrix(options),
     meeting_app_deployment_manifests: buildAllMeetingAppDeploymentManifests(options),
     meeting_app_deployment_manifest_acceptance: buildAllMeetingAppDeploymentManifestAcceptanceReports(options),
@@ -797,6 +802,24 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppAdapterExecutionPlanMatrix(planOptions = {}) {
       return buildMeetingAppAdapterExecutionPlanMatrix(withDefaults(defaults, planOptions));
+    },
+    meetingAppAdapterIntegrationPackage(platformOrCapability, input = {}, packageOptions = {}) {
+      if (
+        platformOrCapability?.schema === 'meeting_app_adapter_capability_report'
+        || platformOrCapability?.schema === 'meeting_app_adapter_execution_plan'
+      ) {
+        return buildMeetingAppAdapterIntegrationPackage(platformOrCapability, withDefaults(defaults, input));
+      }
+      if (platformOrCapability && typeof platformOrCapability === 'object' && !Array.isArray(platformOrCapability)) {
+        return buildMeetingAppAdapterIntegrationPackage(withDefaults(defaults, platformOrCapability));
+      }
+      return buildMeetingAppAdapterIntegrationPackage(platformOrCapability, {
+        ...withDefaults(defaults, packageOptions),
+        input,
+      });
+    },
+    meetingAppAdapterIntegrationPackageMatrix(packageOptions = {}) {
+      return buildMeetingAppAdapterIntegrationPackageMatrix(withDefaults(defaults, packageOptions));
     },
     meetingAppAdapterManifest(platform, manifestOptions = {}) {
       return buildMeetingAppAdapterManifest(platform, withDefaults(defaults, manifestOptions));

@@ -117,6 +117,8 @@ npm run meeting-app:adapter-capability
 
 它会写出 `data/meeting-app-adapter-capability-report.json`，把 Google Meet、Teams、Zoom、Webex、Lark 的官方 provider 事件、本地/浏览器 observation、speaker/participant 轨道、会后 transcript backfill 和 live evidence 状态合成 `recommended_mode`、`pilot_ready`、`production_ready`。报告里还包含 `execution_plan_matrix`，把每个平台拆成 `capture_meeting_app_snapshot`、`start_or_reconcile_meeting_axis`、`insert_annotation_on_current_axis`、`emit_speaker_position_markers`、`configure_provider_reconcile` 等步骤，用来回答“外部项目下一步具体要实现哪条 runtime path”。
 
+给宿主项目真正接入时，SDK 还提供 `buildMeetingAppAdapterIntegrationPackage()` / `buildMeetingAppAdapterIntegrationPackageMatrix()` 和 `kit.meetingAppAdapterIntegrationPackage()` / `kit.meetingAppAdapterIntegrationPackageMatrix()`。这一层把 handoff package、capability report、execution plan、SDK entrypoints、验收命令和 evidence contract 合成单个平台或多平台接入包，适合直接交给 Google Meet、Teams、Zoom、Webex、Lark 的宿主工程消费；它仍然保留 `production_ready=false`，直到真实会议证据和 handoff readiness 通过。
+
 如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
 
 ```bash
@@ -163,7 +165,7 @@ SDK 包级交付前再跑一次 package smoke：
 npm run sdk:package-smoke
 ```
 
-它会对 `packages/meeting-timeline-sdk` 执行 `npm pack`，并在临时 consumer 项目里按包名导入 core、`platform-kit`、`platform-rollout`、`platform-strategy`、`platform-adaptation-package`、`platform-runtime-bundle`、`meeting-platform-runtime-host-verifier`、`platform-evidence-correlation`、`platform-evidence-session`、`platform-live-adapter` 的 suite/readiness、Google Meet adapter、meeting app gate、`meeting-app-adapter-manifest`、`meeting-app-adapter-spec`、`meeting-app-adapter-runtime-config`、`meeting-app-adapter-handoff-package`、`meeting-app-track-pipeline` 和 `meeting-app-track-runtime`，确认外部项目不是依赖仓库内部相对路径。
+它会对 `packages/meeting-timeline-sdk` 执行 `npm pack`，并在临时 consumer 项目里按包名导入 core、`platform-kit`、`platform-rollout`、`platform-strategy`、`platform-adaptation-package`、`platform-runtime-bundle`、`meeting-platform-runtime-host-verifier`、`platform-evidence-correlation`、`platform-evidence-session`、`platform-live-adapter` 的 suite/readiness、Google Meet adapter、meeting app gate、`meeting-app-adapter-manifest`、`meeting-app-adapter-spec`、`meeting-app-adapter-runtime-config`、`meeting-app-adapter-handoff-package`、`meeting-app-adapter-capability`、`meeting-app-adapter-integration-package`、`meeting-app-track-pipeline` 和 `meeting-app-track-runtime`，确认外部项目不是依赖仓库内部相对路径。
 
 ## 启动
 

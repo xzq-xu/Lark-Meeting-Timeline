@@ -306,6 +306,10 @@ import type {
   MeetingAppAdapterExecutionPlanMatrix,
 } from './meeting-app-adapter-capability.mjs';
 import type {
+  MeetingAppAdapterIntegrationPackage,
+  MeetingAppAdapterIntegrationPackageMatrix,
+} from './meeting-app-adapter-integration-package.mjs';
+import type {
   MeetingAppTrackPipeline,
   MeetingAppTrackPipelineAccumulator,
   MeetingAppTrackPipelineInput,
@@ -439,6 +443,12 @@ export interface MeetingPlatformTimelineKit {
     planOptions?: MeetingAppAdapterCapabilityOptions,
   ): MeetingAppAdapterExecutionPlan;
   meetingAppAdapterExecutionPlanMatrix(planOptions?: MeetingAppAdapterCapabilityOptions): MeetingAppAdapterExecutionPlanMatrix;
+  meetingAppAdapterIntegrationPackage(
+    platformOrCapability?: string | MeetingAppAdapterCapabilityReport | MeetingAppAdapterExecutionPlan | MeetingAppAdapterCapabilityOptions,
+    input?: MeetingAppSnapshot | MeetingAppSnapshot[] | Record<string, unknown> | MeetingAppAdapterCapabilityOptions,
+    packageOptions?: MeetingAppAdapterCapabilityOptions,
+  ): MeetingAppAdapterIntegrationPackage;
+  meetingAppAdapterIntegrationPackageMatrix(packageOptions?: MeetingAppAdapterCapabilityOptions): MeetingAppAdapterIntegrationPackageMatrix;
   meetingAppAdapterManifest(platform: string, manifestOptions?: MeetingAppAdapterManifestOptions): MeetingAppAdapterManifest;
   meetingAppAdapterManifestMatrix(manifestOptions?: MeetingAppAdapterManifestOptions): MeetingAppAdapterManifestMatrix;
   assertMeetingAppAdapterManifest(
