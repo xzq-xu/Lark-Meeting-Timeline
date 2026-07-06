@@ -1049,6 +1049,26 @@ export function createMeetingAppTimelineSdk(options = {}) {
     adapterImportPlanMatrix(packagesOrInput = {}, importInput = {}, importOptions = {}) {
       return sdk.platformAdapterImportPlanMatrix(packagesOrInput, importInput, importOptions);
     },
+    platformAdapterInstallManifest(plansOrInput = {}, installInput = {}, installOptions = {}) {
+      return runtime.kit.platformAdapterInstallManifest(
+        plansOrInput,
+        installInput,
+        sdkPlatformOptions(runtime, installOptions),
+      );
+    },
+    adapterInstallManifest(plansOrInput = {}, installInput = {}, installOptions = {}) {
+      return sdk.platformAdapterInstallManifest(plansOrInput, installInput, installOptions);
+    },
+    assertPlatformAdapterInstallManifest(manifestOrInput = {}, installInput = {}, installOptions = {}) {
+      return runtime.kit.assertPlatformAdapterInstallManifest(
+        manifestOrInput,
+        installInput,
+        sdkPlatformOptions(runtime, installOptions),
+      );
+    },
+    assertAdapterInstallManifest(manifestOrInput = {}, installInput = {}, installOptions = {}) {
+      return sdk.assertPlatformAdapterInstallManifest(manifestOrInput, installInput, installOptions);
+    },
     platformRuntimeBundle(platformOrOptions = {}, bundleOptions = {}) {
       const resolved = singlePlatformInput(runtime, platformOrOptions, bundleOptions);
       return runtime.kit.platformRuntimeBundle(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
@@ -1179,6 +1199,7 @@ export * from './adapters/platform-adapter-portfolio.mjs';
 export * from './adapters/platform-adapter-acceptance-checklist.mjs';
 export * from './adapters/platform-adapter-export-package.mjs';
 export * from './adapters/platform-adapter-import-plan.mjs';
+export * from './adapters/platform-adapter-install-manifest.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-strategy.mjs';

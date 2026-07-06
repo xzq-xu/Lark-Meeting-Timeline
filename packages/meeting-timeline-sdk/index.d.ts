@@ -392,6 +392,18 @@ export interface MeetingAppTimelineSdk {
     options?: Record<string, unknown>,
   ): import('./adapters/platform-adapter-import-plan.mjs').MeetingPlatformAdapterImportPlanMatrix;
   adapterImportPlanMatrix: MeetingAppTimelineSdk['platformAdapterImportPlanMatrix'];
+  platformAdapterInstallManifest(
+    plansOrInput?: import('./adapters/platform-adapter-import-plan.mjs').MeetingPlatformAdapterImportPlan[] | import('./adapters/platform-adapter-export-package.mjs').MeetingPlatformAdapterExportPackage[] | Record<string, unknown>,
+    input?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest;
+  adapterInstallManifest: MeetingAppTimelineSdk['platformAdapterInstallManifest'];
+  assertPlatformAdapterInstallManifest(
+    manifestOrInput?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-import-plan.mjs').MeetingPlatformAdapterImportPlan[] | import('./adapters/platform-adapter-export-package.mjs').MeetingPlatformAdapterExportPackage[] | Record<string, unknown>,
+    input?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest;
+  assertAdapterInstallManifest: MeetingAppTimelineSdk['assertPlatformAdapterInstallManifest'];
   platformRuntimeBundle(
     platformOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,

@@ -291,6 +291,7 @@ export function buildMeetingPlatformAdapterImportPlan(exportPackage = {}, input 
     },
     sdk_imports: sdkImports(exportPackage),
     host_file_coverage: coverage,
+    surface_entrypoints: exportPackage.surface_entrypoints,
     surface_entrypoint: exportPackage.surface_entrypoints?.[surface],
     install_steps: installSteps(exportPackage, surface, coverage),
     commands: compactObject({
