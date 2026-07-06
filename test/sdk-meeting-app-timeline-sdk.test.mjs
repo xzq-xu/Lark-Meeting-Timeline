@@ -139,6 +139,37 @@ assert.equal(connectorPackage.runtime_events.plan_matrix.platform_count, 2);
 assert.equal(connectorPackage.contracts.provider_events_block_realtime, false);
 assert.equal(connectorPackage.entrypoints.some((entry) => entry.id === 'speaker-participant-track'), true);
 
+const adapterCapability = sdk.meetingAppAdapterCapability('google-meet', {
+  url: 'https://meet.google.com/abc-defg-hij',
+  page: {
+    controls: [{ label: 'Leave call' }],
+    participants: [{ id: 'ada', ariaLabel: 'Ada Lovelace is speaking' }],
+  },
+});
+assert.equal(adapterCapability.schema, 'meeting_app_adapter_capability_report');
+assert.equal(adapterCapability.platform, 'google_meet');
+assert.equal(adapterCapability.accepted, true);
+assert.equal(adapterCapability.timeline_capabilities.realtime_axis.status, 'local_ready');
+assert.equal(adapterCapability.timeline_capabilities.speaker_track.status, 'local_ready');
+assert.equal(adapterCapability.timeline_capabilities.participant_track.status, 'available');
+assert.equal(adapterCapability.timeline_capabilities.post_meeting_transcript.provider_declared, true);
+assert.equal(sdk.adapterCapability('zoom').platform, 'zoom');
+
+const adapterCapabilityMatrix = sdk.meetingAppAdapterCapabilityMatrix();
+assert.equal(adapterCapabilityMatrix.schema, 'meeting_app_adapter_capability_matrix');
+assert.equal(adapterCapabilityMatrix.platform_count, 2);
+assert.equal(adapterCapabilityMatrix.provider_axis_declared_count, 2);
+assert.equal(sdk.adapterCapabilityMatrix().static_ready_count, 2);
+
+const adapterExecutionPlan = sdk.meetingAppAdapterExecutionPlan(adapterCapability);
+assert.equal(adapterExecutionPlan.schema, 'meeting_app_adapter_execution_plan');
+assert.equal(adapterExecutionPlan.platform, 'google_meet');
+assert.equal(adapterExecutionPlan.realtime_ready, true);
+assert.equal(adapterExecutionPlan.steps.some((step) => step.id === 'configure_provider_reconcile' && step.blocks_realtime_if_missing === false), true);
+assert.equal(sdk.adapterExecutionPlan('zoom').platform, 'zoom');
+assert.equal(sdk.meetingAppAdapterExecutionPlanMatrix().platform_count, 2);
+assert.equal(sdk.adapterExecutionPlanMatrix().accepted_count, 2);
+
 const adaptationPackage = sdk.platformAdaptationPackage('google-meet');
 assert.equal(adaptationPackage.schema, 'meeting_platform_adaptation_package');
 assert.equal(adaptationPackage.platform, 'google_meet');

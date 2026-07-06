@@ -915,6 +915,54 @@ export function createMeetingAppTimelineSdk(options = {}) {
     runtimeConnectorPackage(connectorOptions = {}) {
       return sdk.connectorPackage(connectorOptions);
     },
+    meetingAppAdapterCapability(platformOrOptions = {}, input = {}, capabilityOptions = {}) {
+      if (platformOrOptions && typeof platformOrOptions === 'object' && !Array.isArray(platformOrOptions)) {
+        return runtime.kit.meetingAppAdapterCapability(sdkPlatformOptions(runtime, {
+          ...platformOrOptions,
+          ...input,
+          ...capabilityOptions,
+        }));
+      }
+      return runtime.kit.meetingAppAdapterCapability(
+        platformOrOptions,
+        input,
+        sdkPlatformOptions(runtime, capabilityOptions),
+      );
+    },
+    adapterCapability(platformOrOptions = {}, input = {}, capabilityOptions = {}) {
+      return sdk.meetingAppAdapterCapability(platformOrOptions, input, capabilityOptions);
+    },
+    meetingAppAdapterCapabilityMatrix(capabilityOptions = {}) {
+      return runtime.kit.meetingAppAdapterCapabilityMatrix(sdkPlatformOptions(runtime, capabilityOptions));
+    },
+    adapterCapabilityMatrix(capabilityOptions = {}) {
+      return sdk.meetingAppAdapterCapabilityMatrix(capabilityOptions);
+    },
+    meetingAppAdapterExecutionPlan(platformOrCapability = {}, input = {}, planOptions = {}) {
+      if (platformOrCapability && typeof platformOrCapability === 'object' && !Array.isArray(platformOrCapability)) {
+        return runtime.kit.meetingAppAdapterExecutionPlan(
+          platformOrCapability,
+          sdkPlatformOptions(runtime, {
+            ...input,
+            ...planOptions,
+          }),
+        );
+      }
+      return runtime.kit.meetingAppAdapterExecutionPlan(
+        platformOrCapability,
+        input,
+        sdkPlatformOptions(runtime, planOptions),
+      );
+    },
+    adapterExecutionPlan(platformOrCapability = {}, input = {}, planOptions = {}) {
+      return sdk.meetingAppAdapterExecutionPlan(platformOrCapability, input, planOptions);
+    },
+    meetingAppAdapterExecutionPlanMatrix(planOptions = {}) {
+      return runtime.kit.meetingAppAdapterExecutionPlanMatrix(sdkPlatformOptions(runtime, planOptions));
+    },
+    adapterExecutionPlanMatrix(planOptions = {}) {
+      return sdk.meetingAppAdapterExecutionPlanMatrix(planOptions);
+    },
     platformAdaptationPackage(platformOrOptions = {}, packageOptions = {}) {
       const resolved = singlePlatformInput(runtime, platformOrOptions, packageOptions);
       return runtime.kit.platformAdaptationPackage(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
@@ -1291,6 +1339,7 @@ export function createMeetingAppTimelineSdk(options = {}) {
 }
 
 export * from './adapters/platform-kit.mjs';
+export * from './adapters/meeting-app-adapter-capability.mjs';
 export * from './adapters/meeting-app-adapter-integration-package.mjs';
 export * from './adapters/meeting-app-connector-package.mjs';
 export * from './adapters/meeting-platform-connector.mjs';

@@ -43,6 +43,8 @@ assert.equal(packedFiles.includes('cli/meeting-platform-adapter-launch-plan.mjs'
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-smoke.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-adapter-capability.mjs'), true);
+assert.equal(packedFiles.includes('adapters/meeting-app-adapter-capability.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-integration-runtime.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-integration-runtime.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-runtime-event.mjs'), true);
@@ -293,6 +295,8 @@ import assert from 'node:assert/strict';
 import {
   MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA as ROOT_MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
   SDK_VERSION,
+  buildMeetingAppAdapterCapabilityMatrix as buildMeetingAppAdapterCapabilityMatrixFromRoot,
+  buildMeetingAppAdapterExecutionPlanMatrix as buildMeetingAppAdapterExecutionPlanMatrixFromRoot,
   buildMeetingAppAdapterIntegrationPackageMatrix as buildMeetingAppAdapterIntegrationPackageMatrixFromRoot,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport as buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot,
   buildMeetingPlatformAdaptationPackage as buildMeetingPlatformAdaptationPackageFromRoot,
@@ -680,6 +684,18 @@ assert.equal(buildMeetingPlatformIntegrationRuntimeManifestFromRoot({
 assert.equal(buildMeetingAppAdapterIntegrationPackageMatrixFromRoot({
   platforms: ['google-meet'],
 }).platform_count, 1);
+assert.equal(buildMeetingAppAdapterCapabilityMatrixFromRoot({
+  platforms: ['google-meet'],
+}).platform_count, 1);
+assert.equal(buildMeetingAppAdapterExecutionPlanMatrixFromRoot({
+  platforms: ['google-meet'],
+}).accepted_count, 1);
+assert.equal(buildMeetingAppAdapterCapabilityMatrix({
+  platforms: ['google-meet'],
+}).provider_axis_declared_count, 1);
+assert.equal(buildMeetingAppAdapterExecutionPlanMatrix({
+  platforms: ['google-meet'],
+}).platform_count, 1);
 const rootMeetingAppSdk = createMeetingAppTimelineSdk({
   baseUrl: 'http://localhost:8787',
   fetch: async () => new Response(JSON.stringify({ ok: true })),
@@ -693,6 +709,14 @@ assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot(roo
 assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReport(rootConnectorPackage).accepted, true);
 assert.equal(buildMeetingAppTimelineConnectorHandoff(rootConnectorPackage).schema, 'meeting_app_timeline_connector_handoff');
 assert.equal(assertMeetingAppTimelineConnectorPackage(rootConnectorPackage), rootConnectorPackage);
+assert.equal(rootMeetingAppSdk.meetingAppAdapterCapability('google-meet').schema, 'meeting_app_adapter_capability_report');
+assert.equal(rootMeetingAppSdk.adapterCapability('google-meet').platform, 'google_meet');
+assert.equal(rootMeetingAppSdk.meetingAppAdapterCapabilityMatrix().platform_count, 1);
+assert.equal(rootMeetingAppSdk.adapterCapabilityMatrix().provider_axis_declared_count, 1);
+assert.equal(rootMeetingAppSdk.meetingAppAdapterExecutionPlan('google-meet').schema, 'meeting_app_adapter_execution_plan');
+assert.equal(rootMeetingAppSdk.adapterExecutionPlan('google-meet').realtime_ready, true);
+assert.equal(rootMeetingAppSdk.meetingAppAdapterExecutionPlanMatrix().accepted_count, 1);
+assert.equal(rootMeetingAppSdk.adapterExecutionPlanMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdaptationPackage('google-meet').adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
 assert.equal(rootMeetingAppSdk.adaptationPackageMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformConsumerHandoff().schema, 'meeting_platform_consumer_handoff');

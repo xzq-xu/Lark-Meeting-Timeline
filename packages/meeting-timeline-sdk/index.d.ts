@@ -320,6 +320,26 @@ export interface MeetingAppTimelineSdk {
   hostPackage: MeetingAppTimelineSdk['runtimeAdapterHostPackage'];
   connectorPackage(options?: Record<string, unknown>): MeetingAppTimelineConnectorPackage;
   runtimeConnectorPackage: MeetingAppTimelineSdk['connectorPackage'];
+  meetingAppAdapterCapability(
+    platformOrOptions?: string | import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterCapabilityOptions,
+    input?: Record<string, unknown>,
+    options?: import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterCapabilityOptions,
+  ): import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterCapabilityReport;
+  adapterCapability: MeetingAppTimelineSdk['meetingAppAdapterCapability'];
+  meetingAppAdapterCapabilityMatrix(
+    options?: import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterCapabilityOptions,
+  ): import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterCapabilityMatrix;
+  adapterCapabilityMatrix: MeetingAppTimelineSdk['meetingAppAdapterCapabilityMatrix'];
+  meetingAppAdapterExecutionPlan(
+    platformOrCapability?: string | import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterCapabilityReport | import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterCapabilityOptions,
+    input?: Record<string, unknown>,
+    options?: import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterCapabilityOptions,
+  ): import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterExecutionPlan;
+  adapterExecutionPlan: MeetingAppTimelineSdk['meetingAppAdapterExecutionPlan'];
+  meetingAppAdapterExecutionPlanMatrix(
+    options?: import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterCapabilityOptions,
+  ): import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterExecutionPlanMatrix;
+  adapterExecutionPlanMatrix: MeetingAppTimelineSdk['meetingAppAdapterExecutionPlanMatrix'];
   platformAdaptationPackage(
     platformOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
@@ -524,6 +544,7 @@ export interface MeetingAppTimelineSdk {
 export function createMeetingAppTimelineSdk(options: MeetingAppTimelineSdkOptions): MeetingAppTimelineSdk;
 
 export * from './adapters/platform-kit.mjs';
+export * from './adapters/meeting-app-adapter-capability.mjs';
 export * from './adapters/meeting-app-adapter-integration-package.mjs';
 export * from './adapters/meeting-app-connector-package.mjs';
 export * from './adapters/meeting-platform-connector.mjs';
