@@ -20,6 +20,12 @@ import {
   buildMeetingAppAdapterFitReport,
 } from './meeting-apps.mjs';
 import {
+  assertMeetingAppAdapterManifest,
+  assertMeetingAppAdapterManifestMatrix,
+  buildMeetingAppAdapterManifest,
+  buildMeetingAppAdapterManifestMatrix,
+} from './meeting-app-adapter-manifest.mjs';
+import {
   buildMeetingAppTrackPipeline,
   createMeetingAppTrackPipeline,
 } from './meeting-app-track-pipeline.mjs';
@@ -423,6 +429,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     }),
     meeting_app_extension_install_plan: buildMeetingAppExtensionInstallPlan(options),
     meeting_app_extension_acceptance: buildMeetingAppExtensionScaffoldAcceptanceReport(options),
+    meeting_app_adapter_manifest_matrix: buildMeetingAppAdapterManifestMatrix(options),
     meeting_app_integration_matrix: buildMeetingAppIntegrationMatrix(options),
     meeting_app_deployment_manifests: buildAllMeetingAppDeploymentManifests(options),
     meeting_app_deployment_manifest_acceptance: buildAllMeetingAppDeploymentManifestAcceptanceReports(options),
@@ -727,6 +734,18 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     meetingAppAdapterFitMatrix(input = {}, fitOptions = {}) {
       return buildMeetingAppAdapterFitMatrix(input, withDefaults(defaults, fitOptions));
+    },
+    meetingAppAdapterManifest(platform, manifestOptions = {}) {
+      return buildMeetingAppAdapterManifest(platform, withDefaults(defaults, manifestOptions));
+    },
+    meetingAppAdapterManifestMatrix(manifestOptions = {}) {
+      return buildMeetingAppAdapterManifestMatrix(withDefaults(defaults, manifestOptions));
+    },
+    assertMeetingAppAdapterManifest(manifestOrPlatform = {}, manifestOptions = {}) {
+      return assertMeetingAppAdapterManifest(manifestOrPlatform, withDefaults(defaults, manifestOptions));
+    },
+    assertMeetingAppAdapterManifestMatrix(matrixOrOptions = {}, manifestOptions = {}) {
+      return assertMeetingAppAdapterManifestMatrix(matrixOrOptions, withDefaults(defaults, manifestOptions));
     },
     meetingAppTrackPipeline(input = {}, trackOptions = {}) {
       return buildMeetingAppTrackPipeline(input, withDefaults(defaults, trackOptions));

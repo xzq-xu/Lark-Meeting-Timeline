@@ -67,6 +67,7 @@ function commandWithBase(name, options = {}, extra = '') {
 function buildConsumerCommands(options = {}) {
   return {
     consumer_handoff: commandWithBase('meeting-platform:consumer-handoff', options),
+    app_adapter_manifest: commandWithBase('meeting-app:adapter-manifest', options),
     conformance: commandWithBase('meeting-platform:conformance', options),
     host_integration: commandWithBase('meeting-platform:host-integration', options),
     integration_runtime_manifest: commandWithBase('meeting-platform:integration-runtime-manifest', options),
@@ -145,6 +146,7 @@ function buildEntrypoints(hostPlan = {}, options = {}) {
       platform_kit: hostPlan.sdk?.kit_module,
       integration_runtime: hostPlan.sdk?.integration_runtime_module,
       host_integration: hostPlan.sdk?.host_integration_module,
+      app_adapter_manifest: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-manifest',
       consumer_handoff: '@ai-annotation/meeting-timeline-sdk/adapters/platform-consumer-handoff',
       conformance: hostPlan.sdk?.platform_conformance_module,
       runtime_event: hostPlan.sdk?.runtime_event_module,
@@ -153,6 +155,8 @@ function buildEntrypoints(hostPlan = {}, options = {}) {
     kit_methods: [
       'platformConsumerHandoff',
       'assertPlatformConsumerHandoff',
+      'meetingAppAdapterManifest',
+      'meetingAppAdapterManifestMatrix',
       'platformConformance',
       'platformHostIntegrationPlan',
       'platformRuntimeBundleMatrix',

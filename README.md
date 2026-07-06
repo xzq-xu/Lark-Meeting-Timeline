@@ -69,6 +69,14 @@ npm run meeting-app:fixture-tracks
 
 它会写出 `data/meeting-app-fixture-track-readiness.json`，验证 Google Meet、Teams、Zoom、Webex、Lark 的 fixture 快照是否能驱动 `speaker_track` 和 `participant_track`。这只能证明 SDK wiring 和轨道格式，不替代真实会议页采样。
 
+交给外部宿主项目实现浏览器扩展、WebView 或桌面 Accessibility 采集器前，可以先导出会议 App 适配清单：
+
+```bash
+npm run meeting-app:adapter-manifest
+```
+
+它会写出 `data/meeting-app-adapter-manifests/` 和 `data/meeting-app-adapter-manifest-report.json`，把 Google Meet、Teams、Zoom、Webex、Lark 的 URL match、扩展权限、content script、MutationObserver 参数、DOM/AX selector、`observe_candidates` 消息契约、`captured_at_ms` 时间戳字段和 live snapshot 前置要求整理成机器可读交付物。这个清单只证明静态 SDK contract 和采集边界，真实上线前仍要用现场 DOM/evidence gate 验证。
+
 如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
 
 ```bash
@@ -115,7 +123,7 @@ SDK 包级交付前再跑一次 package smoke：
 npm run sdk:package-smoke
 ```
 
-它会对 `packages/meeting-timeline-sdk` 执行 `npm pack`，并在临时 consumer 项目里按包名导入 core、`platform-kit`、`platform-rollout`、`platform-strategy`、`platform-adaptation-package`、`platform-runtime-bundle`、`meeting-platform-runtime-host-verifier`、`platform-evidence-correlation`、`platform-evidence-session`、`platform-live-adapter` 的 suite/readiness、Google Meet adapter、meeting app gate、`meeting-app-track-pipeline` 和 `meeting-app-track-runtime`，确认外部项目不是依赖仓库内部相对路径。
+它会对 `packages/meeting-timeline-sdk` 执行 `npm pack`，并在临时 consumer 项目里按包名导入 core、`platform-kit`、`platform-rollout`、`platform-strategy`、`platform-adaptation-package`、`platform-runtime-bundle`、`meeting-platform-runtime-host-verifier`、`platform-evidence-correlation`、`platform-evidence-session`、`platform-live-adapter` 的 suite/readiness、Google Meet adapter、meeting app gate、`meeting-app-adapter-manifest`、`meeting-app-track-pipeline` 和 `meeting-app-track-runtime`，确认外部项目不是依赖仓库内部相对路径。
 
 ## 启动
 

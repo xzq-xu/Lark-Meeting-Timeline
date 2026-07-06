@@ -108,6 +108,7 @@ await applyMeetingSignals(timeline, signals);
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-extension`
+- `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-manifest`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixtures`
 - `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-fixture-tracks`
@@ -949,6 +950,30 @@ const observerPlan = kit.meetingAppRuntimeObserverPlan({
 ```
 
 `meetingAppRuntimeObserverPlanMatrix()` 可以一次生成多平台计划。浏览器扩展和 WebView 默认用 mutation observer + 低频 keep-alive；native detector 默认按窗口/Accessibility/音频快照变化触发。它仍然不替代真实 DOM 证据，只是把外部项目的观察循环和节流参数标准化，避免每个宿主自己猜采样频率。
+
+如果要把 Google Meet / Teams / Zoom / Webex / Lark 的本地观察能力交给另一个宿主项目实现，优先生成 `meeting-app-adapter-manifest`。它是比 observer plan 更接近交付边界的清单：包含浏览器匹配规则、扩展权限、content script manifest、MutationObserver 采样参数、DOM/AX selector 数量、`observe_candidates` 消息契约、`captured_at_ms` 时间戳字段、宿主 HTTP endpoints、验收命令和 live snapshot 前置要求：
+
+```js
+import {
+  buildMeetingAppAdapterManifestMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-manifest';
+
+const matrix = buildMeetingAppAdapterManifestMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+
+// matrix.rows 可直接渲染为接入清单；manifest.accepted 只代表静态 SDK contract 通过。
+// readiness.requires_live_snapshot_before_production 会提醒正式发布前仍需真实会议 DOM 快照验证。
+```
+
+CLI 入口会同时写出汇总报告和每个平台的 manifest JSON，适合交给 Chrome/Firefox 扩展、Electron WebView、Android WebView 或桌面 Accessibility 采集器实现：
+
+```bash
+npm run meeting-app:adapter-manifest
+```
+
+默认输出到 `data/meeting-app-adapter-manifests/` 和 `data/meeting-app-adapter-manifest-report.json`。这个清单不要求 provider webhook 或实时转写；provider 事件和 transcript 仍然只作为校准/会后处理，不能阻塞实时标注。
 
 如果宿主不想自己解释 `trigger_policy`，可以直接用 `meeting-app-observer-scheduler`。它消费 observer plan 和现有 runtime，把 DOM mutation、native snapshot change、keep-alive、active speaker follow-up、candidate missing end grace 统一映射为 `runtime.sample()` / `runtime.sampleTracks()` 调用：
 

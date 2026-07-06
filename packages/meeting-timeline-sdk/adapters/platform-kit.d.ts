@@ -215,6 +215,11 @@ import type {
   MeetingPlatformConsumerHandoff,
   MeetingPlatformConsumerHandoffOptions,
 } from './platform-consumer-handoff.mjs';
+import type {
+  MeetingAppAdapterManifest,
+  MeetingAppAdapterManifestMatrix,
+  MeetingAppAdapterManifestOptions,
+} from './meeting-app-adapter-manifest.mjs';
 import type { MeetingAppLaunchGate, MeetingAppLaunchGateOptions, MeetingAppLaunchGateSummary } from './meeting-app-gate.mjs';
 import type { MeetingAppSnapshotRecorder, MeetingAppSnapshotRecord, MeetingAppSnapshotRecordOptions, MeetingAppSnapshotRecordSet } from './meeting-app-snapshot-recorder.mjs';
 import type {
@@ -393,6 +398,16 @@ export interface MeetingPlatformTimelineKit {
     input?: MeetingAppSnapshot | MeetingAppSnapshot[] | Record<string, unknown>,
     fitOptions?: Record<string, unknown>,
   ): MeetingAppAdapterFitMatrix;
+  meetingAppAdapterManifest(platform: string, manifestOptions?: MeetingAppAdapterManifestOptions): MeetingAppAdapterManifest;
+  meetingAppAdapterManifestMatrix(manifestOptions?: MeetingAppAdapterManifestOptions): MeetingAppAdapterManifestMatrix;
+  assertMeetingAppAdapterManifest(
+    manifestOrPlatform?: MeetingAppAdapterManifest | string | MeetingAppAdapterManifestOptions,
+    manifestOptions?: MeetingAppAdapterManifestOptions,
+  ): MeetingAppAdapterManifest;
+  assertMeetingAppAdapterManifestMatrix(
+    matrixOrOptions?: MeetingAppAdapterManifestMatrix | MeetingAppAdapterManifestOptions,
+    manifestOptions?: MeetingAppAdapterManifestOptions,
+  ): MeetingAppAdapterManifestMatrix;
   meetingAppTrackPipeline(
     input?: MeetingAppTrackPipelineInput | Record<string, unknown>[],
     trackOptions?: MeetingAppTrackPipelineOptions,
