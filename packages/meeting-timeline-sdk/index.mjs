@@ -915,6 +915,76 @@ export function createMeetingAppTimelineSdk(options = {}) {
     runtimeConnectorPackage(connectorOptions = {}) {
       return sdk.connectorPackage(connectorOptions);
     },
+    platformAdaptationPackage(platformOrOptions = {}, packageOptions = {}) {
+      const resolved = singlePlatformInput(runtime, platformOrOptions, packageOptions);
+      return runtime.kit.platformAdaptationPackage(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
+    },
+    adaptationPackage(platformOrOptions = {}, packageOptions = {}) {
+      return sdk.platformAdaptationPackage(platformOrOptions, packageOptions);
+    },
+    platformAdaptationPackageMatrix(packageOptions = {}) {
+      return runtime.kit.platformAdaptationPackageMatrix(sdkPlatformOptions(runtime, packageOptions));
+    },
+    adaptationPackageMatrix(packageOptions = {}) {
+      return sdk.platformAdaptationPackageMatrix(packageOptions);
+    },
+    platformConsumerHandoff(handoffOptions = {}) {
+      return runtime.kit.platformConsumerHandoff(sdkPlatformOptions(runtime, handoffOptions));
+    },
+    consumerHandoff(handoffOptions = {}) {
+      return sdk.platformConsumerHandoff(handoffOptions);
+    },
+    assertPlatformConsumerHandoff(handoffOptions = {}) {
+      return runtime.kit.assertPlatformConsumerHandoff(sdkPlatformOptions(runtime, handoffOptions));
+    },
+    assertConsumerHandoff(handoffOptions = {}) {
+      return sdk.assertPlatformConsumerHandoff(handoffOptions);
+    },
+    platformRuntimeBundle(platformOrOptions = {}, bundleOptions = {}) {
+      const resolved = singlePlatformInput(runtime, platformOrOptions, bundleOptions);
+      return runtime.kit.platformRuntimeBundle(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
+    },
+    runtimeBundle(platformOrOptions = {}, bundleOptions = {}) {
+      return sdk.platformRuntimeBundle(platformOrOptions, bundleOptions);
+    },
+    platformRuntimeBundleMatrix(bundleOptions = {}) {
+      return runtime.kit.platformRuntimeBundleMatrix(sdkPlatformOptions(runtime, bundleOptions));
+    },
+    runtimeBundleMatrix(bundleOptions = {}) {
+      return sdk.platformRuntimeBundleMatrix(bundleOptions);
+    },
+    platformAdapterRoute(platformOrOptions = {}, routeOptions = {}) {
+      const resolved = singlePlatformInput(runtime, platformOrOptions, routeOptions);
+      return runtime.kit.platformAdapterRoute(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
+    },
+    adapterRoute(platformOrOptions = {}, routeOptions = {}) {
+      return sdk.platformAdapterRoute(platformOrOptions, routeOptions);
+    },
+    platformAdapterRouteMatrix(routeOptions = {}) {
+      return runtime.kit.platformAdapterRouteMatrix(sdkPlatformOptions(runtime, routeOptions));
+    },
+    adapterRouteMatrix(routeOptions = {}) {
+      return sdk.platformAdapterRouteMatrix(routeOptions);
+    },
+    platformAdaptationStrategy(platformOrOptions = {}, strategyOptions = {}) {
+      const resolved = singlePlatformInput(runtime, platformOrOptions, strategyOptions);
+      return runtime.kit.platformAdaptationStrategy(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
+    },
+    adaptationStrategy(platformOrOptions = {}, strategyOptions = {}) {
+      return sdk.platformAdaptationStrategy(platformOrOptions, strategyOptions);
+    },
+    platformAdaptationStrategyMatrix(strategyOptions = {}) {
+      return runtime.kit.platformAdaptationStrategyMatrix(sdkPlatformOptions(runtime, strategyOptions));
+    },
+    adaptationStrategyMatrix(strategyOptions = {}) {
+      return sdk.platformAdaptationStrategyMatrix(strategyOptions);
+    },
+    platformConnectorHub(connectorOptions = {}) {
+      return runtime.kit.platformConnectorHub(sdkPlatformOptions(runtime, connectorOptions));
+    },
+    connectorHub(connectorOptions = {}) {
+      return sdk.platformConnectorHub(connectorOptions);
+    },
     manifest(manifestOptions = {}) {
       return runtime.manifest(manifestOptions);
     },
@@ -992,3 +1062,8 @@ export * from './adapters/meeting-app-connector-package.mjs';
 export * from './adapters/meeting-platform-connector.mjs';
 export * from './adapters/platform-integration-runtime.mjs';
 export * from './adapters/platform-runtime-event.mjs';
+export * from './adapters/platform-adaptation-package.mjs';
+export * from './adapters/platform-consumer-handoff.mjs';
+export * from './adapters/platform-runtime-bundle.mjs';
+export * from './adapters/platform-adapter-route.mjs';
+export * from './adapters/platform-strategy.mjs';

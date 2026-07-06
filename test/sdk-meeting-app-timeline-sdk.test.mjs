@@ -139,6 +139,48 @@ assert.equal(connectorPackage.runtime_events.plan_matrix.platform_count, 2);
 assert.equal(connectorPackage.contracts.provider_events_block_realtime, false);
 assert.equal(connectorPackage.entrypoints.some((entry) => entry.id === 'speaker-participant-track'), true);
 
+const adaptationPackage = sdk.platformAdaptationPackage('google-meet');
+assert.equal(adaptationPackage.schema, 'meeting_platform_adaptation_package');
+assert.equal(adaptationPackage.platform, 'google_meet');
+assert.equal(adaptationPackage.adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
+assert.equal(sdk.adaptationPackage('zoom').platform, 'zoom');
+
+const adaptationPackageMatrix = sdk.platformAdaptationPackageMatrix();
+assert.equal(adaptationPackageMatrix.platform_count, 2);
+assert.equal(adaptationPackageMatrix.rows.find((row) => row.platform === 'google_meet').provider_path, 'google_workspace_events_pubsub');
+assert.equal(sdk.adaptationPackageMatrix().candidate_observer_count, 2);
+
+const consumerHandoff = sdk.platformConsumerHandoff();
+assert.equal(consumerHandoff.schema, 'meeting_platform_consumer_handoff');
+assert.equal(consumerHandoff.platform_count, 2);
+assert.equal(consumerHandoff.hard_contracts.timestamp_field, 'captured_at_ms');
+assert.equal(sdk.consumerHandoff().lightweight_connector_ready, true);
+assert.equal(sdk.assertConsumerHandoff().accepted, true);
+
+const runtimeBundle = sdk.platformRuntimeBundle('google-meet');
+assert.equal(runtimeBundle.schema, 'meeting_platform_runtime_bundle');
+assert.equal(runtimeBundle.runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
+assert.equal(sdk.runtimeBundle('zoom').platform, 'zoom');
+assert.equal(sdk.platformRuntimeBundleMatrix().platform_count, 2);
+assert.equal(sdk.runtimeBundleMatrix().lightweight_connector_ready_count, 2);
+
+const adapterRoute = sdk.platformAdapterRoute('google-meet');
+assert.equal(adapterRoute.schema, 'meeting_platform_adapter_route');
+assert.equal(adapterRoute.platform, 'google_meet');
+assert.equal(sdk.adapterRoute('zoom').platform, 'zoom');
+assert.equal(sdk.platformAdapterRouteMatrix().platform_count, 2);
+
+const adaptationStrategy = sdk.platformAdaptationStrategy('google-meet');
+assert.equal(adaptationStrategy.schema, 'meeting_platform_adaptation_strategy');
+assert.equal(adaptationStrategy.adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
+assert.equal(sdk.adaptationStrategy('zoom').platform, 'zoom');
+assert.equal(sdk.platformAdaptationStrategyMatrix().provider_reconcile_required_count, 2);
+
+const connectorHub = sdk.platformConnectorHub();
+assert.equal(connectorHub.schema, 'meeting_platform_connector_hub');
+assert.equal(connectorHub.accepted, true);
+assert.equal(sdk.connectorHub().platform_count, 2);
+
 const allPlatformsHostPackage = createMeetingAppTimelineSdk({
   baseUrl,
   fetch: fetchImpl,

@@ -186,9 +186,14 @@ import {
   SDK_VERSION,
   buildMeetingAppAdapterIntegrationPackageMatrix as buildMeetingAppAdapterIntegrationPackageMatrixFromRoot,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport as buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot,
+  buildMeetingPlatformAdaptationPackage as buildMeetingPlatformAdaptationPackageFromRoot,
+  buildMeetingPlatformAdaptationStrategy as buildMeetingPlatformAdaptationStrategyFromRoot,
+  buildMeetingPlatformAdapterRoute as buildMeetingPlatformAdapterRouteFromRoot,
+  buildMeetingPlatformConsumerHandoff as buildMeetingPlatformConsumerHandoffFromRoot,
   buildMeetingPlatformConnector as buildMeetingPlatformConnectorFromRoot,
   buildMeetingPlatformConnectorHub as buildMeetingPlatformConnectorHubFromRoot,
   buildMeetingPlatformIntegrationRuntimeManifest as buildMeetingPlatformIntegrationRuntimeManifestFromRoot,
+  buildMeetingPlatformRuntimeBundle as buildMeetingPlatformRuntimeBundleFromRoot,
   createMeetingAppTimelineSdk,
   createMeetingAppTimelineConnectorRuntimeClient as createMeetingAppTimelineConnectorRuntimeClientFromRoot,
   createMeetingPlatformConnectorBrowserRuntime as createMeetingPlatformConnectorBrowserRuntimeFromRoot,
@@ -516,6 +521,33 @@ assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot(roo
 assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReport(rootConnectorPackage).accepted, true);
 assert.equal(buildMeetingAppTimelineConnectorHandoff(rootConnectorPackage).schema, 'meeting_app_timeline_connector_handoff');
 assert.equal(assertMeetingAppTimelineConnectorPackage(rootConnectorPackage), rootConnectorPackage);
+assert.equal(rootMeetingAppSdk.platformAdaptationPackage('google-meet').adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
+assert.equal(rootMeetingAppSdk.adaptationPackageMatrix().platform_count, 1);
+assert.equal(rootMeetingAppSdk.platformConsumerHandoff().schema, 'meeting_platform_consumer_handoff');
+assert.equal(rootMeetingAppSdk.consumerHandoff().accepted, true);
+assert.equal(rootMeetingAppSdk.platformRuntimeBundle('google-meet').runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
+assert.equal(rootMeetingAppSdk.runtimeBundleMatrix().platform_count, 1);
+assert.equal(rootMeetingAppSdk.platformAdapterRoute('google-meet').platform, 'google_meet');
+assert.equal(rootMeetingAppSdk.adapterRouteMatrix().platform_count, 1);
+assert.equal(rootMeetingAppSdk.platformAdaptationStrategy('google-meet').adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
+assert.equal(rootMeetingAppSdk.adaptationStrategyMatrix().provider_reconcile_required_count, 1);
+assert.equal(rootMeetingAppSdk.connectorHub().accepted, true);
+assert.equal(buildMeetingPlatformAdaptationPackageFromRoot('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
+assert.equal(buildMeetingPlatformConsumerHandoffFromRoot({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+}).accepted, true);
+assert.equal(buildMeetingPlatformRuntimeBundleFromRoot('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).schema, 'meeting_platform_runtime_bundle');
+assert.equal(buildMeetingPlatformAdapterRouteFromRoot('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).platform, 'google_meet');
+assert.equal(buildMeetingPlatformAdaptationStrategyFromRoot('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
 const rootPlatformConnector = buildMeetingPlatformConnectorFromRoot('google-meet', { baseUrl: 'http://localhost:8787' });
 assert.equal(rootPlatformConnector.schema, 'meeting_platform_connector');
 assert.equal(rootPlatformConnector.readiness.realtime_annotation_ready, true);

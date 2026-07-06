@@ -320,6 +320,40 @@ export interface MeetingAppTimelineSdk {
   hostPackage: MeetingAppTimelineSdk['runtimeAdapterHostPackage'];
   connectorPackage(options?: Record<string, unknown>): MeetingAppTimelineConnectorPackage;
   runtimeConnectorPackage: MeetingAppTimelineSdk['connectorPackage'];
+  platformAdaptationPackage(
+    platformOrOptions?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adaptation-package.mjs').MeetingPlatformAdaptationPackage;
+  adaptationPackage: MeetingAppTimelineSdk['platformAdaptationPackage'];
+  platformAdaptationPackageMatrix(options?: Record<string, unknown>): import('./adapters/platform-adaptation-package.mjs').MeetingPlatformAdaptationPackageMatrix;
+  adaptationPackageMatrix: MeetingAppTimelineSdk['platformAdaptationPackageMatrix'];
+  platformConsumerHandoff(options?: Record<string, unknown>): import('./adapters/platform-consumer-handoff.mjs').MeetingPlatformConsumerHandoff;
+  consumerHandoff: MeetingAppTimelineSdk['platformConsumerHandoff'];
+  assertPlatformConsumerHandoff(options?: Record<string, unknown>): import('./adapters/platform-consumer-handoff.mjs').MeetingPlatformConsumerHandoff;
+  assertConsumerHandoff: MeetingAppTimelineSdk['assertPlatformConsumerHandoff'];
+  platformRuntimeBundle(
+    platformOrOptions?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-runtime-bundle.mjs').MeetingPlatformRuntimeBundle;
+  runtimeBundle: MeetingAppTimelineSdk['platformRuntimeBundle'];
+  platformRuntimeBundleMatrix(options?: Record<string, unknown>): import('./adapters/platform-runtime-bundle.mjs').MeetingPlatformRuntimeBundleMatrix;
+  runtimeBundleMatrix: MeetingAppTimelineSdk['platformRuntimeBundleMatrix'];
+  platformAdapterRoute(
+    platformOrOptions?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-route.mjs').MeetingPlatformAdapterRoute;
+  adapterRoute: MeetingAppTimelineSdk['platformAdapterRoute'];
+  platformAdapterRouteMatrix(options?: Record<string, unknown>): import('./adapters/platform-adapter-route.mjs').MeetingPlatformAdapterRouteMatrix;
+  adapterRouteMatrix: MeetingAppTimelineSdk['platformAdapterRouteMatrix'];
+  platformAdaptationStrategy(
+    platformOrOptions?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-strategy.mjs').MeetingPlatformAdaptationStrategy;
+  adaptationStrategy: MeetingAppTimelineSdk['platformAdaptationStrategy'];
+  platformAdaptationStrategyMatrix(options?: Record<string, unknown>): import('./adapters/platform-strategy.mjs').MeetingPlatformAdaptationStrategyMatrix;
+  adaptationStrategyMatrix: MeetingAppTimelineSdk['platformAdaptationStrategyMatrix'];
+  platformConnectorHub(options?: Record<string, unknown>): import('./adapters/meeting-platform-connector.mjs').MeetingPlatformConnectorHub;
+  connectorHub: MeetingAppTimelineSdk['platformConnectorHub'];
   manifest(options?: Record<string, unknown>): Record<string, unknown>;
   readiness(options?: Record<string, unknown>): Record<string, unknown>;
   handoffReadiness(options?: Record<string, unknown>): Record<string, unknown>;
@@ -361,3 +395,8 @@ export * from './adapters/meeting-app-connector-package.mjs';
 export * from './adapters/meeting-platform-connector.mjs';
 export * from './adapters/platform-integration-runtime.mjs';
 export * from './adapters/platform-runtime-event.mjs';
+export * from './adapters/platform-adaptation-package.mjs';
+export * from './adapters/platform-consumer-handoff.mjs';
+export * from './adapters/platform-runtime-bundle.mjs';
+export * from './adapters/platform-adapter-route.mjs';
+export * from './adapters/platform-strategy.mjs';
