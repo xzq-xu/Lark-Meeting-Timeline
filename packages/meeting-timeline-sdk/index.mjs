@@ -953,6 +953,19 @@ export function createMeetingAppTimelineSdk(options = {}) {
     implementationHandoffMatrix(handoffOptions = {}) {
       return sdk.platformImplementationHandoffMatrix(handoffOptions);
     },
+    platformAdapterAuthoringPlan(platformOrOptions = {}, authoringOptions = {}) {
+      const resolved = singlePlatformInput(runtime, platformOrOptions, authoringOptions);
+      return runtime.kit.platformAdapterAuthoringPlan(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
+    },
+    adapterAuthoringPlan(platformOrOptions = {}, authoringOptions = {}) {
+      return sdk.platformAdapterAuthoringPlan(platformOrOptions, authoringOptions);
+    },
+    platformAdapterAuthoringMatrix(authoringOptions = {}) {
+      return runtime.kit.platformAdapterAuthoringMatrix(sdkPlatformOptions(runtime, authoringOptions));
+    },
+    adapterAuthoringMatrix(authoringOptions = {}) {
+      return sdk.platformAdapterAuthoringMatrix(authoringOptions);
+    },
     platformRuntimeBundle(platformOrOptions = {}, bundleOptions = {}) {
       const resolved = singlePlatformInput(runtime, platformOrOptions, bundleOptions);
       return runtime.kit.platformRuntimeBundle(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
@@ -1078,6 +1091,7 @@ export * from './adapters/platform-runtime-event.mjs';
 export * from './adapters/platform-adaptation-package.mjs';
 export * from './adapters/platform-consumer-handoff.mjs';
 export * from './adapters/platform-implementation-handoff.mjs';
+export * from './adapters/platform-adapter-authoring.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-strategy.mjs';

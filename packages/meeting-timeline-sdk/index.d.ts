@@ -338,6 +338,13 @@ export interface MeetingAppTimelineSdk {
   implementationHandoff: MeetingAppTimelineSdk['platformImplementationHandoff'];
   platformImplementationHandoffMatrix(options?: Record<string, unknown>): import('./adapters/platform-implementation-handoff.mjs').MeetingPlatformImplementationHandoffMatrix;
   implementationHandoffMatrix: MeetingAppTimelineSdk['platformImplementationHandoffMatrix'];
+  platformAdapterAuthoringPlan(
+    platformOrOptions?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-authoring.mjs').MeetingPlatformAdapterAuthoringPlan;
+  adapterAuthoringPlan: MeetingAppTimelineSdk['platformAdapterAuthoringPlan'];
+  platformAdapterAuthoringMatrix(options?: Record<string, unknown>): import('./adapters/platform-adapter-authoring.mjs').MeetingPlatformAdapterAuthoringMatrix;
+  adapterAuthoringMatrix: MeetingAppTimelineSdk['platformAdapterAuthoringMatrix'];
   platformRuntimeBundle(
     platformOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
@@ -405,6 +412,7 @@ export * from './adapters/platform-runtime-event.mjs';
 export * from './adapters/platform-adaptation-package.mjs';
 export * from './adapters/platform-consumer-handoff.mjs';
 export * from './adapters/platform-implementation-handoff.mjs';
+export * from './adapters/platform-adapter-authoring.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-strategy.mjs';
