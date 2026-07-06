@@ -13,6 +13,7 @@ import {
 
 export const MEETING_APP_ADAPTER_HANDOFF_PACKAGE_SCHEMA = 'meeting_app_adapter_handoff_package';
 export const MEETING_APP_ADAPTER_HANDOFF_PACKAGE_MATRIX_SCHEMA = 'meeting_app_adapter_handoff_package_matrix';
+export const MEETING_APP_ADAPTER_VERIFICATION_PLAN_SCHEMA = 'meeting_app_adapter_verification_plan';
 export const MEETING_APP_ADAPTER_HANDOFF_PACKAGE_SCHEMA_VERSION = 1;
 
 function firstNonEmpty(...values) {
@@ -73,6 +74,7 @@ function integrationReadme({ spec, runtimeConfig, manifest }) {
     '- `adapter-spec.json`: static URL, permission, selector, MutationObserver and nonblocking contract.',
     '- `runtime-config.json`: options for browser extension, WebView preload or Electron content script runtime.',
     '- `extension-manifest-fragment.json`: match patterns, permissions and content script fragment.',
+    '- `verification-plan.json`: live evidence and acceptance checklist for the host implementation.',
     manifest ? '- `adapter-manifest.json`: built-in adapter manifest used to derive this package.' : '',
     '',
     '## Minimal Integration',
@@ -86,6 +88,7 @@ function integrationReadme({ spec, runtimeConfig, manifest }) {
     '- Capture live DOM snapshots before production rollout.',
     '- Verify speaker and participant track extraction on real meetings.',
     '- Verify annotation insertions keep `captured_at_ms` and land on the current meeting axis.',
+    '- Keep `verification-plan.json` with the evidence package used for handoff readiness.',
     '',
     '## Contract',
     `- adapter_key: ${spec.adapter_key}`,
@@ -94,6 +97,140 @@ function integrationReadme({ spec, runtimeConfig, manifest }) {
     `- transcript_blocks_realtime: ${runtimeConfig.contracts?.transcript_blocks_realtime}`,
     '',
   ].filter(Boolean).join('\n');
+}
+
+function verificationPlan({ spec, runtimeConfig, manifest }) {
+  const adapterKey = spec.adapter_key;
+  const requiredEvidence = [
+    {
+      id: 'live_dom_snapshot',
+      phase: 'live_capture',
+      required: true,
+      minimum_count: 1,
+      accepted_artifacts: ['meeting_app_snapshot_record_set', 'meeting_app_live_evidence_package'],
+      proof_fields: ['snapshot_records[].captured_at_ms', 'snapshot_records[].page.controls', 'snapshot_records[].page.participants'],
+      purpose: 'Proves the selector set can see controls and participants on a real meeting page.',
+    },
+    {
+      id: 'candidate_observation',
+      phase: 'runtime_observation',
+      required: true,
+      minimum_count: 1,
+      accepted_artifacts: ['observe_candidates_message', 'meeting_platform_runtime_event'],
+      proof_fields: ['captured_at_ms', 'platform', 'url'],
+      purpose: 'Proves local observation can timestamp meeting candidates without provider events.',
+    },
+    {
+      id: 'speaker_track',
+      phase: 'runtime_observation',
+      required: true,
+      minimum_count: 1,
+      accepted_artifacts: ['speaker_track', 'meeting_platform_evidence_package'],
+      proof_fields: ['speaker_segments[].captured_at_ms', 'speaker_segments[].speaker_label'],
+      purpose: 'Proves speaker positions can be drawn on the meeting timeline without realtime transcript.',
+    },
+    {
+      id: 'participant_track',
+      phase: 'runtime_observation',
+      required: true,
+      minimum_count: 1,
+      accepted_artifacts: ['participant_track', 'meeting_platform_evidence_package'],
+      proof_fields: ['participant_segments[].captured_at_ms', 'participant_segments[].participant_label'],
+      purpose: 'Proves visible participant positions can be tracked for the timeline.',
+    },
+    {
+      id: 'annotation_insert_current_axis',
+      phase: 'annotation_runtime',
+      required: true,
+      minimum_count: 1,
+      accepted_artifacts: ['timeline_annotation', 'meeting_platform_runtime_replay'],
+      proof_fields: ['annotations[].captured_at_ms', 'annotations[].meeting_id', 'annotations[].axis_id'],
+      purpose: 'Proves handwritten marks land on the current meeting axis at capture time.',
+    },
+  ];
+  const staticChecks = [
+    {
+      id: 'adapter_spec_accepted',
+      phase: 'static',
+      blocking: true,
+      status: spec.accepted === true ? 'passed' : 'failed',
+      evidence: 'adapter-spec.json',
+    },
+    {
+      id: 'runtime_config_accepted',
+      phase: 'static',
+      blocking: true,
+      status: runtimeConfig.accepted === true ? 'passed' : 'failed',
+      evidence: 'runtime-config.json',
+    },
+    {
+      id: 'content_script_ready',
+      phase: 'static',
+      blocking: true,
+      status: runtimeConfig.readiness?.content_script_ready === true ? 'passed' : 'failed',
+      evidence: 'extension-manifest-fragment.json',
+    },
+    {
+      id: 'captured_at_ms_contract',
+      phase: 'static',
+      blocking: true,
+      status: runtimeConfig.contracts?.timestamp_field === 'captured_at_ms' ? 'passed' : 'failed',
+      evidence: 'runtime-config.json',
+    },
+    {
+      id: 'provider_transcript_nonblocking',
+      phase: 'static',
+      blocking: true,
+      status: runtimeConfig.contracts?.provider_events_block_realtime === false
+        && runtimeConfig.contracts?.transcript_blocks_realtime === false
+        ? 'passed'
+        : 'failed',
+      evidence: 'runtime-config.json',
+    },
+  ];
+  const liveChecks = requiredEvidence.map((item) => ({
+    id: `verify_${item.id}`,
+    phase: item.phase,
+    blocking: true,
+    status: 'pending_live_evidence',
+    evidence: item.accepted_artifacts,
+  }));
+  return {
+    type: 'meeting_app_adapter_verification_plan',
+    schema: MEETING_APP_ADAPTER_VERIFICATION_PLAN_SCHEMA,
+    schema_version: MEETING_APP_ADAPTER_HANDOFF_PACKAGE_SCHEMA_VERSION,
+    adapter_key: adapterKey,
+    display_name: spec.display_name,
+    source: spec.source,
+    surface: spec.surface,
+    generated_from: {
+      adapter_spec: spec.schema,
+      runtime_config: runtimeConfig.schema,
+      adapter_manifest: manifest?.schema,
+    },
+    commands: {
+      export_handoff_package: `npm run meeting-app:adapter-handoff-package -- --platforms=${adapterKey}`,
+      run_live_evidence_gate: 'npm run meeting-app:evidence-gate',
+      run_handoff_readiness: `npm run meeting-platform:handoff-readiness -- --platforms=${adapterKey}`,
+      run_package_smoke: 'npm run sdk:package-smoke',
+    },
+    acceptance_policy: {
+      static_checks_must_pass: true,
+      live_evidence_required_before_production: true,
+      provider_events_must_not_block_realtime: true,
+      transcript_import_must_not_block_realtime: true,
+      timestamp_field: 'captured_at_ms',
+    },
+    required_evidence: requiredEvidence,
+    acceptance_checks: [...staticChecks, ...liveChecks],
+    next_actions: [
+      'capture_live_dom_snapshot',
+      'run_candidate_observation',
+      'verify_speaker_and_participant_tracks',
+      'verify_current_axis_annotation_insert',
+      'attach_evidence_package_to_handoff_readiness',
+    ],
+  };
 }
 
 function packageIssues({ spec, runtimeConfig, files }) {
@@ -128,6 +265,9 @@ function packageIssues({ spec, runtimeConfig, files }) {
     files.some((file) => file.path === 'runtime-config.json')
       ? undefined
       : issue('error', 'missing_runtime_config_file', 'Handoff file list must include runtime-config.json.'),
+    files.some((file) => file.path === 'verification-plan.json')
+      ? undefined
+      : issue('error', 'missing_verification_plan_file', 'Handoff file list must include verification-plan.json.'),
   ].filter(Boolean);
 }
 
@@ -138,6 +278,7 @@ export function buildMeetingAppAdapterHandoffPackage(specOrPlatform = {}, option
     : buildMeetingAppAdapterSpec(specOrPlatform, packageOptions);
   const runtimeConfig = buildMeetingAppAdapterRuntimeConfig(spec, packageOptions);
   const manifest = maybeBuiltInManifest(spec, packageOptions);
+  const plan = verificationPlan({ spec, runtimeConfig, manifest });
   const files = [
     {
       path: 'adapter-spec.json',
@@ -164,6 +305,12 @@ export function buildMeetingAppAdapterHandoffPackage(specOrPlatform = {}, option
       media_type: 'application/json',
       schema: 'browser_extension_manifest_fragment',
       content: runtimeConfig.extension,
+    },
+    {
+      path: 'verification-plan.json',
+      media_type: 'application/json',
+      schema: plan.schema,
+      content: plan,
     },
     {
       path: 'integration-readme.md',
@@ -198,6 +345,7 @@ export function buildMeetingAppAdapterHandoffPackage(specOrPlatform = {}, option
     adapter_manifest: manifest,
     runtime_config: runtimeConfig,
     extension_manifest_fragment: runtimeConfig.extension,
+    verification_plan: plan,
     consumer_entrypoints: runtimeConfig.entrypoints,
     contracts: {
       timestamp_field: runtimeConfig.contracts?.timestamp_field,

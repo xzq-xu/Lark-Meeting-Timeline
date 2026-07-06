@@ -57,7 +57,7 @@ assert.equal(report.accepted_count, 4);
 assert.equal(report.matrix.packages, undefined);
 assert.equal(report.rows.find((row) => row.adapter_key === 'whereby').source, 'custom_spec');
 assert.equal(report.rows.find((row) => row.adapter_key === 'slack_huddle').accepted, true);
-assert.equal(report.written_files.length, 22);
+assert.equal(report.written_files.length, 26);
 
 const wherebyRuntime = JSON.parse(await readFile(join(outDir, 'whereby', 'runtime-config.json'), 'utf8'));
 assert.equal(wherebyRuntime.schema, 'meeting_app_adapter_runtime_config');
@@ -68,13 +68,18 @@ const wherebyReadme = await readFile(join(outDir, 'whereby', 'integration-readme
 assert.match(wherebyReadme, /installMeetingAppContentScriptBridge/);
 assert.match(wherebyReadme, /captured_at_ms/);
 
+const wherebyVerificationPlan = JSON.parse(await readFile(join(outDir, 'whereby', 'verification-plan.json'), 'utf8'));
+assert.equal(wherebyVerificationPlan.schema, 'meeting_app_adapter_verification_plan');
+assert.equal(wherebyVerificationPlan.required_evidence.some((item) => item.id === 'live_dom_snapshot'), true);
+assert.equal(wherebyVerificationPlan.acceptance_checks.some((item) => item.id === 'provider_transcript_nonblocking'), true);
+
 const googleManifest = JSON.parse(await readFile(join(outDir, 'google_meet', 'adapter-manifest.json'), 'utf8'));
 assert.equal(googleManifest.schema, 'meeting_app_adapter_manifest');
 
 const descriptor = JSON.parse(await readFile(join(outDir, 'whereby', 'handoff-package.json'), 'utf8'));
 assert.equal(descriptor.schema, 'meeting_app_adapter_handoff_package');
 assert.equal(descriptor.files.some((file) => 'content' in file), false);
-assert.equal(descriptor.written_files.length, 4);
+assert.equal(descriptor.written_files.length, 5);
 
 const template = JSON.parse(await readFile(templateFile, 'utf8'));
 assert.equal(template.adapter_key, 'slack_huddle');

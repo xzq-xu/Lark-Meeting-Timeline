@@ -13,6 +13,7 @@ import type {
 
 export const MEETING_APP_ADAPTER_HANDOFF_PACKAGE_SCHEMA: 'meeting_app_adapter_handoff_package';
 export const MEETING_APP_ADAPTER_HANDOFF_PACKAGE_MATRIX_SCHEMA: 'meeting_app_adapter_handoff_package_matrix';
+export const MEETING_APP_ADAPTER_VERIFICATION_PLAN_SCHEMA: 'meeting_app_adapter_verification_plan';
 export const MEETING_APP_ADAPTER_HANDOFF_PACKAGE_SCHEMA_VERSION: 1;
 
 export interface MeetingAppAdapterHandoffPackageOptions extends MeetingAppAdapterRuntimeConfigOptions {}
@@ -36,6 +37,22 @@ export interface MeetingAppAdapterHandoffPackageIssue {
   [key: string]: unknown;
 }
 
+export interface MeetingAppAdapterVerificationPlan {
+  type: 'meeting_app_adapter_verification_plan';
+  schema: typeof MEETING_APP_ADAPTER_VERIFICATION_PLAN_SCHEMA;
+  schema_version: typeof MEETING_APP_ADAPTER_HANDOFF_PACKAGE_SCHEMA_VERSION;
+  adapter_key: string;
+  display_name: string;
+  source: string;
+  surface: string;
+  generated_from: Record<string, unknown>;
+  commands: Record<string, string>;
+  acceptance_policy: Record<string, unknown>;
+  required_evidence: Array<Record<string, unknown>>;
+  acceptance_checks: Array<Record<string, unknown>>;
+  next_actions: string[];
+}
+
 export interface MeetingAppAdapterHandoffPackage {
   type: 'meeting_app_adapter_handoff_package';
   schema: typeof MEETING_APP_ADAPTER_HANDOFF_PACKAGE_SCHEMA;
@@ -53,6 +70,7 @@ export interface MeetingAppAdapterHandoffPackage {
   adapter_manifest?: MeetingAppAdapterManifest;
   runtime_config: MeetingAppAdapterRuntimeConfig;
   extension_manifest_fragment: Record<string, unknown>;
+  verification_plan: MeetingAppAdapterVerificationPlan;
   consumer_entrypoints: Record<string, string>;
   contracts: Record<string, unknown>;
   validation: Record<string, unknown>;

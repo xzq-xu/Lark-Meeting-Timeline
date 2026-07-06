@@ -1056,7 +1056,7 @@ npm run meeting-app:adapter-handoff-package
 npm run meeting-app:adapter-handoff-package -- --spec-file=data/whereby-spec.json
 ```
 
-默认输出到 `data/meeting-app-adapter-handoff-packages/` 和 `data/meeting-app-adapter-handoff-package-report.json`。每个平台目录里包含 `adapter-spec.json`、`runtime-config.json`、`extension-manifest-fragment.json`、`integration-readme.md`，内置平台还会包含 `adapter-manifest.json`。这份 package 的 `validation.required_live_evidence` 明确要求真实 DOM snapshot、candidate observation、speaker/participant track 和当前轴标注插入验证。
+默认输出到 `data/meeting-app-adapter-handoff-packages/` 和 `data/meeting-app-adapter-handoff-package-report.json`。每个平台目录里包含 `adapter-spec.json`、`runtime-config.json`、`extension-manifest-fragment.json`、`verification-plan.json`、`integration-readme.md`，内置平台还会包含 `adapter-manifest.json`。这份 package 的 `validation.required_live_evidence` 和 `verification-plan.json` 明确要求真实 DOM snapshot、candidate observation、speaker/participant track 和当前轴标注插入验证。
 
 同一份 `runtimeConfig.browser_runtime_options` 也可以直接传给 `createMeetingAppBrowserRuntime()`；`runtimeConfig.capture_options` 可以直接传给 `captureMeetingAppDomSnapshot()` 做手动采样。也就是说，新会议软件的接入路径是 `adapter spec -> runtime config -> handoff package -> live snapshot evidence -> handoff readiness`。
 

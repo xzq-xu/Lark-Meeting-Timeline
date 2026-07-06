@@ -842,6 +842,7 @@ assert.equal(kit.meetingAppAdapterRuntimeConfig('google-meet').capture_options.p
 assert.equal(kit.meetingAppAdapterRuntimeConfigMatrix({ platforms: ['google-meet'] }).schema, 'meeting_app_adapter_runtime_config_matrix');
 assert.equal(buildMeetingAppAdapterHandoffPackage('google-meet').accepted, true);
 assert.equal(buildMeetingAppAdapterHandoffPackage('google-meet').file_paths.includes('runtime-config.json'), true);
+assert.equal(buildMeetingAppAdapterHandoffPackage('google-meet').file_paths.includes('verification-plan.json'), true);
 assert.equal(buildMeetingAppAdapterHandoffPackageMatrix({ platforms: ['google-meet', 'zoom'] }).accepted_count, 2);
 assert.equal(assertMeetingAppAdapterHandoffPackage('zoom').contracts.timestamp_field, 'captured_at_ms');
 assert.equal(assertMeetingAppAdapterHandoffPackageMatrix({ platforms: ['google-meet'] }).package_count, 1);

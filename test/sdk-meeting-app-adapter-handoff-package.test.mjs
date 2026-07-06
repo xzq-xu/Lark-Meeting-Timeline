@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   MEETING_APP_ADAPTER_HANDOFF_PACKAGE_MATRIX_SCHEMA,
   MEETING_APP_ADAPTER_HANDOFF_PACKAGE_SCHEMA,
+  MEETING_APP_ADAPTER_VERIFICATION_PLAN_SCHEMA,
   assertMeetingAppAdapterHandoffPackage,
   assertMeetingAppAdapterHandoffPackageMatrix,
   buildMeetingAppAdapterHandoffPackage,
@@ -35,13 +36,22 @@ assert.equal(whereby.adapter_manifest, undefined);
 assert.equal(whereby.file_paths.includes('adapter-spec.json'), true);
 assert.equal(whereby.file_paths.includes('runtime-config.json'), true);
 assert.equal(whereby.file_paths.includes('extension-manifest-fragment.json'), true);
+assert.equal(whereby.file_paths.includes('verification-plan.json'), true);
 assert.equal(whereby.file_paths.includes('integration-readme.md'), true);
 assert.equal(whereby.contracts.timestamp_field, 'captured_at_ms');
 assert.equal(whereby.contracts.provider_events_block_realtime, false);
 assert.equal(whereby.validation.required_live_evidence.includes('annotation_insert_current_axis'), true);
+assert.equal(whereby.verification_plan.schema, MEETING_APP_ADAPTER_VERIFICATION_PLAN_SCHEMA);
+assert.equal(whereby.verification_plan.acceptance_policy.timestamp_field, 'captured_at_ms');
+assert.equal(whereby.verification_plan.required_evidence.some((item) => item.id === 'speaker_track'), true);
+assert.equal(whereby.verification_plan.acceptance_checks.some((item) => item.id === 'verify_annotation_insert_current_axis'), true);
 assert.equal(
   String(whereby.files.find((file) => file.path === 'integration-readme.md').content).includes('installMeetingAppContentScriptBridge'),
   true,
+);
+assert.equal(
+  whereby.files.find((file) => file.path === 'verification-plan.json').content.required_evidence.length,
+  5,
 );
 assert.equal(assertMeetingAppAdapterHandoffPackage(whereby).adapter_key, 'whereby');
 

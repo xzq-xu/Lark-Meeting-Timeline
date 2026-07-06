@@ -99,7 +99,7 @@ npm run meeting-app:adapter-runtime-config
 npm run meeting-app:adapter-handoff-package
 ```
 
-它会写出 `data/meeting-app-adapter-handoff-packages/` 和 `data/meeting-app-adapter-handoff-package-report.json`。每个平台目录里包含 `adapter-spec.json`、`runtime-config.json`、`extension-manifest-fragment.json`、`integration-readme.md`，内置平台还会包含 `adapter-manifest.json`；这就是给 Google Meet、Teams、Zoom、Webex、Lark 或自定义会议软件宿主项目的最小接入包。
+它会写出 `data/meeting-app-adapter-handoff-packages/` 和 `data/meeting-app-adapter-handoff-package-report.json`。每个平台目录里包含 `adapter-spec.json`、`runtime-config.json`、`extension-manifest-fragment.json`、`verification-plan.json`、`integration-readme.md`，内置平台还会包含 `adapter-manifest.json`；这就是给 Google Meet、Teams、Zoom、Webex、Lark 或自定义会议软件宿主项目的最小接入包。`verification-plan.json` 明确列出真实 DOM snapshot、candidate observation、speaker/participant track 和当前轴标注插入这些上线前必须补齐的证据。
 
 如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
 
