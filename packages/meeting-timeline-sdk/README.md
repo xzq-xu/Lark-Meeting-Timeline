@@ -1004,6 +1004,16 @@ assertMeetingAppAdapterSpec(spec);
 
 spec 通过只表示“这个会议软件有可实现的本地观察 contract”；它不会假装我们已经支持真实 DOM。下一步仍然要用 content script / WebView / Accessibility 采样，把 live snapshot 喂给 `meetingAppAdapterFit()`、runtime host replay 和 handoff readiness。
 
+CLI 入口可以批量生成内置平台 spec、加载自定义 spec JSON，并输出汇总报告：
+
+```bash
+npm run meeting-app:adapter-spec
+npm run meeting-app:adapter-spec -- --spec-file=data/whereby-spec.json
+npm run meeting-app:adapter-spec -- --template-adapter-key=slack-huddle --template-file=data/slack-huddle-spec-template.json
+```
+
+默认输出到 `data/meeting-app-adapter-specs/` 和 `data/meeting-app-adapter-spec-report.json`。报告中的 `custom_count`、`capture_selector_ready_count`、`mutation_observer_ready_count` 可以作为新增会议软件进入真实采样前的静态 gate。
+
 如果宿主不想自己解释 `trigger_policy`，可以直接用 `meeting-app-observer-scheduler`。它消费 observer plan 和现有 runtime，把 DOM mutation、native snapshot change、keep-alive、active speaker follow-up、candidate missing end grace 统一映射为 `runtime.sample()` / `runtime.sampleTracks()` 调用：
 
 ```js

@@ -77,6 +77,14 @@ npm run meeting-app:adapter-manifest
 
 它会写出 `data/meeting-app-adapter-manifests/` 和 `data/meeting-app-adapter-manifest-report.json`，把 Google Meet、Teams、Zoom、Webex、Lark 的 URL match、扩展权限、content script、MutationObserver 参数、DOM/AX selector、`observe_candidates` 消息契约、`captured_at_ms` 时间戳字段和 live snapshot 前置要求整理成机器可读交付物。这个清单只证明静态 SDK contract 和采集边界，真实上线前仍要用现场 DOM/evidence gate 验证。
 
+如果要为暂未内置的会议软件准备接入规范，可以导出 adapter spec：
+
+```bash
+npm run meeting-app:adapter-spec
+```
+
+它会写出 `data/meeting-app-adapter-specs/` 和 `data/meeting-app-adapter-spec-report.json`。也可以传 `-- --spec-file=whereby.json` 或 `-- --template-adapter-key=slack-huddle --template-file=data/slack-huddle-spec-template.json`，先把新平台的 URL match、权限、selector、MutationObserver 和非阻塞规则固化成可验收 contract。
+
 如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
 
 ```bash
