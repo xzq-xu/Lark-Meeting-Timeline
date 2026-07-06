@@ -40,6 +40,10 @@ assert.equal(report.entrypoints.primary_modules.consumer_handoff, '@ai-annotatio
 assert.equal(report.entrypoints.primary_modules.meeting_platform_connector, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector');
 assert.equal(report.lightweight_connector_handoff.content_script_bridge.message_types.includes('meeting_timeline.insert_mark'), true);
 assert.equal(report.lightweight_connector_handoff.host_requirements.timestamp_field, 'captured_at_ms');
+assert.equal(report.sdk_facade_handoff.create_function, 'createMeetingAppTimelineSdk');
+assert.equal(report.sdk_facade_handoff.required_facade_methods.includes('platformConsumerHandoff'), true);
+assert.equal(report.sdk_facade_handoff.surface_wiring.browser_extension.content_script_messages.includes('meeting_timeline.observe_candidates'), true);
+assert.equal(report.sdk_facade_handoff.platform_rows.find((row) => row.platform === 'google_meet').provider_path, 'google_workspace_events_pubsub');
 assert.equal(report.rows.find((row) => row.platform === 'microsoft_teams').consumer_ready, true);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');
 

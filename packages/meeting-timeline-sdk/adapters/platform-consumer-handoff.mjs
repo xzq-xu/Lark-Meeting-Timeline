@@ -304,6 +304,134 @@ function buildContracts(hostPlan = {}) {
   };
 }
 
+function buildSdkFacadeHandoff(platforms = [], inputs = {}) {
+  const {
+    baseUrl,
+    hostPlan = {},
+    adaptationRows = {},
+    runtimeRows = {},
+    routeRows = {},
+    connectorHub = {},
+  } = inputs;
+  const platformRows = platforms.map((platform) => {
+    const adaptation = adaptationRows[platform] ?? {};
+    const runtime = runtimeRows[platform] ?? {};
+    const route = routeRows[platform] ?? {};
+    return compactObject({
+      platform,
+      display_name: adaptation.display_name ?? runtime.display_name,
+      next_phase: adaptation.next_phase,
+      provider_path: adaptation.provider_path,
+      provider_permission_risk: adaptation.provider_permission_risk,
+      adapter_first_route: route.first_route ?? runtime.adapter_first_route,
+      runtime_bundle_ready: runtime.runtime_ready,
+      lightweight_connector_ready: connectorHub.platforms?.includes(platform) && connectorHub.accepted === true,
+      facade_methods: {
+        adaptation_package: `sdk.platformAdaptationPackage('${platform}')`,
+        runtime_bundle: `sdk.platformRuntimeBundle('${platform}')`,
+        adapter_route: `sdk.platformAdapterRoute('${platform}')`,
+        adaptation_strategy: `sdk.platformAdaptationStrategy('${platform}')`,
+      },
+    });
+  });
+  return compactObject({
+    type: 'meeting_platform_sdk_facade_handoff',
+    package: '@ai-annotation/meeting-timeline-sdk',
+    create_function: 'createMeetingAppTimelineSdk',
+    constructor_options: compactObject({
+      baseUrl,
+      platforms,
+    }),
+    required_facade_methods: [
+      'detect',
+      'observePlatformCandidates',
+      'observeMeetingApp',
+      'insertAnnotation',
+      'speakerTrack',
+      'participantTrack',
+      'ingestProvider',
+      'platformAdaptationPackage',
+      'platformConsumerHandoff',
+      'platformRuntimeBundle',
+      'platformAdapterRoute',
+      'platformAdaptationStrategy',
+      'platformConnectorHub',
+    ],
+    minimal_realtime_flow: [
+      {
+        step: 1,
+        method: 'createMeetingAppTimelineSdk({ baseUrl, platforms })',
+        output: 'meeting_app_timeline_sdk',
+      },
+      {
+        step: 2,
+        method: 'sdk.platformConsumerHandoff()',
+        output: 'meeting_platform_consumer_handoff',
+        purpose: 'validate_static_contracts_before_runtime_install',
+      },
+      {
+        step: 3,
+        method: 'sdk.observePlatformCandidates({ tabs/windows })',
+        output: 'local_observer_axis_or_candidate_binding',
+        purpose: 'create_or_bind_the_current_meeting_axis_before_marks',
+      },
+      {
+        step: 4,
+        method: 'sdk.insertAnnotation(platform, { captured_at_ms, ...mark }, { remote: true })',
+        output: 'timeline_annotation',
+        purpose: 'insert_realtime_marks_by_device_capture_time',
+      },
+      {
+        step: 5,
+        method: 'sdk.speakerTrack(platform, sample) / sdk.participantTrack(platform, sample)',
+        output: 'speaker_or_participant_position_markers',
+        purpose: 'draw_positions_without_realtime_transcript_text',
+      },
+      {
+        step: 6,
+        method: 'sdk.ingestProvider(platform, providerEvent)',
+        output: 'reconcile_or_backfill_signal',
+        purpose: 'official_events_reconcile_lifecycle_without_blocking_marks',
+      },
+    ],
+    surface_wiring: {
+      browser_extension: {
+        install_method: 'sdk.platformRuntimeBundle(platform).runtime.lightweight_connector_bridge',
+        manifest_source: 'sdk.platformRuntimeBundle(platform).extension.content_script_manifest',
+        first_background_call: 'sdk.observePlatformCandidates({ tabs })',
+        content_script_messages: [
+          'meeting_timeline.sample',
+          'meeting_timeline.sample_tracks',
+          'meeting_timeline.insert_mark',
+          'meeting_timeline.provider_event',
+          'meeting_timeline.observe_candidates',
+        ],
+      },
+      electron_webview: {
+        install_method: 'sdk.platformRuntimeBundle(platform).runtime.lightweight_connector_bridge.options with windowMessaging=true',
+        first_preload_call: 'sdk.observeMeetingApp(platform, webviewSnapshot)',
+        host_bridge: 'postMessage meeting_timeline.* envelope to preload bridge',
+      },
+      native_detector: {
+        install_method: 'host calls sdk.observePlatformCandidates() and sdk.insertAnnotation() directly',
+        first_detector_call: 'sdk.observePlatformCandidates({ windows, processes, activeWindow })',
+        timestamp_source: 'device_absolute_captured_at_ms',
+      },
+      provider_adapter: {
+        install_method: 'host webhook/long-connection handler calls sdk.ingestProvider(platform, payload)',
+        realtime_blocking: false,
+        role: 'reconcile_and_backfill_after_local_axis',
+      },
+    },
+    host_endpoints: hostPlan.endpoints,
+    runtime_event_endpoint: hostPlan.endpoints?.runtime_events,
+    timestamp_field: 'captured_at_ms',
+    provider_events_block_realtime: false,
+    transcript_blocks_realtime: false,
+    platform_rows: platformRows,
+  });
+}
+
 function hostPlanSummary(hostPlan = {}) {
   return compactObject({
     type: hostPlan.type,
@@ -516,6 +644,14 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
     entrypoints: buildEntrypoints(hostPlan, sharedOptions),
     hard_contracts: buildContracts(hostPlan),
     lightweight_connector_handoff: buildLightweightConnectorHandoff(connectorHub, hostPlan),
+    sdk_facade_handoff: buildSdkFacadeHandoff(platforms, {
+      baseUrl,
+      hostPlan,
+      adaptationRows,
+      runtimeRows,
+      routeRows,
+      connectorHub,
+    }),
     boot_order: buildBootOrder(hostPlan, commands),
     endpoints: hostPlan.endpoints,
     commands,

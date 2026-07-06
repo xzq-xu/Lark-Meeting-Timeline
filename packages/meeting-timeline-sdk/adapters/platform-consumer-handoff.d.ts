@@ -70,6 +70,22 @@ export interface MeetingPlatformConsumerHandoffEntrypoints {
   commands: Record<string, string>;
 }
 
+export interface MeetingPlatformSdkFacadeHandoff {
+  type: 'meeting_platform_sdk_facade_handoff';
+  package: string;
+  create_function: string;
+  constructor_options: Record<string, unknown>;
+  required_facade_methods: string[];
+  minimal_realtime_flow: Array<Record<string, unknown>>;
+  surface_wiring: Record<string, Record<string, unknown>>;
+  host_endpoints?: Record<string, string>;
+  runtime_event_endpoint?: string;
+  timestamp_field: string;
+  provider_events_block_realtime: boolean;
+  transcript_blocks_realtime: boolean;
+  platform_rows: Array<Record<string, unknown>>;
+}
+
 export interface MeetingPlatformConsumerHandoff {
   type: 'meeting_platform_consumer_handoff';
   schema: typeof MEETING_PLATFORM_CONSUMER_HANDOFF_SCHEMA;
@@ -98,6 +114,7 @@ export interface MeetingPlatformConsumerHandoff {
   entrypoints: MeetingPlatformConsumerHandoffEntrypoints;
   hard_contracts: Record<string, unknown>;
   lightweight_connector_handoff: Record<string, unknown>;
+  sdk_facade_handoff: MeetingPlatformSdkFacadeHandoff;
   boot_order: Array<Record<string, unknown>>;
   endpoints: Record<string, string>;
   commands: Record<string, string>;
