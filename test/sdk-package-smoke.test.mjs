@@ -28,7 +28,9 @@ const packedFiles = packInfo.files.map((item) => item.path).sort();
 assert.equal(packedFiles.includes('index.mjs'), true);
 assert.equal(packedFiles.includes('index.d.ts'), true);
 assert.equal(packedFiles.includes('bin/meeting-app-adapter-integration-package.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-app-connector-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-adapter-integration-package.mjs'), true);
+assert.equal(packedFiles.includes('cli/meeting-app-connector-package.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-integration-runtime.mjs'), true);
@@ -155,6 +157,23 @@ assert.equal(binReport.type, 'meeting_app_adapter_integration_package_report');
 assert.equal(binReport.platform_count, 1);
 assert.equal(binReport.required_platforms[0], 'google-meet');
 assert.equal(binReport.runtime_ready_count, 1);
+
+const { stdout: connectorBinStdout } = await execFileAsync(
+  join(consumerDir, 'node_modules', '.bin', 'meeting-app-connector-package'),
+  [
+    '--platforms=google-meet',
+    '--surfaces=browser-extension',
+    '--json=true',
+  ],
+  {
+    cwd: consumerDir,
+  },
+);
+const connectorBinReport = JSON.parse(connectorBinStdout);
+assert.equal(connectorBinReport.type, 'meeting_app_timeline_connector_package_report');
+assert.equal(connectorBinReport.platform_count, 1);
+assert.deepEqual(connectorBinReport.surfaces, ['browser_extension']);
+assert.equal(connectorBinReport.package.schema, 'meeting_app_timeline_connector_package');
 
 await writeFile(join(consumerDir, 'smoke.mjs'), `
 import assert from 'node:assert/strict';

@@ -1,0 +1,213 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { basename, dirname, resolve } from 'node:path';
+import {
+  createMeetingAppTimelineSdk,
+} from '../index.mjs';
+
+function boolLabel(value) {
+  return value ? 'yes' : 'no';
+}
+
+function unique(values = []) {
+  return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
+}
+
+function listArg(value, fallback = []) {
+  if (value == null || value === '') return fallback;
+  return unique(String(value).split(',').map((item) => item.trim()).filter(Boolean));
+}
+
+function boolArg(value, fallback = false) {
+  if (value == null || value === '') return fallback;
+  const text = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(text)) return true;
+  if (['0', 'false', 'no', 'off'].includes(text)) return false;
+  return fallback;
+}
+
+function stripFileContents(files = []) {
+  return files.map(({ content, ...file }) => file);
+}
+
+function stripConnectorPackage(pkg = {}) {
+  return {
+    ...pkg,
+    extension: pkg.extension
+      ? {
+        ...pkg.extension,
+        scaffold: pkg.extension.scaffold
+          ? {
+            ...pkg.extension.scaffold,
+            files: stripFileContents(pkg.extension.scaffold.files),
+          }
+          : undefined,
+      }
+      : undefined,
+  };
+}
+
+async function writeJson(file, value) {
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+}
+
+async function writeContent(file, value) {
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, typeof value === 'string' ? value : `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+}
+
+function surfaceFileName(surface) {
+  return String(surface || 'surface').replace(/[^a-z0-9_-]+/gi, '-');
+}
+
+export function parseMeetingAppConnectorPackageCliArgs(argv = process.argv.slice(2)) {
+  const args = new Map();
+  for (const raw of argv) {
+    const [key, ...rest] = raw.replace(/^--/, '').split('=');
+    args.set(key, rest.length ? rest.join('=') : 'true');
+  }
+  return args;
+}
+
+export function meetingAppConnectorPackageCliOptionsFromArgs(args = new Map()) {
+  const requiredPlatforms = listArg(
+    args.get('required-platforms') || args.get('platforms'),
+    ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+  );
+  const surfaces = listArg(
+    args.get('surfaces') || args.get('surface'),
+    ['browser-extension', 'native-detector'],
+  );
+  return {
+    baseUrl: String(args.get('base-url') || args.get('baseUrl') || 'http://localhost:8787'),
+    outDir: String(args.get('out-dir') || args.get('outDir') || ''),
+    reportFile: String(args.get('report-file') || args.get('write-report') || ''),
+    jsonOutput: args.get('json') === 'true',
+    includePackage: boolArg(args.get('include-package'), false),
+    includeExtensionScaffold: boolArg(args.get('include-extension-scaffold'), true),
+    observeTracks: boolArg(args.get('observe-tracks') || args.get('observeTracks'), true),
+    failOnRejected: args.get('fail-on-rejected') === 'true' || args.get('fail-on-failed') === 'true',
+    requiredPlatforms,
+    surfaces,
+  };
+}
+
+async function writeConnectorPackageFiles(outDir, pkg = {}) {
+  if (!outDir) return [];
+  const writtenFiles = [];
+  const root = resolve(outDir);
+  const write = async (relative, value, content = false) => {
+    const file = resolve(root, relative);
+    if (content) await writeContent(file, value);
+    else await writeJson(file, value);
+    writtenFiles.push(file);
+  };
+
+  await write('connector-package.json', stripConnectorPackage(pkg));
+  await write('host-package.json', pkg.host_package);
+  await write('handoff-matrix.json', pkg.handoff_matrix);
+  await write('handoff-acceptance.json', pkg.handoff_acceptance);
+  await write('runtime-event-plan-matrix.json', pkg.runtime_events?.plan_matrix);
+
+  for (const [surface, plan] of Object.entries(pkg.observer_plan_by_surface ?? {})) {
+    await write(`observer-plan-${surfaceFileName(surface)}.json`, plan);
+  }
+  for (const [surface, config] of Object.entries(pkg.scheduler_config_by_surface ?? {})) {
+    await write(`scheduler-config-${surfaceFileName(surface)}.json`, config);
+  }
+
+  for (const file of pkg.extension?.scaffold?.files ?? []) {
+    const target = resolve(root, 'extension', file.path);
+    await writeContent(target, file.content);
+    writtenFiles.push(target);
+  }
+
+  return writtenFiles;
+}
+
+export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
+  const {
+    baseUrl = 'http://localhost:8787',
+    outDir = '',
+    reportFile = '',
+    includePackage = false,
+    includeExtensionScaffold = true,
+    observeTracks = true,
+    requiredPlatforms = ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+    surfaces = ['browser-extension', 'native-detector'],
+  } = options;
+
+  const sdk = createMeetingAppTimelineSdk({
+    baseUrl,
+    platforms: requiredPlatforms,
+  });
+  const pkg = sdk.connectorPackage({
+    platforms: requiredPlatforms,
+    surfaces,
+    includeExtensionScaffold,
+    observeTracks,
+  });
+  const writtenFiles = await writeConnectorPackageFiles(outDir, pkg);
+
+  const report = {
+    type: 'meeting_app_timeline_connector_package_report',
+    ok: pkg.accepted === true,
+    base_url: baseUrl,
+    out_dir: outDir || undefined,
+    platform_count: pkg.platform_count,
+    surface_count: pkg.surface_count,
+    handoff_count: pkg.handoff_count,
+    ready_count: pkg.ready_count,
+    accepted: pkg.accepted === true,
+    required_platforms: requiredPlatforms,
+    surfaces: pkg.surfaces,
+    extension_scaffold: Boolean(pkg.extension?.scaffold),
+    extension_accepted: pkg.extension?.acceptance?.accepted,
+    runtime_event_action_count: pkg.runtime_events?.action_count ?? 0,
+    observer_surface_count: Object.keys(pkg.observer_plan_by_surface ?? {}).length,
+    scheduler_surface_count: Object.keys(pkg.scheduler_config_by_surface ?? {}).length,
+    written_files: writtenFiles,
+    rows: pkg.handoff_matrix?.rows?.map((row) => ({
+      platform: row.platform,
+      surface: row.surface,
+      ready_to_start: row.ready_to_start,
+      realtime_annotation_ready: row.realtime_annotation_ready,
+      speaker_track_ready: row.speaker_track_ready,
+      participant_track_ready: row.participant_track_ready,
+      install_target: row.install_target,
+      start_mode: row.start_mode,
+    })) ?? [],
+    package: includePackage ? pkg : stripConnectorPackage(pkg),
+    next_actions: pkg.next_actions,
+  };
+
+  if (reportFile) await writeJson(resolve(reportFile), report);
+  return report;
+}
+
+export function formatMeetingAppConnectorPackageCliReport(report = {}) {
+  const lines = [
+    `meeting_app_timeline_connector_package_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | surfaces=${report.surface_count} | handoffs=${report.handoff_count} | ready=${report.ready_count} | extension=${boolLabel(report.extension_scaffold)} | extension_accepted=${boolLabel(report.extension_accepted)} | runtime_actions=${report.runtime_event_action_count} | written=${report.written_files?.length ?? 0}`,
+  ];
+  for (const row of report.rows ?? []) {
+    lines.push(`${row.platform}/${row.surface}: ready=${boolLabel(row.ready_to_start)} realtime=${boolLabel(row.realtime_annotation_ready)} speaker=${boolLabel(row.speaker_track_ready)} participant=${boolLabel(row.participant_track_ready)} install=${row.install_target ?? 'n/a'} start=${row.start_mode ?? 'n/a'}`);
+  }
+  if (report.next_actions?.length > 0) lines.push(`next_actions=${report.next_actions.join(',')}`);
+  if (report.out_dir) lines.push(`out_dir=${basename(report.out_dir)}`);
+  return lines.join('\n');
+}
+
+export async function runMeetingAppConnectorPackageCli(argv = process.argv.slice(2), io = console) {
+  const options = meetingAppConnectorPackageCliOptionsFromArgs(
+    parseMeetingAppConnectorPackageCliArgs(argv),
+  );
+  const report = await buildMeetingAppConnectorPackageCliReport(options);
+  if (options.jsonOutput) {
+    io.log(JSON.stringify(report, null, 2));
+  } else {
+    io.log(formatMeetingAppConnectorPackageCliReport(report));
+  }
+  if (!report.ok && options.failOnRejected) process.exitCode = 2;
+  return report;
+}
+

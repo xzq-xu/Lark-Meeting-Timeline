@@ -654,6 +654,19 @@ const connectorPackage = meetingSdk.connectorPackage({
 
 这个 facade 也直接暴露宿主集成需要的机器可读适配产物：`adapterProfile()`、`observerPlan()`、`selectAdapter()`、`handoff()`、`handoffMatrix()`、`handoffAcceptance()`、`hostPackage()` 和 `connectorPackage()`。外部项目可以先用 `hostPackage()` 拿到 Google Meet / Teams / Zoom / Webex / Lark 的 content-script/WebView/native detector 安装目标、runtime options、speaker/participant track 参数、CI gates 和 `captured_at_ms` 非阻塞标注契约，再按当前会议 URL 用 `handoff()` 选择单场会议的启动配置。`connectorPackage()` 是更完整的交付物，会把 host package、按 surface 拆分的 observer plan、scheduler config、浏览器扩展 scaffold、runtime event plan 和硬契约收在一起，适合直接给另一个项目落地。
 
+需要把这份 connector package 直接落盘给另一个宿主项目时，可以用 SDK 自带 CLI：
+
+```sh
+npx meeting-app-connector-package \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --surfaces=browser-extension,native-detector \
+  --base-url=https://timeline.example.com \
+  --out-dir=meeting-app-connector-package \
+  --report-file=meeting-app-connector-package-report.json
+```
+
+CLI 会输出 `connector-package.json`、`host-package.json`、handoff/acceptance 矩阵、按 surface 拆分的 observer plan / scheduler config、runtime event plan，以及可作为起点的浏览器扩展 scaffold。报告会剥离 scaffold 文件内容，避免 CI 日志和交接摘要过大；实际文件会写在 `extension/` 目录下。
+
 `platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。CI 里可以用 `assertMeetingAppAdapterIntegrationPackage()`、`assertMeetingAppAdapterIntegrationPackageMatrix()` 或 kit 上的同名方法做 gate；默认 target 是 `pilot`，如果传 `target: 'production'`，则必须补齐真实会议 evidence package、provider start/end reconcile 和 handoff readiness 之后才会通过。
 
 同一层也可以从 CLI 直接导出，默认覆盖 Google Meet、Teams、Zoom、Webex、Lark：

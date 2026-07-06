@@ -129,6 +129,14 @@ npm run meeting-app:adapter-integration-package
 
 同一个命令也随 SDK 包发布为 `meeting-app-adapter-integration-package`，宿主项目安装 `@ai-annotation/meeting-timeline-sdk` 后可以直接从 `node_modules/.bin` 或 `npx` 生成接入包，不需要复制本仓库的 `scripts/`。
 
+如果外部项目需要更完整的“一次性交付包”，可以直接导出 connector package：
+
+```bash
+npm run meeting-app:connector-package
+```
+
+它会写出 `data/meeting-app-connector-package/` 和 `data/meeting-app-connector-package-report.json`，把 host package、handoff matrix、observer plan、scheduler config、runtime event plan 和浏览器扩展 scaffold 合在一起。这个入口也随 SDK 包发布为 `meeting-app-connector-package`，适合下游项目直接生成 Google Meet、Teams、Zoom、Webex、Lark 的浏览器扩展或 native detector 接入材料。
+
 如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
 
 ```bash
