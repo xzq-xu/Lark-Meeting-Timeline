@@ -37,6 +37,23 @@ export interface MeetingAppAdapterIntegrationStep {
   evidence?: string[];
 }
 
+export interface MeetingAppAdapterRuntimeDelivery {
+  schema: 'meeting_app_adapter_runtime_delivery';
+  platform: string;
+  display_name?: string;
+  runtime_bundle_schema?: string;
+  runtime_bundle_id?: string;
+  objective?: string;
+  modules: Record<string, string>;
+  adapter_route: Record<string, unknown>;
+  browser: Record<string, unknown>;
+  runtime: Record<string, unknown>;
+  messaging: Record<string, unknown>;
+  host: Record<string, unknown>;
+  readiness: Record<string, unknown>;
+  next_actions: string[];
+}
+
 export interface MeetingAppAdapterIntegrationPackage {
   type: 'meeting_app_adapter_integration_package';
   schema: 'meeting_app_adapter_integration_package';
@@ -57,6 +74,7 @@ export interface MeetingAppAdapterIntegrationPackage {
   file_paths: string[];
   entrypoints: Record<string, string>;
   commands: Record<string, string>;
+  runtime_delivery: MeetingAppAdapterRuntimeDelivery;
   evidence_contract: Record<string, unknown>;
   integration_steps: MeetingAppAdapterIntegrationStep[];
   gates: MeetingAppAdapterExecutionGate[];

@@ -873,6 +873,9 @@ const packageIntegration = buildMeetingAppAdapterIntegrationPackage('google-meet
 assert.equal(packageIntegration.schema, 'meeting_app_adapter_integration_package');
 assert.equal(packageIntegration.realtime_ready, true);
 assert.equal(packageIntegration.entrypoints.adapter_integration_package, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-integration-package');
+assert.equal(packageIntegration.entrypoints.platform_runtime_bundle, '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle');
+assert.equal(packageIntegration.runtime_delivery.adapter_route.first_route, 'local_observer_axis');
+assert.equal(packageIntegration.runtime_delivery.host.annotation_timestamp_field, 'captured_at_ms');
 assert.equal(assertMeetingAppAdapterIntegrationPackage(packageIntegration).platform, 'google_meet');
 const packageIntegrationMatrix = buildMeetingAppAdapterIntegrationPackageMatrix({
   platforms: ['google-meet'],

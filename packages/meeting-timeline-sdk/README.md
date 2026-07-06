@@ -601,7 +601,7 @@ npm run meeting-platform:adaptation-package -- \
 
 这份 package 的定位是“交给另一个项目开始接入”的 SDK 汇总，不替代真实会议采样；`readiness.sdk_wiring_ready=true` 只说明协议和 SDK 调用面可接，是否能 production 仍要看 evidence package / handoff readiness。
 
-如果宿主项目只关心会议软件页面侧适配，可以直接用 `meeting-app-adapter-integration-package`。它把静态 handoff package、capability report、execution plan、entrypoints、命令和 evidence contract 合成一个对象，适合作为 Google Meet、Teams、Zoom、Webex、Lark 适配任务的交接输入：
+如果宿主项目只关心会议软件页面侧适配，可以直接用 `meeting-app-adapter-integration-package`。它把静态 handoff package、capability report、execution plan、runtime delivery、entrypoints、命令和 evidence contract 合成一个对象，适合作为 Google Meet、Teams、Zoom、Webex、Lark 适配任务的交接输入：
 
 ```js
 import {
@@ -619,7 +619,7 @@ const matrix = buildMeetingAppAdapterIntegrationPackageMatrix({
   evidenceByPlatform,
 });
 
-console.log(pkg.entrypoints, pkg.integration_steps, matrix.rows);
+console.log(pkg.runtime_delivery.adapter_route, pkg.entrypoints, pkg.integration_steps, matrix.rows);
 ```
 
 `platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。CI 里可以用 `assertMeetingAppAdapterIntegrationPackage()`、`assertMeetingAppAdapterIntegrationPackageMatrix()` 或 kit 上的同名方法做 gate；默认 target 是 `pilot`，如果传 `target: 'production'`，则必须补齐真实会议 evidence package、provider start/end reconcile 和 handoff readiness 之后才会通过。

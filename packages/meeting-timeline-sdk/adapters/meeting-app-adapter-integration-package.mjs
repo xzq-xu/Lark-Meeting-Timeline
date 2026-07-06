@@ -11,6 +11,9 @@ import {
   MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
+import {
+  buildMeetingPlatformRuntimeBundle,
+} from './platform-runtime-bundle.mjs';
 
 export const MEETING_APP_ADAPTER_INTEGRATION_PACKAGE_SCHEMA = 'meeting_app_adapter_integration_package';
 export const MEETING_APP_ADAPTER_INTEGRATION_PACKAGE_MATRIX_SCHEMA = 'meeting_app_adapter_integration_package_matrix';
@@ -103,7 +106,7 @@ function executionPlanForCapability(capability = {}, options = {}) {
   return buildMeetingAppAdapterExecutionPlan(capability, options);
 }
 
-function buildFiles({ handoffPackage, capabilityReport, executionPlan }) {
+function buildFiles({ handoffPackage, capabilityReport, executionPlan, runtimeDelivery }) {
   return [
     ...(handoffPackage.files ?? []),
     {
@@ -118,6 +121,12 @@ function buildFiles({ handoffPackage, capabilityReport, executionPlan }) {
       schema: executionPlan.schema,
       content: executionPlan,
     },
+    {
+      path: 'runtime-delivery.json',
+      media_type: 'application/json',
+      schema: 'meeting_app_adapter_runtime_delivery',
+      content: runtimeDelivery,
+    },
   ];
 }
 
@@ -129,6 +138,7 @@ function integrationEntryPoints(handoffPackage = {}) {
     adapter_integration_package: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-integration-package',
     adapter_capability: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-capability',
     adapter_handoff_package: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-handoff-package',
+    platform_runtime_bundle: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
     browser_runtime_factory: runtime.browser_runtime_factory,
     content_script_bridge_factory: runtime.content_script_bridge_factory,
     capture_function: runtime.capture_function,
@@ -145,6 +155,7 @@ function commandSet(platform, options = {}) {
   return {
     generate_capability_report: `npm run meeting-app:adapter-capability -- --platforms=${platform}${baseUrlArg}`,
     export_adapter_handoff_package: `npm run meeting-app:adapter-handoff-package -- --platforms=${platform}${baseUrlArg}`,
+    export_runtime_bundle: `npm run meeting-platform:runtime-bundle -- --platforms=${platform}${baseUrlArg}`,
     verify_adapter_evidence: `npm run meeting-app:adapter-verify -- --platforms=${platform}${baseUrlArg}`,
     verify_platform_handoff: `npm run meeting-platform:handoff-readiness -- --platforms=${platform}${baseUrlArg}`,
     run_runtime_host_replay: `npm run meeting-platform:runtime-host-replay -- --platforms=${platform}${baseUrlArg}`,
@@ -173,6 +184,61 @@ function evidenceContract(handoffPackage = {}, executionPlan = {}) {
     provider_events_block_realtime: handoffPackage.contracts?.provider_events_block_realtime,
     transcript_blocks_realtime: handoffPackage.contracts?.transcript_blocks_realtime,
   };
+}
+
+function runtimeDelivery(platform, options = {}) {
+  const bundle = buildMeetingPlatformRuntimeBundle(platform, options);
+  return compactObject({
+    schema: 'meeting_app_adapter_runtime_delivery',
+    platform: bundle.platform,
+    display_name: bundle.display_name,
+    runtime_bundle_schema: bundle.schema,
+    runtime_bundle_id: bundle.id,
+    objective: bundle.objective,
+    modules: bundle.modules,
+    adapter_route: compactObject({
+      schema: bundle.adapter_route?.schema,
+      ready: bundle.readiness?.runtime_ready === true && (bundle.adapter_route?.route_count ?? 0) > 0,
+      recommended_mode: bundle.adapter_route?.recommended_mode,
+      selected_routes: bundle.adapter_route?.route_order
+        ?? bundle.adapter_route?.routes?.map((route) => firstNonEmpty(route.route, route.id, route.name, route.type)),
+      first_route: bundle.adapter_route?.route_order?.[0]
+        ?? firstNonEmpty(
+          bundle.adapter_route?.routes?.[0]?.route,
+          bundle.adapter_route?.routes?.[0]?.id,
+          bundle.adapter_route?.routes?.[0]?.name,
+          bundle.adapter_route?.routes?.[0]?.type,
+        ),
+      local_observer_first: String(bundle.adapter_route?.recommended_mode ?? '').includes('local_observer_first'),
+      provider_events_block_realtime: false,
+      transcript_blocks_realtime: false,
+    }),
+    browser: {
+      matches: bundle.browser?.matches ?? [],
+      host_permissions: bundle.browser?.host_permissions ?? [],
+      content_script_count: bundle.browser?.content_scripts?.length ?? 0,
+      candidate_observation: bundle.browser?.candidate_observation,
+    },
+    runtime: compactObject({
+      preset: bundle.runtime?.preset,
+      capture_profile: bundle.runtime?.capture_profile,
+      mutation_observer: bundle.runtime?.mutation_observer,
+      content_script_bridge: bundle.runtime?.content_script_bridge,
+      observation_loop: bundle.runtime?.observation_loop,
+      observer_scheduler: bundle.runtime?.observer_scheduler,
+      runtime_host: bundle.runtime?.runtime_host,
+    }),
+    messaging: compactObject({
+      runtime_event_endpoint: bundle.messaging?.runtime_event?.endpoint,
+      runtime_event_schema: bundle.messaging?.runtime_event?.schema,
+      accepted_methods: bundle.messaging?.accepted_methods,
+      bridge_message_types: bundle.messaging?.bridge_message_types,
+      background_message_types: bundle.messaging?.background_message_types,
+    }),
+    host: bundle.host,
+    readiness: bundle.readiness,
+    next_actions: bundle.next_actions,
+  });
 }
 
 function integrationSteps(executionPlan = {}) {
@@ -247,8 +313,9 @@ export function buildMeetingAppAdapterIntegrationPackage(platformOrCapability = 
   const platform = capabilityReport.platform;
   const executionPlan = executionPlanForCapability(capabilityReport, options);
   const handoffPackage = buildMeetingAppAdapterHandoffPackage(platform, options);
+  const runtime = runtimeDelivery(platform, options);
   const packageReadiness = readiness({ capabilityReport, handoffPackage, executionPlan });
-  const files = buildFiles({ handoffPackage, capabilityReport, executionPlan });
+  const files = buildFiles({ handoffPackage, capabilityReport, executionPlan, runtimeDelivery: runtime });
   return {
     type: 'meeting_app_adapter_integration_package',
     schema: MEETING_APP_ADAPTER_INTEGRATION_PACKAGE_SCHEMA,
@@ -269,6 +336,7 @@ export function buildMeetingAppAdapterIntegrationPackage(platformOrCapability = 
     file_paths: files.map((file) => file.path),
     entrypoints: integrationEntryPoints(handoffPackage),
     commands: commandSet(platform, options),
+    runtime_delivery: runtime,
     evidence_contract: evidenceContract(handoffPackage, executionPlan),
     integration_steps: integrationSteps(executionPlan),
     gates: executionPlan.gates,

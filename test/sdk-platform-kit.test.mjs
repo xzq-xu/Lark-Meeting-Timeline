@@ -217,6 +217,8 @@ assert.equal(appIntegrationPackage.platform, 'google_meet');
 assert.equal(appIntegrationPackage.pilot_ready, true);
 assert.equal(appIntegrationPackage.realtime_ready, true);
 assert.equal(appIntegrationPackage.entrypoints.platform_kit, '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit');
+assert.equal(appIntegrationPackage.runtime_delivery.adapter_route.local_observer_first, true);
+assert.equal(appIntegrationPackage.runtime_delivery.messaging.runtime_event_endpoint.endsWith('/api/meeting-platform/runtime-events'), true);
 assert.equal(kit.assertMeetingAppAdapterIntegrationPackage(appIntegrationPackage).platform, 'google_meet');
 const appIntegrationPackageMatrix = kit.meetingAppAdapterIntegrationPackageMatrix({
   platforms: ['google-meet', 'zoom'],
