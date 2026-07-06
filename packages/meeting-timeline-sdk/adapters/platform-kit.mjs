@@ -298,6 +298,10 @@ import {
   buildMeetingPlatformAdapterLaunchPlan,
 } from './platform-adapter-launch-plan.mjs';
 import {
+  buildMeetingPlatformAdapterSessionHandoff,
+  createMeetingPlatformAdapterSession,
+} from './platform-adapter-session.mjs';
+import {
   assertMeetingPlatformAdapterSample,
   assertMeetingPlatformAdapterSampleMatrix,
   buildMeetingPlatformAdapterSamplePlan,
@@ -446,6 +450,49 @@ function withDefaults(defaults = {}, options = {}) {
       ...(options.env ?? {}),
     },
   });
+}
+
+function isAdapterSessionClient(value) {
+  return Boolean(value)
+    && typeof value === 'object'
+    && (
+      typeof value.observePlatformCandidates === 'function'
+      || typeof value.observeCandidates === 'function'
+      || typeof value.observe === 'function'
+      || typeof value.insertAnnotation === 'function'
+      || typeof value.insertMark === 'function'
+    );
+}
+
+function adapterSessionOptions(defaults = {}, clientOrOptions = {}, options = {}) {
+  if (isAdapterSessionClient(clientOrOptions)) return withDefaults(defaults, options);
+  return withDefaults(defaults, {
+    ...(clientOrOptions ?? {}),
+    ...options,
+  });
+}
+
+function adapterSessionClient(bridge, clientOrOptions = {}, options = {}) {
+  const candidates = [
+    options.client,
+    options.sdk,
+    clientOrOptions?.client,
+    clientOrOptions?.sdk,
+    clientOrOptions,
+  ];
+  const client = candidates.find(isAdapterSessionClient);
+  if (client) return client;
+  return {
+    observePlatformCandidates(payload = {}, observeOptions = {}) {
+      return bridge.observeCandidates(payload.candidates ?? [], observeOptions);
+    },
+    insertAnnotation(platform, payload, markOptions = {}) {
+      return bridge.insertAnnotation(payload, markOptions);
+    },
+    insertMark(payload = {}, markOptions = {}) {
+      return bridge.insertAnnotation(payload, markOptions);
+    },
+  };
 }
 
 function bridgeInput(clientOrOptions, defaults = {}) {
@@ -765,6 +812,14 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertPlatformAdapterLaunchPlan(planOrInput = {}, launchInput = {}, launchOptions = {}) {
       return assertMeetingPlatformAdapterLaunchPlan(planOrInput, launchInput, withDefaults(defaults, launchOptions));
+    },
+    platformAdapterSession(launchPlanOrInput = {}, clientOrSessionOptions = {}, sessionOptions = {}) {
+      const mergedOptions = adapterSessionOptions(defaults, clientOrSessionOptions, sessionOptions);
+      const client = adapterSessionClient(bridge, clientOrSessionOptions, mergedOptions);
+      return createMeetingPlatformAdapterSession(launchPlanOrInput, client, mergedOptions);
+    },
+    platformAdapterSessionHandoff(launchPlanOrInput = {}, handoffOptions = {}) {
+      return buildMeetingPlatformAdapterSessionHandoff(launchPlanOrInput, withDefaults(defaults, handoffOptions));
     },
     platformEvidencePackage(platformOrInput, input = {}, packageOptions = {}) {
       if (platformOrInput && typeof platformOrInput === 'object' && !Array.isArray(platformOrInput)) {

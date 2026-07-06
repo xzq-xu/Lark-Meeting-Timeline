@@ -220,6 +220,12 @@ import type {
   MeetingPlatformAdapterLaunchPlanOptions,
 } from './platform-adapter-launch-plan.mjs';
 import type {
+  MeetingPlatformAdapterSession,
+  MeetingPlatformAdapterSessionClient,
+  MeetingPlatformAdapterSessionHandoff,
+  MeetingPlatformAdapterSessionOptions,
+} from './platform-adapter-session.mjs';
+import type {
   MeetingPlatformAdapterSample,
   MeetingPlatformAdapterSampleMatrix,
   MeetingPlatformAdapterSampleOptions,
@@ -444,6 +450,8 @@ export interface MeetingPlatformTimelineKit {
   assertPlatformAdapterInstallManifest(manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterImportPlan[] | MeetingPlatformAdapterExportPackage[] | Record<string, unknown>, installInput?: MeetingPlatformAdapterInstallManifestOptions, installOptions?: MeetingPlatformAdapterInstallManifestOptions): MeetingPlatformAdapterInstallManifest;
   platformAdapterLaunchPlan(manifestOrInput?: MeetingPlatformAdapterInstallManifest | Record<string, unknown>, launchInput?: MeetingPlatformAdapterLaunchPlanOptions | string, launchOptions?: MeetingPlatformAdapterLaunchPlanOptions): MeetingPlatformAdapterLaunchPlan;
   assertPlatformAdapterLaunchPlan(planOrInput?: MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterInstallManifest | Record<string, unknown>, launchInput?: MeetingPlatformAdapterLaunchPlanOptions | string, launchOptions?: MeetingPlatformAdapterLaunchPlanOptions): MeetingPlatformAdapterLaunchPlan;
+  platformAdapterSession(launchPlanOrInput?: MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, clientOrSessionOptions?: MeetingPlatformAdapterSessionClient | MeetingPlatformAdapterSessionOptions, sessionOptions?: MeetingPlatformAdapterSessionOptions): MeetingPlatformAdapterSession;
+  platformAdapterSessionHandoff(launchPlanOrInput?: MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, handoffOptions?: MeetingPlatformAdapterSessionOptions): MeetingPlatformAdapterSessionHandoff;
   platformEvidencePackage(platformOrInput: string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, packageOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackage;
   platformEvidencePackageSummary(packageOrInput: MeetingPlatformEvidencePackage | string | MeetingPlatformEvidencePackageOptions, input?: MeetingPlatformEvidencePackageOptions, summaryOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageSummary;
   platformEvidencePackageBuilder(platform: string, builderOptions?: MeetingPlatformEvidencePackageOptions): MeetingPlatformEvidencePackageBuilder;
