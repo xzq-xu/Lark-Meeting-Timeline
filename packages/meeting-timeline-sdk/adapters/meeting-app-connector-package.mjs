@@ -1,8 +1,14 @@
 import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
+import {
+  buildMeetingPlatformRuntimeEvent,
+  createMeetingPlatformRuntimeEventClient,
+  normalizeMeetingPlatformRuntimeEventAction,
+} from './platform-runtime-event.mjs';
 
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA = 'meeting_app_timeline_connector_package';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_package_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA = 'meeting_app_timeline_connector_handoff';
+export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA = 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION = 1;
 
 const REALTIME_RUNTIME_ACTIONS = Object.freeze([
@@ -75,6 +81,33 @@ function runtimeActionsByPlatform(pkg = {}) {
     const actions = result.get(platform) ?? new Set();
     if (row.action) actions.add(String(row.action));
     result.set(platform, actions);
+  }
+  return result;
+}
+
+function runtimeActionRows(pkg = {}) {
+  return (pkg.runtime_events?.plan_matrix?.rows ?? []).map((row) => compactObject({
+    platform: normalizeKey(row.platform),
+    action: normalizeMeetingPlatformRuntimeEventAction(row.action),
+    client_method: row.client_method,
+    producer: row.producer,
+    realtime_role: row.realtime_role,
+    provider_dependency: row.provider_dependency,
+    transcript_dependency: row.transcript_dependency,
+  }));
+}
+
+function runtimeActionSet(pkg = {}) {
+  return new Set(runtimeActionRows(pkg).map((row) => row.action));
+}
+
+function runtimePlatformActionMap(pkg = {}) {
+  const result = new Map();
+  for (const row of runtimeActionRows(pkg)) {
+    if (!row.platform) continue;
+    const actions = result.get(row.platform) ?? new Set();
+    actions.add(row.action);
+    result.set(row.platform, actions);
   }
   return result;
 }
@@ -359,4 +392,152 @@ export function buildMeetingAppTimelineConnectorHandoff(pkg = {}, options = {}) 
     acceptance,
     next_actions: acceptance.next_actions,
   });
+}
+
+export function createMeetingAppTimelineConnectorRuntimeClient(pkg = {}, options = {}) {
+  const acceptance = buildMeetingAppTimelineConnectorPackageAcceptanceReport(pkg, options);
+  if (acceptance.accepted !== true && options.assertPackage !== false && options.assert_package !== false) {
+    throw new MeetingTimelineSdkError('Meeting app timeline connector package is not accepted for runtime client', {
+      report: acceptance,
+      issues: acceptance.issues,
+    });
+  }
+  const endpoint = firstNonEmpty(
+    options.endpoint,
+    options.runtimeEventEndpoint,
+    options.runtime_event_endpoint,
+    pkg.runtime_events?.endpoint,
+  );
+  if (!endpoint) {
+    throw new MeetingTimelineSdkError('runtime event endpoint is required for connector runtime client');
+  }
+  const platforms = selectedPlatforms(pkg, options);
+  const surfaces = selectedSurfaces(pkg, options);
+  const actionRows = runtimeActionRows(pkg);
+  const actionSet = runtimeActionSet(pkg);
+  const platformActionMap = runtimePlatformActionMap(pkg);
+  const client = createMeetingPlatformRuntimeEventClient({
+    ...options,
+    endpoint,
+  });
+
+  function assertSupported(actionInput, platformInput, supportOptions = {}) {
+    const action = normalizeMeetingPlatformRuntimeEventAction(actionInput);
+    const platform = platformInput == null ? undefined : normalizeKey(platformInput);
+    if (supportOptions.allowUnsupportedAction === true || supportOptions.allow_unsupported_action === true) {
+      return { action, platform, supported: true, bypassed: true };
+    }
+    if (!actionSet.has(action)) {
+      throw new MeetingTimelineSdkError(`Runtime action ${action} is not present in connector package`, {
+        action,
+        platform,
+        package_id: pkg.id,
+      });
+    }
+    if (platform) {
+      const actions = platformActionMap.get(platform);
+      if (!actions?.has(action)) {
+        throw new MeetingTimelineSdkError(`Runtime action ${action} is not supported for ${platform}`, {
+          action,
+          platform,
+          package_id: pkg.id,
+        });
+      }
+    }
+    return { action, platform, supported: true };
+  }
+
+  function buildEvent(eventInput = {}, eventOptions = {}) {
+    const event = buildMeetingPlatformRuntimeEvent(eventInput, {
+      ...options,
+      ...eventOptions,
+    });
+    assertSupported(event.action, event.platform, eventOptions);
+    return event;
+  }
+
+  async function send(eventInput = {}, sendOptions = {}) {
+    const event = eventInput?.schema === 'meeting_platform_runtime_event'
+      ? eventInput
+      : buildEvent(eventInput, sendOptions);
+    assertSupported(event.action, event.platform, sendOptions);
+    return client.send(event, sendOptions);
+  }
+
+  return {
+    type: MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    package_id: pkg.id,
+    endpoint,
+    platforms,
+    surfaces,
+    acceptance,
+    runtime_event_client: client,
+    supported_action_count: actionRows.length,
+    supported_actions: unique(actionRows.map((row) => row.action)),
+    supported_actions_by_platform: Object.fromEntries([...platformActionMap.entries()].map(([platform, actions]) => [
+      platform,
+      [...actions],
+    ])),
+    action_rows: actionRows,
+    supports(action, platform) {
+      try {
+        assertSupported(action, platform);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    assertSupported,
+    buildEvent,
+    send,
+    observeMeetingApp(platform, snapshot = {}, observeOptions = {}) {
+      assertSupported('observe_meeting_app', platform, observeOptions);
+      return client.observeMeetingApp(platform, snapshot, observeOptions);
+    },
+    observePlatformCandidates(input = {}, observeOptions = {}) {
+      assertSupported('observe_platform_candidates', undefined, observeOptions);
+      return client.observePlatformCandidates(input, observeOptions);
+    },
+    ingestProvider(platform, payload = {}, ingestOptions = {}) {
+      assertSupported('provider_event', platform, ingestOptions);
+      return client.ingestProvider(platform, payload, ingestOptions);
+    },
+    insertAnnotation(platform, annotationInput = {}, markOptions = {}) {
+      assertSupported('insert_annotation', platform, markOptions);
+      return client.insertAnnotation(platform, annotationInput, markOptions);
+    },
+    insertMark(platform, annotationInput = {}, markOptions = {}) {
+      return this.insertAnnotation(platform, annotationInput, markOptions);
+    },
+    speakerTrack(platform, input = {}, trackOptions = {}) {
+      assertSupported('speaker_track', platform, trackOptions);
+      return client.speakerTrack(platform, input, trackOptions);
+    },
+    participantTrack(platform, input = {}, trackOptions = {}) {
+      assertSupported('participant_track', platform, trackOptions);
+      return client.participantTrack(platform, input, trackOptions);
+    },
+    timelineView(platform, input = {}, viewOptions = {}) {
+      assertSupported('timeline_view', platform, viewOptions);
+      return client.timelineView(platform, input, viewOptions);
+    },
+    adapterRoute(platform, routeOptions = {}) {
+      assertSupported('adapter_route', platform, routeOptions);
+      return client.adapterRoute(platform, routeOptions);
+    },
+    adapterRoutes(routeOptions = {}) {
+      assertSupported('adapter_routes', undefined, routeOptions);
+      return client.adapterRoutes(routeOptions);
+    },
+    runManifest(manifestOptions = {}) {
+      assertSupported('run_manifest', undefined, manifestOptions);
+      return client.runManifest(manifestOptions);
+    },
+    runHandoffReadiness(readinessOptions = {}) {
+      assertSupported('run_handoff_readiness', undefined, readinessOptions);
+      return client.runHandoffReadiness(readinessOptions);
+    },
+  };
 }

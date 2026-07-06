@@ -186,6 +186,7 @@ import {
   buildMeetingAppTimelineConnectorPackageAcceptanceReport as buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot,
   buildMeetingPlatformIntegrationRuntimeManifest as buildMeetingPlatformIntegrationRuntimeManifestFromRoot,
   createMeetingAppTimelineSdk,
+  createMeetingAppTimelineConnectorRuntimeClient as createMeetingAppTimelineConnectorRuntimeClientFromRoot,
   createMeetingTimelineClient,
   createMeetingPlatformTimelineKit as createMeetingPlatformTimelineKitFromRoot,
   detectMeetingPlatformForBrowser as detectMeetingPlatformForBrowserFromRoot,
@@ -382,6 +383,7 @@ import {
   assertMeetingAppTimelineConnectorPackage,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport,
+  createMeetingAppTimelineConnectorRuntimeClient,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package';
 import {
   assertMeetingAppRuntimeAdapterHandoff,
@@ -495,6 +497,14 @@ assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot(roo
 assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReport(rootConnectorPackage).accepted, true);
 assert.equal(buildMeetingAppTimelineConnectorHandoff(rootConnectorPackage).schema, 'meeting_app_timeline_connector_handoff');
 assert.equal(assertMeetingAppTimelineConnectorPackage(rootConnectorPackage), rootConnectorPackage);
+const connectorRuntimeClientFromRoot = createMeetingAppTimelineConnectorRuntimeClientFromRoot(rootConnectorPackage, {
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+});
+assert.equal(connectorRuntimeClientFromRoot.schema, 'meeting_app_timeline_connector_runtime_client');
+assert.equal(connectorRuntimeClientFromRoot.supports('insert_annotation', 'google-meet'), true);
+assert.equal(createMeetingAppTimelineConnectorRuntimeClient(rootConnectorPackage, {
+  fetch: async () => new Response(JSON.stringify({ ok: true })),
+}).supports('observe_platform_candidates'), true);
 
 const kit = createMeetingPlatformTimelineKit(client, {
   baseUrl: 'http://localhost:8787',

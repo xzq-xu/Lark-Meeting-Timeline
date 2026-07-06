@@ -3,6 +3,7 @@ import type { MeetingAppTimelineConnectorPackage } from '../index.mjs';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA: 'meeting_app_timeline_connector_package';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_package_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA: 'meeting_app_timeline_connector_handoff';
+export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA: 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION: 1;
 
 export interface MeetingAppTimelineConnectorPackageIssue {
@@ -81,6 +82,38 @@ export interface MeetingAppTimelineConnectorHandoff {
   next_actions: string[];
 }
 
+export interface MeetingAppTimelineConnectorRuntimeClient {
+  type: 'meeting_app_timeline_connector_runtime_client';
+  schema: 'meeting_app_timeline_connector_runtime_client';
+  schema_version: 1;
+  package_id?: string;
+  endpoint: string;
+  platforms: string[];
+  surfaces: string[];
+  acceptance: MeetingAppTimelineConnectorPackageAcceptanceReport;
+  runtime_event_client: import('./platform-runtime-event.mjs').MeetingPlatformRuntimeEventClient;
+  supported_action_count: number;
+  supported_actions: string[];
+  supported_actions_by_platform: Record<string, string[]>;
+  action_rows: Array<Record<string, unknown>>;
+  supports(action: string, platform?: string): boolean;
+  assertSupported(action: string, platform?: string, options?: Record<string, unknown>): Record<string, unknown>;
+  buildEvent(input?: Record<string, unknown>, options?: Record<string, unknown>): import('./platform-runtime-event.mjs').MeetingPlatformRuntimeEvent;
+  send(input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
+  observeMeetingApp(platform: string, snapshot?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
+  observePlatformCandidates(input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
+  ingestProvider(platform: string, payload?: unknown, options?: Record<string, unknown>): Promise<unknown>;
+  insertAnnotation(platform: string, annotationInput?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
+  insertMark(platform: string, annotationInput?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
+  speakerTrack(platform: string, input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
+  participantTrack(platform: string, input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
+  timelineView(platform: string, input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
+  adapterRoute(platform: string, options?: Record<string, unknown>): Promise<unknown>;
+  adapterRoutes(options?: Record<string, unknown>): Promise<unknown>;
+  runManifest(options?: Record<string, unknown>): Promise<unknown>;
+  runHandoffReadiness(options?: Record<string, unknown>): Promise<unknown>;
+}
+
 export function buildMeetingAppTimelineConnectorPackageAcceptanceReport(
   pkg?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,
   options?: Record<string, unknown>,
@@ -99,3 +132,8 @@ export function buildMeetingAppTimelineConnectorHandoff(
   pkg?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,
   options?: Record<string, unknown>,
 ): MeetingAppTimelineConnectorHandoff;
+
+export function createMeetingAppTimelineConnectorRuntimeClient(
+  pkg?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineConnectorRuntimeClient;

@@ -6,6 +6,7 @@ import {
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport,
   createMeetingAppTimelineSdk,
+  createMeetingAppTimelineConnectorRuntimeClient,
   stripMeetingAppTimelineConnectorPackageFileContents,
 } from '../packages/meeting-timeline-sdk/index.mjs';
 import {
@@ -53,6 +54,67 @@ assert.equal(handoff.extension.file_paths.includes('manifest.json'), true);
 assert.equal(handoff.extension.file_paths.includes('src/content-script.entry.mjs'), true);
 assert.equal(handoff.ci_gates.includes('require_captured_at_ms_for_realtime_annotations'), true);
 
+let capturedRuntimeRequest = null;
+const connectorRuntimeClient = createMeetingAppTimelineConnectorRuntimeClient(connectorPackage, {
+  now: () => 1_782_614_401_000,
+  fetch: async (url, init) => {
+    capturedRuntimeRequest = {
+      url,
+      method: init.method,
+      headers: init.headers,
+      body: JSON.parse(init.body),
+    };
+    return new Response(JSON.stringify({
+      ok: true,
+      accepted: capturedRuntimeRequest.body,
+    }), {
+      status: 201,
+      headers: { 'content-type': 'application/json' },
+    });
+  },
+});
+assert.equal(connectorRuntimeClient.schema, 'meeting_app_timeline_connector_runtime_client');
+assert.equal(connectorRuntimeClient.endpoint, 'https://timeline.example.com/api/meeting-platform/runtime-events');
+assert.equal(connectorRuntimeClient.supports('insert_annotation', 'google-meet'), true);
+assert.equal(connectorRuntimeClient.supports('provider_event', 'google-meet'), true);
+assert.equal(connectorRuntimeClient.supports('missing_action', 'google-meet'), false);
+assert.equal(connectorRuntimeClient.supported_actions_by_platform.google_meet.includes('speaker_track'), true);
+const builtInsertEvent = connectorRuntimeClient.buildEvent({
+  action: 'insert_annotation',
+  platform: 'zoom',
+  annotation: {
+    id: 'note-1',
+    captured_at_ms: 1_782_614_402_000,
+  },
+});
+assert.equal(builtInsertEvent.schema, 'meeting_platform_runtime_event');
+assert.equal(builtInsertEvent.action, 'insert_annotation');
+assert.equal(builtInsertEvent.platform, 'zoom');
+
+const insertResult = await connectorRuntimeClient.insertAnnotation('zoom', {
+  id: 'note-2',
+  label: 'why?',
+  captured_at_ms: 1_782_614_403_000,
+});
+assert.equal(capturedRuntimeRequest.url, 'https://timeline.example.com/api/meeting-platform/runtime-events');
+assert.equal(capturedRuntimeRequest.method, 'POST');
+assert.equal(capturedRuntimeRequest.body.action, 'insert_annotation');
+assert.equal(capturedRuntimeRequest.body.platform, 'zoom');
+assert.equal(insertResult.accepted.annotation.id, 'note-2');
+
+await connectorRuntimeClient.observePlatformCandidates({
+  tabs: [{
+    active: true,
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Google Meet',
+  }],
+});
+assert.equal(capturedRuntimeRequest.body.action, 'observe_platform_candidates');
+assert.equal(capturedRuntimeRequest.body.platform, undefined);
+assert.equal(capturedRuntimeRequest.body.tabs[0].url, 'https://meet.google.com/abc-defg-hij');
+await connectorRuntimeClient.runManifest({ platforms: ['google-meet'], target: 'realtime' });
+assert.equal(capturedRuntimeRequest.body.action, 'run_manifest');
+
 const stripped = stripMeetingAppTimelineConnectorPackageFileContents(connectorPackage);
 assert.equal(stripped.extension.scaffold.files.some((file) => 'content' in file), false);
 assert.equal(connectorPackage.extension.scaffold.files.some((file) => 'content' in file), true);
@@ -78,6 +140,24 @@ assert.equal(
 assert.throws(
   () => assertMeetingAppTimelineConnectorPackage(missingRuntimeActionPackage),
   /Meeting app timeline connector package is not accepted/,
+);
+assert.throws(
+  () => createMeetingAppTimelineConnectorRuntimeClient(missingRuntimeActionPackage, {
+    fetch: async () => new Response('{}'),
+  }),
+  /not accepted for runtime client/,
+);
+const unsafeRuntimeClient = createMeetingAppTimelineConnectorRuntimeClient(missingRuntimeActionPackage, {
+  assertPackage: false,
+  fetch: async () => new Response('{}'),
+});
+assert.throws(
+  () => unsafeRuntimeClient.buildEvent({
+    action: 'insert_annotation',
+    platform: 'zoom',
+    annotation: { id: 'blocked', captured_at_ms: 1_782_614_404_000 },
+  }),
+  /Runtime action insert_annotation is not present in connector package/,
 );
 
 const blockingProviderPackage = {

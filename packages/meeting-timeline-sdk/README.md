@@ -674,6 +674,7 @@ import {
   assertMeetingAppTimelineConnectorPackage,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport,
+  createMeetingAppTimelineConnectorRuntimeClient,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package';
 
 const acceptance = buildMeetingAppTimelineConnectorPackageAcceptanceReport(connectorPackage, {
@@ -681,9 +682,17 @@ const acceptance = buildMeetingAppTimelineConnectorPackageAcceptanceReport(conne
 });
 assertMeetingAppTimelineConnectorPackage(connectorPackage);
 const handoff = buildMeetingAppTimelineConnectorHandoff(connectorPackage);
+const runtime = createMeetingAppTimelineConnectorRuntimeClient(connectorPackage, { fetch });
+await runtime.insertAnnotation('google-meet', {
+  id: 'mark-001',
+  label: 'why?',
+  captured_at_ms: Date.now(),
+});
 ```
 
 默认 `target: 'realtime'` 会检查 `captured_at_ms`、provider/transcript 非阻塞、runtime event endpoint、`observe_meeting_app` / `insert_annotation` / speaker / participant 轨道动作、每个 surface 的 observer plan 和 scheduler config，以及浏览器扩展 scaffold。`target: 'production'` 会额外要求真实会议 live snapshot evidence，因此不会把静态包误判成生产可上线。
+
+`createMeetingAppTimelineConnectorRuntimeClient()` 会从 connector package 读取 runtime event endpoint 和各平台支持的 action，发送前先校验 action/platform 是否在 package 的 runtime plan 中。外部项目可以把它用于 Google Meet content script、Teams WebView preload、Zoom/Webex native helper 或 Lark 长连接代理，统一发 `observe_meeting_app`、`observe_platform_candidates`、`insert_annotation`、`speaker_track` 和 `participant_track`，不用手写 action 路由表。
 
 `platform-kit` 同样暴露这一层：`kit.meetingAppAdapterIntegrationPackage('google-meet')` 和 `kit.meetingAppAdapterIntegrationPackageMatrix()`。CI 里可以用 `assertMeetingAppAdapterIntegrationPackage()`、`assertMeetingAppAdapterIntegrationPackageMatrix()` 或 kit 上的同名方法做 gate；默认 target 是 `pilot`，如果传 `target: 'production'`，则必须补齐真实会议 evidence package、provider start/end reconcile 和 handoff readiness 之后才会通过。
 
