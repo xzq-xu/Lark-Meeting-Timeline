@@ -17,6 +17,8 @@ export const MEETING_APP_EXTENSION_MESSAGE_TYPES = Object.freeze({
   observe_candidates: 'meeting_timeline.observe_candidates',
   preflight_current_window: 'meeting_timeline.preflight_current_window',
   preflight_candidates: 'meeting_timeline.preflight_candidates',
+  candidate_launch_plan: 'meeting_timeline.candidate_launch_plan',
+  open_candidate_session: 'meeting_timeline.open_candidate_session',
 });
 
 export const MEETING_APP_EXTENSION_STATUS_STORAGE_KEY = 'meeting_timeline_extension_status';
@@ -82,6 +84,18 @@ const MESSAGE_TYPE_ALIASES = Object.freeze({
   preflight_platform_candidates: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates,
   preflightplatformcandidates: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates,
   'preflight-platform-candidates': MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates,
+  candidate_launch_plan: MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan,
+  candidatelaunchplan: MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan,
+  'candidate-launch-plan': MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan,
+  launch_candidates: MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan,
+  launchcandidates: MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan,
+  'launch-candidates': MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan,
+  open_candidate_session: MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session,
+  opencandidatesession: MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session,
+  'open-candidate-session': MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session,
+  open_candidates: MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session,
+  opencandidates: MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session,
+  'open-candidates': MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session,
 });
 
 export const MEETING_APP_EXTENSION_PROFILES = Object.freeze({
@@ -404,6 +418,48 @@ export function buildMeetingAppExtensionPreflightCandidatesMessage(input = {}, o
     input: plainObject(merged.input) ? merged.input : undefined,
     options: Object.keys(preflightOptions).length > 0 ? preflightOptions : undefined,
   });
+}
+
+function candidateLaunchOptions(merged = {}) {
+  const launchOptions = {
+    ...(plainObject(merged.options) ? merged.options : {}),
+    ...(plainObject(merged.launchOptions) ? merged.launchOptions : {}),
+    ...(plainObject(merged.launch_options) ? merged.launch_options : {}),
+    ...(plainObject(merged.preflightOptions) ? merged.preflightOptions : {}),
+    ...(plainObject(merged.preflight_options) ? merged.preflight_options : {}),
+  };
+  return Object.keys(launchOptions).length > 0 ? launchOptions : undefined;
+}
+
+function buildCandidateLaunchMessage(input = {}, options = {}, defaultType) {
+  const merged = plainObject(input) ? { ...input, ...options } : options;
+  return compactObject({
+    type: normalizeMeetingAppExtensionMessageType(firstNonEmpty(
+      merged.type,
+      merged.messageType,
+      merged.message_type,
+      defaultType,
+    )),
+    request_id: firstNonEmpty(merged.request_id, merged.requestId),
+    captured_at_ms: firstNonEmpty(merged.captured_at_ms, merged.capturedAtMs, Date.now()),
+    platform: optionalPlatform(firstNonEmpty(merged.platform, merged.platform_key, merged.platformKey)),
+    url: firstNonEmpty(merged.url, merged.href, merged.meeting_url, merged.meetingUrl),
+    title: merged.title,
+    query: firstNonEmpty(merged.query, merged.tabs_query, merged.tabsQuery),
+    tabs: firstNonEmpty(merged.tabs, merged.browser_tabs, merged.browserTabs),
+    windows: firstNonEmpty(merged.windows, merged.browser_windows, merged.browserWindows),
+    candidates: merged.candidates,
+    input: plainObject(merged.input) ? merged.input : undefined,
+    options: candidateLaunchOptions(merged),
+  });
+}
+
+export function buildMeetingAppExtensionCandidateLaunchPlanMessage(input = {}, options = {}) {
+  return buildCandidateLaunchMessage(input, options, 'candidate_launch_plan');
+}
+
+export function buildMeetingAppExtensionOpenCandidateSessionMessage(input = {}, options = {}) {
+  return buildCandidateLaunchMessage(input, options, 'open_candidate_session');
 }
 
 export function buildMeetingAppExtensionClientCallMessage(methodOrInput, input = {}, options = {}) {

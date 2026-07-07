@@ -11,7 +11,9 @@ export type MeetingAppExtensionMessageType =
   | 'meeting_timeline.extension_status'
   | 'meeting_timeline.observe_candidates'
   | 'meeting_timeline.preflight_current_window'
-  | 'meeting_timeline.preflight_candidates';
+  | 'meeting_timeline.preflight_candidates'
+  | 'meeting_timeline.candidate_launch_plan'
+  | 'meeting_timeline.open_candidate_session';
 
 export type MeetingAppExtensionClientCallMethod =
   | 'startMeeting'
@@ -191,6 +193,8 @@ export const MEETING_APP_EXTENSION_MESSAGE_TYPES: Readonly<{
   observe_candidates: 'meeting_timeline.observe_candidates';
   preflight_current_window: 'meeting_timeline.preflight_current_window';
   preflight_candidates: 'meeting_timeline.preflight_candidates';
+  candidate_launch_plan: 'meeting_timeline.candidate_launch_plan';
+  open_candidate_session: 'meeting_timeline.open_candidate_session';
 }>;
 export const MEETING_APP_EXTENSION_STATUS_STORAGE_KEY: 'meeting_timeline_extension_status';
 export const MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS: Readonly<Record<MeetingAppExtensionClientCallMethod, string>>;
@@ -234,6 +238,46 @@ export function buildMeetingAppExtensionPreflightCandidatesMessage(
     browserTabs?: Record<string, unknown>[];
     input?: Record<string, unknown>;
     options?: Record<string, unknown>;
+    preflightOptions?: Record<string, unknown>;
+    preflight_options?: Record<string, unknown>;
+  },
+  options?: MeetingAppExtensionMessageOptions,
+): Record<string, unknown>;
+
+export function buildMeetingAppExtensionCandidateLaunchPlanMessage(
+  input?: MeetingAppExtensionMessageOptions & {
+    query?: Record<string, unknown>;
+    tabs?: Record<string, unknown>[];
+    browser_tabs?: Record<string, unknown>[];
+    browserTabs?: Record<string, unknown>[];
+    windows?: Record<string, unknown>[];
+    browser_windows?: Record<string, unknown>[];
+    browserWindows?: Record<string, unknown>[];
+    candidates?: Record<string, unknown>[];
+    input?: Record<string, unknown>;
+    options?: Record<string, unknown>;
+    launchOptions?: Record<string, unknown>;
+    launch_options?: Record<string, unknown>;
+    preflightOptions?: Record<string, unknown>;
+    preflight_options?: Record<string, unknown>;
+  },
+  options?: MeetingAppExtensionMessageOptions,
+): Record<string, unknown>;
+
+export function buildMeetingAppExtensionOpenCandidateSessionMessage(
+  input?: MeetingAppExtensionMessageOptions & {
+    query?: Record<string, unknown>;
+    tabs?: Record<string, unknown>[];
+    browser_tabs?: Record<string, unknown>[];
+    browserTabs?: Record<string, unknown>[];
+    windows?: Record<string, unknown>[];
+    browser_windows?: Record<string, unknown>[];
+    browserWindows?: Record<string, unknown>[];
+    candidates?: Record<string, unknown>[];
+    input?: Record<string, unknown>;
+    options?: Record<string, unknown>;
+    launchOptions?: Record<string, unknown>;
+    launch_options?: Record<string, unknown>;
     preflightOptions?: Record<string, unknown>;
     preflight_options?: Record<string, unknown>;
   },

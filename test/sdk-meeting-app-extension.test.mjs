@@ -11,6 +11,7 @@ import {
   buildMeetingAppContentScriptManifest,
   buildMeetingAppExtensionBackgroundSource,
   buildMeetingAppExtensionBuildSource,
+  buildMeetingAppExtensionCandidateLaunchPlanMessage,
   buildMeetingAppExtensionClientCallMessage,
   buildMeetingAppExtensionContentScriptSource,
   buildMeetingAppExtensionCurrentWindowPreflightMessage,
@@ -18,6 +19,7 @@ import {
   buildMeetingAppExtensionLiveCaptureSource,
   buildMeetingAppExtensionMatchPatterns,
   buildMeetingAppExtensionObserveCandidatesMessage,
+  buildMeetingAppExtensionOpenCandidateSessionMessage,
   buildMeetingAppExtensionPackageJson,
   buildMeetingAppExtensionPreflightCandidatesMessage,
   buildMeetingAppExtensionScaffold,
@@ -347,6 +349,8 @@ assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status, 'meeting_time
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates, 'meeting_timeline.observe_candidates');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window, 'meeting_timeline.preflight_current_window');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates, 'meeting_timeline.preflight_candidates');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan, 'meeting_timeline.candidate_launch_plan');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session, 'meeting_timeline.open_candidate_session');
 assert.equal(MEETING_APP_EXTENSION_STATUS_STORAGE_KEY, 'meeting_timeline_extension_status');
 assert.equal(MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS.insertMarks, '/api/annotations/batch');
 assert.equal(normalizeMeetingAppExtensionMessageType('client_call'), MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call);
@@ -355,6 +359,8 @@ assert.equal(normalizeMeetingAppExtensionMessageType('extension-status'), MEETIN
 assert.equal(normalizeMeetingAppExtensionMessageType('observe-platform-candidates'), MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates);
 assert.equal(normalizeMeetingAppExtensionMessageType('current-window-preflight'), MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window);
 assert.equal(normalizeMeetingAppExtensionMessageType('preflight-platform-candidates'), MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates);
+assert.equal(normalizeMeetingAppExtensionMessageType('candidate-launch-plan'), MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan);
+assert.equal(normalizeMeetingAppExtensionMessageType('open-candidates'), MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session);
 assert.equal(meetingAppExtensionTimelineEndpoint('insertMarks'), '/api/annotations/batch');
 assert.throws(
   () => meetingAppExtensionTimelineEndpoint('deleteEverything'),
@@ -417,6 +423,36 @@ assert.deepEqual(preflightCandidatesMessage, {
   captured_at_ms: 126,
   query: { active: false },
   options: { requireSpeakerTrack: true },
+});
+
+const candidateLaunchPlanMessage = buildMeetingAppExtensionCandidateLaunchPlanMessage({
+  requestId: 'candidate-launch-001',
+  capturedAtMs: 127,
+  tabs: [{ url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet', active: true }],
+  options: { requireSpeakerTrack: true },
+});
+assert.deepEqual(candidateLaunchPlanMessage, {
+  type: MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan,
+  request_id: 'candidate-launch-001',
+  captured_at_ms: 127,
+  tabs: [{ url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet', active: true }],
+  options: { requireSpeakerTrack: true },
+});
+
+const openCandidateSessionMessage = buildMeetingAppExtensionOpenCandidateSessionMessage({
+  request_id: 'open-candidate-001',
+  captured_at_ms: 128,
+  platform: 'google-meet',
+  tabs: [{ url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet', active: true }],
+  launch_options: { requireSpeakerTrack: true, focusExisting: true },
+});
+assert.deepEqual(openCandidateSessionMessage, {
+  type: MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session,
+  request_id: 'open-candidate-001',
+  captured_at_ms: 128,
+  platform: 'google_meet',
+  tabs: [{ url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet', active: true }],
+  options: { requireSpeakerTrack: true, focusExisting: true },
 });
 
 const observeCandidatesMessage = buildMeetingAppExtensionObserveCandidatesMessage({

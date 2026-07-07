@@ -666,7 +666,9 @@ import {
 import {
   MEETING_APP_EXTENSION_MESSAGE_TYPES,
   buildMeetingAppExtensionBackgroundSource,
+  buildMeetingAppExtensionCandidateLaunchPlanMessage,
   buildMeetingAppExtensionCurrentWindowPreflightMessage,
+  buildMeetingAppExtensionOpenCandidateSessionMessage,
   buildMeetingAppExtensionPreflightCandidatesMessage,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-extension';
 import {
@@ -1050,6 +1052,16 @@ assert.equal(buildMeetingAppExtensionCurrentWindowPreflightMessage({
 assert.equal(buildMeetingAppExtensionPreflightCandidatesMessage({
   capturedAtMs: 124,
 }).type, 'meeting_timeline.preflight_candidates');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan, 'meeting_timeline.candidate_launch_plan');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session, 'meeting_timeline.open_candidate_session');
+assert.equal(buildMeetingAppExtensionCandidateLaunchPlanMessage({
+  requestId: 'candidate-launch-001',
+  tabs: [{ url: 'https://meet.google.com/abc-defg-hij', active: true }],
+}).type, 'meeting_timeline.candidate_launch_plan');
+assert.equal(buildMeetingAppExtensionOpenCandidateSessionMessage({
+  requestId: 'open-candidate-001',
+  tabs: [{ url: 'https://meet.google.com/abc-defg-hij', active: true }],
+}).type, 'meeting_timeline.open_candidate_session');
 assert.match(buildMeetingAppExtensionBackgroundSource({
   baseUrl: 'http://localhost:8787',
 }), /meeting_timeline\.preflight_current_window/);
@@ -1886,12 +1898,20 @@ assert.equal(smokeGoogleRuntimeBundle.browser.matches.includes('https://meet.goo
 assert.equal(smokeGoogleRuntimeBundle.adapter_route.routes[0].route, 'local_observer_axis');
 assert.equal(smokeGoogleRuntimeBundle.runtime.content_script_bridge.install_function, 'installMeetingPlatformIntegrationContentScriptBridge');
 assert.equal(smokeGoogleRuntimeBundle.runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
+assert.equal(smokeGoogleRuntimeBundle.messaging.bridge_message_types.includes('meeting_timeline.candidate_launch_plan'), true);
+assert.equal(smokeGoogleRuntimeBundle.messaging.bridge_message_types.includes('meeting_timeline.open_candidate_session'), true);
 assert.equal(smokeGoogleRuntimeBundle.messaging.lightweight_connector_message_types.includes('meeting_timeline.sample_tracks'), true);
 assert.equal(smokeGoogleRuntimeBundle.messaging.lightweight_connector_message_types.includes('meeting_timeline.preflight_current_window'), true);
+assert.equal(smokeGoogleRuntimeBundle.messaging.lightweight_connector_message_types.includes('meeting_timeline.candidate_launch_plan'), false);
+assert.equal(smokeGoogleRuntimeBundle.messaging.lightweight_connector_message_types.includes('meeting_timeline.open_candidate_session'), false);
 assert.equal(smokeGoogleRuntimeBundle.messaging.background_message_types.includes('meeting_timeline.preflight_candidates'), true);
+assert.equal(smokeGoogleRuntimeBundle.messaging.background_message_types.includes('meeting_timeline.candidate_launch_plan'), false);
+assert.equal(smokeGoogleRuntimeBundle.messaging.background_message_types.includes('meeting_timeline.open_candidate_session'), false);
 assert.equal(smokeGoogleRuntimeBundle.messaging.runtime_event.plan.realtime_contract.transcript_required_for_realtime, false);
 assert.equal(smokeGoogleRuntimeBundle.messaging.examples.preflight_current_window.type, 'meeting_timeline.preflight_current_window');
 assert.equal(smokeGoogleRuntimeBundle.messaging.examples.preflight_candidates.type, 'meeting_timeline.preflight_candidates');
+assert.equal(smokeGoogleRuntimeBundle.messaging.examples.candidate_launch_plan.type, 'meeting_timeline.candidate_launch_plan');
+assert.equal(smokeGoogleRuntimeBundle.messaging.examples.open_candidate_session.type, 'meeting_timeline.open_candidate_session');
 assert.equal(smokeGoogleRuntimeBundle.messaging.examples.content_script_insert_annotation.type, 'meeting_timeline.insert_mark');
 assert.equal(buildMeetingPlatformRuntimeBundleMatrix({
   baseUrl: 'http://localhost:8787',

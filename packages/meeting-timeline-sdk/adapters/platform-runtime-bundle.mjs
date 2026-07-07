@@ -16,8 +16,10 @@ import {
   MEETING_APP_EXTENSION_MESSAGE_TYPES,
   buildMeetingAppContentScriptManifest,
   buildMeetingAppExtensionAttachedMessage,
+  buildMeetingAppExtensionCandidateLaunchPlanMessage,
   buildMeetingAppExtensionClientCallMessage,
   buildMeetingAppExtensionCurrentWindowPreflightMessage,
+  buildMeetingAppExtensionOpenCandidateSessionMessage,
   buildMeetingAppExtensionObserveCandidatesMessage,
   buildMeetingAppExtensionPreflightCandidatesMessage,
   buildMeetingAppExtensionStatusMessage,
@@ -128,6 +130,30 @@ function messageExamples(platform, options = {}) {
       requestId: 'preflight-candidates-001',
       capturedAtMs,
       query: { active: false },
+      options: {
+        requireSpeakerTrack: true,
+      },
+    }),
+    candidate_launch_plan: buildMeetingAppExtensionCandidateLaunchPlanMessage({
+      requestId: 'candidate-launch-001',
+      capturedAtMs,
+      tabs: [{
+        url,
+        title: `${extensionPlatform ?? 'local'} meeting`,
+        active: true,
+      }],
+      options: {
+        requireSpeakerTrack: true,
+      },
+    }),
+    open_candidate_session: buildMeetingAppExtensionOpenCandidateSessionMessage({
+      requestId: 'open-candidate-001',
+      capturedAtMs,
+      tabs: [{
+        url,
+        title: `${extensionPlatform ?? 'local'} meeting`,
+        active: true,
+      }],
       options: {
         requireSpeakerTrack: true,
       },
@@ -372,6 +398,8 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
       bridge_message_types: [
         'meeting_timeline.sample',
         MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+        MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan,
+        MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session,
         'meeting_timeline.insert_mark',
         'meeting_timeline.insert_marks',
         'meeting_timeline.provider_event',
