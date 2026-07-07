@@ -8,6 +8,9 @@ import {
   buildMeetingPlatformConsumerHandoff,
 } from './platform-consumer-handoff.mjs';
 import {
+  buildMeetingPlatformFieldIntakeMatrix,
+} from './platform-field-intake.mjs';
+import {
   createMeetingPlatformConnectorContentScriptBridge,
 } from './meeting-platform-connector.mjs';
 
@@ -17,6 +20,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA = 'meeting_app_timeli
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist';
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_ADOPTION_INDEX_SCHEMA = 'meeting_app_timeline_connector_adoption_index';
+export const MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA = 'meeting_app_timeline_connector_field_intake_index';
 export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA = 'meeting_app_timeline_connector_bridge_handoff';
 export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_bridge_handoff_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_SMOKE_REPORT_SCHEMA = 'meeting_app_timeline_connector_bridge_smoke_report';
@@ -909,6 +913,107 @@ export function assertMeetingAppTimelineConnectorHostInstallChecklist(checklistO
   return checklistOrPackage;
 }
 
+function fieldIntakeMatrixForChecklist(checklist = {}, options = {}) {
+  return buildMeetingPlatformFieldIntakeMatrix({
+    ...options,
+    baseUrl: firstNonEmpty(options.baseUrl, options.base_url, checklist.base_url),
+    platforms: (checklist.rows ?? []).map((row) => normalizeKey(row.platform)),
+  });
+}
+
+function summarizeFieldOperatorSteps(steps = []) {
+  return asArray(steps).map((step) => compactObject({
+    id: step.id,
+    owner: step.owner,
+    objective: step.objective,
+    command: step.command,
+    output: step.output,
+    required_snapshot: step.required_snapshot,
+    required_coverage: step.required_coverage,
+  }));
+}
+
+export function buildMeetingAppTimelineConnectorFieldIntakeIndex(checklistOrPackage = {}, options = {}) {
+  const checklist = checklistOrPackage?.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA
+    ? checklistOrPackage
+    : buildMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage, options);
+  const matrix = fieldIntakeMatrixForChecklist(checklist, options);
+  const checklistByPlatform = new Map((checklist.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
+  const rows = (matrix.plans ?? []).map((plan) => {
+    const platform = normalizeKey(plan.platform);
+    const checklistRow = checklistByPlatform.get(platform) ?? {};
+    return compactObject({
+      platform,
+      display_name: plan.display_name ?? checklistRow.display_name,
+      status: plan.status,
+      production_ready: plan.production_ready === true,
+      ready_for_realtime_annotations: plan.ready_for_realtime_annotations === true,
+      connector_selected_surface: checklistRow.selected_surface,
+      connector_install_target: checklistRow.install_target,
+      connector_runtime_preset: checklistRow.runtime_preset,
+      provider_endpoint: plan.provider_endpoint,
+      field_evidence_input: plan.files?.field_evidence_input,
+      evidence_package: plan.files?.evidence_package,
+      required_inputs: plan.required_inputs,
+      forbidden_inputs: plan.forbidden_inputs,
+      required_local_snapshots: plan.acceptance?.required_local_snapshots ?? [],
+      required_provider_coverage: plan.acceptance?.required_provider_coverage ?? [],
+      missing_env: plan.provider_connection?.security?.missing_env ?? [],
+      provider_transport: plan.provider_connection?.transport,
+      provider_realtime_blocking: plan.provider_connection?.realtime_annotation_policy?.provider_events_block_realtime,
+      commands: {
+        export_field_intake_plan: plan.commands?.export_field_intake_plan,
+        build_field_evidence: plan.commands?.build_field_evidence,
+        inspect_capture_gaps: plan.commands?.inspect_capture_gaps,
+        validate_real_intake: plan.commands?.validate_real_intake,
+        validate_live_readiness: plan.commands?.validate_live_readiness,
+      },
+      operator_steps: summarizeFieldOperatorSteps(plan.operator_steps),
+      next_actions: plan.next_actions,
+    });
+  });
+  const missing = rows.flatMap((row) => [
+    row.field_evidence_input ? undefined : `${row.platform}:field_evidence_input`,
+    row.evidence_package ? undefined : `${row.platform}:evidence_package`,
+    row.commands?.build_field_evidence ? undefined : `${row.platform}:build_field_evidence_command`,
+    row.commands?.validate_real_intake ? undefined : `${row.platform}:validate_real_intake_command`,
+    (row.required_local_snapshots ?? []).length > 0 ? undefined : `${row.platform}:required_local_snapshots`,
+    (row.required_provider_coverage ?? []).length > 0 ? undefined : `${row.platform}:required_provider_coverage`,
+  ].filter(Boolean));
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: missing.length === 0,
+    target: checklist.target,
+    package_id: checklist.package_id,
+    base_url: checklist.base_url,
+    platform_count: checklist.platform_count,
+    row_count: rows.length,
+    production_ready_count: matrix.production_ready_count,
+    realtime_ready_count: matrix.realtime_ready_count,
+    provider_blocked_count: matrix.provider_blocked_count,
+    local_capture_needed_count: matrix.local_capture_needed_count,
+    provider_capture_needed_count: matrix.provider_capture_needed_count,
+    field_matrix_schema: matrix.schema,
+    rows,
+    issue_count: unique(missing).length,
+    issues: unique(missing),
+    next_actions: unique(rows.flatMap((row) => row.next_actions ?? [])),
+  });
+}
+
+export function assertMeetingAppTimelineConnectorFieldIntakeIndex(checklistOrPackage = {}, options = {}) {
+  const index = buildMeetingAppTimelineConnectorFieldIntakeIndex(checklistOrPackage, options);
+  if (!index.accepted) {
+    throw new MeetingTimelineSdkError('Meeting app timeline connector field intake index is not accepted', {
+      index,
+      issues: index.issues,
+    });
+  }
+  return index;
+}
+
 function adoptionEvidenceAccepted(options = {}, platform) {
   const key = normalizeKey(platform);
   const byPlatform = firstNonEmpty(
@@ -950,15 +1055,18 @@ export function buildMeetingAppTimelineConnectorAdoptionIndex(checklistOrPackage
   const checklist = checklistOrPackage?.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA
     ? checklistOrPackage
     : buildMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage, options);
+  const fieldIntakeIndex = buildMeetingAppTimelineConnectorFieldIntakeIndex(checklist, options);
   const bridgeHandoff = buildMeetingAppTimelineConnectorBridgeHandoff(checklist, options);
   const bridgeAcceptance = buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(bridgeHandoff, options);
   const smokePlan = buildMeetingAppTimelineConnectorSmokePlan(checklist, options);
   const smokeAcceptance = buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan, options);
+  const fieldIntakeByPlatform = new Map((fieldIntakeIndex.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
   const bridgeByPlatform = new Map((bridgeHandoff.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
   const smokeByPlatform = new Map((smokePlan.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
   const rows = (checklist.rows ?? []).map((row) => {
     const platform = normalizeKey(row.platform);
     const actions = asArray(row.runtime_actions).map((action) => normalizeMeetingPlatformRuntimeEventAction(action));
+    const fieldIntake = fieldIntakeByPlatform.get(platform) ?? {};
     const bridgeRow = bridgeByPlatform.get(platform) ?? {};
     const smokeRow = smokeByPlatform.get(platform) ?? {};
     const hasObserveCandidates = actions.includes('observe_platform_candidates');
@@ -1035,6 +1143,17 @@ export function buildMeetingAppTimelineConnectorAdoptionIndex(checklistOrPackage
         transcript_blocks_realtime: row.transcript_blocks_realtime,
         required_for_realtime: false,
       },
+      field_intake: {
+        status: fieldIntake.status,
+        ready_for_realtime_annotations: fieldIntake.ready_for_realtime_annotations,
+        provider_endpoint: fieldIntake.provider_endpoint,
+        field_evidence_input: fieldIntake.field_evidence_input,
+        evidence_package: fieldIntake.evidence_package,
+        missing_env: fieldIntake.missing_env,
+        required_local_snapshots: fieldIntake.required_local_snapshots,
+        required_provider_coverage: fieldIntake.required_provider_coverage,
+        commands: fieldIntake.commands,
+      },
       runtime_actions: actions,
       client_methods: row.client_methods,
       bridge_ready: bridgeReady,
@@ -1056,7 +1175,10 @@ export function buildMeetingAppTimelineConnectorAdoptionIndex(checklistOrPackage
     });
     return {
       ...adoptionRow,
-      next_actions: adoptionNextActions(adoptionRow),
+      next_actions: unique([
+        ...adoptionNextActions(adoptionRow),
+        ...(fieldIntake.next_actions ?? []),
+      ]),
     };
   });
   const realtimeReadyCount = rows.filter((row) => row.realtime_ready === true).length;
@@ -1089,9 +1211,11 @@ export function buildMeetingAppTimelineConnectorAdoptionIndex(checklistOrPackage
       bridge_handoff_acceptance: bridgeAcceptance.schema,
       smoke_plan: smokePlan.schema,
       smoke_plan_acceptance: smokeAcceptance.schema,
+      field_intake_index: fieldIntakeIndex.schema,
     },
     files_to_read_first: [
       'connector-adoption-index.json',
+      'connector-field-intake-index.json',
       'host-install-checklist.json',
       'connector-bridge-handoff.json',
       'connector-bridge-smoke-report.json',

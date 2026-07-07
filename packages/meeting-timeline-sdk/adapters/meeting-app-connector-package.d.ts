@@ -6,6 +6,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA: 'meeting_app_timelin
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA: 'meeting_app_timeline_connector_host_install_checklist';
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_host_install_checklist_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_ADOPTION_INDEX_SCHEMA: 'meeting_app_timeline_connector_adoption_index';
+export const MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA: 'meeting_app_timeline_connector_field_intake_index';
 export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA: 'meeting_app_timeline_connector_bridge_handoff';
 export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_bridge_handoff_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_SMOKE_REPORT_SCHEMA: 'meeting_app_timeline_connector_bridge_smoke_report';
@@ -141,6 +142,44 @@ export interface MeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport
   issue_count: number;
   issues: MeetingAppTimelineConnectorPackageIssue[];
   rows: Array<Record<string, unknown>>;
+  next_actions: string[];
+}
+
+export interface MeetingAppTimelineConnectorFieldIntakeIndex {
+  type: 'meeting_app_timeline_connector_field_intake_index';
+  schema: 'meeting_app_timeline_connector_field_intake_index';
+  schema_version: 1;
+  accepted: boolean;
+  target?: string;
+  package_id?: string;
+  base_url?: string;
+  platform_count: number;
+  row_count: number;
+  production_ready_count: number;
+  realtime_ready_count: number;
+  provider_blocked_count: number;
+  local_capture_needed_count: number;
+  provider_capture_needed_count: number;
+  field_matrix_schema?: string;
+  rows: Array<Record<string, unknown> & {
+    platform: string;
+    status: string;
+    production_ready: boolean;
+    ready_for_realtime_annotations: boolean;
+    connector_selected_surface?: string;
+    connector_install_target?: string;
+    provider_endpoint?: string;
+    field_evidence_input?: string;
+    evidence_package?: string;
+    required_local_snapshots: string[];
+    required_provider_coverage: string[];
+    missing_env: string[];
+    commands?: Record<string, string>;
+    operator_steps: Array<Record<string, unknown>>;
+    next_actions: string[];
+  }>;
+  issue_count: number;
+  issues: string[];
   next_actions: string[];
 }
 
@@ -431,6 +470,16 @@ export function assertMeetingAppTimelineConnectorHostInstallChecklist<T extends 
   checklistOrPackage?: T,
   options?: Record<string, unknown>,
 ): T;
+
+export function buildMeetingAppTimelineConnectorFieldIntakeIndex(
+  checklistOrPackage?: MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineConnectorFieldIntakeIndex;
+
+export function assertMeetingAppTimelineConnectorFieldIntakeIndex(
+  checklistOrPackage?: MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineConnectorFieldIntakeIndex;
 
 export function buildMeetingAppTimelineConnectorAdoptionIndex(
   checklistOrPackage?: MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,

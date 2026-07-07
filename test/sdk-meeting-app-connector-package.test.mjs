@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import {
   MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_ADOPTION_INDEX_SCHEMA,
+  MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA,
   assertMeetingAppTimelineConnectorBridgeHandoff,
   assertMeetingAppTimelineConnectorAdoptionIndex,
+  assertMeetingAppTimelineConnectorFieldIntakeIndex,
   assertMeetingAppTimelineConnectorBridgeSmoke,
   assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
@@ -16,6 +18,7 @@ import {
   buildMeetingAppTimelineConnectorBridgeHandoff,
   buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport,
   buildMeetingAppTimelineConnectorAdoptionIndex,
+  buildMeetingAppTimelineConnectorFieldIntakeIndex,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
@@ -112,6 +115,18 @@ assert.equal(adoptionIndex.rows.find((row) => row.platform === 'zoom').selected_
 assert.equal(adoptionIndex.rows.every((row) => row.can_start_axis_before_provider === true), true);
 assert.equal(adoptionIndex.rows.every((row) => row.production_evidence_required.includes('runtime_host_replay')), true);
 assert.equal(assertMeetingAppTimelineConnectorAdoptionIndex(connectorPackage).accepted, true);
+
+const fieldIntakeIndex = buildMeetingAppTimelineConnectorFieldIntakeIndex(hostInstallChecklist);
+assert.equal(fieldIntakeIndex.schema, MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA);
+assert.equal(fieldIntakeIndex.accepted, true);
+assert.equal(fieldIntakeIndex.platform_count, 2);
+assert.equal(fieldIntakeIndex.rows.find((row) => row.platform === 'google_meet').provider_endpoint, 'https://timeline.example.com/api/platform-events/google-meet');
+assert.equal(fieldIntakeIndex.rows.find((row) => row.platform === 'google_meet').field_evidence_input.endsWith('/meeting-platform-field-evidence/google_meet.json'), true);
+assert.equal(fieldIntakeIndex.rows.find((row) => row.platform === 'zoom').commands.validate_real_intake.includes('meeting-platform:real-intake'), true);
+assert.equal(fieldIntakeIndex.rows.every((row) => row.required_local_snapshots.includes('active_speaker')), true);
+assert.equal(fieldIntakeIndex.next_actions.includes('capture_real_provider_start_end_events'), true);
+assert.equal(assertMeetingAppTimelineConnectorFieldIntakeIndex(connectorPackage).accepted, true);
+assert.equal(adoptionIndex.rows.find((row) => row.platform === 'google_meet').field_intake.commands.build_field_evidence.includes('meeting-platform:field-evidence'), true);
 
 const bridgeHandoff = buildMeetingAppTimelineConnectorBridgeHandoff(connectorPackage);
 assert.equal(bridgeHandoff.schema, MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA);
