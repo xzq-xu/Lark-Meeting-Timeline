@@ -830,6 +830,7 @@ assert.equal(rootMeetingAppSdk.implementationHandoffMatrix().implementation_read
 assert.equal(rootMeetingAppSdk.platformAdapterAuthoringPlan('google-meet').built_in, true);
 assert.equal(rootMeetingAppSdk.adapterAuthoringMatrix({ platforms: ['google-meet', 'Acme Rooms'] }).external_authoring_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterPortfolioItem('google-meet').p1_provider_reconcile.path, 'google_workspace_events_pubsub');
+assert.equal(rootMeetingAppSdk.adapterPortfolioItem('zoom').recommended_first_surface, 'native_detector');
 assert.equal(rootMeetingAppSdk.adapterPortfolio({ platforms: ['google-meet', 'Acme Rooms'] }).external_authoring_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterAcceptanceChecklist('google-meet', {}, { target: 'static' }).accepted, true);
 assert.equal(rootMeetingAppSdk.adapterAcceptanceChecklistMatrix({ platforms: ['google-meet'] }, { target: 'static' }).accepted_count, 1);
@@ -1346,6 +1347,7 @@ assert.equal(kit.platformImplementationHandoffMatrix({ platforms: ['zoom'] }).im
 assert.equal(kit.platformAdapterAuthoringPlan('zoom').provider_reconcile.path, 'zoom_meeting_webhooks');
 assert.equal(kit.platformAdapterAuthoringMatrix({ platforms: ['zoom'] }).built_in_count, 1);
 assert.equal(kit.platformAdapterPortfolioItem('zoom').p1_provider_reconcile.path, 'zoom_meeting_webhooks');
+assert.equal(kit.platformAdapterPortfolioItem('zoom').recommended_first_surface, 'native_detector');
 assert.equal(kit.platformAdapterPortfolio({ platforms: ['zoom'] }).pilot_ready_count, 1);
 assert.equal(kit.platformAdapterAcceptanceChecklist('zoom', {}, { target: 'static' }).accepted, true);
 assert.equal(kit.platformAdapterAcceptanceChecklistMatrix({ platforms: ['zoom'] }, { target: 'static' }).accepted_count, 1);

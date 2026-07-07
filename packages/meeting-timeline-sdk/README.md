@@ -785,7 +785,7 @@ npm run meeting-platform:adapter-authoring -- \
   --report-file=data/meeting-platform-adapter-authoring-report.json
 ```
 
-如果要给另一个项目一个“多会议软件接入看板”的单一 JSON，优先用 `platformAdapterPortfolio()` 或 CLI。它会为每个平台列出 `p0_realtime_axis`、`p1_provider_reconcile`、`p2_post_meeting_backfill`、`official_doc_count`、`implementation_ready`、`pilot_ready`、`production_ready` 和 `next_action`：
+如果要给另一个项目一个“多会议软件接入看板”的单一 JSON，优先用 `platformAdapterPortfolio()` 或 CLI。它会为每个平台列出 `adapter_surfaces`、`launch_requirements`、`p0_realtime_axis`、`p1_provider_reconcile`、`p2_post_meeting_backfill`、`official_doc_count`、`implementation_ready`、`pilot_ready`、`production_ready` 和 `next_action`。这里的 `recommended_first_surface` 会复用 runtime profile 的平台画像：Google Meet 默认 `browser_extension`，Zoom 默认 `native_detector`，Teams 的 desktop observer 会映射到宿主可启动的 native detector；自定义平台仍保留 authoring plan 的浏览器优先骨架，避免误套内置平台策略：
 
 ```sh
 npm run meeting-platform:adapter-portfolio -- \

@@ -8,6 +8,9 @@ import {
 import {
   buildMeetingPlatformProviderConnectionPack,
 } from './platform-provider-connection.mjs';
+import {
+  buildMeetingPlatformRuntimeProfile,
+} from './platform-runtime-profile.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_PORTFOLIO_ITEM_SCHEMA = 'meeting_platform_adapter_portfolio_item';
 export const MEETING_PLATFORM_ADAPTER_PORTFOLIO_SCHEMA = 'meeting_platform_adapter_portfolio';
@@ -59,6 +62,38 @@ function optionalImplementationHandoff(platform, options = {}, builtIn = false) 
   } catch {
     return undefined;
   }
+}
+
+function optionalRuntimeProfile(platform, options = {}, builtIn = false) {
+  if (!builtIn) return undefined;
+  try {
+    return buildMeetingPlatformRuntimeProfile(platform, options);
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeSurface(surface) {
+  return surface == null ? undefined : String(surface).replace(/-/g, '_');
+}
+
+function launchableSurface(surface) {
+  const normalized = normalizeSurface(surface);
+  if (normalized === 'desktop_observer') return 'native_detector';
+  if (normalized === 'desktop_or_browser_observer') return 'native_detector';
+  if (normalized === 'browser_extension_or_desktop_observer') return 'browser_extension';
+  if (normalized === 'browser_extension_or_native_detector') return 'browser_extension';
+  return normalized;
+}
+
+function recommendedFirstSurface(runtimeProfile = {}, fallback) {
+  const surfaces = runtimeProfile.adapter_surfaces ?? {};
+  const ordered = unique([
+    ...(surfaces.recommended_order ?? []),
+    surfaces.primary,
+    fallback,
+  ].map((surface) => launchableSurface(surface)));
+  return ordered.find((surface) => surface && surface !== 'provider_reconcile') ?? fallback;
 }
 
 function docs(providerConnection = {}) {
@@ -114,6 +149,8 @@ export function buildMeetingPlatformAdapterPortfolioItem(platform, options = {})
   const plan = buildMeetingPlatformAdapterAuthoringPlan(platform, options);
   const providerConnection = optionalProviderConnection(plan.platform, options, plan.built_in);
   const handoff = optionalImplementationHandoff(plan.platform, options, plan.built_in);
+  const runtimeProfile = optionalRuntimeProfile(plan.platform, options, plan.built_in);
+  const firstSurface = recommendedFirstSurface(runtimeProfile, plan.recommended_first_surface);
   const browserMatches = plan.browser_surface?.matches ?? [];
   const providerDocs = docs(providerConnection);
   return compactObject({
@@ -124,15 +161,22 @@ export function buildMeetingPlatformAdapterPortfolioItem(platform, options = {})
     display_name: plan.display_name,
     built_in: plan.built_in,
     adapter_status: plan.built_in ? 'built_in_adapter_available' : 'adapter_authoring_required',
-    recommended_first_surface: plan.recommended_first_surface,
+    recommended_first_surface: firstSurface,
+    adapter_surfaces: runtimeProfile?.adapter_surfaces,
+    launch_requirements: runtimeProfile?.launch_requirements,
+    evidence_thresholds: runtimeProfile?.evidence_thresholds,
+    fallback_policy: runtimeProfile?.fallback_policy,
     p0_realtime_axis: {
-      source: plan.recommended_first_surface,
+      source: firstSurface,
       local_axis_first: true,
       browser_matches: browserMatches,
       browser_match_count: browserMatches.length,
       candidate_observation_required: true,
       candidate_observation_message_type: plan.required_contracts?.candidate_observation_message_type,
       timestamp_field: plan.required_contracts?.timestamp_field,
+      surface_order: runtimeProfile?.adapter_surfaces?.recommended_order,
+      launch_context: runtimeProfile?.adapter_surfaces?.launch_context,
+      realtime_axis_surface: runtimeProfile?.adapter_surfaces?.realtime_axis_surface,
       provider_events_block_realtime: false,
       transcript_blocks_realtime: false,
     },
@@ -180,11 +224,15 @@ export function buildMeetingPlatformAdapterPortfolio(options = {}) {
     display_name: item.display_name,
     built_in: item.built_in,
     adapter_status: item.adapter_status,
+    primary_surface: item.adapter_surfaces?.primary,
+    surface_order: item.adapter_surfaces?.recommended_order,
     recommended_first_surface: item.recommended_first_surface,
     browser_match_count: item.p0_realtime_axis?.browser_match_count ?? 0,
     provider_path: item.p1_provider_reconcile?.path,
     provider_transport: item.p1_provider_reconcile?.transport,
     official_doc_count: item.p1_provider_reconcile?.official_doc_count ?? 0,
+    pilot_provider_records_required: item.evidence_thresholds?.pilot?.provider_records_required,
+    production_provider_records_required: item.evidence_thresholds?.production?.provider_records_required,
     implementation_ready: item.implementation?.implementation_ready === true,
     pilot_ready: item.implementation?.pilot_ready === true,
     production_ready: item.implementation?.production_ready === true,

@@ -18,6 +18,10 @@ export interface MeetingPlatformAdapterPortfolioItem {
   built_in: boolean;
   adapter_status: string;
   recommended_first_surface: string;
+  adapter_surfaces?: Record<string, unknown>;
+  launch_requirements?: Record<string, unknown>;
+  evidence_thresholds?: Record<string, unknown>;
+  fallback_policy?: Record<string, unknown>;
   p0_realtime_axis: Record<string, unknown>;
   p1_provider_reconcile: Record<string, unknown>;
   p2_post_meeting_backfill: Record<string, unknown>;
