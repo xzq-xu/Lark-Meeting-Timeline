@@ -162,6 +162,23 @@ assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'zoom').adapter_mode, 'native_or_desktop_observer');
 assert.equal(connectorAdapterMatrix.rows.every((row) => row.runtime_sequence[0].action === 'observe_platform_candidates'), true);
 assert.equal(sdk.assertConnectorAdapterMatrix(connectorPackage).accepted, true);
+const resolvedConnectorHostAdapter = sdk.resolveConnectorHostAdapterConfig({
+  tabs: [
+    { url: 'https://zoom.us/j/987654321', active: false, in_meeting: true },
+    { url: 'https://meet.google.com/abc-defg-hij', active: true, audible: true, in_meeting: true },
+  ],
+}, connectorPackage);
+assert.equal(resolvedConnectorHostAdapter.schema, 'meeting_app_timeline_host_adapter_config_resolution');
+assert.equal(resolvedConnectorHostAdapter.accepted, true);
+assert.equal(resolvedConnectorHostAdapter.platform, 'google_meet');
+assert.equal(resolvedConnectorHostAdapter.host_config.selected_surface, 'browser_extension');
+assert.equal(sdk.assertResolvedConnectorHostAdapterConfig('https://zoom.us/j/987654321', connectorPackage).platform, 'zoom');
+const unsupportedConnectorHostAdapter = sdk.resolveConnectorHostAdapterConfig(
+  'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+  connectorPackage,
+);
+assert.equal(unsupportedConnectorHostAdapter.accepted, false);
+assert.equal(unsupportedConnectorHostAdapter.issues.some((issue) => issue.code === 'meeting_platform_not_supported'), true);
 const providerReplayReport = sdk.providerReplayReport('google-meet', {
   baseReceivedAtMs: 1_782_614_400_000,
 });

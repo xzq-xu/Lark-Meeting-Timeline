@@ -19,6 +19,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA: 'meeting_app_
 export const MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_adapter_matrix_acceptance_report';
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA: 'meeting_app_timeline_host_adapter_config';
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA: 'meeting_app_timeline_host_adapter_config_index';
+export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA: 'meeting_app_timeline_host_adapter_config_resolution';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA: 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION: 1;
 
@@ -678,6 +679,26 @@ export interface MeetingAppTimelineHostAdapterConfigIndex {
   next_actions: string[];
 }
 
+export interface MeetingAppTimelineHostAdapterConfigResolution {
+  type: 'meeting_app_timeline_host_adapter_config_resolution';
+  schema: 'meeting_app_timeline_host_adapter_config_resolution';
+  schema_version: 1;
+  accepted: boolean;
+  package_id?: string;
+  platform?: string;
+  resolution: import('./meeting-platform-connector.mjs').MeetingPlatformConnectorResolution;
+  host_config?: MeetingAppTimelineHostAdapterConfig;
+  config_file?: string;
+  selected_surface?: string;
+  adapter_mode?: string;
+  install_target?: string;
+  runtime_event_endpoint?: string;
+  timestamp_field?: string;
+  issue_count: number;
+  issues: MeetingAppTimelineConnectorPackageIssue[];
+  next_actions: string[];
+}
+
 export interface MeetingAppTimelineConnectorRuntimeClient {
   type: 'meeting_app_timeline_connector_runtime_client';
   schema: 'meeting_app_timeline_connector_runtime_client';
@@ -872,6 +893,18 @@ export function assertMeetingAppTimelineHostAdapterConfigIndex(
   matrixOrChecklistOrPackage?: MeetingAppTimelineConnectorAdapterMatrix | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | MeetingAppTimelineHostAdapterConfigIndex | Record<string, unknown>,
   options?: Record<string, unknown>,
 ): MeetingAppTimelineHostAdapterConfigIndex;
+
+export function resolveMeetingAppTimelineHostAdapterConfig(
+  indexOrMatrixOrChecklistOrPackage?: MeetingAppTimelineHostAdapterConfigIndex | MeetingAppTimelineConnectorAdapterMatrix | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  input?: string | URL | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineHostAdapterConfigResolution;
+
+export function assertMeetingAppTimelineResolvedHostAdapterConfig(
+  indexOrMatrixOrChecklistOrPackage?: MeetingAppTimelineHostAdapterConfigIndex | MeetingAppTimelineConnectorAdapterMatrix | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  input?: string | URL | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineHostAdapterConfigResolution;
 
 export function createMeetingAppTimelineConnectorRuntimeClient(
   pkg?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,

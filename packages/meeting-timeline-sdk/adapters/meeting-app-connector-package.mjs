@@ -12,6 +12,7 @@ import {
 } from './platform-field-intake.mjs';
 import {
   createMeetingPlatformConnectorContentScriptBridge,
+  resolveMeetingPlatformConnectorInput,
 } from './meeting-platform-connector.mjs';
 
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA = 'meeting_app_timeline_connector_package';
@@ -33,6 +34,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA = 'meeting_app
 export const MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_adapter_matrix_acceptance_report';
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA = 'meeting_app_timeline_host_adapter_config';
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA = 'meeting_app_timeline_host_adapter_config_index';
+export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA = 'meeting_app_timeline_host_adapter_config_resolution';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA = 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION = 1;
 
@@ -3060,6 +3062,13 @@ function hostAdapterMatrixFrom(matrixOrChecklistOrPackage = {}, options = {}) {
   return buildMeetingAppTimelineConnectorAdapterMatrix(matrixOrChecklistOrPackage, options);
 }
 
+function hostAdapterConfigIndexFrom(indexOrMatrixOrChecklistOrPackage = {}, options = {}) {
+  if (indexOrMatrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA) {
+    return indexOrMatrixOrChecklistOrPackage;
+  }
+  return buildMeetingAppTimelineHostAdapterConfigIndex(indexOrMatrixOrChecklistOrPackage, options);
+}
+
 export function buildMeetingAppTimelineHostAdapterConfig(matrixOrChecklistOrPackage = {}, platformOrOptions = {}, options = {}) {
   if (matrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA) {
     const requestedPlatform = hostAdapterConfigPlatform(platformOrOptions, options);
@@ -3175,6 +3184,78 @@ export function assertMeetingAppTimelineHostAdapterConfigIndex(matrixOrChecklist
     });
   }
   return index;
+}
+
+export function resolveMeetingAppTimelineHostAdapterConfig(indexOrMatrixOrChecklistOrPackage = {}, input = {}, options = {}) {
+  const index = hostAdapterConfigIndexFrom(indexOrMatrixOrChecklistOrPackage, options);
+  const platforms = unique([
+    ...(index.rows ?? []).map((row) => row.platform),
+    ...asArray(firstNonEmpty(options.platforms, options.platform_keys, options.platformKeys)),
+  ]);
+  const resolution = resolveMeetingPlatformConnectorInput(input, {
+    ...options,
+    platforms,
+  });
+  const platform = normalizeKey(resolution.platform);
+  const hostConfig = platform ? index.configs?.[platform] : undefined;
+  const issues = [];
+  if (resolution.detected !== true) {
+    addIssue(issues, 'meeting_platform_not_detected', 'No supported meeting platform was detected from the input', {
+      candidate_count: resolution.candidate_count,
+    });
+  }
+  if (resolution.detected === true && resolution.supported !== true) {
+    addIssue(issues, 'meeting_platform_not_supported', 'Detected meeting platform is not in the host adapter config index', {
+      platform,
+      current_platforms: resolution.current_platforms,
+    });
+  }
+  if (resolution.detected === true && !hostConfig) {
+    addIssue(issues, 'missing_host_adapter_config', 'No host adapter config exists for detected platform', {
+      platform,
+    });
+  }
+  if (hostConfig && hostConfig.accepted !== true) {
+    addIssue(issues, 'host_adapter_config_not_accepted', 'Detected host adapter config is not accepted', {
+      platform,
+      config_issues: hostConfig.issues,
+    });
+  }
+  return compactObject({
+    type: MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA,
+    schema: MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    package_id: index.package_id,
+    platform,
+    resolution,
+    host_config: hostConfig,
+    config_file: hostConfig?.config_file,
+    selected_surface: hostConfig?.selected_surface,
+    adapter_mode: hostConfig?.adapter_mode,
+    install_target: hostConfig?.install_target,
+    runtime_event_endpoint: hostConfig?.runtime_event_endpoint ?? index.runtime_event_endpoint,
+    timestamp_field: hostConfig?.timestamp_field ?? index.timestamp_field,
+    issue_count: issues.length,
+    issues,
+    next_actions: issues.length > 0
+      ? unique([
+        ...issues.map((issue) => `fix_${issue.code}`),
+        ...(resolution.next_actions ?? []),
+      ])
+      : ['install_resolved_host_adapter_config'],
+  });
+}
+
+export function assertMeetingAppTimelineResolvedHostAdapterConfig(indexOrMatrixOrChecklistOrPackage = {}, input = {}, options = {}) {
+  const resolved = resolveMeetingAppTimelineHostAdapterConfig(indexOrMatrixOrChecklistOrPackage, input, options);
+  if (resolved.accepted !== true) {
+    throw new MeetingTimelineSdkError('Meeting app timeline host adapter config resolution is not accepted', {
+      resolved,
+      issues: resolved.issues,
+    });
+  }
+  return resolved;
 }
 
 export function createMeetingAppTimelineConnectorRuntimeClient(pkg = {}, options = {}) {

@@ -341,6 +341,7 @@ import {
   buildMeetingAppTimelineConnectorFieldIntakeIndex as buildMeetingAppTimelineConnectorFieldIntakeIndexFromRoot,
   buildMeetingAppTimelineHostAdapterConfig as buildMeetingAppTimelineHostAdapterConfigFromRoot,
   buildMeetingAppTimelineHostAdapterConfigIndex as buildMeetingAppTimelineHostAdapterConfigIndexFromRoot,
+  resolveMeetingAppTimelineHostAdapterConfig as resolveMeetingAppTimelineHostAdapterConfigFromRoot,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport as buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot,
   buildMeetingAppTimelineConnectorPlatformRoadmap as buildMeetingAppTimelineConnectorPlatformRoadmapFromRoot,
   buildMeetingAppTimelineConnectorReleaseGate as buildMeetingAppTimelineConnectorReleaseGateFromRoot,
@@ -667,6 +668,7 @@ import {
   assertMeetingAppTimelineConnectorFieldIntakeIndex,
   assertMeetingAppTimelineHostAdapterConfig,
   assertMeetingAppTimelineHostAdapterConfigIndex,
+  assertMeetingAppTimelineResolvedHostAdapterConfig,
   assertMeetingAppTimelineConnectorBridgeSmoke,
   assertMeetingAppTimelineConnectorPlatformRoadmap,
   assertMeetingAppTimelineConnectorReleaseGate,
@@ -680,6 +682,7 @@ import {
   buildMeetingAppTimelineConnectorFieldIntakeIndex,
   buildMeetingAppTimelineHostAdapterConfig,
   buildMeetingAppTimelineHostAdapterConfigIndex,
+  resolveMeetingAppTimelineHostAdapterConfig,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
@@ -913,6 +916,9 @@ assert.equal(buildMeetingAppTimelineHostAdapterConfigIndex(rootConnectorPackage)
 assert.equal(buildMeetingAppTimelineHostAdapterConfigIndexFromRoot(rootConnectorPackage).accepted, true);
 assert.equal(assertMeetingAppTimelineHostAdapterConfig(rootConnectorPackage, 'google-meet').accepted, true);
 assert.equal(assertMeetingAppTimelineHostAdapterConfigIndex(rootConnectorPackage).accepted, true);
+assert.equal(resolveMeetingAppTimelineHostAdapterConfig(rootConnectorPackage, 'https://meet.google.com/abc-defg-hij').schema, 'meeting_app_timeline_host_adapter_config_resolution');
+assert.equal(resolveMeetingAppTimelineHostAdapterConfigFromRoot(rootConnectorPackage, 'https://meet.google.com/abc-defg-hij').accepted, true);
+assert.equal(assertMeetingAppTimelineResolvedHostAdapterConfig(rootConnectorPackage, 'https://meet.google.com/abc-defg-hij').platform, 'google_meet');
 assert.equal(rootMeetingAppSdk.connectorReleaseGate(rootConnectorPackage).schema, 'meeting_app_timeline_connector_release_gate');
 assert.equal(rootMeetingAppSdk.assertConnectorReleaseGate(rootConnectorPackage).accepted, true);
 assert.equal(rootMeetingAppSdk.connectorPlatformRoadmap(rootConnectorPackage).schema, 'meeting_app_timeline_connector_platform_roadmap');
@@ -925,6 +931,8 @@ assert.equal(rootMeetingAppSdk.connectorHostAdapterConfig('google-meet', { surfa
 assert.equal(rootMeetingAppSdk.assertConnectorHostAdapterConfig(rootConnectorPackage, 'google-meet').accepted, true);
 assert.equal(rootMeetingAppSdk.connectorHostAdapterConfigIndex(rootConnectorPackage).accepted, true);
 assert.equal(rootMeetingAppSdk.assertConnectorHostAdapterConfigIndex(rootConnectorPackage).row_count, 1);
+assert.equal(rootMeetingAppSdk.resolveConnectorHostAdapterConfig('https://meet.google.com/abc-defg-hij', rootConnectorPackage).accepted, true);
+assert.equal(rootMeetingAppSdk.assertResolvedConnectorHostAdapterConfig({ tab: { url: 'https://meet.google.com/abc-defg-hij', active: true } }, rootConnectorPackage).platform, 'google_meet');
 const rootProviderReplay = buildMeetingPlatformProviderReplayReport('google-meet');
 assert.equal(rootProviderReplay.schema, 'meeting_platform_provider_replay_report');
 assert.equal(rootProviderReplay.accepted, true);

@@ -7,6 +7,7 @@ import {
   MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA,
+  MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_PLATFORM_ROADMAP_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA,
@@ -18,6 +19,7 @@ import {
   assertMeetingAppTimelineConnectorFieldIntakeIndex,
   assertMeetingAppTimelineHostAdapterConfig,
   assertMeetingAppTimelineHostAdapterConfigIndex,
+  assertMeetingAppTimelineResolvedHostAdapterConfig,
   assertMeetingAppTimelineConnectorBridgeSmoke,
   assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
@@ -34,6 +36,7 @@ import {
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineHostAdapterConfig,
   buildMeetingAppTimelineHostAdapterConfigIndex,
+  resolveMeetingAppTimelineHostAdapterConfig,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport,
@@ -404,6 +407,35 @@ const sdkHostAdapterConfigIndex = sdk.connectorHostAdapterConfigIndex(connectorP
 assert.equal(sdkHostAdapterConfigIndex.accepted, true);
 assert.equal(sdkHostAdapterConfigIndex.configs.zoom.provider_replay.provider_events_block_realtime, false);
 assert.equal(sdk.assertConnectorHostAdapterConfigIndex(adapterMatrix).row_count, 2);
+
+const resolvedGoogleHostAdapter = resolveMeetingAppTimelineHostAdapterConfig(hostAdapterConfigIndex, {
+  tabs: [
+    { url: 'https://zoom.us/j/987654321', title: 'Zoom Meeting', active: false, in_meeting: true },
+    { url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet', active: true, audible: true, in_meeting: true },
+  ],
+});
+assert.equal(resolvedGoogleHostAdapter.schema, MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA);
+assert.equal(resolvedGoogleHostAdapter.accepted, true);
+assert.equal(resolvedGoogleHostAdapter.platform, 'google_meet');
+assert.equal(resolvedGoogleHostAdapter.resolution.reason, 'meeting_url');
+assert.equal(resolvedGoogleHostAdapter.host_config.selected_surface, 'browser_extension');
+assert.equal(resolvedGoogleHostAdapter.config_file, 'host-adapter-configs/google_meet.json');
+assert.equal(assertMeetingAppTimelineResolvedHostAdapterConfig(adapterMatrix, {
+  tab: { url: 'https://meet.google.com/abc-defg-hij', active: true },
+}).accepted, true);
+
+const resolvedZoomHostAdapter = resolveMeetingAppTimelineHostAdapterConfig(connectorPackage, 'https://zoom.us/j/987654321');
+assert.equal(resolvedZoomHostAdapter.accepted, true);
+assert.equal(resolvedZoomHostAdapter.platform, 'zoom');
+assert.equal(resolvedZoomHostAdapter.host_config.adapter_mode, 'native_or_desktop_observer');
+assert.equal(resolvedZoomHostAdapter.runtime_event_endpoint, 'https://timeline.example.com/api/meeting-platform/runtime-events');
+
+const unresolvedTeamsHostAdapter = resolveMeetingAppTimelineHostAdapterConfig(hostAdapterConfigIndex, {
+  url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+});
+assert.equal(unresolvedTeamsHostAdapter.accepted, false);
+assert.equal(unresolvedTeamsHostAdapter.platform, 'microsoft_teams');
+assert.equal(unresolvedTeamsHostAdapter.issues.some((issue) => issue.code === 'meeting_platform_not_supported'), true);
 
 assert.equal(connectorPackage.adapter_blueprints.ready_count, 2);
 assert.equal(connectorPackage.adapter_blueprints.matrix.schema, 'meeting_platform_adapter_blueprint_matrix');

@@ -19,6 +19,7 @@ import {
   assertMeetingAppTimelineConnectorAdapterMatrix,
   assertMeetingAppTimelineHostAdapterConfig,
   assertMeetingAppTimelineHostAdapterConfigIndex,
+  assertMeetingAppTimelineResolvedHostAdapterConfig,
   assertMeetingAppTimelineConnectorPlatformRoadmap,
   assertMeetingAppTimelineConnectorReleaseGate,
   buildMeetingAppTimelineConnectorAdapterMatrix,
@@ -26,6 +27,7 @@ import {
   buildMeetingAppTimelineHostAdapterConfigIndex,
   buildMeetingAppTimelineConnectorPlatformRoadmap,
   buildMeetingAppTimelineConnectorReleaseGate,
+  resolveMeetingAppTimelineHostAdapterConfig,
 } from './adapters/meeting-app-connector-package.mjs';
 
 export const SDK_VERSION = '0.1.0';
@@ -561,6 +563,15 @@ function shouldUseRuntimeEvent(options = {}, defaults = {}) {
     || mode === 'remote'
     || mode === 'runtime_event'
     || mode === 'runtime_events';
+}
+
+function isConnectorHostAdapterSource(value = {}) {
+  return [
+    'meeting_app_timeline_connector_package',
+    'meeting_app_timeline_connector_host_install_checklist',
+    'meeting_app_timeline_connector_adapter_matrix',
+    'meeting_app_timeline_host_adapter_config_index',
+  ].includes(value?.schema);
 }
 
 function platformAndInput(runtime, platformOrInput, inputOrOptions = {}, options = {}) {
@@ -1118,6 +1129,24 @@ export function createMeetingAppTimelineSdk(options = {}) {
       return assertMeetingAppTimelineHostAdapterConfigIndex(source, {
         ...sdkPlatformOptions(runtime, connectorOptions),
         ...indexOptions,
+      });
+    },
+    resolveConnectorHostAdapterConfig(input = {}, connectorOptions = {}, resolveOptions = {}) {
+      const source = isConnectorHostAdapterSource(connectorOptions)
+        ? connectorOptions
+        : sdk.connectorPackage(connectorOptions);
+      return resolveMeetingAppTimelineHostAdapterConfig(source, input, {
+        ...sdkPlatformOptions(runtime, isConnectorHostAdapterSource(connectorOptions) ? {} : connectorOptions),
+        ...resolveOptions,
+      });
+    },
+    assertResolvedConnectorHostAdapterConfig(input = {}, connectorOptions = {}, resolveOptions = {}) {
+      const source = isConnectorHostAdapterSource(connectorOptions)
+        ? connectorOptions
+        : sdk.connectorPackage(connectorOptions);
+      return assertMeetingAppTimelineResolvedHostAdapterConfig(source, input, {
+        ...sdkPlatformOptions(runtime, isConnectorHostAdapterSource(connectorOptions) ? {} : connectorOptions),
+        ...resolveOptions,
       });
     },
     providerReplayReport(platformOrInput = {}, recordsOrOptions = undefined, replayOptions = {}) {

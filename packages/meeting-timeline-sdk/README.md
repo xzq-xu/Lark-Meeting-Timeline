@@ -958,6 +958,7 @@ import {
   buildMeetingAppTimelineConnectorSmokePlan,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
   createMeetingAppTimelineConnectorRuntimeClient,
+  resolveMeetingAppTimelineHostAdapterConfig,
   runMeetingAppTimelineConnectorBridgeSmoke,
   runMeetingAppTimelineConnectorSmokePlan,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package';
@@ -971,6 +972,9 @@ const adoptionIndex = buildMeetingAppTimelineConnectorAdoptionIndex(connectorPac
 const fieldIntakeIndex = buildMeetingAppTimelineConnectorFieldIntakeIndex(connectorPackage);
 const hostConfig = buildMeetingAppTimelineHostAdapterConfig(connectorPackage, 'google-meet');
 const hostConfigIndex = buildMeetingAppTimelineHostAdapterConfigIndex(connectorPackage);
+const resolvedHostConfig = resolveMeetingAppTimelineHostAdapterConfig(connectorPackage, {
+  tabs: [{ url: 'https://meet.google.com/abc-defg-hij', active: true }],
+});
 const bridgeHandoff = buildMeetingAppTimelineConnectorBridgeHandoff(connectorPackage);
 const bridgeAcceptance = buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(bridgeHandoff);
 const bridgeSmoke = await runMeetingAppTimelineConnectorBridgeSmoke(bridgeHandoff);
