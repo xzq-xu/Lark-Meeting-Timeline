@@ -1,5 +1,6 @@
 import type { MeetingPlatformConformanceReport } from './platform-conformance.mjs';
 import type { MeetingPlatformAdapterBlueprintMatrix } from './platform-adapter-blueprint.mjs';
+import type { MeetingPlatformAdapterStartupPlanMatrix } from './platform-adapter-startup.mjs';
 
 export const MEETING_PLATFORM_CONSUMER_HANDOFF_SCHEMA: 'meeting_platform_consumer_handoff';
 export const MEETING_PLATFORM_CONSUMER_HANDOFF_SCHEMA_VERSION: 1;
@@ -51,6 +52,11 @@ export interface MeetingPlatformConsumerHandoffRow {
   adapter_blueprint_ready: boolean;
   adapter_blueprint_primary_surface?: string;
   adapter_blueprint_first_acceptance_gate?: string;
+  adapter_startup_ready: boolean;
+  adapter_startup_selected_surface?: string;
+  adapter_startup_install_target?: string;
+  adapter_startup_observe_action?: string;
+  adapter_startup_insert_action?: string;
   speaker_track_ready: boolean;
   speaker_min_stable_ms?: number;
   speaker_switch_stable_ms?: number;
@@ -106,6 +112,7 @@ export interface MeetingPlatformSurfaceCoverageMatrix {
   post_meeting_backfill_supported_count: number;
   lightweight_connector_ready_count: number;
   adapter_blueprint_ready_count: number;
+  adapter_startup_ready_count: number;
   speaker_track_ready_count: number;
   participant_track_ready_count: number;
   platforms: string[];
@@ -119,6 +126,7 @@ export interface MeetingPlatformSurfaceCoverageMatrix {
     post_meeting_backfill: Record<string, unknown>;
     lightweight_connector: Record<string, unknown>;
     adapter_blueprint: Record<string, unknown>;
+    adapter_startup: Record<string, unknown>;
     speaker_track: Record<string, unknown>;
     participant_track: Record<string, unknown>;
   }>;
@@ -165,6 +173,7 @@ export interface MeetingPlatformConsumerHandoff {
   lightweight_connector_ready: boolean;
   lightweight_connector_platform_count: number;
   adapter_blueprint_ready_count: number;
+  adapter_startup_ready_count: number;
   adapter_route_ready_count: number;
   candidate_observer_count: number;
   speaker_track_ready_count: number;
@@ -195,6 +204,9 @@ export interface MeetingPlatformConsumerHandoff {
   handoff_readiness_matrix: Record<string, unknown>;
   adapter_blueprint_matrix: Omit<MeetingPlatformAdapterBlueprintMatrix, 'blueprints'> & {
     blueprints?: MeetingPlatformAdapterBlueprintMatrix['blueprints'];
+  };
+  adapter_startup_plan_matrix: Omit<MeetingPlatformAdapterStartupPlanMatrix, 'plans'> & {
+    plans?: MeetingPlatformAdapterStartupPlanMatrix['plans'];
   };
 }
 
