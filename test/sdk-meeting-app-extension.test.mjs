@@ -39,6 +39,7 @@ function installGeneratedBackground(source) {
   const listeners = [];
   const storage = {};
   const fetchCalls = [];
+  const tabMessages = [];
   globalThis.chrome = {
     runtime: {
       onMessage: {
@@ -73,6 +74,21 @@ function installGeneratedBackground(source) {
           title: 'Google Meet',
           url: 'https://meet.google.com/abc-defg-hij',
         }]);
+      },
+      sendMessage(tabId, message, options, callback) {
+        const sendOptions = typeof options === 'function' ? {} : (options ?? {});
+        const sendCallback = typeof options === 'function' ? options : callback;
+        tabMessages.push({ tabId, message, options: sendOptions });
+        sendCallback?.({
+          handled: true,
+          action: 'preflightCurrentWindow',
+          result: {
+            schema: 'meeting_platform_adapter_preflight',
+            accepted: true,
+            platform: message.platform ?? message.input?.platform ?? 'google_meet',
+            readiness: { realtime_annotation_ready: true },
+          },
+        });
       },
     },
   };
@@ -119,6 +135,7 @@ function installGeneratedBackground(source) {
   return {
     storage,
     fetchCalls,
+    tabMessages,
     send(message, sender = {}) {
       return new Promise((resolve) => {
         const returned = listener(message, sender, resolve);
@@ -556,6 +573,8 @@ assert.match(backgroundSource, /const BASE_URL = "https:\/\/timeline\.example\.c
 assert.match(backgroundSource, /meeting_timeline\.extension_attached/);
 assert.match(backgroundSource, /meeting_timeline\.extension_status/);
 assert.match(backgroundSource, /meeting_timeline\.observe_candidates/);
+assert.match(backgroundSource, /meeting_timeline\.preflight_current_window/);
+assert.match(backgroundSource, /tabs\.sendMessage/);
 assert.match(backgroundSource, /createMeetingPlatformRuntimeEventClient/);
 assert.match(backgroundSource, /observePlatformCandidates/);
 assert.match(backgroundSource, /STATUS_STORAGE_KEY/);
@@ -626,6 +645,43 @@ try {
   assert.equal(postedRuntimeEvent.source, 'meeting_app_extension_background');
   assert.equal(postedRuntimeEvent.tabs[0].url, 'https://meet.google.com/abc-defg-hij');
   assert.equal(postedRuntimeEvent.extension_sender.tab_id, 7);
+
+  const preflightResponse = await backgroundRuntime.send({
+    type: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+    request_id: 'preflight-001',
+    options: { requireSpeakerTrack: true },
+  }, {
+    tab: { id: 7 },
+    frameId: 0,
+    url: 'https://meet.google.com/abc-defg-hij',
+  });
+  assert.equal(preflightResponse.ok, true);
+  assert.equal(preflightResponse.tab_id, 7);
+  assert.equal(preflightResponse.body.action, 'preflightCurrentWindow');
+  assert.equal(preflightResponse.body.result.accepted, true);
+  assert.equal(backgroundRuntime.tabMessages.length, 1);
+  assert.equal(backgroundRuntime.tabMessages[0].tabId, 7);
+  assert.equal(backgroundRuntime.tabMessages[0].message.type, MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window);
+  assert.deepEqual(backgroundRuntime.tabMessages[0].message.options, { requireSpeakerTrack: true });
+  assert.equal(backgroundRuntime.fetchCalls.length, 2);
+
+  const larkPreflightResponse = await backgroundRuntime.send({
+    type: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+    tab_id: 8,
+    platform: 'lark',
+    input: {
+      url: 'https://vc.feishu.cn/j/123456',
+      title: 'Lark meeting',
+    },
+    options: { requireSpeakerTrack: false },
+  });
+  assert.equal(larkPreflightResponse.ok, true);
+  assert.equal(larkPreflightResponse.tab_id, 8);
+  assert.equal(larkPreflightResponse.body.result.platform, 'lark');
+  assert.equal(backgroundRuntime.tabMessages.length, 2);
+  assert.equal(backgroundRuntime.tabMessages[1].tabId, 8);
+  assert.equal(backgroundRuntime.tabMessages[1].message.input.url, 'https://vc.feishu.cn/j/123456');
+  assert.equal(backgroundRuntime.fetchCalls.length, 2);
 } finally {
   backgroundRuntime.restore();
 }
@@ -682,8 +738,10 @@ assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.m
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /createMeetingPlatformRuntimeEventClient/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /observePlatformCandidates/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /meeting_timeline\.observe_candidates/);
+assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /meeting_timeline\.preflight_current_window/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /npm run build/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /observe_candidates/);
+assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /preflight_current_window/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /diagnose\(\)/);
 
 const scaffoldReport = buildMeetingAppExtensionScaffoldAcceptanceReport(scaffold);

@@ -661,6 +661,7 @@ import {
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-handoff-package';
 import {
   MEETING_APP_EXTENSION_MESSAGE_TYPES,
+  buildMeetingAppExtensionBackgroundSource,
   buildMeetingAppExtensionCurrentWindowPreflightMessage,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-extension';
 import {
@@ -1011,6 +1012,12 @@ assert.equal(buildMeetingAppExtensionCurrentWindowPreflightMessage({
   platform: 'google-meet',
   capturedAtMs: 123,
 }).type, 'meeting_timeline.preflight_current_window');
+assert.match(buildMeetingAppExtensionBackgroundSource({
+  baseUrl: 'http://localhost:8787',
+}), /meeting_timeline\.preflight_current_window/);
+assert.match(buildMeetingAppExtensionBackgroundSource({
+  baseUrl: 'http://localhost:8787',
+}), /tabs\.sendMessage/);
 assert.equal(resolveMeetingPlatformConnectorInput('https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample', {
   platforms: ['google-meet', 'teams'],
 }).platform, 'microsoft_teams');
