@@ -376,6 +376,11 @@ export interface MeetingAppTimelineSdk {
     bootstrapOptions?: Record<string, unknown>,
   ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineHostAdapterBootstrapPlan;
   assertConnectorHostAdapterBootstrapPlan: MeetingAppTimelineSdk['connectorHostAdapterBootstrapPlan'];
+  connectorHostAdapterBootstrapPlanMatrix(
+    connectorOptions?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+    matrixOptions?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineHostAdapterBootstrapPlanMatrix;
+  assertConnectorHostAdapterBootstrapPlanMatrix: MeetingAppTimelineSdk['connectorHostAdapterBootstrapPlanMatrix'];
   providerReplayReport(
     platformOrInput?: string | Record<string, unknown>,
     recordsOrOptions?: Array<Record<string, unknown>> | Record<string, unknown>,

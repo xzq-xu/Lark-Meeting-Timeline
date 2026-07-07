@@ -7,6 +7,7 @@ import {
   MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_SCHEMA,
+  MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA,
@@ -19,6 +20,7 @@ import {
   assertMeetingAppTimelineConnectorAdapterMatrix,
   assertMeetingAppTimelineConnectorFieldIntakeIndex,
   assertMeetingAppTimelineHostAdapterBootstrapPlan,
+  assertMeetingAppTimelineHostAdapterBootstrapPlanMatrix,
   assertMeetingAppTimelineHostAdapterConfig,
   assertMeetingAppTimelineHostAdapterConfigIndex,
   assertMeetingAppTimelineResolvedHostAdapterConfig,
@@ -37,6 +39,7 @@ import {
   buildMeetingAppTimelineConnectorFieldIntakeIndex,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineHostAdapterBootstrapPlan,
+  buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix,
   buildMeetingAppTimelineHostAdapterConfig,
   buildMeetingAppTimelineHostAdapterConfigIndex,
   resolveMeetingAppTimelineHostAdapterConfig,
@@ -466,6 +469,36 @@ assert.equal(zoomBootstrapPlan.accepted, true);
 assert.equal(zoomBootstrapPlan.platform, 'zoom');
 assert.equal(zoomBootstrapPlan.install_target, 'native_or_desktop_observer');
 assert.equal(zoomBootstrapPlan.steps.find((step) => step.id === 'install_host_adapter').adapter_mode, 'native_or_desktop_observer');
+
+const bootstrapPlanMatrix = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(connectorPackage);
+assert.equal(bootstrapPlanMatrix.schema, MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_SCHEMA);
+assert.equal(bootstrapPlanMatrix.accepted, true);
+assert.equal(bootstrapPlanMatrix.platform_count, 2);
+assert.equal(bootstrapPlanMatrix.accepted_count, 2);
+assert.equal(bootstrapPlanMatrix.rows.find((row) => row.platform === 'google_meet').install_target, 'manifest_v3_content_script');
+assert.equal(bootstrapPlanMatrix.rows.find((row) => row.platform === 'zoom').install_target, 'native_or_desktop_observer');
+assert.equal(bootstrapPlanMatrix.plans.google_meet.startup_order[3], 'runtime_observe_platform_candidates');
+assert.equal(assertMeetingAppTimelineHostAdapterBootstrapPlanMatrix(connectorPackage).accepted, true);
+
+const allPlatformSdk = createMeetingAppTimelineSdk({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+const allPlatformPackage = allPlatformSdk.connectorPackage({
+  surfaces: ['browser-extension', 'native-detector'],
+  observeTracks: true,
+});
+const allPlatformBootstrapMatrix = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(allPlatformPackage);
+assert.equal(allPlatformBootstrapMatrix.accepted, true);
+assert.equal(allPlatformBootstrapMatrix.platform_count, 5);
+assert.deepEqual(
+  new Set(allPlatformBootstrapMatrix.rows.map((row) => row.platform)),
+  new Set(['google_meet', 'microsoft_teams', 'zoom', 'webex', 'lark']),
+);
+assert.equal(allPlatformBootstrapMatrix.rows.every((row) => row.startup_order.includes('runtime_insert_annotation')), true);
+assert.equal(allPlatformBootstrapMatrix.plans.microsoft_teams.resolution.platform, 'microsoft_teams');
+assert.equal(allPlatformBootstrapMatrix.plans.webex.accepted, true);
+assert.equal(allPlatformBootstrapMatrix.plans.lark.accepted, true);
 
 const teamsBootstrapPlan = buildMeetingAppTimelineHostAdapterBootstrapPlan(hostAdapterConfigIndex, {
   url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',

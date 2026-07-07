@@ -19,12 +19,14 @@ import {
   assertMeetingAppTimelineConnectorAdapterMatrix,
   assertMeetingAppTimelineHostAdapterConfig,
   assertMeetingAppTimelineHostAdapterBootstrapPlan,
+  assertMeetingAppTimelineHostAdapterBootstrapPlanMatrix,
   assertMeetingAppTimelineHostAdapterConfigIndex,
   assertMeetingAppTimelineResolvedHostAdapterConfig,
   assertMeetingAppTimelineConnectorPlatformRoadmap,
   assertMeetingAppTimelineConnectorReleaseGate,
   buildMeetingAppTimelineConnectorAdapterMatrix,
   buildMeetingAppTimelineHostAdapterBootstrapPlan,
+  buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix,
   buildMeetingAppTimelineHostAdapterConfig,
   buildMeetingAppTimelineHostAdapterConfigIndex,
   buildMeetingAppTimelineConnectorPlatformRoadmap,
@@ -1167,6 +1169,24 @@ export function createMeetingAppTimelineSdk(options = {}) {
       return assertMeetingAppTimelineHostAdapterBootstrapPlan(source, input, {
         ...sdkPlatformOptions(runtime, isConnectorHostAdapterSource(connectorOptions) ? {} : connectorOptions),
         ...bootstrapOptions,
+      });
+    },
+    connectorHostAdapterBootstrapPlanMatrix(connectorOptions = {}, matrixOptions = {}) {
+      const source = isConnectorHostAdapterSource(connectorOptions)
+        ? connectorOptions
+        : sdk.connectorPackage(connectorOptions);
+      return buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(source, {
+        ...sdkPlatformOptions(runtime, isConnectorHostAdapterSource(connectorOptions) ? {} : connectorOptions),
+        ...matrixOptions,
+      });
+    },
+    assertConnectorHostAdapterBootstrapPlanMatrix(connectorOptions = {}, matrixOptions = {}) {
+      const source = isConnectorHostAdapterSource(connectorOptions)
+        ? connectorOptions
+        : sdk.connectorPackage(connectorOptions);
+      return assertMeetingAppTimelineHostAdapterBootstrapPlanMatrix(source, {
+        ...sdkPlatformOptions(runtime, isConnectorHostAdapterSource(connectorOptions) ? {} : connectorOptions),
+        ...matrixOptions,
       });
     },
     providerReplayReport(platformOrInput = {}, recordsOrOptions = undefined, replayOptions = {}) {

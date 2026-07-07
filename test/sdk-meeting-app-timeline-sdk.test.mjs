@@ -181,6 +181,11 @@ assert.equal(connectorHostAdapterBootstrapPlan.accepted, true);
 assert.equal(connectorHostAdapterBootstrapPlan.startup_order[3], 'runtime_observe_platform_candidates');
 assert.equal(connectorHostAdapterBootstrapPlan.required_runtime_actions.includes('insert_annotation'), true);
 assert.equal(sdk.assertConnectorHostAdapterBootstrapPlan('https://zoom.us/j/987654321', connectorPackage).platform, 'zoom');
+const connectorHostAdapterBootstrapPlanMatrix = sdk.connectorHostAdapterBootstrapPlanMatrix(connectorPackage);
+assert.equal(connectorHostAdapterBootstrapPlanMatrix.schema, 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix');
+assert.equal(connectorHostAdapterBootstrapPlanMatrix.accepted, true);
+assert.equal(connectorHostAdapterBootstrapPlanMatrix.accepted_count, 2);
+assert.equal(sdk.assertConnectorHostAdapterBootstrapPlanMatrix(connectorPackage).accepted, true);
 const unsupportedConnectorHostAdapter = sdk.resolveConnectorHostAdapterConfig(
   'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
   connectorPackage,

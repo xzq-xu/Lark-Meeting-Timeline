@@ -36,6 +36,7 @@ export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA = 'meeting_app_time
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA = 'meeting_app_timeline_host_adapter_config_index';
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA = 'meeting_app_timeline_host_adapter_config_resolution';
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_SCHEMA = 'meeting_app_timeline_host_adapter_bootstrap_plan';
+export const MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_SCHEMA = 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA = 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION = 1;
 
@@ -3284,6 +3285,49 @@ function bootstrapRuntimeSteps(hostConfig = {}) {
   }));
 }
 
+function bootstrapMatrixInputsByPlatform(options = {}) {
+  const raw = firstNonEmpty(
+    options.inputsByPlatform,
+    options.inputs_by_platform,
+    options.inputByPlatform,
+    options.input_by_platform,
+    {},
+  );
+  return Object.fromEntries(Object.entries(raw ?? {}).map(([platform, input]) => [normalizeKey(platform), input]));
+}
+
+function bootstrapMatrixInputForPlatform(platform, inputsByPlatform = {}) {
+  const normalized = normalizeKey(platform);
+  return inputsByPlatform[normalized]
+    ?? inputsByPlatform[platform]
+    ?? {
+      tab: {
+        url: sampleUrlForPlatform(normalized),
+        active: true,
+        in_meeting: true,
+      },
+    };
+}
+
+function bootstrapMatrixRowFromPlan(plan = {}) {
+  return compactObject({
+    platform: plan.platform,
+    accepted: plan.accepted === true,
+    selected_surface: plan.selected_surface,
+    adapter_mode: plan.adapter_mode,
+    install_target: plan.install_target,
+    runtime_event_endpoint: plan.runtime_event_endpoint,
+    timestamp_field: plan.timestamp_field,
+    first_runtime_action: plan.local_axis_contract?.first_runtime_action,
+    mark_runtime_action: plan.local_axis_contract?.mark_runtime_action,
+    startup_order: plan.startup_order,
+    required_runtime_actions: plan.required_runtime_actions,
+    issue_count: plan.issue_count ?? 0,
+    issues: plan.issues ?? [],
+    next_actions: plan.next_actions ?? [],
+  });
+}
+
 export function buildMeetingAppTimelineHostAdapterBootstrapPlan(indexOrMatrixOrChecklistOrPackage = {}, input = {}, options = {}) {
   const resolved = indexOrMatrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA
     ? indexOrMatrixOrChecklistOrPackage
@@ -3375,6 +3419,93 @@ export function assertMeetingAppTimelineHostAdapterBootstrapPlan(indexOrMatrixOr
     });
   }
   return plan;
+}
+
+export function buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(indexOrMatrixOrChecklistOrPackage = {}, options = {}) {
+  const index = hostAdapterConfigIndexFrom(indexOrMatrixOrChecklistOrPackage, options);
+  const inputsByPlatform = bootstrapMatrixInputsByPlatform(options);
+  const plans = {};
+  const rows = [];
+  const issues = [
+    ...(index.accepted === true ? [] : ['host_adapter_config_index_not_accepted']),
+  ];
+  for (const indexRow of index.rows ?? []) {
+    const platform = normalizeKey(indexRow.platform);
+    const input = bootstrapMatrixInputForPlatform(platform, inputsByPlatform);
+    let plan;
+    try {
+      plan = buildMeetingAppTimelineHostAdapterBootstrapPlan(index, input, {
+        ...options,
+        platforms: unique([
+          ...(index.rows ?? []).map((row) => row.platform),
+          ...asArray(firstNonEmpty(options.platforms, options.platform_keys, options.platformKeys)),
+        ]),
+      });
+    } catch (error) {
+      plan = compactObject({
+        type: MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_SCHEMA,
+        schema: MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_SCHEMA,
+        schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+        accepted: false,
+        package_id: index.package_id,
+        platform,
+        selected_surface: indexRow.selected_surface,
+        adapter_mode: indexRow.adapter_mode,
+        install_target: indexRow.install_target,
+        runtime_event_endpoint: index.runtime_event_endpoint,
+        timestamp_field: index.timestamp_field,
+        startup_order: [],
+        steps: [],
+        required_runtime_actions: [],
+        optional_runtime_actions: [],
+        issue_count: 1,
+        issues: [`bootstrap_plan_exception:${error?.message ?? 'unknown_error'}`],
+        next_actions: ['fix_bootstrap_plan_exception'],
+      });
+    }
+    const planPlatform = normalizeKey(plan.platform ?? platform);
+    plans[planPlatform] = plan;
+    rows.push(bootstrapMatrixRowFromPlan({ ...plan, platform: planPlatform }));
+    if (plan.accepted !== true) {
+      issues.push(`${planPlatform}:host_adapter_bootstrap_plan_not_accepted`);
+    }
+  }
+  return compactObject({
+    type: MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_SCHEMA,
+    schema: MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    package_id: index.package_id,
+    platform_count: index.platform_count ?? rows.length,
+    row_count: rows.length,
+    accepted_count: rows.filter((row) => row.accepted === true).length,
+    runtime_event_endpoint: index.runtime_event_endpoint,
+    timestamp_field: index.timestamp_field,
+    source_config_index_schema: index.schema,
+    files_to_read_first: [
+      'host-adapter-config-index.json',
+      'connector-adapter-matrix.json',
+      'provider-replay-matrix.json',
+    ],
+    rows,
+    plans,
+    issue_count: issues.length,
+    issues,
+    next_actions: issues.length > 0
+      ? issues.map((issue) => `fix_${issue}`)
+      : ['install_host_adapters_for_supported_platforms'],
+  });
+}
+
+export function assertMeetingAppTimelineHostAdapterBootstrapPlanMatrix(indexOrMatrixOrChecklistOrPackage = {}, options = {}) {
+  const matrix = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(indexOrMatrixOrChecklistOrPackage, options);
+  if (matrix.accepted !== true) {
+    throw new MeetingTimelineSdkError('Meeting app timeline host adapter bootstrap plan matrix is not accepted', {
+      matrix,
+      issues: matrix.issues,
+    });
+  }
+  return matrix;
 }
 
 export function createMeetingAppTimelineConnectorRuntimeClient(pkg = {}, options = {}) {
