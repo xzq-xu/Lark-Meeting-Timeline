@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import {
+  MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA,
@@ -8,6 +9,7 @@ import {
   assertMeetingAppTimelineConnectorPackage,
   assertMeetingAppTimelineConnectorSmokePlan,
   assertMeetingAppTimelineConnectorSmokeRun,
+  buildMeetingAppTimelineConnectorBridgeHandoff,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
@@ -90,6 +92,21 @@ assert.equal(hostInstallChecklistAcceptance.ready_count, 2);
 assert.equal(hostInstallChecklistAcceptance.issue_count, 0);
 assert.equal(assertMeetingAppTimelineConnectorHostInstallChecklist(hostInstallChecklist), hostInstallChecklist);
 assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(connectorPackage).accepted, true);
+
+const bridgeHandoff = buildMeetingAppTimelineConnectorBridgeHandoff(connectorPackage);
+assert.equal(bridgeHandoff.schema, MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA);
+assert.equal(bridgeHandoff.accepted, true);
+assert.equal(bridgeHandoff.platform_count, 2);
+assert.equal(bridgeHandoff.module, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector');
+assert.equal(bridgeHandoff.factories.install_content_script_bridge, 'installMeetingPlatformConnectorContentScriptBridge');
+assert.equal(bridgeHandoff.message_contract.message_types.includes('meeting_timeline.insert_mark'), true);
+assert.equal(bridgeHandoff.message_contract.message_types.includes('meeting_timeline.observe_candidates'), true);
+assert.equal(bridgeHandoff.host_requirements.timestamp_field, 'captured_at_ms');
+assert.equal(bridgeHandoff.host_requirements.provider_events_block_realtime, false);
+assert.equal(bridgeHandoff.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
+assert.equal(bridgeHandoff.rows.find((row) => row.platform === 'zoom').install_target, 'native_or_desktop_observer');
+assert.equal(bridgeHandoff.sample_messages[0].payload.captured_at_ms, 1_782_614_400_000);
+assert.equal(bridgeHandoff.issue_count, 0);
 
 const smokePlan = buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist, {
   baseCapturedAtMs: 1_782_614_400_000,

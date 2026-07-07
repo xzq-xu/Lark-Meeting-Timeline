@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import {
+  buildMeetingAppTimelineConnectorBridgeHandoff,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
@@ -100,6 +101,7 @@ function connectorQuickstartMarkdown(pkg = {}) {
     '## Read These Files First',
     '',
     '- `connector-handoff.json`: compact handoff summary for another host project.',
+    '- `connector-bridge-handoff.json`: lightweight connector bridge handoff for browser extension, Electron WebView preload, mobile WebView, or native helper integration.',
     '- `host-install-checklist.json`: machine-readable per-platform install checklist for host CI or setup UI.',
     '- `host-install-checklist-acceptance.json`: standalone acceptance report for the host install checklist.',
     '- `connector-smoke-plan.json`: executable per-platform smoke order: observe candidates, insert annotation, then optional speaker/participant markers.',
@@ -201,6 +203,7 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   await write('adapter-blueprint-matrix.json', pkg.adapter_blueprints?.matrix);
   await write('startup-plan-matrix.json', pkg.startup_plans?.matrix);
   await write('connector-handoff.json', buildMeetingAppTimelineConnectorHandoff(pkg));
+  await write('connector-bridge-handoff.json', buildMeetingAppTimelineConnectorBridgeHandoff(pkg));
   await write('host-install-checklist.json', buildMeetingAppTimelineConnectorHostInstallChecklist(pkg));
   await write('host-install-checklist-acceptance.json', buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(pkg));
   await write('connector-smoke-plan.json', buildMeetingAppTimelineConnectorSmokePlan(pkg));
@@ -247,6 +250,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     observeTracks,
   });
   const connectorHandoff = buildMeetingAppTimelineConnectorHandoff(pkg);
+  const connectorBridgeHandoff = buildMeetingAppTimelineConnectorBridgeHandoff(pkg);
   const hostInstallChecklist = buildMeetingAppTimelineConnectorHostInstallChecklist(pkg);
   const hostInstallChecklistAcceptance = buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(hostInstallChecklist);
   const smokePlan = buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist);
@@ -285,6 +289,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
       start_mode: row.start_mode,
     })) ?? [],
     handoff: connectorHandoff,
+    bridge_handoff: connectorBridgeHandoff,
     host_install_checklist: hostInstallChecklist,
     host_install_checklist_acceptance: hostInstallChecklistAcceptance,
     smoke_plan: smokePlan,

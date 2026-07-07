@@ -4,12 +4,16 @@ import {
   createMeetingPlatformRuntimeEventClient,
   normalizeMeetingPlatformRuntimeEventAction,
 } from './platform-runtime-event.mjs';
+import {
+  buildMeetingPlatformConsumerHandoff,
+} from './platform-consumer-handoff.mjs';
 
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA = 'meeting_app_timeline_connector_package';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_package_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA = 'meeting_app_timeline_connector_handoff';
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist';
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist_acceptance_report';
+export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA = 'meeting_app_timeline_connector_bridge_handoff';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA = 'meeting_app_timeline_connector_smoke_plan';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_smoke_plan_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA = 'meeting_app_timeline_connector_smoke_run_report';
@@ -791,6 +795,115 @@ export function assertMeetingAppTimelineConnectorHostInstallChecklist(checklistO
     });
   }
   return checklistOrPackage;
+}
+
+export function buildMeetingAppTimelineConnectorBridgeHandoff(pkgOrChecklist = {}, options = {}) {
+  const isChecklist = pkgOrChecklist?.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA;
+  const checklist = isChecklist
+    ? pkgOrChecklist
+    : buildMeetingAppTimelineConnectorHostInstallChecklist(pkgOrChecklist, options);
+  const platforms = unique((checklist.rows ?? []).map((row) => normalizeKey(row.platform))).filter(Boolean);
+  const baseUrl = firstNonEmpty(options.baseUrl, options.base_url, checklist.base_url, pkgOrChecklist.base_url);
+  const consumerHandoff = buildMeetingPlatformConsumerHandoff({
+    ...options,
+    baseUrl,
+    platforms,
+  });
+  const lightweight = consumerHandoff.lightweight_connector_handoff ?? {};
+  const rows = (checklist.rows ?? []).map((row) => compactObject({
+    platform: normalizeKey(row.platform),
+    display_name: row.display_name,
+    selected_surface: row.selected_surface,
+    install_target: row.install_target,
+    runtime_actions: row.runtime_actions,
+    client_methods: row.client_methods,
+    required_host_steps: row.required_host_steps,
+    bridge_factory: lightweight.factories?.install_content_script_bridge,
+    runtime_factory: lightweight.factories?.create_runtime,
+    hub_factory: lightweight.factories?.create_hub,
+    supported_message_types: lightweight.content_script_bridge?.message_types,
+    output_runtime_actions: lightweight.content_script_bridge?.output_runtime_actions,
+  }));
+  const issues = [
+    ...(checklist.accepted === true ? [] : ['host_install_checklist_not_accepted']),
+    ...(lightweight.accepted === true ? [] : ['lightweight_connector_handoff_not_accepted']),
+    ...((consumerHandoff.issues ?? [])
+      .filter((issue) => issue.severity === 'error')
+      .map((issue) => issue.code)),
+  ];
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    target: checklist.target,
+    package_id: checklist.package_id,
+    base_url: baseUrl,
+    runtime_event_endpoint: checklist.runtime_event_endpoint ?? lightweight.runtime_event_endpoint,
+    platform_count: platforms.length,
+    row_count: rows.length,
+    platforms,
+    module: lightweight.module,
+    factories: lightweight.factories,
+    kit_methods: lightweight.kit_methods,
+    message_contract: lightweight.content_script_bridge,
+    host_requirements: lightweight.host_requirements,
+    startup_order: [
+      'create_or_load_connector_package',
+      'read_connector_bridge_handoff',
+      'install_platform_content_script_or_webview_preload_bridge',
+      'send_meeting_timeline_observe_candidates_before_first_mark',
+      'send_meeting_timeline_insert_mark_with_captured_at_ms',
+      'send_speaker_and_participant_track_markers_when_available',
+      'run_connector_smoke_plan_against_host_runtime_client',
+    ],
+    sample_messages: [
+      {
+        type: 'meeting_timeline.observe_candidates',
+        payload: {
+          captured_at_ms: 1_782_614_400_000,
+          tabs: [{
+            active: true,
+            url: sampleUrlForPlatform(platforms[0] ?? 'google_meet'),
+            title: 'Current meeting tab',
+          }],
+        },
+      },
+      {
+        type: 'meeting_timeline.insert_mark',
+        payload: {
+          mark: {
+            id: 'mark-1',
+            label: 'why?',
+            captured_at_ms: 1_782_614_401_000,
+          },
+        },
+      },
+      {
+        type: 'meeting_timeline.sample_tracks',
+        payload: {
+          captured_at_ms: 1_782_614_402_000,
+          speakers: [{ id: 'speaker-1', name: 'Speaker 1' }],
+          participants: [{ id: 'participant-1', name: 'Participant 1' }],
+        },
+      },
+    ],
+    rows,
+    issue_count: issues.length,
+    issues: unique(issues),
+    source_schemas: {
+      host_install_checklist: checklist.schema,
+      consumer_handoff: consumerHandoff.schema,
+      lightweight_connector_handoff: lightweight.type,
+    },
+    next_actions: issues.length > 0
+      ? unique([
+        ...issues.map((issue) => `fix_${issue}`),
+        ...(checklist.next_actions ?? []),
+        ...(consumerHandoff.next_actions ?? []),
+      ])
+      : checklist.next_actions ?? consumerHandoff.next_actions ?? [],
+  });
 }
 
 export function buildMeetingAppTimelineConnectorSmokePlan(checklistOrPackage = {}, options = {}) {
