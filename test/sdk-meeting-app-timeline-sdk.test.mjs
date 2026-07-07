@@ -173,6 +173,14 @@ assert.equal(resolvedConnectorHostAdapter.accepted, true);
 assert.equal(resolvedConnectorHostAdapter.platform, 'google_meet');
 assert.equal(resolvedConnectorHostAdapter.host_config.selected_surface, 'browser_extension');
 assert.equal(sdk.assertResolvedConnectorHostAdapterConfig('https://zoom.us/j/987654321', connectorPackage).platform, 'zoom');
+const connectorHostAdapterBootstrapPlan = sdk.connectorHostAdapterBootstrapPlan({
+  tab: { url: 'https://meet.google.com/abc-defg-hij', active: true, in_meeting: true },
+}, connectorPackage);
+assert.equal(connectorHostAdapterBootstrapPlan.schema, 'meeting_app_timeline_host_adapter_bootstrap_plan');
+assert.equal(connectorHostAdapterBootstrapPlan.accepted, true);
+assert.equal(connectorHostAdapterBootstrapPlan.startup_order[3], 'runtime_observe_platform_candidates');
+assert.equal(connectorHostAdapterBootstrapPlan.required_runtime_actions.includes('insert_annotation'), true);
+assert.equal(sdk.assertConnectorHostAdapterBootstrapPlan('https://zoom.us/j/987654321', connectorPackage).platform, 'zoom');
 const unsupportedConnectorHostAdapter = sdk.resolveConnectorHostAdapterConfig(
   'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
   connectorPackage,

@@ -6,6 +6,7 @@ import {
   MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
+  MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA,
@@ -17,6 +18,7 @@ import {
   assertMeetingAppTimelineConnectorAdoptionIndex,
   assertMeetingAppTimelineConnectorAdapterMatrix,
   assertMeetingAppTimelineConnectorFieldIntakeIndex,
+  assertMeetingAppTimelineHostAdapterBootstrapPlan,
   assertMeetingAppTimelineHostAdapterConfig,
   assertMeetingAppTimelineHostAdapterConfigIndex,
   assertMeetingAppTimelineResolvedHostAdapterConfig,
@@ -34,6 +36,7 @@ import {
   buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport,
   buildMeetingAppTimelineConnectorFieldIntakeIndex,
   buildMeetingAppTimelineConnectorHandoff,
+  buildMeetingAppTimelineHostAdapterBootstrapPlan,
   buildMeetingAppTimelineHostAdapterConfig,
   buildMeetingAppTimelineHostAdapterConfigIndex,
   resolveMeetingAppTimelineHostAdapterConfig,
@@ -436,6 +439,39 @@ const unresolvedTeamsHostAdapter = resolveMeetingAppTimelineHostAdapterConfig(ho
 assert.equal(unresolvedTeamsHostAdapter.accepted, false);
 assert.equal(unresolvedTeamsHostAdapter.platform, 'microsoft_teams');
 assert.equal(unresolvedTeamsHostAdapter.issues.some((issue) => issue.code === 'meeting_platform_not_supported'), true);
+
+const googleBootstrapPlan = buildMeetingAppTimelineHostAdapterBootstrapPlan(hostAdapterConfigIndex, {
+  tab: { url: 'https://meet.google.com/abc-defg-hij', active: true, audible: true, in_meeting: true },
+});
+assert.equal(googleBootstrapPlan.schema, MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_SCHEMA);
+assert.equal(googleBootstrapPlan.accepted, true);
+assert.equal(googleBootstrapPlan.platform, 'google_meet');
+assert.deepEqual(googleBootstrapPlan.startup_order.slice(0, 5), [
+  'resolve_meeting_platform',
+  'load_host_adapter_config',
+  'install_host_adapter',
+  'runtime_observe_platform_candidates',
+  'runtime_insert_annotation',
+]);
+assert.equal(googleBootstrapPlan.steps.find((step) => step.id === 'install_host_adapter').selected_surface, 'browser_extension');
+assert.equal(googleBootstrapPlan.steps.find((step) => step.id === 'install_host_adapter').install_target, 'manifest_v3_content_script');
+assert.equal(googleBootstrapPlan.steps.find((step) => step.action === 'insert_annotation').captured_at_ms_required, true);
+assert.equal(googleBootstrapPlan.required_runtime_actions.includes('observe_platform_candidates'), true);
+assert.equal(googleBootstrapPlan.required_runtime_actions.includes('insert_annotation'), true);
+assert.equal(googleBootstrapPlan.local_axis_contract.provider_reconcile_blocks_realtime, false);
+assert.equal(assertMeetingAppTimelineHostAdapterBootstrapPlan(connectorPackage, 'https://meet.google.com/abc-defg-hij').accepted, true);
+
+const zoomBootstrapPlan = buildMeetingAppTimelineHostAdapterBootstrapPlan(connectorPackage, 'https://zoom.us/j/987654321');
+assert.equal(zoomBootstrapPlan.accepted, true);
+assert.equal(zoomBootstrapPlan.platform, 'zoom');
+assert.equal(zoomBootstrapPlan.install_target, 'native_or_desktop_observer');
+assert.equal(zoomBootstrapPlan.steps.find((step) => step.id === 'install_host_adapter').adapter_mode, 'native_or_desktop_observer');
+
+const teamsBootstrapPlan = buildMeetingAppTimelineHostAdapterBootstrapPlan(hostAdapterConfigIndex, {
+  url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+});
+assert.equal(teamsBootstrapPlan.accepted, false);
+assert.equal(teamsBootstrapPlan.issues.includes('host_adapter_config_resolution_not_accepted'), true);
 
 assert.equal(connectorPackage.adapter_blueprints.ready_count, 2);
 assert.equal(connectorPackage.adapter_blueprints.matrix.schema, 'meeting_platform_adapter_blueprint_matrix');

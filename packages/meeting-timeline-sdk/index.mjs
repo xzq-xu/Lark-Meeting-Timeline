@@ -18,11 +18,13 @@ import {
 import {
   assertMeetingAppTimelineConnectorAdapterMatrix,
   assertMeetingAppTimelineHostAdapterConfig,
+  assertMeetingAppTimelineHostAdapterBootstrapPlan,
   assertMeetingAppTimelineHostAdapterConfigIndex,
   assertMeetingAppTimelineResolvedHostAdapterConfig,
   assertMeetingAppTimelineConnectorPlatformRoadmap,
   assertMeetingAppTimelineConnectorReleaseGate,
   buildMeetingAppTimelineConnectorAdapterMatrix,
+  buildMeetingAppTimelineHostAdapterBootstrapPlan,
   buildMeetingAppTimelineHostAdapterConfig,
   buildMeetingAppTimelineHostAdapterConfigIndex,
   buildMeetingAppTimelineConnectorPlatformRoadmap,
@@ -1147,6 +1149,24 @@ export function createMeetingAppTimelineSdk(options = {}) {
       return assertMeetingAppTimelineResolvedHostAdapterConfig(source, input, {
         ...sdkPlatformOptions(runtime, isConnectorHostAdapterSource(connectorOptions) ? {} : connectorOptions),
         ...resolveOptions,
+      });
+    },
+    connectorHostAdapterBootstrapPlan(input = {}, connectorOptions = {}, bootstrapOptions = {}) {
+      const source = isConnectorHostAdapterSource(connectorOptions)
+        ? connectorOptions
+        : sdk.connectorPackage(connectorOptions);
+      return buildMeetingAppTimelineHostAdapterBootstrapPlan(source, input, {
+        ...sdkPlatformOptions(runtime, isConnectorHostAdapterSource(connectorOptions) ? {} : connectorOptions),
+        ...bootstrapOptions,
+      });
+    },
+    assertConnectorHostAdapterBootstrapPlan(input = {}, connectorOptions = {}, bootstrapOptions = {}) {
+      const source = isConnectorHostAdapterSource(connectorOptions)
+        ? connectorOptions
+        : sdk.connectorPackage(connectorOptions);
+      return assertMeetingAppTimelineHostAdapterBootstrapPlan(source, input, {
+        ...sdkPlatformOptions(runtime, isConnectorHostAdapterSource(connectorOptions) ? {} : connectorOptions),
+        ...bootstrapOptions,
       });
     },
     providerReplayReport(platformOrInput = {}, recordsOrOptions = undefined, replayOptions = {}) {

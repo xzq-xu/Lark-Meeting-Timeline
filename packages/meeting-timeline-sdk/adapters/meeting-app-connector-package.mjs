@@ -35,6 +35,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_ACCEPTANCE_SCHEMA = '
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA = 'meeting_app_timeline_host_adapter_config';
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA = 'meeting_app_timeline_host_adapter_config_index';
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA = 'meeting_app_timeline_host_adapter_config_resolution';
+export const MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_SCHEMA = 'meeting_app_timeline_host_adapter_bootstrap_plan';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA = 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION = 1;
 
@@ -3256,6 +3257,124 @@ export function assertMeetingAppTimelineResolvedHostAdapterConfig(indexOrMatrixO
     });
   }
   return resolved;
+}
+
+function bootstrapPlanStep(id, order, input = {}) {
+  return compactObject({
+    id,
+    order,
+    ...input,
+  });
+}
+
+function bootstrapRuntimeSteps(hostConfig = {}) {
+  return (hostConfig.runtime_sequence ?? []).map((step = {}, index) => bootstrapPlanStep(`runtime_${step.action ?? index + 1}`, index + 4, {
+    action: step.action,
+    client_method: step.client_method,
+    message_type: step.message_type,
+    required: step.required !== false,
+    required_field: step.required_field,
+    captured_at_ms_required: step.required_field === 'captured_at_ms',
+    timing: step.action === 'insert_annotation'
+      ? 'on_user_mark'
+      : 'on_adapter_ready',
+    source: step.action === 'insert_annotation'
+      ? 'human_annotation_capture'
+      : 'meeting_surface_observer',
+  }));
+}
+
+export function buildMeetingAppTimelineHostAdapterBootstrapPlan(indexOrMatrixOrChecklistOrPackage = {}, input = {}, options = {}) {
+  const resolved = indexOrMatrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA
+    ? indexOrMatrixOrChecklistOrPackage
+    : resolveMeetingAppTimelineHostAdapterConfig(indexOrMatrixOrChecklistOrPackage, input, options);
+  const hostConfig = resolved.host_config;
+  const runtimeSteps = hostConfig ? bootstrapRuntimeSteps(hostConfig) : [];
+  const observeIndex = runtimeSteps.findIndex((step) => step.action === 'observe_platform_candidates');
+  const insertIndex = runtimeSteps.findIndex((step) => step.action === 'insert_annotation');
+  const issues = [
+    ...(resolved.accepted === true ? [] : ['host_adapter_config_resolution_not_accepted']),
+    ...(hostConfig ? [] : ['missing_host_adapter_config']),
+    ...(hostConfig?.runtime_event_endpoint ? [] : ['missing_runtime_event_endpoint']),
+    ...(hostConfig?.timestamp_field === 'captured_at_ms' ? [] : ['invalid_timestamp_contract']),
+    ...(observeIndex >= 0 ? [] : ['missing_observe_platform_candidates_step']),
+    ...(insertIndex >= 0 ? [] : ['missing_insert_annotation_step']),
+    ...(observeIndex >= 0 && insertIndex > observeIndex ? [] : ['observe_candidates_must_precede_insert_annotation']),
+  ];
+  const installStep = bootstrapPlanStep('install_host_adapter', 3, {
+    selected_surface: hostConfig?.selected_surface,
+    adapter_mode: hostConfig?.adapter_mode,
+    install_target: hostConfig?.install_target,
+    install_step: hostConfig?.install_step,
+    bridge_factory: hostConfig?.bridge_contract?.install_bridge_factory,
+  });
+  const steps = [
+    bootstrapPlanStep('resolve_meeting_platform', 1, {
+      accepted: resolved.resolution?.detected === true && resolved.resolution?.supported === true,
+      reason: resolved.resolution?.reason,
+      candidate_count: resolved.resolution?.candidate_count,
+      meeting: resolved.resolution?.meeting,
+    }),
+    bootstrapPlanStep('load_host_adapter_config', 2, {
+      config_file: resolved.config_file,
+      config_schema: hostConfig?.schema,
+      accepted: hostConfig?.accepted,
+    }),
+    installStep,
+    ...runtimeSteps,
+  ];
+  return compactObject({
+    type: MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_SCHEMA,
+    schema: MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    package_id: resolved.package_id,
+    platform: resolved.platform,
+    selected_surface: resolved.selected_surface,
+    adapter_mode: resolved.adapter_mode,
+    install_target: resolved.install_target,
+    runtime_event_endpoint: resolved.runtime_event_endpoint,
+    timestamp_field: resolved.timestamp_field,
+    resolution: resolved.resolution,
+    host_config: hostConfig,
+    local_axis_contract: {
+      first_runtime_action: hostConfig?.realtime_contract?.first_runtime_action,
+      mark_runtime_action: hostConfig?.realtime_contract?.mark_runtime_action,
+      mark_timestamp_field: hostConfig?.realtime_contract?.mark_timestamp_field,
+      provider_reconcile_blocks_realtime: hostConfig?.realtime_contract?.provider_reconcile_blocks_realtime,
+      transcript_blocks_realtime: hostConfig?.realtime_contract?.transcript_blocks_realtime,
+      provider_replay_blocks_realtime: hostConfig?.realtime_contract?.provider_replay_blocks_realtime,
+      can_start_axis_before_provider: hostConfig?.realtime_contract?.can_start_axis_before_provider,
+      can_insert_annotation_on_current_axis: hostConfig?.realtime_contract?.can_insert_annotation_on_current_axis,
+    },
+    startup_order: steps.map((step) => step.id),
+    steps,
+    required_runtime_actions: unique(runtimeSteps.filter((step) => step.required === true).map((step) => step.action)),
+    optional_runtime_actions: unique(runtimeSteps.filter((step) => step.required !== true).map((step) => step.action)),
+    bridge_contract: hostConfig?.bridge_contract,
+    sdk_facade_methods: {
+      resolve_host_adapter_config: 'sdk.resolveConnectorHostAdapterConfig(input, connectorPackage)',
+      host_adapter_bootstrap_plan: 'sdk.connectorHostAdapterBootstrapPlan(input, connectorPackage)',
+      insert_annotation: hostConfig?.sdk_facade_methods?.insert_annotation,
+      observe_candidates: hostConfig?.sdk_facade_methods?.observe_candidates,
+    },
+    issue_count: issues.length,
+    issues,
+    next_actions: issues.length > 0
+      ? issues.map((issue) => `fix_${issue}`)
+      : ['install_host_adapter_and_start_observe_candidates'],
+  });
+}
+
+export function assertMeetingAppTimelineHostAdapterBootstrapPlan(indexOrMatrixOrChecklistOrPackage = {}, input = {}, options = {}) {
+  const plan = buildMeetingAppTimelineHostAdapterBootstrapPlan(indexOrMatrixOrChecklistOrPackage, input, options);
+  if (plan.accepted !== true) {
+    throw new MeetingTimelineSdkError('Meeting app timeline host adapter bootstrap plan is not accepted', {
+      plan,
+      issues: plan.issues,
+    });
+  }
+  return plan;
 }
 
 export function createMeetingAppTimelineConnectorRuntimeClient(pkg = {}, options = {}) {
