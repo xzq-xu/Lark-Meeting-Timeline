@@ -17,9 +17,13 @@ import {
 } from './adapters/platform-ingest.mjs';
 import {
   assertMeetingAppTimelineConnectorAdapterMatrix,
+  assertMeetingAppTimelineHostAdapterConfig,
+  assertMeetingAppTimelineHostAdapterConfigIndex,
   assertMeetingAppTimelineConnectorPlatformRoadmap,
   assertMeetingAppTimelineConnectorReleaseGate,
   buildMeetingAppTimelineConnectorAdapterMatrix,
+  buildMeetingAppTimelineHostAdapterConfig,
+  buildMeetingAppTimelineHostAdapterConfigIndex,
   buildMeetingAppTimelineConnectorPlatformRoadmap,
   buildMeetingAppTimelineConnectorReleaseGate,
 } from './adapters/meeting-app-connector-package.mjs';
@@ -1058,6 +1062,62 @@ export function createMeetingAppTimelineSdk(options = {}) {
       return assertMeetingAppTimelineConnectorAdapterMatrix(pkg, {
         ...sdkPlatformOptions(runtime, connectorOptions),
         ...matrixOptions,
+      });
+    },
+    connectorHostAdapterConfig(connectorOrPlatform = {}, platformOrOptions = {}, configOptions = {}) {
+      const platformFirst = typeof connectorOrPlatform === 'string';
+      const sourceOptions = platformFirst ? platformOrOptions : connectorOrPlatform;
+      const source = platformFirst
+        ? sdk.connectorPackage(sourceOptions)
+        : (
+          connectorOrPlatform?.schema === 'meeting_app_timeline_connector_package'
+          || connectorOrPlatform?.schema === 'meeting_app_timeline_connector_host_install_checklist'
+          || connectorOrPlatform?.schema === 'meeting_app_timeline_connector_adapter_matrix'
+            ? connectorOrPlatform
+            : sdk.connectorPackage(connectorOrPlatform)
+        );
+      return buildMeetingAppTimelineHostAdapterConfig(source, platformFirst ? connectorOrPlatform : platformOrOptions, {
+        ...sdkPlatformOptions(runtime, sourceOptions),
+        ...configOptions,
+      });
+    },
+    assertConnectorHostAdapterConfig(connectorOrPlatform = {}, platformOrOptions = {}, configOptions = {}) {
+      const platformFirst = typeof connectorOrPlatform === 'string';
+      const sourceOptions = platformFirst ? platformOrOptions : connectorOrPlatform;
+      const source = platformFirst
+        ? sdk.connectorPackage(sourceOptions)
+        : (
+          connectorOrPlatform?.schema === 'meeting_app_timeline_connector_package'
+          || connectorOrPlatform?.schema === 'meeting_app_timeline_connector_host_install_checklist'
+          || connectorOrPlatform?.schema === 'meeting_app_timeline_connector_adapter_matrix'
+            ? connectorOrPlatform
+            : sdk.connectorPackage(connectorOrPlatform)
+        );
+      return assertMeetingAppTimelineHostAdapterConfig(source, platformFirst ? connectorOrPlatform : platformOrOptions, {
+        ...sdkPlatformOptions(runtime, sourceOptions),
+        ...configOptions,
+      });
+    },
+    connectorHostAdapterConfigIndex(connectorOptions = {}, indexOptions = {}) {
+      const source = connectorOptions?.schema === 'meeting_app_timeline_connector_package'
+        || connectorOptions?.schema === 'meeting_app_timeline_connector_host_install_checklist'
+        || connectorOptions?.schema === 'meeting_app_timeline_connector_adapter_matrix'
+        ? connectorOptions
+        : sdk.connectorPackage(connectorOptions);
+      return buildMeetingAppTimelineHostAdapterConfigIndex(source, {
+        ...sdkPlatformOptions(runtime, connectorOptions),
+        ...indexOptions,
+      });
+    },
+    assertConnectorHostAdapterConfigIndex(connectorOptions = {}, indexOptions = {}) {
+      const source = connectorOptions?.schema === 'meeting_app_timeline_connector_package'
+        || connectorOptions?.schema === 'meeting_app_timeline_connector_host_install_checklist'
+        || connectorOptions?.schema === 'meeting_app_timeline_connector_adapter_matrix'
+        ? connectorOptions
+        : sdk.connectorPackage(connectorOptions);
+      return assertMeetingAppTimelineHostAdapterConfigIndex(source, {
+        ...sdkPlatformOptions(runtime, connectorOptions),
+        ...indexOptions,
       });
     },
     providerReplayReport(platformOrInput = {}, recordsOrOptions = undefined, replayOptions = {}) {

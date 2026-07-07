@@ -17,6 +17,8 @@ export const MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA: 'meeting_app_ti
 export const MEETING_APP_TIMELINE_CONNECTOR_PLATFORM_ROADMAP_SCHEMA: 'meeting_app_timeline_connector_platform_roadmap';
 export const MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA: 'meeting_app_timeline_connector_adapter_matrix';
 export const MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_adapter_matrix_acceptance_report';
+export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA: 'meeting_app_timeline_host_adapter_config';
+export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA: 'meeting_app_timeline_host_adapter_config_index';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA: 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION: 1;
 
@@ -607,6 +609,75 @@ export interface MeetingAppTimelineConnectorAdapterMatrixAcceptanceReport {
   next_actions: string[];
 }
 
+export interface MeetingAppTimelineHostAdapterConfig {
+  type: 'meeting_app_timeline_host_adapter_config';
+  schema: 'meeting_app_timeline_host_adapter_config';
+  schema_version: 1;
+  accepted: boolean;
+  platform: string;
+  display_name?: string;
+  status?: string;
+  selected_surface?: string;
+  adapter_mode?: string;
+  install_target?: string;
+  install_step?: string;
+  runtime_event_endpoint?: string;
+  timestamp_field?: string;
+  source_matrix_schema?: string;
+  config_file?: string;
+  realtime_contract: {
+    first_runtime_action?: string;
+    mark_runtime_action?: string;
+    mark_timestamp_field?: string;
+    provider_reconcile_blocks_realtime?: boolean;
+    transcript_blocks_realtime?: boolean;
+    provider_replay_blocks_realtime?: boolean;
+    can_start_axis_before_provider?: boolean;
+    can_insert_annotation_on_current_axis?: boolean;
+  };
+  input_sources: Array<Record<string, unknown>>;
+  runtime_sequence: Array<Record<string, unknown>>;
+  bridge_contract: Record<string, unknown>;
+  sdk_facade_methods: Record<string, string>;
+  provider_replay: Record<string, unknown>;
+  evidence_contract: Record<string, unknown>;
+  validation_files: string[];
+  issue_count: number;
+  issues: MeetingAppTimelineConnectorPackageIssue[];
+  next_actions: string[];
+}
+
+export interface MeetingAppTimelineHostAdapterConfigIndex {
+  type: 'meeting_app_timeline_host_adapter_config_index';
+  schema: 'meeting_app_timeline_host_adapter_config_index';
+  schema_version: 1;
+  accepted: boolean;
+  package_id?: string;
+  platform_count: number;
+  row_count: number;
+  runtime_event_endpoint?: string;
+  timestamp_field?: string;
+  source_matrix_schema?: string;
+  files_to_read_first: string[];
+  rows: Array<Record<string, unknown> & {
+    platform: string;
+    status?: string;
+    selected_surface?: string;
+    adapter_mode?: string;
+    install_target?: string;
+    config_file?: string;
+    accepted: boolean;
+    issue_count: number;
+    provider_replay_accepted?: boolean;
+    can_start_axis_before_provider?: boolean;
+    timestamp_field?: string;
+  }>;
+  configs: Record<string, MeetingAppTimelineHostAdapterConfig>;
+  issue_count: number;
+  issues: string[];
+  next_actions: string[];
+}
+
 export interface MeetingAppTimelineConnectorRuntimeClient {
   type: 'meeting_app_timeline_connector_runtime_client';
   schema: 'meeting_app_timeline_connector_runtime_client';
@@ -779,6 +850,28 @@ export function assertMeetingAppTimelineConnectorAdapterMatrix(
   matrixOrChecklistOrPackage?: MeetingAppTimelineConnectorAdapterMatrix | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
   options?: Record<string, unknown>,
 ): MeetingAppTimelineConnectorAdapterMatrix;
+
+export function buildMeetingAppTimelineHostAdapterConfig(
+  matrixOrChecklistOrPackage?: MeetingAppTimelineConnectorAdapterMatrix | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | MeetingAppTimelineHostAdapterConfig | Record<string, unknown>,
+  platformOrOptions?: string | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineHostAdapterConfig;
+
+export function buildMeetingAppTimelineHostAdapterConfigIndex(
+  matrixOrChecklistOrPackage?: MeetingAppTimelineConnectorAdapterMatrix | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineHostAdapterConfigIndex;
+
+export function assertMeetingAppTimelineHostAdapterConfig(
+  matrixOrConfigOrChecklistOrPackage?: MeetingAppTimelineConnectorAdapterMatrix | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | MeetingAppTimelineHostAdapterConfig | Record<string, unknown>,
+  platformOrOptions?: string | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineHostAdapterConfig;
+
+export function assertMeetingAppTimelineHostAdapterConfigIndex(
+  matrixOrChecklistOrPackage?: MeetingAppTimelineConnectorAdapterMatrix | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | MeetingAppTimelineHostAdapterConfigIndex | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineHostAdapterConfigIndex;
 
 export function createMeetingAppTimelineConnectorRuntimeClient(
   pkg?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,

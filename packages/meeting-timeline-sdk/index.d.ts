@@ -353,6 +353,17 @@ export interface MeetingAppTimelineSdk {
     matrixOptions?: Record<string, unknown>,
   ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineConnectorAdapterMatrix;
   assertConnectorAdapterMatrix: MeetingAppTimelineSdk['connectorAdapterMatrix'];
+  connectorHostAdapterConfig(
+    connectorOrPlatform?: string | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+    platformOrOptions?: string | Record<string, unknown>,
+    configOptions?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineHostAdapterConfig;
+  assertConnectorHostAdapterConfig: MeetingAppTimelineSdk['connectorHostAdapterConfig'];
+  connectorHostAdapterConfigIndex(
+    connectorOptions?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+    indexOptions?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineHostAdapterConfigIndex;
+  assertConnectorHostAdapterConfigIndex: MeetingAppTimelineSdk['connectorHostAdapterConfigIndex'];
   providerReplayReport(
     platformOrInput?: string | Record<string, unknown>,
     recordsOrOptions?: Array<Record<string, unknown>> | Record<string, unknown>,

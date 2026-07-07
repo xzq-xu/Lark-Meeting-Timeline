@@ -6,6 +6,8 @@ import {
   MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
+  MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA,
+  MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_PLATFORM_ROADMAP_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA,
@@ -14,6 +16,8 @@ import {
   assertMeetingAppTimelineConnectorAdoptionIndex,
   assertMeetingAppTimelineConnectorAdapterMatrix,
   assertMeetingAppTimelineConnectorFieldIntakeIndex,
+  assertMeetingAppTimelineHostAdapterConfig,
+  assertMeetingAppTimelineHostAdapterConfigIndex,
   assertMeetingAppTimelineConnectorBridgeSmoke,
   assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
@@ -28,6 +32,8 @@ import {
   buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport,
   buildMeetingAppTimelineConnectorFieldIntakeIndex,
   buildMeetingAppTimelineConnectorHandoff,
+  buildMeetingAppTimelineHostAdapterConfig,
+  buildMeetingAppTimelineHostAdapterConfigIndex,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport,
@@ -357,6 +363,47 @@ assert.equal(assertMeetingAppTimelineConnectorAdapterMatrix(hostInstallChecklist
   bridgeHandoff,
   smokePlan,
 }).accepted, true);
+
+const hostAdapterConfigIndex = buildMeetingAppTimelineHostAdapterConfigIndex(adapterMatrix);
+assert.equal(hostAdapterConfigIndex.schema, MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA);
+assert.equal(hostAdapterConfigIndex.accepted, true);
+assert.equal(hostAdapterConfigIndex.row_count, 2);
+assert.equal(hostAdapterConfigIndex.runtime_event_endpoint, 'https://timeline.example.com/api/meeting-platform/runtime-events');
+assert.equal(hostAdapterConfigIndex.files_to_read_first.includes('host-adapter-config-index.json'), true);
+assert.equal(hostAdapterConfigIndex.rows.find((row) => row.platform === 'google_meet').config_file, 'host-adapter-configs/google_meet.json');
+assert.equal(hostAdapterConfigIndex.configs.google_meet.schema, MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA);
+assert.equal(hostAdapterConfigIndex.configs.zoom.selected_surface, 'native_detector');
+assert.equal(assertMeetingAppTimelineHostAdapterConfigIndex(adapterMatrix).accepted, true);
+
+const googleHostAdapterConfig = buildMeetingAppTimelineHostAdapterConfig(adapterMatrix, 'google-meet');
+assert.equal(googleHostAdapterConfig.schema, MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA);
+assert.equal(googleHostAdapterConfig.accepted, true);
+assert.equal(googleHostAdapterConfig.platform, 'google_meet');
+assert.equal(googleHostAdapterConfig.selected_surface, 'browser_extension');
+assert.equal(googleHostAdapterConfig.config_file, 'host-adapter-configs/google_meet.json');
+assert.equal(googleHostAdapterConfig.realtime_contract.first_runtime_action, 'observe_platform_candidates');
+assert.equal(googleHostAdapterConfig.realtime_contract.mark_timestamp_field, 'captured_at_ms');
+assert.equal(googleHostAdapterConfig.realtime_contract.provider_replay_blocks_realtime, false);
+assert.equal(googleHostAdapterConfig.realtime_contract.can_start_axis_before_provider, true);
+assert.equal(googleHostAdapterConfig.runtime_sequence[0].action, 'observe_platform_candidates');
+assert.equal(googleHostAdapterConfig.runtime_sequence[1].required_field, 'captured_at_ms');
+assert.equal(googleHostAdapterConfig.sdk_facade_methods.host_adapter_config, "sdk.connectorHostAdapterConfig('google_meet')");
+assert.equal(googleHostAdapterConfig.provider_replay.accepted, true);
+assert.equal(googleHostAdapterConfig.issue_count, 0);
+assert.equal(assertMeetingAppTimelineHostAdapterConfig(connectorPackage, 'google-meet').accepted, true);
+
+const sdkGoogleHostAdapterConfig = sdk.connectorHostAdapterConfig('google-meet', {
+  surfaces: ['browser-extension', 'native-detector'],
+  observeTracks: true,
+});
+assert.equal(sdkGoogleHostAdapterConfig.platform, 'google_meet');
+assert.equal(sdkGoogleHostAdapterConfig.accepted, true);
+assert.equal(sdkGoogleHostAdapterConfig.runtime_sequence[1].action, 'insert_annotation');
+assert.equal(sdk.assertConnectorHostAdapterConfig(connectorPackage, 'zoom').platform, 'zoom');
+const sdkHostAdapterConfigIndex = sdk.connectorHostAdapterConfigIndex(connectorPackage);
+assert.equal(sdkHostAdapterConfigIndex.accepted, true);
+assert.equal(sdkHostAdapterConfigIndex.configs.zoom.provider_replay.provider_events_block_realtime, false);
+assert.equal(sdk.assertConnectorHostAdapterConfigIndex(adapterMatrix).row_count, 2);
 
 assert.equal(connectorPackage.adapter_blueprints.ready_count, 2);
 assert.equal(connectorPackage.adapter_blueprints.matrix.schema, 'meeting_platform_adapter_blueprint_matrix');

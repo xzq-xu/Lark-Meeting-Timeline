@@ -31,6 +31,8 @@ export const MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA = 'meeting_app_t
 export const MEETING_APP_TIMELINE_CONNECTOR_PLATFORM_ROADMAP_SCHEMA = 'meeting_app_timeline_connector_platform_roadmap';
 export const MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA = 'meeting_app_timeline_connector_adapter_matrix';
 export const MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_adapter_matrix_acceptance_report';
+export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA = 'meeting_app_timeline_host_adapter_config';
+export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA = 'meeting_app_timeline_host_adapter_config_index';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA = 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION = 1;
 
@@ -2931,6 +2933,248 @@ export function assertMeetingAppTimelineConnectorAdapterMatrix(matrixOrChecklist
     });
   }
   return matrix;
+}
+
+function hostAdapterConfigPlatform(platformOrOptions = {}, options = {}) {
+  if (typeof platformOrOptions === 'string') return normalizeKey(platformOrOptions);
+  return normalizeKey(firstNonEmpty(
+    platformOrOptions?.platform,
+    platformOrOptions?.platform_key,
+    platformOrOptions?.platformKey,
+    platformOrOptions?.provider,
+    options.platform,
+    options.platform_key,
+    options.platformKey,
+    options.provider,
+  ));
+}
+
+function hostAdapterConfigIssues(config = {}) {
+  const issues = [];
+  if (config.schema !== MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA) {
+    addIssue(issues, 'invalid_schema', 'Expected a meeting app timeline host adapter config', {
+      expected_schema: MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA,
+      actual_schema: config.schema,
+    });
+  }
+  if (!config.platform) addIssue(issues, 'missing_platform', 'Host adapter config is missing platform');
+  if (!config.selected_surface) addIssue(issues, 'missing_selected_surface', 'Host adapter config is missing selected_surface', { platform: config.platform });
+  if (!config.install_target) addIssue(issues, 'missing_install_target', 'Host adapter config is missing install_target', { platform: config.platform });
+  if (!config.runtime_event_endpoint) addIssue(issues, 'missing_runtime_event_endpoint', 'Host adapter config is missing runtime_event_endpoint', { platform: config.platform });
+  if (config.timestamp_field !== 'captured_at_ms') {
+    addIssue(issues, 'invalid_timestamp_contract', 'Host adapter config must use captured_at_ms', {
+      platform: config.platform,
+      timestamp_field: config.timestamp_field,
+    });
+  }
+  if (config.realtime_contract?.provider_replay_blocks_realtime !== false) {
+    addIssue(issues, 'provider_replay_blocks_realtime', 'Provider replay must not block realtime annotations', { platform: config.platform });
+  }
+  if (config.realtime_contract?.provider_reconcile_blocks_realtime !== false) {
+    addIssue(issues, 'provider_reconcile_blocks_realtime', 'Provider reconcile must not block realtime annotations', { platform: config.platform });
+  }
+  if (config.realtime_contract?.transcript_blocks_realtime !== false) {
+    addIssue(issues, 'transcript_blocks_realtime', 'Transcript import must not block realtime annotations', { platform: config.platform });
+  }
+  if (config.realtime_contract?.can_start_axis_before_provider !== true) {
+    addIssue(issues, 'cannot_start_axis_before_provider', 'Host adapter must be able to start axis before provider reconcile', { platform: config.platform });
+  }
+  if (config.realtime_contract?.can_insert_annotation_on_current_axis !== true) {
+    addIssue(issues, 'cannot_insert_annotation_on_current_axis', 'Host adapter must insert annotations on the current local axis', { platform: config.platform });
+  }
+  if (config.provider_replay?.accepted !== true) {
+    addIssue(issues, 'provider_replay_not_accepted', 'Host adapter config must include accepted provider replay', { platform: config.platform });
+  }
+  if (config.provider_replay?.provider_events_block_realtime !== false) {
+    addIssue(issues, 'provider_replay_not_nonblocking', 'Host adapter provider replay must be non-blocking', { platform: config.platform });
+  }
+  const sequence = config.runtime_sequence ?? [];
+  if (sequence[0]?.action !== 'observe_platform_candidates') {
+    addIssue(issues, 'first_action_not_observe_candidates', 'Host adapter first runtime action must observe platform candidates', { platform: config.platform });
+  }
+  if (sequence[1]?.action !== 'insert_annotation') {
+    addIssue(issues, 'second_action_not_insert_annotation', 'Host adapter second runtime action must insert annotation', { platform: config.platform });
+  }
+  if (sequence[1]?.required_field !== 'captured_at_ms') {
+    addIssue(issues, 'insert_annotation_missing_captured_at_ms', 'Insert annotation action must require captured_at_ms', { platform: config.platform });
+  }
+  return issues;
+}
+
+function hostAdapterConfigFromMatrixRow(row = {}, matrix = {}) {
+  const config = compactObject({
+    type: MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA,
+    schema: MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    platform: row.platform,
+    display_name: row.display_name,
+    status: row.status,
+    selected_surface: row.selected_surface,
+    adapter_mode: row.adapter_mode,
+    install_target: row.install_target,
+    install_step: row.install_step,
+    runtime_event_endpoint: row.runtime_event_endpoint ?? matrix.runtime_event_endpoint,
+    timestamp_field: row.timestamp_field ?? matrix.timestamp_field,
+    source_matrix_schema: matrix.schema,
+    config_file: row.platform ? `host-adapter-configs/${row.platform}.json` : undefined,
+    realtime_contract: {
+      first_runtime_action: matrix.runtime_invariants?.first_runtime_action,
+      mark_runtime_action: matrix.runtime_invariants?.mark_runtime_action,
+      mark_timestamp_field: matrix.runtime_invariants?.mark_timestamp_field,
+      provider_reconcile_blocks_realtime: row.provider_reconcile_blocks_realtime,
+      transcript_blocks_realtime: row.transcript_blocks_realtime,
+      provider_replay_blocks_realtime: row.provider_replay?.provider_events_block_realtime !== false,
+      can_start_axis_before_provider: row.can_start_axis_before_provider,
+      can_insert_annotation_on_current_axis: row.can_insert_annotation_on_current_axis,
+    },
+    input_sources: row.input_sources,
+    runtime_sequence: row.runtime_sequence,
+    bridge_contract: row.bridge_contract,
+    sdk_facade_methods: {
+      ...row.sdk_facade_methods,
+      host_adapter_config: `sdk.connectorHostAdapterConfig('${row.platform}')`,
+      host_adapter_config_index: 'sdk.connectorHostAdapterConfigIndex(connectorPackage)',
+    },
+    provider_replay: row.provider_replay,
+    evidence_contract: row.evidence_contract,
+    validation_files: unique([
+      ...(row.validation_files ?? []),
+      'host-adapter-config-index.json',
+      row.platform ? `host-adapter-configs/${row.platform}.json` : undefined,
+    ]),
+    next_actions: row.next_actions,
+  });
+  const issues = hostAdapterConfigIssues(config);
+  return compactObject({
+    ...config,
+    accepted: issues.length === 0,
+    issue_count: issues.length,
+    issues,
+  });
+}
+
+function hostAdapterMatrixFrom(matrixOrChecklistOrPackage = {}, options = {}) {
+  if (matrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA) {
+    return matrixOrChecklistOrPackage;
+  }
+  return buildMeetingAppTimelineConnectorAdapterMatrix(matrixOrChecklistOrPackage, options);
+}
+
+export function buildMeetingAppTimelineHostAdapterConfig(matrixOrChecklistOrPackage = {}, platformOrOptions = {}, options = {}) {
+  if (matrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA) {
+    const requestedPlatform = hostAdapterConfigPlatform(platformOrOptions, options);
+    const config = {
+      ...matrixOrChecklistOrPackage,
+      issues: hostAdapterConfigIssues(matrixOrChecklistOrPackage),
+    };
+    if (requestedPlatform && normalizeKey(config.platform) !== requestedPlatform) {
+      throw new MeetingTimelineSdkError('Host adapter config platform does not match requested platform', {
+        requested_platform: requestedPlatform,
+        config_platform: config.platform,
+      });
+    }
+    return compactObject({
+      ...config,
+      accepted: config.issues.length === 0,
+      issue_count: config.issues.length,
+    });
+  }
+  const matrix = hostAdapterMatrixFrom(matrixOrChecklistOrPackage, options);
+  const platform = firstNonEmpty(
+    hostAdapterConfigPlatform(platformOrOptions, options),
+    normalizeKey(matrix.recommended_first_platform),
+    normalizeKey(matrix.rows?.[0]?.platform),
+  );
+  const row = (matrix.rows ?? []).find((item) => normalizeKey(item.platform) === platform);
+  if (!row) {
+    throw new MeetingTimelineSdkError('Host adapter config platform not found in connector adapter matrix', {
+      platform,
+      available_platforms: (matrix.rows ?? []).map((item) => item.platform),
+    });
+  }
+  return hostAdapterConfigFromMatrixRow(row, matrix);
+}
+
+export function buildMeetingAppTimelineHostAdapterConfigIndex(matrixOrChecklistOrPackage = {}, options = {}) {
+  const matrix = hostAdapterMatrixFrom(matrixOrChecklistOrPackage, options);
+  const configs = Object.fromEntries((matrix.rows ?? []).map((row) => [
+    normalizeKey(row.platform),
+    hostAdapterConfigFromMatrixRow(row, matrix),
+  ]));
+  const rows = (matrix.rows ?? []).map((row) => {
+    const platform = normalizeKey(row.platform);
+    const config = configs[platform] ?? {};
+    return compactObject({
+      platform,
+      status: row.status,
+      selected_surface: row.selected_surface,
+      adapter_mode: row.adapter_mode,
+      install_target: row.install_target,
+      config_file: config.config_file ?? `host-adapter-configs/${platform}.json`,
+      accepted: config.accepted === true,
+      issue_count: config.issue_count ?? 0,
+      provider_replay_accepted: row.provider_replay?.accepted === true,
+      can_start_axis_before_provider: row.can_start_axis_before_provider === true,
+      timestamp_field: row.timestamp_field,
+    });
+  });
+  const issues = [
+    ...(matrix.accepted === true ? [] : ['connector_adapter_matrix_not_accepted']),
+    ...rows.filter((row) => row.accepted !== true).map((row) => `${row.platform}:host_adapter_config_not_accepted`),
+  ];
+  return compactObject({
+    type: MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA,
+    schema: MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    package_id: matrix.package_id,
+    platform_count: matrix.platform_count ?? rows.length,
+    row_count: rows.length,
+    runtime_event_endpoint: matrix.runtime_event_endpoint,
+    timestamp_field: matrix.timestamp_field,
+    source_matrix_schema: matrix.schema,
+    files_to_read_first: [
+      'host-adapter-config-index.json',
+      'connector-adapter-matrix.json',
+      'provider-replay-matrix.json',
+    ],
+    rows,
+    configs,
+    issue_count: issues.length,
+    issues,
+    next_actions: issues.length > 0
+      ? issues.map((issue) => `fix_${issue}`)
+      : ['load_host_adapter_config_for_current_meeting_platform'],
+  });
+}
+
+export function assertMeetingAppTimelineHostAdapterConfig(matrixOrConfigOrChecklistOrPackage = {}, platformOrOptions = {}, options = {}) {
+  const config = buildMeetingAppTimelineHostAdapterConfig(matrixOrConfigOrChecklistOrPackage, platformOrOptions, options);
+  if (config.accepted !== true) {
+    throw new MeetingTimelineSdkError('Meeting app timeline host adapter config is not accepted', {
+      config,
+      issues: config.issues,
+    });
+  }
+  return config;
+}
+
+export function assertMeetingAppTimelineHostAdapterConfigIndex(matrixOrChecklistOrPackage = {}, options = {}) {
+  const index = matrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA
+    ? matrixOrChecklistOrPackage
+    : buildMeetingAppTimelineHostAdapterConfigIndex(matrixOrChecklistOrPackage, options);
+  const issues = [
+    ...(index.schema === MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA ? [] : ['invalid_schema']),
+    ...(index.accepted === true ? [] : ['host_adapter_config_index_not_accepted']),
+    ...((index.rows ?? []).filter((row) => row.accepted !== true).map((row) => `${row.platform}:host_adapter_config_not_accepted`)),
+  ];
+  if (issues.length > 0) {
+    throw new MeetingTimelineSdkError('Meeting app timeline host adapter config index is not accepted', {
+      index,
+      issues,
+    });
+  }
+  return index;
 }
 
 export function createMeetingAppTimelineConnectorRuntimeClient(pkg = {}, options = {}) {

@@ -14,6 +14,8 @@ import {
   buildMeetingAppTimelineConnectorReleaseGate,
   buildMeetingAppTimelineConnectorSmokePlan,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
+  buildMeetingAppTimelineHostAdapterConfig,
+  buildMeetingAppTimelineHostAdapterConfigIndex,
   createMeetingAppTimelineSdk,
   runMeetingAppTimelineConnectorBridgeSmoke,
   runMeetingAppTimelineConnectorSmokePlan,
@@ -80,79 +82,6 @@ function markdownTable(rows = [], columns = []) {
   const separator = `| ${columns.map(() => '---').join(' | ')} |`;
   const body = rows.map((row) => `| ${columns.map((column) => String(column.value(row) ?? '')).join(' | ')} |`);
   return [header, separator, ...body].join('\n');
-}
-
-function hostAdapterConfigFromMatrixRow(row = {}, matrix = {}) {
-  return {
-    type: 'meeting_app_timeline_host_adapter_config',
-    schema: 'meeting_app_timeline_host_adapter_config',
-    schema_version: 1,
-    platform: row.platform,
-    display_name: row.display_name,
-    status: row.status,
-    selected_surface: row.selected_surface,
-    adapter_mode: row.adapter_mode,
-    install_target: row.install_target,
-    install_step: row.install_step,
-    runtime_event_endpoint: row.runtime_event_endpoint ?? matrix.runtime_event_endpoint,
-    timestamp_field: row.timestamp_field ?? matrix.timestamp_field,
-    realtime_contract: {
-      first_runtime_action: matrix.runtime_invariants?.first_runtime_action,
-      mark_runtime_action: matrix.runtime_invariants?.mark_runtime_action,
-      mark_timestamp_field: matrix.runtime_invariants?.mark_timestamp_field,
-      provider_reconcile_blocks_realtime: row.provider_reconcile_blocks_realtime,
-      transcript_blocks_realtime: row.transcript_blocks_realtime,
-      provider_replay_blocks_realtime: row.provider_replay?.provider_events_block_realtime !== false,
-      can_start_axis_before_provider: row.can_start_axis_before_provider,
-      can_insert_annotation_on_current_axis: row.can_insert_annotation_on_current_axis,
-    },
-    input_sources: row.input_sources,
-    runtime_sequence: row.runtime_sequence,
-    bridge_contract: row.bridge_contract,
-    sdk_facade_methods: row.sdk_facade_methods,
-    provider_replay: row.provider_replay,
-    evidence_contract: row.evidence_contract,
-    validation_files: row.validation_files,
-    next_actions: row.next_actions,
-  };
-}
-
-function hostAdapterConfigIndex(matrix = {}) {
-  const rows = (matrix.rows ?? []).map((row) => {
-    const configPath = `host-adapter-configs/${row.platform}.json`;
-    return {
-      platform: row.platform,
-      status: row.status,
-      selected_surface: row.selected_surface,
-      adapter_mode: row.adapter_mode,
-      install_target: row.install_target,
-      config_file: configPath,
-      provider_replay_accepted: row.provider_replay?.accepted === true,
-      can_start_axis_before_provider: row.can_start_axis_before_provider === true,
-      timestamp_field: row.timestamp_field,
-    };
-  });
-  return {
-    type: 'meeting_app_timeline_host_adapter_config_index',
-    schema: 'meeting_app_timeline_host_adapter_config_index',
-    schema_version: 1,
-    accepted: matrix.accepted === true && rows.every((row) => row.provider_replay_accepted === true),
-    package_id: matrix.package_id,
-    platform_count: matrix.platform_count ?? rows.length,
-    row_count: rows.length,
-    runtime_event_endpoint: matrix.runtime_event_endpoint,
-    timestamp_field: matrix.timestamp_field,
-    files_to_read_first: [
-      'host-adapter-config-index.json',
-      'connector-adapter-matrix.json',
-      'provider-replay-matrix.json',
-    ],
-    rows,
-    configs: Object.fromEntries((matrix.rows ?? []).map((row) => [
-      row.platform,
-      hostAdapterConfigFromMatrixRow(row, matrix),
-    ])),
-  };
 }
 
 function connectorQuickstartMarkdown(pkg = {}) {
@@ -327,7 +256,7 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
     smokePlan,
   });
   const connectorAdapterMatrixAcceptance = buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(connectorAdapterMatrix);
-  const adapterConfigIndex = hostAdapterConfigIndex(connectorAdapterMatrix);
+  const adapterConfigIndex = buildMeetingAppTimelineHostAdapterConfigIndex(connectorAdapterMatrix);
   await write('connector-adoption-index.json', connectorAdoptionIndex);
   await write('connector-field-intake-index.json', connectorFieldIntakeIndex);
   await write('connector-release-gate.json', connectorReleaseGate);
@@ -335,7 +264,7 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   await write('connector-adapter-matrix-acceptance.json', connectorAdapterMatrixAcceptance);
   await write('host-adapter-config-index.json', adapterConfigIndex);
   for (const row of connectorAdapterMatrix.rows ?? []) {
-    await write(`host-adapter-configs/${row.platform}.json`, hostAdapterConfigFromMatrixRow(row, connectorAdapterMatrix));
+    await write(`host-adapter-configs/${row.platform}.json`, buildMeetingAppTimelineHostAdapterConfig(connectorAdapterMatrix, row.platform));
   }
   await write('connector-platform-roadmap.json', connectorPlatformRoadmap);
   await write('connector-bridge-handoff.json', connectorBridgeHandoff);
@@ -419,7 +348,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     smokePlan,
   });
   const connectorAdapterMatrixAcceptance = buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(connectorAdapterMatrix);
-  const adapterConfigIndex = hostAdapterConfigIndex(connectorAdapterMatrix);
+  const adapterConfigIndex = buildMeetingAppTimelineHostAdapterConfigIndex(connectorAdapterMatrix);
   const writtenFiles = await writeConnectorPackageFiles(outDir, pkg);
 
   const report = {
