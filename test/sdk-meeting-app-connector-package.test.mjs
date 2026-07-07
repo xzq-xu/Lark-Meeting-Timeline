@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_ADOPTION_INDEX_SCHEMA,
+  MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_PLATFORM_ROADMAP_SCHEMA,
@@ -11,6 +12,7 @@ import {
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA,
   assertMeetingAppTimelineConnectorBridgeHandoff,
   assertMeetingAppTimelineConnectorAdoptionIndex,
+  assertMeetingAppTimelineConnectorAdapterMatrix,
   assertMeetingAppTimelineConnectorFieldIntakeIndex,
   assertMeetingAppTimelineConnectorBridgeSmoke,
   assertMeetingAppTimelineConnectorHostInstallChecklist,
@@ -22,6 +24,8 @@ import {
   buildMeetingAppTimelineConnectorBridgeHandoff,
   buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport,
   buildMeetingAppTimelineConnectorAdoptionIndex,
+  buildMeetingAppTimelineConnectorAdapterMatrix,
+  buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport,
   buildMeetingAppTimelineConnectorFieldIntakeIndex,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
@@ -291,6 +295,51 @@ assert.equal(platformRoadmap.rows.find((row) => row.platform === 'zoom').install
 assert.equal(platformRoadmap.rows.every((row) => row.validation_sequence.includes('connector-release-gate.json')), true);
 assert.equal(platformRoadmap.rows.find((row) => row.platform === 'google_meet').sdk_facade_methods.connector_release_gate, 'sdk.connectorReleaseGate(connectorPackage)');
 assert.equal(assertMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, { releaseGate }).accepted, true);
+
+const adapterMatrix = buildMeetingAppTimelineConnectorAdapterMatrix(hostInstallChecklist, {
+  releaseGate,
+  platformRoadmap,
+  fieldIntakeIndex,
+  bridgeHandoff,
+  smokePlan,
+});
+assert.equal(adapterMatrix.schema, MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA);
+assert.equal(adapterMatrix.accepted, true);
+assert.equal(adapterMatrix.host_wiring_ready_count, 2);
+assert.equal(adapterMatrix.pilot_ready_count, 2);
+assert.equal(adapterMatrix.production_ready_count, 0);
+assert.equal(adapterMatrix.recommended_first_platform, 'google_meet');
+assert.equal(adapterMatrix.runtime_invariants.first_runtime_action, 'observe_platform_candidates');
+assert.equal(adapterMatrix.runtime_invariants.mark_timestamp_field, 'captured_at_ms');
+const googleAdapterRow = adapterMatrix.rows.find((row) => row.platform === 'google_meet');
+const zoomAdapterRow = adapterMatrix.rows.find((row) => row.platform === 'zoom');
+assert.equal(googleAdapterRow.selected_surface, 'browser_extension');
+assert.equal(googleAdapterRow.adapter_mode, 'browser_content_script');
+assert.equal(googleAdapterRow.install_step, 'install_manifest_v3_content_script_or_web_extension');
+assert.equal(googleAdapterRow.runtime_sequence[0].action, 'observe_platform_candidates');
+assert.equal(googleAdapterRow.runtime_sequence[1].action, 'insert_annotation');
+assert.equal(googleAdapterRow.runtime_sequence[1].required_field, 'captured_at_ms');
+assert.equal(googleAdapterRow.can_start_axis_before_provider, true);
+assert.equal(googleAdapterRow.provider_reconcile_blocks_realtime, false);
+assert.equal(googleAdapterRow.input_sources.find((source) => source.id === 'provider_reconcile').blocks_realtime_annotation, false);
+assert.equal(googleAdapterRow.bridge_contract.install_bridge_factory, 'installMeetingPlatformConnectorContentScriptBridge');
+assert.equal(googleAdapterRow.evidence_contract.pilot_required.includes('candidate_observation'), true);
+assert.equal(googleAdapterRow.validation_files.includes('connector-smoke-run-report.json'), true);
+assert.equal(zoomAdapterRow.selected_surface, 'native_detector');
+assert.equal(zoomAdapterRow.adapter_mode, 'native_or_desktop_observer');
+assert.equal(zoomAdapterRow.install_step, 'install_native_desktop_observer_or_accessibility_detector');
+assert.equal(zoomAdapterRow.evidence_contract.production_required.includes('runtime_host_replay'), true);
+const adapterMatrixAcceptance = buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(adapterMatrix);
+assert.equal(adapterMatrixAcceptance.schema, 'meeting_app_timeline_connector_adapter_matrix_acceptance_report');
+assert.equal(adapterMatrixAcceptance.accepted, true);
+assert.equal(adapterMatrixAcceptance.issue_count, 0);
+assert.equal(assertMeetingAppTimelineConnectorAdapterMatrix(hostInstallChecklist, {
+  releaseGate,
+  platformRoadmap,
+  fieldIntakeIndex,
+  bridgeHandoff,
+  smokePlan,
+}).accepted, true);
 
 assert.equal(connectorPackage.adapter_blueprints.ready_count, 2);
 assert.equal(connectorPackage.adapter_blueprints.matrix.schema, 'meeting_platform_adapter_blueprint_matrix');

@@ -348,6 +348,11 @@ export interface MeetingAppTimelineSdk {
     roadmapOptions?: Record<string, unknown>,
   ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineConnectorPlatformRoadmap;
   assertConnectorPlatformRoadmap: MeetingAppTimelineSdk['connectorPlatformRoadmap'];
+  connectorAdapterMatrix(
+    connectorOptions?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+    matrixOptions?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineConnectorAdapterMatrix;
+  assertConnectorAdapterMatrix: MeetingAppTimelineSdk['connectorAdapterMatrix'];
   meetingAppAdapterCapability(
     platformOrOptions?: string | import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterCapabilityOptions,
     input?: Record<string, unknown>,

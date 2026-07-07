@@ -155,6 +155,13 @@ assert.equal(connectorPlatformRoadmap.accepted, true);
 assert.equal(connectorPlatformRoadmap.rows.find((row) => row.platform === 'google_meet').recommended_first_surface, 'browser_extension');
 assert.equal(connectorPlatformRoadmap.rows.find((row) => row.platform === 'zoom').recommended_first_surface, 'native_detector');
 assert.equal(sdk.assertConnectorPlatformRoadmap(connectorPackage).accepted, true);
+const connectorAdapterMatrix = sdk.connectorAdapterMatrix(connectorPackage);
+assert.equal(connectorAdapterMatrix.schema, 'meeting_app_timeline_connector_adapter_matrix');
+assert.equal(connectorAdapterMatrix.accepted, true);
+assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').adapter_mode, 'browser_content_script');
+assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'zoom').adapter_mode, 'native_or_desktop_observer');
+assert.equal(connectorAdapterMatrix.rows.every((row) => row.runtime_sequence[0].action === 'observe_platform_candidates'), true);
+assert.equal(sdk.assertConnectorAdapterMatrix(connectorPackage).accepted, true);
 
 const adapterCapability = sdk.meetingAppAdapterCapability('google-meet', {
   url: 'https://meet.google.com/abc-defg-hij',

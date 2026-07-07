@@ -2,6 +2,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import {
   buildMeetingAppTimelineConnectorAdoptionIndex,
+  buildMeetingAppTimelineConnectorAdapterMatrix,
+  buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport,
   buildMeetingAppTimelineConnectorBridgeHandoff,
   buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport,
   buildMeetingAppTimelineConnectorFieldIntakeIndex,
@@ -110,6 +112,8 @@ function connectorQuickstartMarkdown(pkg = {}) {
     '- `connector-adoption-index.json`: per-platform P0/P1/P2 adoption status, install target, realtime readiness, bridge readiness, and production evidence gaps.',
     '- `connector-field-intake-index.json`: per-platform live evidence collection paths, required snapshots/events, output files, and validation commands.',
     '- `connector-release-gate.json`: aggregated pilot/production gate for package acceptance, host checklist, bridge, field intake, and smoke execution.',
+    '- `connector-adapter-matrix.json`: per-platform runtime wiring plan: selected surface, install step, input sources, event order, SDK methods, and evidence contract.',
+    '- `connector-adapter-matrix-acceptance.json`: standalone gate for the adapter matrix runtime invariants.',
     '- `connector-platform-roadmap.json`: recommended per-platform implementation order, first surface, install target, release status, and next action.',
     '- `connector-bridge-handoff.json`: lightweight connector bridge handoff for browser extension, Electron WebView preload, mobile WebView, or native helper integration.',
     '- `connector-bridge-handoff-acceptance.json`: standalone gate for the lightweight connector bridge handoff.',
@@ -239,9 +243,19 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   const connectorPlatformRoadmap = buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
     releaseGate: connectorReleaseGate,
   });
+  const connectorAdapterMatrix = buildMeetingAppTimelineConnectorAdapterMatrix(hostInstallChecklist, {
+    releaseGate: connectorReleaseGate,
+    platformRoadmap: connectorPlatformRoadmap,
+    fieldIntakeIndex: connectorFieldIntakeIndex,
+    bridgeHandoff: connectorBridgeHandoff,
+    smokePlan,
+  });
+  const connectorAdapterMatrixAcceptance = buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(connectorAdapterMatrix);
   await write('connector-adoption-index.json', connectorAdoptionIndex);
   await write('connector-field-intake-index.json', connectorFieldIntakeIndex);
   await write('connector-release-gate.json', connectorReleaseGate);
+  await write('connector-adapter-matrix.json', connectorAdapterMatrix);
+  await write('connector-adapter-matrix-acceptance.json', connectorAdapterMatrixAcceptance);
   await write('connector-platform-roadmap.json', connectorPlatformRoadmap);
   await write('connector-bridge-handoff.json', connectorBridgeHandoff);
   await write('connector-bridge-handoff-acceptance.json', connectorBridgeHandoffAcceptance);
@@ -316,11 +330,19 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
   const connectorPlatformRoadmap = buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
     releaseGate: connectorReleaseGate,
   });
+  const connectorAdapterMatrix = buildMeetingAppTimelineConnectorAdapterMatrix(hostInstallChecklist, {
+    releaseGate: connectorReleaseGate,
+    platformRoadmap: connectorPlatformRoadmap,
+    fieldIntakeIndex: connectorFieldIntakeIndex,
+    bridgeHandoff: connectorBridgeHandoff,
+    smokePlan,
+  });
+  const connectorAdapterMatrixAcceptance = buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(connectorAdapterMatrix);
   const writtenFiles = await writeConnectorPackageFiles(outDir, pkg);
 
   const report = {
     type: 'meeting_app_timeline_connector_package_report',
-    ok: pkg.accepted === true && connectorReleaseGate.accepted === true,
+    ok: pkg.accepted === true && connectorReleaseGate.accepted === true && connectorAdapterMatrixAcceptance.accepted === true,
     base_url: baseUrl,
     out_dir: outDir || undefined,
     platform_count: pkg.platform_count,
@@ -330,6 +352,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     accepted: pkg.accepted === true,
     release_gate_accepted: connectorReleaseGate.accepted === true,
     release_gate_target: connectorReleaseGate.target,
+    adapter_matrix_accepted: connectorAdapterMatrixAcceptance.accepted === true,
     required_platforms: requiredPlatforms,
     surfaces: pkg.surfaces,
     extension_scaffold: Boolean(pkg.extension?.scaffold),
@@ -354,6 +377,8 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     adoption_index: connectorAdoptionIndex,
     field_intake_index: connectorFieldIntakeIndex,
     release_gate: connectorReleaseGate,
+    adapter_matrix: connectorAdapterMatrix,
+    adapter_matrix_acceptance: connectorAdapterMatrixAcceptance,
     platform_roadmap: connectorPlatformRoadmap,
     bridge_handoff: connectorBridgeHandoff,
     bridge_handoff_acceptance: connectorBridgeHandoffAcceptance,
@@ -373,7 +398,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
 
 export function formatMeetingAppConnectorPackageCliReport(report = {}) {
   const lines = [
-    `meeting_app_timeline_connector_package_report | ok=${boolLabel(report.ok)} | release_gate=${boolLabel(report.release_gate_accepted)} | target=${report.release_gate_target ?? 'pilot'} | platforms=${report.platform_count} | surfaces=${report.surface_count} | handoffs=${report.handoff_count} | ready=${report.ready_count} | blueprint_ready=${report.adapter_blueprint_ready_count} | startup_ready=${report.startup_plan_ready_count} | extension=${boolLabel(report.extension_scaffold)} | extension_accepted=${boolLabel(report.extension_accepted)} | runtime_actions=${report.runtime_event_action_count} | written=${report.written_files?.length ?? 0}`,
+    `meeting_app_timeline_connector_package_report | ok=${boolLabel(report.ok)} | release_gate=${boolLabel(report.release_gate_accepted)} | adapter_matrix=${boolLabel(report.adapter_matrix_accepted)} | target=${report.release_gate_target ?? 'pilot'} | platforms=${report.platform_count} | surfaces=${report.surface_count} | handoffs=${report.handoff_count} | ready=${report.ready_count} | blueprint_ready=${report.adapter_blueprint_ready_count} | startup_ready=${report.startup_plan_ready_count} | extension=${boolLabel(report.extension_scaffold)} | extension_accepted=${boolLabel(report.extension_accepted)} | runtime_actions=${report.runtime_event_action_count} | written=${report.written_files?.length ?? 0}`,
   ];
   for (const row of report.rows ?? []) {
     lines.push(`${row.platform}/${row.surface}: ready=${boolLabel(row.ready_to_start)} realtime=${boolLabel(row.realtime_annotation_ready)} speaker=${boolLabel(row.speaker_track_ready)} participant=${boolLabel(row.participant_track_ready)} install=${row.install_target ?? 'n/a'} start=${row.start_mode ?? 'n/a'}`);

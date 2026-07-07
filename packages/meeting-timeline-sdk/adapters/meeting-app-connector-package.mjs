@@ -29,6 +29,8 @@ export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA = 'meet
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA = 'meeting_app_timeline_connector_smoke_run_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA = 'meeting_app_timeline_connector_release_gate';
 export const MEETING_APP_TIMELINE_CONNECTOR_PLATFORM_ROADMAP_SCHEMA = 'meeting_app_timeline_connector_platform_roadmap';
+export const MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA = 'meeting_app_timeline_connector_adapter_matrix';
+export const MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_adapter_matrix_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA = 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION = 1;
 
@@ -2456,6 +2458,395 @@ export function assertMeetingAppTimelineConnectorPlatformRoadmap(checklistOrPack
     });
   }
   return roadmap;
+}
+
+function adapterMatrixModeForSurface(surface) {
+  const normalized = normalizeKey(surface);
+  if (normalized === 'browser_extension') return 'browser_content_script';
+  if (normalized === 'webview_preload' || normalized === 'electron_webview') return 'host_injected_webview_preload';
+  if (normalized === 'native_detector' || normalized === 'desktop_observer') return 'native_or_desktop_observer';
+  if (normalized === 'provider_reconcile') return 'provider_reconcile_only_not_realtime';
+  return normalized || 'unknown_surface';
+}
+
+function adapterMatrixInstallStep(row = {}) {
+  if (row.selected_surface === 'browser_extension') return 'install_manifest_v3_content_script_or_web_extension';
+  if (row.selected_surface === 'native_detector') return 'install_native_desktop_observer_or_accessibility_detector';
+  if (row.selected_surface === 'webview_preload' || row.selected_surface === 'electron_webview') {
+    return 'inject_webview_preload_bridge';
+  }
+  return 'install_selected_surface_runtime';
+}
+
+function adapterMatrixPrimaryInputs(row = {}, fieldIntake = {}) {
+  return [
+    {
+      id: 'local_meeting_surface',
+      required_for_realtime: true,
+      source: row.selected_surface,
+      install_target: row.install_target,
+      emits: ['observe_platform_candidates', 'observe_meeting_app'],
+      evidence: ['candidate_observation', 'active_snapshot'],
+    },
+    {
+      id: 'annotation_stream',
+      required_for_realtime: true,
+      source: 'device_or_host_annotation_stream',
+      emits: ['insert_annotation'],
+      required_field: 'captured_at_ms',
+      evidence: ['annotation_insert_current_axis'],
+    },
+    {
+      id: 'speaker_participant_tracks',
+      required_for_realtime: false,
+      source: row.selected_surface,
+      emits: ['speaker_track', 'participant_track'],
+      evidence: ['speaker_track', 'participant_track'],
+    },
+    {
+      id: 'provider_reconcile',
+      required_for_realtime: false,
+      required_for_production: true,
+      source: fieldIntake.provider_endpoint ? 'official_provider_event' : 'provider_event_or_post_meeting_artifact',
+      endpoint: fieldIntake.provider_endpoint,
+      blocks_realtime_annotation: false,
+      evidence: ['provider_start_end_events', 'provider_participant_or_artifact_events'],
+    },
+  ];
+}
+
+function adapterMatrixRuntimeSequence(row = {}, smokeRow = {}) {
+  const smokeSteps = smokeRow.steps ?? [];
+  const sequence = [
+    {
+      order: 1,
+      action: 'observe_platform_candidates',
+      client_method: row.client_methods?.observe_platform_candidates ?? 'observePlatformCandidates',
+      message_type: 'meeting_timeline.observe_candidates',
+      required: true,
+      must_precede: 'insert_annotation',
+    },
+    {
+      order: 2,
+      action: 'insert_annotation',
+      client_method: row.client_methods?.insert_annotation ?? 'insertAnnotation',
+      message_type: 'meeting_timeline.insert_mark',
+      required: true,
+      required_field: 'captured_at_ms',
+    },
+    {
+      order: 3,
+      action: 'speaker_track',
+      client_method: row.client_methods?.speaker_track ?? 'speakerTrack',
+      message_type: 'meeting_timeline.sample_tracks',
+      required: false,
+    },
+    {
+      order: 4,
+      action: 'participant_track',
+      client_method: row.client_methods?.participant_track ?? 'participantTrack',
+      message_type: 'meeting_timeline.sample_tracks',
+      required: false,
+    },
+  ];
+  return sequence.map((step) => compactObject({
+    ...step,
+    smoke_step_id: smokeSteps.find((smokeStep) => smokeStep.action === step.action)?.id,
+  }));
+}
+
+function adapterMatrixRowStatus(row = {}, releaseRow = {}) {
+  if (releaseRow.production_ready === true) return 'production_ready';
+  if (releaseRow.pilot_ready === true) return 'pilot_ready';
+  if (row.realtime_startup_ready === true && row.adapter_blueprint_ready === true) return 'host_wiring_ready';
+  return 'blocked';
+}
+
+export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage = {}, options = {}) {
+  const hostInstallChecklist = checklistOrPackage.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA
+    ? checklistOrPackage
+    : buildMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage, options);
+  const releaseGate = firstNonEmpty(
+    options.releaseGate,
+    options.release_gate,
+    buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, options),
+  );
+  const roadmap = firstNonEmpty(
+    options.platformRoadmap,
+    options.platform_roadmap,
+    buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
+      ...options,
+      releaseGate,
+    }),
+  );
+  const fieldIntakeIndex = firstNonEmpty(
+    options.fieldIntakeIndex,
+    options.field_intake_index,
+    buildMeetingAppTimelineConnectorFieldIntakeIndex(hostInstallChecklist, options),
+  );
+  const bridgeHandoff = firstNonEmpty(
+    options.bridgeHandoff,
+    options.bridge_handoff,
+    buildMeetingAppTimelineConnectorBridgeHandoff(hostInstallChecklist, options),
+  );
+  const smokePlan = firstNonEmpty(
+    options.smokePlan,
+    options.smoke_plan,
+    buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist, options),
+  );
+  const releaseByPlatform = new Map((releaseGate.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
+  const roadmapByPlatform = new Map((roadmap.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
+  const fieldByPlatform = new Map((fieldIntakeIndex.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
+  const bridgeByPlatform = new Map((bridgeHandoff.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
+  const smokeByPlatform = new Map((smokePlan.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
+  const rows = (hostInstallChecklist.rows ?? []).map((row) => {
+    const platform = normalizeKey(row.platform);
+    const releaseRow = releaseByPlatform.get(platform) ?? {};
+    const roadmapRow = roadmapByPlatform.get(platform) ?? {};
+    const fieldRow = fieldByPlatform.get(platform) ?? {};
+    const bridgeRow = bridgeByPlatform.get(platform) ?? {};
+    const smokeRow = smokeByPlatform.get(platform) ?? {};
+    const selectedSurface = normalizeKey(row.selected_surface);
+    const runtimeSequence = adapterMatrixRuntimeSequence(row, smokeRow);
+    const missing = [
+      selectedSurface ? undefined : 'selected_surface',
+      row.install_target ? undefined : 'install_target',
+      row.realtime_startup_ready === true ? undefined : 'realtime_startup_ready',
+      row.adapter_blueprint_ready === true ? undefined : 'adapter_blueprint_ready',
+      row.client_methods?.observe_platform_candidates ? undefined : 'observe_platform_candidates_client_method',
+      row.client_methods?.insert_annotation === 'insertAnnotation' ? undefined : 'insert_annotation_client_method',
+      hostInstallChecklist.timestamp_field === 'captured_at_ms' ? undefined : 'captured_at_ms_contract',
+      row.provider_events_block_realtime === false ? undefined : 'provider_events_nonblocking',
+      row.transcript_blocks_realtime === false ? undefined : 'transcript_nonblocking',
+    ].filter(Boolean);
+    return compactObject({
+      platform,
+      display_name: row.display_name ?? roadmapRow.display_name,
+      status: adapterMatrixRowStatus(row, releaseRow),
+      selected_surface: selectedSurface,
+      adapter_mode: adapterMatrixModeForSurface(selectedSurface),
+      install_target: row.install_target,
+      install_step: adapterMatrixInstallStep({ ...row, selected_surface: selectedSurface }),
+      recommended_first_surface: roadmapRow.recommended_first_surface,
+      surface_order: roadmapRow.surface_order,
+      can_start_axis_before_provider: row.realtime_startup_ready === true && row.provider_events_block_realtime === false,
+      can_insert_annotation_on_current_axis: row.client_methods?.insert_annotation === 'insertAnnotation',
+      provider_reconcile_blocks_realtime: row.provider_events_block_realtime !== false,
+      transcript_blocks_realtime: row.transcript_blocks_realtime !== false,
+      runtime_event_endpoint: hostInstallChecklist.runtime_event_endpoint,
+      timestamp_field: hostInstallChecklist.timestamp_field,
+      input_sources: adapterMatrixPrimaryInputs(row, fieldRow),
+      runtime_sequence: runtimeSequence,
+      bridge_contract: {
+        module: bridgeHandoff.module,
+        install_bridge_factory: bridgeRow.bridge_factory ?? bridgeHandoff.factories?.install_content_script_bridge,
+        create_hub_factory: bridgeHandoff.factories?.create_hub,
+        supported_message_types: bridgeRow.supported_message_types ?? bridgeHandoff.message_contract?.message_types,
+      },
+      sdk_facade_methods: {
+        build_matrix: 'sdk.connectorAdapterMatrix(connectorPackage)',
+        resolve_platform: 'sdk.resolve(input)',
+        observe_candidates: 'sdk.observePlatformCandidates(input)',
+        insert_annotation: `sdk.insertAnnotation('${platform}', mark)`,
+        speaker_track: `sdk.speakerTrack('${platform}', sample)`,
+        participant_track: `sdk.participantTrack('${platform}', sample)`,
+        provider_reconcile: `sdk.ingestProvider('${platform}', providerEvent)`,
+      },
+      evidence_contract: {
+        pilot_required: [
+          'candidate_observation',
+          'annotation_insert_current_axis',
+          'captured_at_ms_preserved',
+        ],
+        production_required: [
+          'live_meeting_surface_snapshot',
+          'provider_start_end_events',
+          'runtime_host_replay',
+        ],
+        field_evidence_input: fieldRow.field_evidence_input,
+        evidence_package: fieldRow.evidence_package,
+      },
+      validation_files: [
+        'connector-adapter-matrix.json',
+        'connector-smoke-plan.json',
+        'connector-smoke-run-report.json',
+        'connector-release-gate.json',
+        'connector-field-intake-index.json',
+      ],
+      release_missing: releaseRow.missing ?? [],
+      missing,
+      next_actions: missing.length > 0
+        ? missing.map((item) => `fix_${item}`)
+        : unique([
+          'wire_runtime_sequence_into_host_project',
+          releaseRow.production_ready === true
+            ? 'ship_platform_adapter_to_host_project'
+            : 'capture_live_evidence_before_production_rollout',
+        ]),
+    });
+  });
+  const issues = [
+    ...(hostInstallChecklist.accepted === true ? [] : ['host_install_checklist_not_accepted']),
+    ...(releaseGate.accepted === true ? [] : ['connector_release_gate_not_accepted']),
+    ...(roadmap.accepted === true ? [] : ['connector_platform_roadmap_not_accepted']),
+    ...(bridgeHandoff.accepted === true ? [] : ['connector_bridge_handoff_not_accepted']),
+    ...(smokePlan.accepted === true ? [] : ['connector_smoke_plan_not_accepted']),
+    ...rows.flatMap((row) => row.missing.map((missing) => `${row.platform}:${missing}`)),
+  ];
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    target: releaseGate.target,
+    package_id: hostInstallChecklist.package_id,
+    platform_count: hostInstallChecklist.platform_count ?? rows.length,
+    row_count: rows.length,
+    host_wiring_ready_count: rows.filter((row) => row.status !== 'blocked').length,
+    pilot_ready_count: rows.filter((row) => row.status === 'pilot_ready' || row.status === 'production_ready').length,
+    production_ready_count: rows.filter((row) => row.status === 'production_ready').length,
+    recommended_first_platform: roadmap.recommended_first_platform,
+    recommended_first_surface: roadmap.recommended_first_surface,
+    runtime_event_endpoint: hostInstallChecklist.runtime_event_endpoint,
+    timestamp_field: hostInstallChecklist.timestamp_field,
+    provider_events_block_realtime: false,
+    transcript_blocks_realtime: false,
+    source_schemas: {
+      host_install_checklist: hostInstallChecklist.schema,
+      connector_release_gate: releaseGate.schema,
+      connector_platform_roadmap: roadmap.schema,
+      connector_field_intake_index: fieldIntakeIndex.schema,
+      connector_bridge_handoff: bridgeHandoff.schema,
+      connector_smoke_plan: smokePlan.schema,
+    },
+    files_to_read_first: [
+      'connector-adapter-matrix.json',
+      'connector-platform-roadmap.json',
+      'connector-release-gate.json',
+      'connector-smoke-plan.json',
+      'connector-field-intake-index.json',
+    ],
+    runtime_invariants: {
+      local_surface_starts_realtime_axis: true,
+      provider_reconcile_blocks_realtime: false,
+      transcript_import_blocks_realtime: false,
+      first_runtime_action: 'observe_platform_candidates',
+      mark_runtime_action: 'insert_annotation',
+      mark_timestamp_field: 'captured_at_ms',
+      speaker_positions_do_not_require_transcript_text: true,
+    },
+    rows,
+    issue_count: unique(issues).length,
+    issues: unique(issues),
+    next_actions: issues.length > 0
+      ? unique([
+        ...issues.map((issue) => `fix_${issue}`),
+        ...rows.flatMap((row) => row.next_actions ?? []),
+      ])
+      : ['wire_adapter_matrix_into_host_project'],
+  });
+}
+
+export function buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(matrixOrChecklistOrPackage = {}, options = {}) {
+  const matrix = matrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA
+    ? matrixOrChecklistOrPackage
+    : buildMeetingAppTimelineConnectorAdapterMatrix(matrixOrChecklistOrPackage, options);
+  const rows = matrix.rows ?? [];
+  const issues = [];
+  if (matrix.schema !== MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA) {
+    addIssue(issues, 'invalid_schema', 'Expected a meeting app timeline connector adapter matrix', {
+      expected_schema: MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA,
+      actual_schema: matrix.schema,
+    });
+  }
+  if (matrix.accepted !== true) addIssue(issues, 'adapter_matrix_not_accepted', 'Connector adapter matrix accepted flag is not true');
+  if (matrix.timestamp_field !== 'captured_at_ms') {
+    addIssue(issues, 'invalid_timestamp_contract', 'Adapter matrix must require captured_at_ms', {
+      timestamp_field: matrix.timestamp_field,
+    });
+  }
+  if (matrix.provider_events_block_realtime !== false) {
+    addIssue(issues, 'provider_events_block_realtime', 'Provider reconcile must not block realtime annotation insertion');
+  }
+  if (matrix.transcript_blocks_realtime !== false) {
+    addIssue(issues, 'transcript_blocks_realtime', 'Transcript import must not block realtime annotation insertion');
+  }
+  if ((matrix.platform_count ?? 0) <= 0) addIssue(issues, 'missing_platforms', 'Adapter matrix must include at least one platform');
+  if (rows.length !== matrix.platform_count) {
+    addIssue(issues, 'row_count_mismatch', 'Adapter matrix row count must equal platform_count', {
+      row_count: rows.length,
+      platform_count: matrix.platform_count,
+    });
+  }
+  for (const row of rows) {
+    const platform = normalizeKey(row.platform);
+    const sequence = row.runtime_sequence ?? [];
+    if (!platform) addIssue(issues, 'row_missing_platform', 'Adapter matrix row is missing platform');
+    if (!row.selected_surface) addIssue(issues, 'row_missing_selected_surface', 'Adapter matrix row is missing selected_surface', { platform });
+    if (!row.install_target) addIssue(issues, 'row_missing_install_target', 'Adapter matrix row is missing install_target', { platform });
+    if (row.can_start_axis_before_provider !== true) {
+      addIssue(issues, 'row_cannot_start_axis_before_provider', 'Adapter matrix row must start axis before provider reconcile', { platform });
+    }
+    if (row.can_insert_annotation_on_current_axis !== true) {
+      addIssue(issues, 'row_cannot_insert_annotation_on_current_axis', 'Adapter matrix row must insert annotation on current axis', { platform });
+    }
+    if (sequence[0]?.action !== 'observe_platform_candidates') {
+      addIssue(issues, 'row_first_action_not_observe_candidates', 'First runtime action must observe platform candidates', { platform });
+    }
+    if (sequence[1]?.action !== 'insert_annotation') {
+      addIssue(issues, 'row_second_action_not_insert_annotation', 'Second runtime action must insert annotation', { platform });
+    }
+    if (sequence[1]?.required_field !== 'captured_at_ms') {
+      addIssue(issues, 'row_insert_annotation_missing_captured_at_ms', 'Insert annotation action must require captured_at_ms', { platform });
+    }
+  }
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_ACCEPTANCE_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_ACCEPTANCE_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    target: matrix.target,
+    package_id: matrix.package_id,
+    platform_count: matrix.platform_count ?? 0,
+    row_count: rows.length,
+    host_wiring_ready_count: matrix.host_wiring_ready_count,
+    pilot_ready_count: matrix.pilot_ready_count,
+    production_ready_count: matrix.production_ready_count,
+    timestamp_field: matrix.timestamp_field,
+    runtime_event_endpoint: matrix.runtime_event_endpoint,
+    issue_count: issues.length,
+    issues,
+    rows: rows.map((row) => compactObject({
+      platform: row.platform,
+      status: row.status,
+      selected_surface: row.selected_surface,
+      adapter_mode: row.adapter_mode,
+      install_target: row.install_target,
+      first_action: row.runtime_sequence?.[0]?.action,
+      second_action: row.runtime_sequence?.[1]?.action,
+      timestamp_field: row.timestamp_field,
+    })),
+    next_actions: issues.length > 0
+      ? unique([
+        ...issues.map((issue) => `fix_${issue.code}`),
+        ...(matrix.next_actions ?? []),
+      ])
+      : matrix.next_actions ?? [],
+  });
+}
+
+export function assertMeetingAppTimelineConnectorAdapterMatrix(matrixOrChecklistOrPackage = {}, options = {}) {
+  const matrix = matrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA
+    ? matrixOrChecklistOrPackage
+    : buildMeetingAppTimelineConnectorAdapterMatrix(matrixOrChecklistOrPackage, options);
+  const report = buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(matrix, options);
+  if (!report.accepted) {
+    throw new MeetingTimelineSdkError('Meeting app timeline connector adapter matrix is not accepted', {
+      report,
+      issues: report.issues,
+    });
+  }
+  return matrix;
 }
 
 export function createMeetingAppTimelineConnectorRuntimeClient(pkg = {}, options = {}) {
