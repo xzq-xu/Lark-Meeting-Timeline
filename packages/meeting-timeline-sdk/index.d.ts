@@ -353,6 +353,14 @@ export interface MeetingAppTimelineSdk {
     matrixOptions?: Record<string, unknown>,
   ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineConnectorAdapterMatrix;
   assertConnectorAdapterMatrix: MeetingAppTimelineSdk['connectorAdapterMatrix'];
+  providerReplayReport(
+    platformOrInput?: string | Record<string, unknown>,
+    recordsOrOptions?: Array<Record<string, unknown>> | Record<string, unknown>,
+    replayOptions?: Record<string, unknown>,
+  ): import('./adapters/platform-ingest.mjs').MeetingPlatformProviderReplayReport;
+  assertProviderReplayReport: MeetingAppTimelineSdk['providerReplayReport'];
+  providerReplayMatrix(options?: Record<string, unknown>): import('./adapters/platform-ingest.mjs').MeetingPlatformProviderReplayMatrix;
+  assertProviderReplayMatrix: MeetingAppTimelineSdk['providerReplayMatrix'];
   meetingAppAdapterCapability(
     platformOrOptions?: string | import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterCapabilityOptions,
     input?: Record<string, unknown>,
@@ -697,6 +705,7 @@ export * from './adapters/meeting-app-connector-package.mjs';
 export * from './adapters/meeting-platform-connector.mjs';
 export * from './adapters/platform-integration-runtime.mjs';
 export * from './adapters/platform-runtime-event.mjs';
+export * from './adapters/platform-ingest.mjs';
 export * from './adapters/platform-adaptation-package.mjs';
 export * from './adapters/platform-consumer-handoff.mjs';
 export * from './adapters/platform-implementation-handoff.mjs';

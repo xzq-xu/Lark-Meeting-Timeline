@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
 
 import {
+  assertMeetingPlatformProviderReplayMatrix,
+  assertMeetingPlatformProviderReplayReport,
+  buildMeetingPlatformProviderReplayAcceptanceReport,
+  buildMeetingPlatformProviderReplayMatrix,
+  buildMeetingPlatformProviderReplayReport,
   diagnosePlatformEvent,
   ingestPlatformEvent,
   normalizePlatformEvent,
+  sampleMeetingPlatformProviderEvents,
 } from '../packages/meeting-timeline-sdk/adapters/platform-ingest.mjs';
 
 const startMs = 1_782_442_800_000;
@@ -115,6 +121,14 @@ assert.equal(normalizedLark.source, 'lark_webhook');
 assert.equal(normalizedLark.signals[0].meeting.meeting_id, 'lark-meeting-001');
 assert.equal(normalizedLark.signals[0].meeting.minute_token, 'minute-token-001');
 
+const rawLarkProviderReplay = buildMeetingPlatformProviderReplayReport('lark', [larkStartEvent], {
+  baseReceivedAtMs: startMs,
+  requiredCoverage: ['meeting_start'],
+});
+assert.equal(rawLarkProviderReplay.accepted, true);
+assert.equal(rawLarkProviderReplay.rows[0].signal_types.includes('meeting_started'), true);
+assert.equal(rawLarkProviderReplay.rows[0].meetings[0].minute_token, 'minute-token-001');
+
 const calls = [];
 const client = {
   async startMeeting(input) {
@@ -220,6 +234,56 @@ const webexTranscriptResult = normalizePlatformEvent({
 assert.equal(webexTranscriptResult.platform, 'webex');
 assert.equal(webexTranscriptResult.signals[0].type, 'artifact_ready');
 assert.equal(webexTranscriptResult.signals[0].occurred_at_ms, startMs + 120_000);
+
+const googleProviderSamples = sampleMeetingPlatformProviderEvents('google-meet', {
+  baseReceivedAtMs: startMs,
+});
+assert.equal(googleProviderSamples.length, 4);
+assert.equal(googleProviderSamples[0].kind, 'meeting_start');
+const googleProviderReplay = buildMeetingPlatformProviderReplayReport('google-meet', googleProviderSamples, {
+  baseReceivedAtMs: startMs,
+});
+assert.equal(googleProviderReplay.schema, 'meeting_platform_provider_replay_report');
+assert.equal(googleProviderReplay.accepted, true);
+assert.equal(googleProviderReplay.platform, 'google_meet');
+assert.equal(googleProviderReplay.runtime_contract.runtime_action, 'provider_event');
+assert.equal(googleProviderReplay.runtime_contract.provider_events_block_realtime, false);
+assert.equal(googleProviderReplay.coverage.meeting_start, true);
+assert.equal(googleProviderReplay.coverage.meeting_end, true);
+assert.equal(googleProviderReplay.coverage.participant_track, true);
+assert.equal(googleProviderReplay.coverage.artifact_ready, true);
+assert.equal(googleProviderReplay.rows.every((row) => row.runtime_event_action === 'provider_event'), true);
+assert.equal(googleProviderReplay.rows.find((row) => row.kind === 'meeting_start').signal_types.includes('meeting_started'), true);
+const googleProviderReplayAcceptance = buildMeetingPlatformProviderReplayAcceptanceReport(googleProviderReplay);
+assert.equal(googleProviderReplayAcceptance.schema, 'meeting_platform_provider_replay_acceptance_report');
+assert.equal(googleProviderReplayAcceptance.accepted, true);
+assert.equal(assertMeetingPlatformProviderReplayReport(googleProviderReplay).accepted, true);
+
+const providerReplayMatrix = buildMeetingPlatformProviderReplayMatrix({
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+  baseReceivedAtMs: startMs,
+});
+assert.equal(providerReplayMatrix.schema, 'meeting_platform_provider_replay_matrix');
+assert.equal(providerReplayMatrix.accepted, true);
+assert.equal(providerReplayMatrix.platform_count, 5);
+assert.equal(providerReplayMatrix.accepted_count, 5);
+assert.equal(providerReplayMatrix.rows.every((row) => row.coverage.meeting_start === true), true);
+assert.equal(providerReplayMatrix.rows.every((row) => row.coverage.meeting_end === true), true);
+assert.equal(providerReplayMatrix.rows.every((row) => row.provider_events_block_realtime === false), true);
+assert.equal(providerReplayMatrix.rows.find((row) => row.platform === 'microsoft_teams').signal_types.includes('participant_joined'), true);
+assert.equal(assertMeetingPlatformProviderReplayMatrix(providerReplayMatrix).accepted, true);
+
+const missingEndReplay = buildMeetingPlatformProviderReplayReport('zoom', [
+  sampleMeetingPlatformProviderEvents('zoom', { baseReceivedAtMs: startMs })[0],
+], {
+  baseReceivedAtMs: startMs,
+});
+assert.equal(missingEndReplay.accepted, false);
+assert.equal(missingEndReplay.issues.includes('missing_coverage:meeting_end'), true);
+assert.throws(
+  () => assertMeetingPlatformProviderReplayReport(missingEndReplay),
+  /provider replay report is not accepted/,
+);
 
 await assert.rejects(
   () => ingestPlatformEvent(client, 'unknown-platform', {}),

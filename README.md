@@ -18,6 +18,7 @@
 - SDK live evidence session，可在真实会议进行中持续收集本地 DOM / provider 样本，实时判断能否把当前标注落到会议轴，并在采样完成后导出 handoff 包
 - SDK evidence package，可把单场真实会议的 provider webhook 记录、本地 DOM 记录、rollout plan 和 handoff 摘要封成可复验交接包
 - SDK runtime host replay，可把现场采集的会议 App 快照或 evidence package 回放到 runtime host，验收 start / speaker / end 是否能按真实时间戳写入时间轴
+- SDK provider replay，可把 Google Meet / Teams / Zoom / Webex / Lark 的 provider 原始事件样本跑过统一 normalizer 和 runtime event contract，验证 start/end/participant/artifact 覆盖，同时保持 provider 事件不阻塞实时标注
 - 本地手动开始/结束实时会议，用作没有公网 webhook 时的 fallback
 - 会中实时写入外部标注事件，并通过 SSE 自动刷新页面
 - 开放标注接口 `POST /api/annotations`，供后续墨水屏/手写设备接入

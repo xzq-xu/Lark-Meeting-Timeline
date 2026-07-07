@@ -10,6 +10,12 @@ import {
   createMeetingPlatformRuntimeEventClient,
 } from './adapters/platform-runtime-event.mjs';
 import {
+  assertMeetingPlatformProviderReplayMatrix,
+  assertMeetingPlatformProviderReplayReport,
+  buildMeetingPlatformProviderReplayMatrix,
+  buildMeetingPlatformProviderReplayReport,
+} from './adapters/platform-ingest.mjs';
+import {
   assertMeetingAppTimelineConnectorAdapterMatrix,
   assertMeetingAppTimelineConnectorPlatformRoadmap,
   assertMeetingAppTimelineConnectorReleaseGate,
@@ -1029,6 +1035,24 @@ export function createMeetingAppTimelineSdk(options = {}) {
         ...matrixOptions,
       });
     },
+    providerReplayReport(platformOrInput = {}, recordsOrOptions = undefined, replayOptions = {}) {
+      return buildMeetingPlatformProviderReplayReport(
+        platformOrInput,
+        recordsOrOptions,
+        sdkPlatformOptions(runtime, replayOptions),
+      );
+    },
+    assertProviderReplayReport(platformOrInput = {}, recordsOrOptions = undefined, replayOptions = {}) {
+      return assertMeetingPlatformProviderReplayReport(
+        sdk.providerReplayReport(platformOrInput, recordsOrOptions, replayOptions),
+      );
+    },
+    providerReplayMatrix(replayOptions = {}) {
+      return buildMeetingPlatformProviderReplayMatrix(sdkPlatformOptions(runtime, replayOptions));
+    },
+    assertProviderReplayMatrix(replayOptions = {}) {
+      return assertMeetingPlatformProviderReplayMatrix(sdk.providerReplayMatrix(replayOptions));
+    },
     meetingAppAdapterCapability(platformOrOptions = {}, input = {}, capabilityOptions = {}) {
       if (platformOrOptions && typeof platformOrOptions === 'object' && !Array.isArray(platformOrOptions)) {
         return runtime.kit.meetingAppAdapterCapability(sdkPlatformOptions(runtime, {
@@ -1609,6 +1633,7 @@ export * from './adapters/meeting-app-connector-package.mjs';
 export * from './adapters/meeting-platform-connector.mjs';
 export * from './adapters/platform-integration-runtime.mjs';
 export * from './adapters/platform-runtime-event.mjs';
+export * from './adapters/platform-ingest.mjs';
 export * from './adapters/platform-adaptation-package.mjs';
 export * from './adapters/platform-consumer-handoff.mjs';
 export * from './adapters/platform-implementation-handoff.mjs';

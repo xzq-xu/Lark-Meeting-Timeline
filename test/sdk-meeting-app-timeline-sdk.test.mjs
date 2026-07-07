@@ -162,6 +162,22 @@ assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'zoom').adapter_mode, 'native_or_desktop_observer');
 assert.equal(connectorAdapterMatrix.rows.every((row) => row.runtime_sequence[0].action === 'observe_platform_candidates'), true);
 assert.equal(sdk.assertConnectorAdapterMatrix(connectorPackage).accepted, true);
+const providerReplayReport = sdk.providerReplayReport('google-meet', {
+  baseReceivedAtMs: 1_782_614_400_000,
+});
+assert.equal(providerReplayReport.schema, 'meeting_platform_provider_replay_report');
+assert.equal(providerReplayReport.accepted, true);
+assert.equal(providerReplayReport.coverage.meeting_start, true);
+assert.equal(providerReplayReport.runtime_contract.provider_events_block_realtime, false);
+assert.equal(sdk.assertProviderReplayReport(providerReplayReport).accepted, true);
+const providerReplayMatrix = sdk.providerReplayMatrix({
+  platforms: ['google-meet', 'zoom'],
+});
+assert.equal(providerReplayMatrix.schema, 'meeting_platform_provider_replay_matrix');
+assert.equal(providerReplayMatrix.accepted, true);
+assert.equal(providerReplayMatrix.accepted_count, 2);
+assert.equal(providerReplayMatrix.rows.every((row) => row.provider_events_block_realtime === false), true);
+assert.equal(sdk.assertProviderReplayMatrix(providerReplayMatrix).accepted, true);
 
 const adapterCapability = sdk.meetingAppAdapterCapability('google-meet', {
   url: 'https://meet.google.com/abc-defg-hij',

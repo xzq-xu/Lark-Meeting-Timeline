@@ -2441,6 +2441,28 @@ await ingestPlatformEvent(timeline, 'google-meet', req.body, {
 
 `diagnosePlatformEvent()` 不写入 timeline，只返回 adapter、`signal_types`、`coverage`、`meetings` 和 `issues`，用于验收真实样本事件是否能建轴、是否只是订阅生命周期事件、是否缺少 meeting URL 导致和本地观察器对齐变弱。`ingestPlatformEvent()` 内部会按平台名选择 normalizer，把原始事件转成 `NormalizedMeetingSignal[]`，再调用 `startMeeting`、`endMeeting` 或可选的 participant/artifact handler。对于 Google Meet / Teams / Zoom / Webex，新项目可以优先接这一层，只有需要自定义事件验签、补拉详情或 artifact 导入时再下钻到 registry/core。
 
+如果另一个项目还没接好官方 webhook，但需要先验证“provider 原始事件能不能进入统一 runtime contract”，可以用 provider replay。它不会插入用户标注，也不会把 provider 当成实时落标注前置条件，只把 Google Meet / Teams / Zoom / Webex / Lark 的原始事件样本跑过 normalizer、diagnostic 和 `provider_event` runtime event：
+
+```js
+import {
+  assertMeetingPlatformProviderReplayMatrix,
+  buildMeetingPlatformProviderReplayReport,
+  sampleMeetingPlatformProviderEvents,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest';
+
+const samples = sampleMeetingPlatformProviderEvents('google-meet');
+const report = buildMeetingPlatformProviderReplayReport('google-meet', samples);
+
+console.log(report.coverage.meeting_start, report.coverage.meeting_end);
+// report.runtime_contract.provider_events_block_realtime === false
+
+assertMeetingPlatformProviderReplayMatrix({
+  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+});
+```
+
+`createMeetingAppTimelineSdk()` 也直接暴露同一层：`sdk.providerReplayReport()`、`sdk.assertProviderReplayReport()`、`sdk.providerReplayMatrix()` 和 `sdk.assertProviderReplayMatrix()`。这适合放进下游项目 CI，证明 provider 样本能被 SDK 识别为开始、结束、参会人或 artifact 事件；真正的实时标注仍必须使用本地观察建轴和 `captured_at_ms`。
+
 如果要验收一组真实平台样本，而不是单条事件，可以用 `platform-acceptance`。它会合并 setup readiness、integration plan 和样本事件诊断，输出 `accepted / blocked / pending_samples / missing_required_coverage`：
 
 ```js

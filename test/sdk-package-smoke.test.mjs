@@ -53,6 +53,8 @@ assert.equal(packedFiles.includes('adapters/platform-runtime-event.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-runtime-event.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-registry.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-registry.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-ingest.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-ingest.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-conformance.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-conformance.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-consumer-handoff.mjs'), true);
@@ -323,6 +325,9 @@ import {
   buildMeetingAppTimelineConnectorReleaseGate as buildMeetingAppTimelineConnectorReleaseGateFromRoot,
   buildMeetingAppTimelineConnectorSmokePlan as buildMeetingAppTimelineConnectorSmokePlanFromRoot,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport as buildMeetingAppTimelineConnectorSmokePlanAcceptanceReportFromRoot,
+  buildMeetingPlatformProviderReplayMatrix as buildMeetingPlatformProviderReplayMatrixFromRoot,
+  buildMeetingPlatformProviderReplayReport as buildMeetingPlatformProviderReplayReportFromRoot,
+  sampleMeetingPlatformProviderEvents as sampleMeetingPlatformProviderEventsFromRoot,
   runMeetingAppTimelineConnectorBridgeSmoke as runMeetingAppTimelineConnectorBridgeSmokeFromRoot,
   runMeetingAppTimelineConnectorSmokePlan as runMeetingAppTimelineConnectorSmokePlanFromRoot,
   buildMeetingPlatformAdaptationPackage as buildMeetingPlatformAdaptationPackageFromRoot,
@@ -385,6 +390,13 @@ import {
 	  resolveMeetingPlatformForInput,
 	  runMeetingPlatformIntegrationRuntimeManifest,
 		} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';
+import {
+  assertMeetingPlatformProviderReplayMatrix,
+  assertMeetingPlatformProviderReplayReport,
+  buildMeetingPlatformProviderReplayMatrix,
+  buildMeetingPlatformProviderReplayReport,
+  sampleMeetingPlatformProviderEvents,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-ingest';
 import {
   MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
   buildMeetingPlatformAnnotationRuntimeEvent,
@@ -874,6 +886,34 @@ assert.equal(rootMeetingAppSdk.connectorPlatformRoadmap(rootConnectorPackage).sc
 assert.equal(rootMeetingAppSdk.assertConnectorPlatformRoadmap(rootConnectorPackage).accepted, true);
 assert.equal(rootMeetingAppSdk.connectorAdapterMatrix(rootConnectorPackage).schema, 'meeting_app_timeline_connector_adapter_matrix');
 assert.equal(rootMeetingAppSdk.assertConnectorAdapterMatrix(rootConnectorPackage).accepted, true);
+const rootProviderReplay = buildMeetingPlatformProviderReplayReport('google-meet');
+assert.equal(rootProviderReplay.schema, 'meeting_platform_provider_replay_report');
+assert.equal(rootProviderReplay.accepted, true);
+assert.equal(rootProviderReplay.runtime_contract.provider_events_block_realtime, false);
+assert.equal(buildMeetingPlatformProviderReplayReportFromRoot('zoom').accepted, true);
+assert.equal(sampleMeetingPlatformProviderEvents('webex').length, 4);
+assert.equal(sampleMeetingPlatformProviderEventsFromRoot('google-meet').length, 4);
+assert.equal(assertMeetingPlatformProviderReplayReport(rootProviderReplay).accepted, true);
+const rootProviderReplayMatrix = buildMeetingPlatformProviderReplayMatrix({
+  platforms: ['google-meet', 'zoom'],
+});
+assert.equal(rootProviderReplayMatrix.schema, 'meeting_platform_provider_replay_matrix');
+assert.equal(rootProviderReplayMatrix.accepted, true);
+assert.equal(rootProviderReplayMatrix.accepted_count, 2);
+assert.equal(buildMeetingPlatformProviderReplayMatrixFromRoot({
+  platforms: ['google-meet', 'zoom'],
+}).accepted_count, 2);
+assert.equal(assertMeetingPlatformProviderReplayMatrix({
+  platforms: ['google-meet'],
+}).accepted, true);
+assert.equal(rootMeetingAppSdk.providerReplayReport('google-meet').schema, 'meeting_platform_provider_replay_report');
+assert.equal(rootMeetingAppSdk.assertProviderReplayReport('google-meet').accepted, true);
+assert.equal(rootMeetingAppSdk.providerReplayMatrix({
+  platforms: ['google-meet'],
+}).accepted, true);
+assert.equal(rootMeetingAppSdk.assertProviderReplayMatrix({
+  platforms: ['google-meet'],
+}).accepted, true);
 assert.equal((await runMeetingAppTimelineConnectorBridgeSmoke(rootConnectorPackage)).schema, 'meeting_app_timeline_connector_bridge_smoke_report');
 assert.equal((await runMeetingAppTimelineConnectorBridgeSmokeFromRoot(rootConnectorPackage)).accepted, true);
 assert.equal((await assertMeetingAppTimelineConnectorBridgeSmoke(rootConnectorPackage)).accepted, true);
