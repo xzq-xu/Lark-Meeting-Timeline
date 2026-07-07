@@ -14,6 +14,7 @@ import {
   buildMeetingAppTimelineConnectorReleaseGate,
   buildMeetingAppTimelineConnectorSmokePlan,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
+  buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix,
   buildMeetingAppTimelineHostAdapterConfig,
   buildMeetingAppTimelineHostAdapterConfigIndex,
   createMeetingAppTimelineSdk,
@@ -117,6 +118,7 @@ function connectorQuickstartMarkdown(pkg = {}) {
     '- `connector-adapter-matrix.json`: per-platform runtime wiring plan: selected surface, install step, input sources, event order, SDK methods, and evidence contract.',
     '- `connector-adapter-matrix-acceptance.json`: standalone gate for the adapter matrix runtime invariants.',
     '- `host-adapter-config-index.json` and `host-adapter-configs/{platform}.json`: compact per-platform configs a host project can load directly.',
+    '- `host-adapter-bootstrap-plan-matrix.json`: per-platform host startup plan after URL/window resolution: load config, install adapter, observe candidates, insert annotation.',
     '- `connector-platform-roadmap.json`: recommended per-platform implementation order, first surface, install target, release status, and next action.',
     '- `provider-replay-matrix.json`: provider raw event replay across Google Meet, Teams, Zoom, Webex, and Lark; verifies start/end/participant/artifact coverage without blocking realtime annotations.',
     '- `connector-bridge-handoff.json`: lightweight connector bridge handoff for browser extension, Electron WebView preload, mobile WebView, or native helper integration.',
@@ -138,6 +140,7 @@ function connectorQuickstartMarkdown(pkg = {}) {
     '- Realtime annotations must carry `captured_at_ms` from the device or ink end time.',
     '- Provider events and transcript/artifact import must not block realtime annotation insertion.',
     '- Use `startup-plan-matrix.json` to choose the host runtime surface before installing bridges.',
+    '- Use `host-adapter-bootstrap-plan-matrix.json` as the final host-side CI gate before wiring Google Meet, Teams, Zoom, Webex, or Lark windows.',
     '- Use `connector-handoff.json` for CI and handoff dashboards instead of parsing every raw file.',
     '',
     '## Startup Matrix',
@@ -257,12 +260,14 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   });
   const connectorAdapterMatrixAcceptance = buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(connectorAdapterMatrix);
   const adapterConfigIndex = buildMeetingAppTimelineHostAdapterConfigIndex(connectorAdapterMatrix);
+  const hostAdapterBootstrapPlanMatrix = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(adapterConfigIndex);
   await write('connector-adoption-index.json', connectorAdoptionIndex);
   await write('connector-field-intake-index.json', connectorFieldIntakeIndex);
   await write('connector-release-gate.json', connectorReleaseGate);
   await write('connector-adapter-matrix.json', connectorAdapterMatrix);
   await write('connector-adapter-matrix-acceptance.json', connectorAdapterMatrixAcceptance);
   await write('host-adapter-config-index.json', adapterConfigIndex);
+  await write('host-adapter-bootstrap-plan-matrix.json', hostAdapterBootstrapPlanMatrix);
   for (const row of connectorAdapterMatrix.rows ?? []) {
     await write(`host-adapter-configs/${row.platform}.json`, buildMeetingAppTimelineHostAdapterConfig(connectorAdapterMatrix, row.platform));
   }
@@ -349,11 +354,15 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
   });
   const connectorAdapterMatrixAcceptance = buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(connectorAdapterMatrix);
   const adapterConfigIndex = buildMeetingAppTimelineHostAdapterConfigIndex(connectorAdapterMatrix);
+  const hostAdapterBootstrapPlanMatrix = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(adapterConfigIndex);
   const writtenFiles = await writeConnectorPackageFiles(outDir, pkg);
 
   const report = {
     type: 'meeting_app_timeline_connector_package_report',
-    ok: pkg.accepted === true && connectorReleaseGate.accepted === true && connectorAdapterMatrixAcceptance.accepted === true,
+    ok: pkg.accepted === true
+      && connectorReleaseGate.accepted === true
+      && connectorAdapterMatrixAcceptance.accepted === true
+      && hostAdapterBootstrapPlanMatrix.accepted === true,
     base_url: baseUrl,
     out_dir: outDir || undefined,
     platform_count: pkg.platform_count,
@@ -366,6 +375,8 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     adapter_matrix_accepted: connectorAdapterMatrixAcceptance.accepted === true,
     host_adapter_config_accepted: adapterConfigIndex.accepted === true,
     host_adapter_config_count: adapterConfigIndex.row_count,
+    host_adapter_bootstrap_accepted: hostAdapterBootstrapPlanMatrix.accepted === true,
+    host_adapter_bootstrap_count: hostAdapterBootstrapPlanMatrix.row_count,
     required_platforms: requiredPlatforms,
     surfaces: pkg.surfaces,
     extension_scaffold: Boolean(pkg.extension?.scaffold),
@@ -397,6 +408,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     adapter_matrix: connectorAdapterMatrix,
     adapter_matrix_acceptance: connectorAdapterMatrixAcceptance,
     host_adapter_config_index: adapterConfigIndex,
+    host_adapter_bootstrap_plan_matrix: hostAdapterBootstrapPlanMatrix,
     platform_roadmap: connectorPlatformRoadmap,
     bridge_handoff: connectorBridgeHandoff,
     bridge_handoff_acceptance: connectorBridgeHandoffAcceptance,
@@ -416,7 +428,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
 
 export function formatMeetingAppConnectorPackageCliReport(report = {}) {
   const lines = [
-    `meeting_app_timeline_connector_package_report | ok=${boolLabel(report.ok)} | release_gate=${boolLabel(report.release_gate_accepted)} | adapter_matrix=${boolLabel(report.adapter_matrix_accepted)} | host_configs=${boolLabel(report.host_adapter_config_accepted)} | provider_replay=${boolLabel(report.provider_replay_accepted)} | target=${report.release_gate_target ?? 'pilot'} | platforms=${report.platform_count} | surfaces=${report.surface_count} | handoffs=${report.handoff_count} | ready=${report.ready_count} | blueprint_ready=${report.adapter_blueprint_ready_count} | startup_ready=${report.startup_plan_ready_count} | extension=${boolLabel(report.extension_scaffold)} | extension_accepted=${boolLabel(report.extension_accepted)} | runtime_actions=${report.runtime_event_action_count} | provider_runtime_events=${report.provider_replay_runtime_event_count} | written=${report.written_files?.length ?? 0}`,
+    `meeting_app_timeline_connector_package_report | ok=${boolLabel(report.ok)} | release_gate=${boolLabel(report.release_gate_accepted)} | adapter_matrix=${boolLabel(report.adapter_matrix_accepted)} | host_configs=${boolLabel(report.host_adapter_config_accepted)} | host_bootstrap=${boolLabel(report.host_adapter_bootstrap_accepted)} | provider_replay=${boolLabel(report.provider_replay_accepted)} | target=${report.release_gate_target ?? 'pilot'} | platforms=${report.platform_count} | surfaces=${report.surface_count} | handoffs=${report.handoff_count} | ready=${report.ready_count} | blueprint_ready=${report.adapter_blueprint_ready_count} | startup_ready=${report.startup_plan_ready_count} | extension=${boolLabel(report.extension_scaffold)} | extension_accepted=${boolLabel(report.extension_accepted)} | runtime_actions=${report.runtime_event_action_count} | provider_runtime_events=${report.provider_replay_runtime_event_count} | written=${report.written_files?.length ?? 0}`,
   ];
   for (const row of report.rows ?? []) {
     lines.push(`${row.platform}/${row.surface}: ready=${boolLabel(row.ready_to_start)} realtime=${boolLabel(row.realtime_annotation_ready)} speaker=${boolLabel(row.speaker_track_ready)} participant=${boolLabel(row.participant_track_ready)} install=${row.install_target ?? 'n/a'} start=${row.start_mode ?? 'n/a'}`);
