@@ -26,6 +26,7 @@ assert.match(stdout, /meeting_app_timeline_connector_package_report/);
 assert.match(stdout, /ok=yes/);
 assert.match(stdout, /release_gate=yes/);
 assert.match(stdout, /adapter_matrix=yes/);
+assert.match(stdout, /host_configs=yes/);
 assert.match(stdout, /provider_replay=yes/);
 assert.match(stdout, /platforms=2/);
 assert.match(stdout, /surfaces=2/);
@@ -54,7 +55,9 @@ assert.equal(report.scheduler_surface_count, 2);
 assert.equal(report.release_gate_accepted, true);
 assert.equal(report.release_gate_target, 'pilot');
 assert.equal(report.adapter_matrix_accepted, true);
-assert.equal(report.written_files.length, 35);
+assert.equal(report.host_adapter_config_accepted, true);
+assert.equal(report.host_adapter_config_count, 2);
+assert.equal(report.written_files.length, 38);
 assert.equal(report.rows.some((row) => row.platform === 'google_meet' && row.surface === 'browser_extension'), true);
 assert.equal(report.rows.some((row) => row.platform === 'zoom' && row.surface === 'native_detector'), true);
 assert.equal(report.handoff.schema, 'meeting_app_timeline_connector_handoff');
@@ -83,6 +86,9 @@ assert.equal(report.adapter_matrix.accepted, true);
 assert.equal(report.adapter_matrix.rows.find((row) => row.platform === 'google_meet').adapter_mode, 'browser_content_script');
 assert.equal(report.adapter_matrix.rows.find((row) => row.platform === 'zoom').adapter_mode, 'native_or_desktop_observer');
 assert.equal(report.adapter_matrix.rows.every((row) => row.runtime_sequence[0].action === 'observe_platform_candidates'), true);
+assert.equal(report.host_adapter_config_index.schema, 'meeting_app_timeline_host_adapter_config_index');
+assert.equal(report.host_adapter_config_index.accepted, true);
+assert.equal(report.host_adapter_config_index.rows.find((row) => row.platform === 'google_meet').config_file, 'host-adapter-configs/google_meet.json');
 assert.equal(report.adapter_matrix_acceptance.schema, 'meeting_app_timeline_connector_adapter_matrix_acceptance_report');
 assert.equal(report.adapter_matrix_acceptance.accepted, true);
 assert.equal(report.bridge_handoff.schema, 'meeting_app_timeline_connector_bridge_handoff');
@@ -193,6 +199,25 @@ assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'zoom').
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'zoom').provider_replay.provider_events_block_realtime, false);
 assert.equal(connectorAdapterMatrix.files_to_read_first.includes('connector-adapter-matrix.json'), true);
 assert.equal(connectorAdapterMatrix.files_to_read_first.includes('provider-replay-matrix.json'), true);
+
+const hostAdapterConfigIndex = JSON.parse(await readFile(join(outDir, 'host-adapter-config-index.json'), 'utf8'));
+assert.equal(hostAdapterConfigIndex.schema, 'meeting_app_timeline_host_adapter_config_index');
+assert.equal(hostAdapterConfigIndex.accepted, true);
+assert.equal(hostAdapterConfigIndex.row_count, 2);
+assert.equal(hostAdapterConfigIndex.rows.find((row) => row.platform === 'zoom').config_file, 'host-adapter-configs/zoom.json');
+
+const googleHostAdapterConfig = JSON.parse(await readFile(join(outDir, 'host-adapter-configs', 'google_meet.json'), 'utf8'));
+assert.equal(googleHostAdapterConfig.schema, 'meeting_app_timeline_host_adapter_config');
+assert.equal(googleHostAdapterConfig.platform, 'google_meet');
+assert.equal(googleHostAdapterConfig.selected_surface, 'browser_extension');
+assert.equal(googleHostAdapterConfig.realtime_contract.mark_timestamp_field, 'captured_at_ms');
+assert.equal(googleHostAdapterConfig.provider_replay.accepted, true);
+assert.equal(googleHostAdapterConfig.runtime_sequence[0].action, 'observe_platform_candidates');
+
+const zoomHostAdapterConfig = JSON.parse(await readFile(join(outDir, 'host-adapter-configs', 'zoom.json'), 'utf8'));
+assert.equal(zoomHostAdapterConfig.platform, 'zoom');
+assert.equal(zoomHostAdapterConfig.selected_surface, 'native_detector');
+assert.equal(zoomHostAdapterConfig.provider_replay.provider_events_block_realtime, false);
 
 const connectorAdapterMatrixAcceptance = JSON.parse(await readFile(join(outDir, 'connector-adapter-matrix-acceptance.json'), 'utf8'));
 assert.equal(connectorAdapterMatrixAcceptance.schema, 'meeting_app_timeline_connector_adapter_matrix_acceptance_report');
