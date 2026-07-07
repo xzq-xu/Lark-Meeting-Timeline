@@ -557,6 +557,22 @@ export function buildMeetingAppTimelineConnectorPackageAcceptanceReport(pkg = {}
   }
   if (!pkg.runtime_events?.endpoint) addIssue(issues, 'missing_runtime_event_endpoint', 'Runtime event endpoint is required');
   if ((pkg.runtime_events?.action_count ?? 0) <= 0) addIssue(issues, 'missing_runtime_event_actions', 'Runtime event plan has no actions');
+  if (!pkg.provider_replay?.matrix) {
+    addIssue(issues, 'missing_provider_replay_matrix', 'Connector package must include provider replay matrix for provider CI');
+  } else {
+    if (pkg.provider_replay.accepted !== true || pkg.provider_replay.matrix.accepted !== true) {
+      addIssue(issues, 'provider_replay_matrix_not_accepted', 'Provider replay matrix must be accepted for connector handoff');
+    }
+    if ((pkg.provider_replay.matrix.platform_count ?? 0) < platforms.length) {
+      addIssue(issues, 'provider_replay_platform_coverage_incomplete', 'Provider replay matrix must cover every selected platform', {
+        provider_replay_platform_count: pkg.provider_replay.matrix.platform_count ?? 0,
+        platform_count: platforms.length,
+      });
+    }
+    if ((pkg.provider_replay.matrix.rows ?? []).some((row) => row.provider_events_block_realtime !== false)) {
+      addIssue(issues, 'provider_replay_blocks_realtime', 'Provider replay must keep provider events non-blocking for realtime annotations');
+    }
+  }
   if (!pkg.adapter_blueprints?.matrix) {
     addIssue(issues, 'missing_adapter_blueprint_matrix', 'Connector package must include adapter blueprint matrix for external host wiring');
   } else if ((pkg.adapter_blueprints.ready_count ?? 0) < platforms.length) {
@@ -682,6 +698,17 @@ export function buildMeetingAppTimelineConnectorHandoff(pkg = {}, options = {}) 
     platform_count: platforms.length,
     surface_count: surfaces.length,
     runtime_event_endpoint: pkg.runtime_events?.endpoint,
+    provider_replay: pkg.provider_replay ? {
+      accepted: pkg.provider_replay.accepted,
+      accepted_count: pkg.provider_replay.accepted_count,
+      platform_count: pkg.provider_replay.platform_count,
+      runtime_event_count: pkg.provider_replay.runtime_event_count,
+      command: pkg.provider_replay.command,
+      bin: pkg.provider_replay.bin,
+      sdk_method: pkg.provider_replay.sdk_method,
+      rows: pkg.provider_replay.matrix?.rows,
+      provider_events_block_realtime: pkg.provider_replay.realtime_policy?.provider_events_block_realtime,
+    } : undefined,
     adapter_blueprints: pkg.adapter_blueprints ? {
       ready_count: pkg.adapter_blueprints.ready_count,
       platform_count: pkg.adapter_blueprints.platform_count,
@@ -791,6 +818,7 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, o
     },
     files_to_read_first: [
       'connector-handoff.json',
+      'provider-replay-matrix.json',
       'startup-plan-matrix.json',
       'adapter-blueprint-matrix.json',
       'runtime-event-plan-matrix.json',
@@ -2268,6 +2296,7 @@ export function buildMeetingAppTimelineConnectorReleaseGate(checklistOrPackage =
       'connector-release-gate.json',
       'connector-adoption-index.json',
       'connector-field-intake-index.json',
+      'provider-replay-matrix.json',
       'connector-bridge-smoke-report.json',
       'connector-smoke-run-report.json',
       'host-install-checklist.json',

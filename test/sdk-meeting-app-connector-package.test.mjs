@@ -69,6 +69,10 @@ assert.equal(acceptance.surface_reports.find((row) => row.surface === 'browser_e
 assert.equal(acceptance.extension.required, true);
 assert.equal(acceptance.extension.accepted, true);
 assert.equal(acceptance.extension.manifest_version, 3);
+assert.equal(connectorPackage.provider_replay.accepted, true);
+assert.equal(connectorPackage.provider_replay.matrix.schema, 'meeting_platform_provider_replay_matrix');
+assert.equal(connectorPackage.provider_replay.accepted_count, 2);
+assert.equal(connectorPackage.provider_replay.matrix.rows.every((row) => row.provider_events_block_realtime === false), true);
 
 assert.equal(buildAcceptanceReportFromSubpath(connectorPackage).accepted, true);
 assert.equal(assertMeetingAppTimelineConnectorPackage(connectorPackage), connectorPackage);
@@ -80,6 +84,9 @@ assert.equal(handoff.runtime_event_endpoint, 'https://timeline.example.com/api/m
 assert.equal(handoff.timestamp_field, 'captured_at_ms');
 assert.equal(handoff.provider_events_block_realtime, false);
 assert.equal(handoff.transcript_blocks_realtime, false);
+assert.equal(handoff.provider_replay.accepted, true);
+assert.equal(handoff.provider_replay.accepted_count, 2);
+assert.equal(handoff.provider_replay.provider_events_block_realtime, false);
 assert.equal(handoff.adapter_blueprints.ready_count, 2);
 assert.equal(handoff.adapter_blueprints.platform_count, 2);
 assert.equal(handoff.adapter_blueprints.sdk_method, 'sdk.platformAdapterBlueprint(platform)');
@@ -100,6 +107,7 @@ assert.equal(hostInstallChecklist.schema, 'meeting_app_timeline_connector_host_i
 assert.equal(hostInstallChecklist.accepted, true);
 assert.equal(hostInstallChecklist.ready_count, 2);
 assert.equal(hostInstallChecklist.timestamp_field, 'captured_at_ms');
+assert.equal(hostInstallChecklist.files_to_read_first.includes('provider-replay-matrix.json'), true);
 assert.equal(hostInstallChecklist.files_to_read_first.includes('startup-plan-matrix.json'), true);
 assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
 assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');

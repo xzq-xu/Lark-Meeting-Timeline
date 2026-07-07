@@ -232,6 +232,7 @@ assert.equal(connectorBinReport.type, 'meeting_app_timeline_connector_package_re
 assert.equal(connectorBinReport.platform_count, 1);
 assert.deepEqual(connectorBinReport.surfaces, ['browser_extension']);
 assert.equal(connectorBinReport.package.schema, 'meeting_app_timeline_connector_package');
+assert.equal(connectorBinReport.package.provider_replay.accepted, true);
 
 const { stdout: adapterExportBinStdout } = await execFileAsync(
   join(consumerDir, 'node_modules', '.bin', 'meeting-platform-adapter-export-package'),
@@ -874,6 +875,8 @@ assert.equal(rootMeetingAppSdk.schema, 'meeting_app_timeline_sdk');
 assert.equal(rootMeetingAppSdk.hostPackage({ surfaces: ['browser-extension'] }).schema, 'meeting_app_runtime_adapter_host_package');
 const rootConnectorPackage = rootMeetingAppSdk.connectorPackage({ surfaces: ['browser-extension'] });
 assert.equal(rootConnectorPackage.schema, 'meeting_app_timeline_connector_package');
+assert.equal(rootConnectorPackage.provider_replay.matrix.schema, 'meeting_platform_provider_replay_matrix');
+assert.equal(rootConnectorPackage.provider_replay.accepted, true);
 assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot(rootConnectorPackage).accepted, true);
 assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReport(rootConnectorPackage).accepted, true);
 assert.equal(buildMeetingAppTimelineConnectorHandoff(rootConnectorPackage).schema, 'meeting_app_timeline_connector_handoff');

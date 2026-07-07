@@ -115,6 +115,7 @@ function connectorQuickstartMarkdown(pkg = {}) {
     '- `connector-adapter-matrix.json`: per-platform runtime wiring plan: selected surface, install step, input sources, event order, SDK methods, and evidence contract.',
     '- `connector-adapter-matrix-acceptance.json`: standalone gate for the adapter matrix runtime invariants.',
     '- `connector-platform-roadmap.json`: recommended per-platform implementation order, first surface, install target, release status, and next action.',
+    '- `provider-replay-matrix.json`: provider raw event replay across Google Meet, Teams, Zoom, Webex, and Lark; verifies start/end/participant/artifact coverage without blocking realtime annotations.',
     '- `connector-bridge-handoff.json`: lightweight connector bridge handoff for browser extension, Electron WebView preload, mobile WebView, or native helper integration.',
     '- `connector-bridge-handoff-acceptance.json`: standalone gate for the lightweight connector bridge handoff.',
     '- `connector-bridge-smoke-report.json`: dry-run bridge message dispatch report for observe candidates, insert mark, tracks, and preflight.',
@@ -216,6 +217,7 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   await write('handoff-matrix.json', pkg.handoff_matrix);
   await write('handoff-acceptance.json', pkg.handoff_acceptance);
   await write('runtime-event-plan-matrix.json', pkg.runtime_events?.plan_matrix);
+  await write('provider-replay-matrix.json', pkg.provider_replay?.matrix);
   await write('adapter-blueprint-matrix.json', pkg.adapter_blueprints?.matrix);
   await write('startup-plan-matrix.json', pkg.startup_plans?.matrix);
   await write('connector-handoff.json', buildMeetingAppTimelineConnectorHandoff(pkg));
@@ -358,6 +360,9 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     extension_scaffold: Boolean(pkg.extension?.scaffold),
     extension_accepted: pkg.extension?.acceptance?.accepted,
     runtime_event_action_count: pkg.runtime_events?.action_count ?? 0,
+    provider_replay_accepted: pkg.provider_replay?.accepted === true,
+    provider_replay_accepted_count: pkg.provider_replay?.accepted_count ?? 0,
+    provider_replay_runtime_event_count: pkg.provider_replay?.runtime_event_count ?? 0,
     adapter_blueprint_ready_count: pkg.adapter_blueprints?.ready_count ?? 0,
     startup_plan_ready_count: pkg.startup_plans?.realtime_startup_ready_count ?? 0,
     observer_surface_count: Object.keys(pkg.observer_plan_by_surface ?? {}).length,
@@ -376,6 +381,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     handoff: connectorHandoff,
     adoption_index: connectorAdoptionIndex,
     field_intake_index: connectorFieldIntakeIndex,
+    provider_replay: pkg.provider_replay,
     release_gate: connectorReleaseGate,
     adapter_matrix: connectorAdapterMatrix,
     adapter_matrix_acceptance: connectorAdapterMatrixAcceptance,
@@ -398,7 +404,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
 
 export function formatMeetingAppConnectorPackageCliReport(report = {}) {
   const lines = [
-    `meeting_app_timeline_connector_package_report | ok=${boolLabel(report.ok)} | release_gate=${boolLabel(report.release_gate_accepted)} | adapter_matrix=${boolLabel(report.adapter_matrix_accepted)} | target=${report.release_gate_target ?? 'pilot'} | platforms=${report.platform_count} | surfaces=${report.surface_count} | handoffs=${report.handoff_count} | ready=${report.ready_count} | blueprint_ready=${report.adapter_blueprint_ready_count} | startup_ready=${report.startup_plan_ready_count} | extension=${boolLabel(report.extension_scaffold)} | extension_accepted=${boolLabel(report.extension_accepted)} | runtime_actions=${report.runtime_event_action_count} | written=${report.written_files?.length ?? 0}`,
+    `meeting_app_timeline_connector_package_report | ok=${boolLabel(report.ok)} | release_gate=${boolLabel(report.release_gate_accepted)} | adapter_matrix=${boolLabel(report.adapter_matrix_accepted)} | provider_replay=${boolLabel(report.provider_replay_accepted)} | target=${report.release_gate_target ?? 'pilot'} | platforms=${report.platform_count} | surfaces=${report.surface_count} | handoffs=${report.handoff_count} | ready=${report.ready_count} | blueprint_ready=${report.adapter_blueprint_ready_count} | startup_ready=${report.startup_plan_ready_count} | extension=${boolLabel(report.extension_scaffold)} | extension_accepted=${boolLabel(report.extension_accepted)} | runtime_actions=${report.runtime_event_action_count} | provider_runtime_events=${report.provider_replay_runtime_event_count} | written=${report.written_files?.length ?? 0}`,
   ];
   for (const row of report.rows ?? []) {
     lines.push(`${row.platform}/${row.surface}: ready=${boolLabel(row.ready_to_start)} realtime=${boolLabel(row.realtime_annotation_ready)} speaker=${boolLabel(row.speaker_track_ready)} participant=${boolLabel(row.participant_track_ready)} install=${row.install_target ?? 'n/a'} start=${row.start_mode ?? 'n/a'}`);

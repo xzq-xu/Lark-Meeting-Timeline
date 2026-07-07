@@ -838,6 +838,16 @@ export function createMeetingAppTimelineSdk(options = {}) {
         : undefined;
       const runtimeEventPlanMatrix = runtime.kit.platformRuntimeEventPlanMatrix(merged);
       const adapterBlueprintMatrix = runtime.kit.platformAdapterBlueprintMatrix(merged);
+      const providerReplayMatrix = sdk.providerReplayMatrix({
+        ...merged,
+        target: firstNonEmpty(connectorOptions.providerReplayTarget, connectorOptions.provider_replay_target, 'pilot'),
+        recordsByPlatform: firstNonEmpty(
+          connectorOptions.providerRecordsByPlatform,
+          connectorOptions.provider_records_by_platform,
+          connectorOptions.providerEventsByPlatform,
+          connectorOptions.provider_events_by_platform,
+        ),
+      });
       const startupPlanInput = firstNonEmpty(
         connectorOptions.startupInput,
         connectorOptions.startup_input,
@@ -883,6 +893,20 @@ export function createMeetingAppTimelineSdk(options = {}) {
           endpoint: runtimeEvents.endpoint,
           plan_matrix: runtimeEventPlanMatrix,
           action_count: runtimeEventPlanMatrix.rows?.length ?? 0,
+        },
+        provider_replay: {
+          matrix: providerReplayMatrix,
+          accepted: providerReplayMatrix.accepted === true,
+          accepted_count: providerReplayMatrix.accepted_count,
+          platform_count: providerReplayMatrix.platform_count,
+          runtime_event_count: providerReplayMatrix.runtime_event_count,
+          command: 'npm run meeting-platform:provider-replay',
+          bin: 'meeting-platform-provider-replay',
+          sdk_method: 'sdk.providerReplayMatrix(options)',
+          realtime_policy: {
+            provider_events_block_realtime: false,
+            local_observer_remains_primary_realtime_axis: true,
+          },
         },
         adapter_blueprints: {
           matrix: {
@@ -952,6 +976,7 @@ export function createMeetingAppTimelineSdk(options = {}) {
           local_observer_first: true,
           speaker_track_text_required: false,
           participant_track_text_required: false,
+          provider_replay_required_for_provider_ci: true,
           adapter_blueprint_required_before_host_wiring: true,
           startup_plan_required_before_runtime_install: true,
           production_requires_live_snapshot: true,
