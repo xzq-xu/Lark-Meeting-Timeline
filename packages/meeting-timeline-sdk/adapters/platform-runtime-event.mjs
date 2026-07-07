@@ -25,6 +25,8 @@ export const MEETING_PLATFORM_RUNTIME_EVENT_ACTIONS = Object.freeze([
   'timeline_view',
   'adapter_route',
   'adapter_routes',
+  'adapter_blueprint',
+  'adapter_blueprints',
   'runtime_bundles',
   'registry',
   'manifest',
@@ -65,6 +67,12 @@ const ACTION_ALIASES = new Map([
   ['adapter_route_matrix', 'adapter_routes'],
   ['platform_adapter_routes', 'adapter_routes'],
   ['platform_adapter_route_matrix', 'adapter_routes'],
+  ['adapter_blueprint', 'adapter_blueprint'],
+  ['platform_adapter_blueprint', 'adapter_blueprint'],
+  ['adapter_blueprints', 'adapter_blueprints'],
+  ['adapter_blueprint_matrix', 'adapter_blueprints'],
+  ['platform_adapter_blueprints', 'adapter_blueprints'],
+  ['platform_adapter_blueprint_matrix', 'adapter_blueprints'],
   ['runtime_bundle_matrix', 'runtime_bundles'],
   ['runtime_bundles', 'runtime_bundles'],
   ['platform_registry', 'registry'],
@@ -92,6 +100,7 @@ const PLATFORM_REQUIRED_ACTIONS = new Set([
   'participant_track',
   'timeline_view',
   'adapter_route',
+  'adapter_blueprint',
 ]);
 
 function firstNonEmpty(...values) {
@@ -424,6 +433,23 @@ export function buildMeetingPlatformAdapterRoutesRuntimeEvent(input = {}, option
   }, options);
 }
 
+export function buildMeetingPlatformAdapterBlueprintRuntimeEvent(platform, input = {}, options = {}) {
+  return buildMeetingPlatformRuntimeEvent({
+    ...input,
+    action: 'adapter_blueprint',
+    platform,
+    payload: input,
+  }, options);
+}
+
+export function buildMeetingPlatformAdapterBlueprintsRuntimeEvent(input = {}, options = {}) {
+  return buildMeetingPlatformRuntimeEvent({
+    ...input,
+    action: 'adapter_blueprints',
+    payload: input,
+  }, options);
+}
+
 export function buildMeetingPlatformRunManifestRuntimeEvent(input = {}, options = {}) {
   return buildMeetingPlatformRuntimeEvent({
     ...input,
@@ -544,6 +570,12 @@ function runtimeEventExamples(platform, options = {}) {
     adapter_routes: buildMeetingPlatformAdapterRoutesRuntimeEvent({
       platforms: [platform],
     }, options),
+    adapter_blueprint: buildMeetingPlatformAdapterBlueprintRuntimeEvent(platform, {
+      platforms: [platform],
+    }, options),
+    adapter_blueprints: buildMeetingPlatformAdapterBlueprintsRuntimeEvent({
+      platforms: [platform],
+    }, options),
     run_manifest: buildMeetingPlatformRunManifestRuntimeEvent({
       platforms: [platform],
       target: 'production',
@@ -651,6 +683,28 @@ function runtimeEventActionRows(platform, endpoint) {
       client_method: 'adapterRoutes',
       producer: 'host_ci_or_admin_panel',
       realtime_role: 'adapter_route_matrix_inspection',
+      required_fields: [],
+      recommended_fields: ['platforms'],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'adapter_blueprint',
+      client_method: 'adapterBlueprint',
+      producer: 'host_ci_or_admin_panel',
+      realtime_role: 'single_platform_adapter_blueprint_inspection',
+      required_fields: ['platform'],
+      recommended_fields: [],
+      provider_dependency: false,
+      transcript_dependency: false,
+      endpoint,
+    },
+    {
+      action: 'adapter_blueprints',
+      client_method: 'adapterBlueprints',
+      producer: 'host_ci_or_admin_panel',
+      realtime_role: 'adapter_blueprint_matrix_inspection',
       required_fields: [],
       recommended_fields: ['platforms'],
       provider_dependency: false,
@@ -783,6 +837,7 @@ export function buildMeetingPlatformRuntimeEventPlan(platform, options = {}) {
       'send provider_event as reconcile/backfill evidence when official events arrive',
       'request timeline_view from the host UI instead of duplicating SVG positioning logic',
       'request adapter_routes from admin tooling when rendering the platform integration route matrix',
+      'request adapter_blueprints from admin tooling before building browser/native/provider surfaces',
       'send run_manifest or run_handoff_readiness from CI/admin tooling before host handoff',
     ],
     actions: actionRows,
@@ -915,6 +970,12 @@ export function createMeetingPlatformRuntimeEventClient(options = {}) {
     },
     adapterRoutes(routeOptions = {}) {
       return send(buildMeetingPlatformAdapterRoutesRuntimeEvent(routeOptions, routeOptions), routeOptions);
+    },
+    adapterBlueprint(platform, blueprintOptions = {}) {
+      return send(buildMeetingPlatformAdapterBlueprintRuntimeEvent(platform, blueprintOptions, blueprintOptions), blueprintOptions);
+    },
+    adapterBlueprints(blueprintOptions = {}) {
+      return send(buildMeetingPlatformAdapterBlueprintsRuntimeEvent(blueprintOptions, blueprintOptions), blueprintOptions);
     },
     runtimeBundles(bundleOptions = {}) {
       return send({ action: 'runtime_bundles' }, bundleOptions);

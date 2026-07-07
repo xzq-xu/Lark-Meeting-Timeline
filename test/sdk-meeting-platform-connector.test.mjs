@@ -165,7 +165,7 @@ assert.equal(matrix.accepted_count, 5);
 assert.equal(matrix.realtime_ready_count, 5);
 assert.equal(matrix.candidate_observer_count, 5);
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').browser_observer_enabled, true);
-assert.equal(matrix.rows.find((row) => row.platform === 'zoom').runtime_action_count, 16);
+assert.equal(matrix.rows.find((row) => row.platform === 'zoom').runtime_action_count, 18);
 assert.equal(matrix.registry_manifest.platform_count, 5);
 
 const defaultMatrix = buildDefaultMeetingPlatformConnectorMatrix({ baseUrl });

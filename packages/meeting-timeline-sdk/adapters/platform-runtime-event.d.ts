@@ -90,6 +90,8 @@ export interface MeetingPlatformRuntimeEventClient {
   timelineView(platform: string, input?: Record<string, unknown>, viewOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   adapterRoute(platform: string, routeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   adapterRoutes(routeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  adapterBlueprint(platform: string, blueprintOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  adapterBlueprints(blueprintOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   runtimeBundles(bundleOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   registry(registryOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   manifest(manifestOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
@@ -186,6 +188,15 @@ export function buildMeetingPlatformAdapterRouteRuntimeEvent(
   options?: MeetingPlatformRuntimeEventOptions,
 ): MeetingPlatformRuntimeEvent;
 export function buildMeetingPlatformAdapterRoutesRuntimeEvent(
+  input?: Record<string, unknown>,
+  options?: MeetingPlatformRuntimeEventOptions,
+): MeetingPlatformRuntimeEvent;
+export function buildMeetingPlatformAdapterBlueprintRuntimeEvent(
+  platform: string,
+  input?: Record<string, unknown>,
+  options?: MeetingPlatformRuntimeEventOptions,
+): MeetingPlatformRuntimeEvent;
+export function buildMeetingPlatformAdapterBlueprintsRuntimeEvent(
   input?: Record<string, unknown>,
   options?: MeetingPlatformRuntimeEventOptions,
 ): MeetingPlatformRuntimeEvent;

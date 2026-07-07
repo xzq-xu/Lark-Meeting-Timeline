@@ -67,7 +67,7 @@ assert.equal(matrix.browser_observer_count, 5);
 assert.equal(matrix.candidate_observer_count, 5);
 assert.equal(matrix.provider_observer_count, 5);
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').provider_start_event_count, 1);
-assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 16);
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 18);
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').next_phase, 'axis_bootstrap');
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').primary_surface, 'browser_extension');
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').surface_order[0], 'desktop_observer');

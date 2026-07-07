@@ -9,6 +9,10 @@ import type {
   MeetingPlatformAdapterRoute,
   MeetingPlatformAdapterRouteMatrix,
 } from './platform-adapter-route.mjs';
+import type {
+  MeetingPlatformAdapterBlueprint,
+  MeetingPlatformAdapterBlueprintMatrix,
+} from './platform-adapter-blueprint.mjs';
 import type { MeetingPlatformParticipantTrackMatrix } from './platform-participant-track.mjs';
 import type { MeetingPlatformSpeakerTrackMatrix } from './platform-speaker-track.mjs';
 import type {
@@ -243,6 +247,8 @@ export interface MeetingPlatformIntegrationRuntime {
   runtimeBundles(bundleOptions?: Record<string, unknown>): MeetingPlatformRuntimeBundleMatrix;
   adapterRoute(platform: string, routeOptions?: Record<string, unknown>): MeetingPlatformAdapterRoute;
   adapterRoutes(routeOptions?: Record<string, unknown>): MeetingPlatformAdapterRouteMatrix;
+  adapterBlueprint(platform: string, blueprintOptions?: Record<string, unknown>): MeetingPlatformAdapterBlueprint;
+  adapterBlueprints(blueprintOptions?: Record<string, unknown>): MeetingPlatformAdapterBlueprintMatrix;
   adaptationPackages(packageOptions?: Record<string, unknown>): Record<string, unknown>;
   adaptationStrategyMatrix(strategyOptions?: Record<string, unknown>): MeetingPlatformAdaptationStrategyMatrix;
   resolvePlatform(input?: Record<string, unknown>, resolveOptions?: Record<string, unknown>): MeetingPlatformResolution;

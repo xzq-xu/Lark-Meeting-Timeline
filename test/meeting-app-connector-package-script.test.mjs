@@ -27,7 +27,7 @@ assert.match(stdout, /ok=yes/);
 assert.match(stdout, /platforms=2/);
 assert.match(stdout, /surfaces=2/);
 assert.match(stdout, /extension=yes/);
-assert.match(stdout, /runtime_actions=32/);
+assert.match(stdout, /runtime_actions=36/);
 
 const report = JSON.parse(await readFile(reportFile, 'utf8'));
 assert.equal(report.type, 'meeting_app_timeline_connector_package_report');
@@ -38,7 +38,7 @@ assert.equal(report.handoff_count, 4);
 assert.equal(report.ready_count, 4);
 assert.equal(report.extension_scaffold, true);
 assert.equal(report.extension_accepted, true);
-assert.equal(report.runtime_event_action_count, 32);
+assert.equal(report.runtime_event_action_count, 36);
 assert.equal(report.observer_surface_count, 2);
 assert.equal(report.scheduler_surface_count, 2);
 assert.equal(report.written_files.length, 16);

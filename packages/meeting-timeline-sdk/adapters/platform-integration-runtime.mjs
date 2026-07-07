@@ -858,6 +858,15 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
         platforms: routeOptions.platforms ?? routeOptions.platform_keys ?? platforms,
       });
     },
+    adapterBlueprint(platform, blueprintOptions = {}) {
+      return kit.platformAdapterBlueprint(platform, blueprintOptions);
+    },
+    adapterBlueprints(blueprintOptions = {}) {
+      return kit.platformAdapterBlueprintMatrix({
+        ...blueprintOptions,
+        platforms: blueprintOptions.platforms ?? blueprintOptions.platform_keys ?? platforms,
+      });
+    },
     adaptationPackages(packageOptions = {}) {
       return kit.platformAdaptationPackageMatrix({
         ...packageOptions,
@@ -1003,6 +1012,7 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
       if (['run_manifest', 'runtime_manifest_run', 'integration_manifest_run'].includes(action)) return runtime.runManifest(eventRuntimeOptions);
       if (['runtime_bundles', 'runtime_bundle_matrix'].includes(action)) return runtime.runtimeBundles(eventRuntimeOptions);
       if (['adapter_routes', 'adapter_route_matrix'].includes(action)) return runtime.adapterRoutes(eventRuntimeOptions);
+      if (['adapter_blueprints', 'adapter_blueprint_matrix'].includes(action)) return runtime.adapterBlueprints(eventRuntimeOptions);
       if (['strategy', 'adaptation_strategy', 'adaptation_strategy_matrix'].includes(action)) return runtime.adaptationStrategyMatrix(eventRuntimeOptions);
       if (['resolve', 'resolve_platform', 'platform_resolution'].includes(action)) return runtime.resolvePlatform(eventInput, eventRuntimeOptions);
       if (['resolve_candidates', 'resolve_platform_candidates', 'platform_candidate_resolution'].includes(action)) return runtime.resolvePlatformCandidates(eventInput, eventRuntimeOptions);
@@ -1032,6 +1042,9 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
       if (['adapter_route'].includes(action)) {
         return runtime.adapterRoute(platform, eventRuntimeOptions);
       }
+      if (['adapter_blueprint'].includes(action)) {
+        return runtime.adapterBlueprint(platform, eventRuntimeOptions);
+      }
       throw new MeetingTimelineSdkError('unsupported meeting platform runtime event action', {
         action,
         supported_actions: [
@@ -1043,6 +1056,8 @@ export function createMeetingPlatformIntegrationRuntime(clientOrOptions, options
           'timeline_view',
           'adapter_route',
           'adapter_routes',
+          'adapter_blueprint',
+          'adapter_blueprints',
           'runtime_bundles',
           'adaptation_strategy_matrix',
           'resolve_platform',

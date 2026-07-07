@@ -34,7 +34,7 @@ assert.equal(report.acceptance.accepted, true);
 assert.equal(report.acceptance.blocking_count, 0);
 assert.equal(report.acceptance.manifest, undefined);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').insert_endpoint, `${baseUrl}/api/annotations`);
-assert.equal(report.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 16);
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 18);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_primary_surface, 'browser_extension');
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_provider_blocks_realtime, false);
@@ -75,6 +75,6 @@ const { stdout: textStdout } = await execFileAsync(process.execPath, [
 assert.match(textStdout, /meeting_platform_registry_report/);
 assert.match(textStdout, /lark: normalize=yes/);
 assert.match(textStdout, /provider=/);
-assert.match(textStdout, /runtime_actions=16/);
+assert.match(textStdout, /runtime_actions=18/);
 
 console.log('ok meeting platform registry script');

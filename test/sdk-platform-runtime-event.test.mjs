@@ -5,6 +5,8 @@ import {
   MEETING_PLATFORM_RUNTIME_EVENT_SCHEMA,
   assertMeetingPlatformRuntimeEvent,
   buildMeetingPlatformAnnotationRuntimeEvent,
+  buildMeetingPlatformAdapterBlueprintRuntimeEvent,
+  buildMeetingPlatformAdapterBlueprintsRuntimeEvent,
   buildMeetingPlatformAdapterRouteRuntimeEvent,
   buildMeetingPlatformAdapterRoutesRuntimeEvent,
   buildMeetingPlatformCandidateObservationRuntimeEvent,
@@ -33,6 +35,7 @@ assert.equal(normalizeMeetingPlatformRuntimeEventAction('observe-candidates'), '
 assert.equal(normalizeMeetingPlatformRuntimeEventAction('integration-runtime-run-manifest'), 'run_manifest');
 assert.equal(normalizeMeetingPlatformRuntimeEventAction('handoff-readiness-run'), 'run_handoff_readiness');
 assert.equal(normalizeMeetingPlatformRuntimeEventAction('adapter-route-matrix'), 'adapter_routes');
+assert.equal(normalizeMeetingPlatformRuntimeEventAction('adapter-blueprint-matrix'), 'adapter_blueprints');
 assert.equal(meetingPlatformRuntimeEventEndpoint({ baseUrl }), `${baseUrl}${MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT}`);
 
 const observeEvent = buildMeetingPlatformObserveRuntimeEvent('google-meet', {
@@ -131,6 +134,23 @@ assert.equal(adapterRoutesEvent.action, 'adapter_routes');
 assert.equal(adapterRoutesEvent.platform, undefined);
 assert.deepEqual(adapterRoutesEvent.platforms, ['google-meet', 'zoom']);
 
+const adapterBlueprintEvent = buildMeetingPlatformAdapterBlueprintRuntimeEvent('google-meet', {
+  purpose: 'inspect_single_blueprint',
+}, {
+  now: () => now + 8,
+});
+assert.equal(adapterBlueprintEvent.action, 'adapter_blueprint');
+assert.equal(adapterBlueprintEvent.platform, 'google_meet');
+
+const adapterBlueprintsEvent = buildMeetingPlatformAdapterBlueprintsRuntimeEvent({
+  platforms: ['google-meet', 'zoom'],
+}, {
+  now: () => now + 9,
+});
+assert.equal(adapterBlueprintsEvent.action, 'adapter_blueprints');
+assert.equal(adapterBlueprintsEvent.platform, undefined);
+assert.deepEqual(adapterBlueprintsEvent.platforms, ['google-meet', 'zoom']);
+
 const calls = [];
 const client = {
   async startMeeting(input) {
@@ -215,6 +235,9 @@ assert.equal(runtimeRunHandoffReadinessResult.platform_count, 1);
 assert.equal(runtimeRunHandoffReadinessResult.runtime_host_replay_ready_count, 0);
 assert.equal((await runtime.handleEvent(adapterRouteEvent)).routes[0].route, 'local_observer_axis');
 assert.equal((await runtime.handleEvent(adapterRoutesEvent)).platform_count, 2);
+assert.equal((await runtime.handleEvent(adapterBlueprintEvent)).primary_surface, 'browser_extension');
+assert.equal((await runtime.handleEvent(adapterBlueprintsEvent)).platform_count, 2);
+assert.equal((await runtime.handleEvent(adapterBlueprintsEvent)).ready_count, 2);
 
 const googlePlan = buildMeetingPlatformRuntimeEventPlan('google-meet', {
   baseUrl,
@@ -233,6 +256,8 @@ assert.equal(googlePlan.actions.find((row) => row.action === 'insert_annotation'
 assert.equal(googlePlan.actions.find((row) => row.action === 'observe_platform_candidates').client_method, 'observePlatformCandidates');
 assert.equal(googlePlan.actions.find((row) => row.action === 'adapter_route').client_method, 'adapterRoute');
 assert.equal(googlePlan.actions.find((row) => row.action === 'adapter_routes').client_method, 'adapterRoutes');
+assert.equal(googlePlan.actions.find((row) => row.action === 'adapter_blueprint').client_method, 'adapterBlueprint');
+assert.equal(googlePlan.actions.find((row) => row.action === 'adapter_blueprints').client_method, 'adapterBlueprints');
 assert.equal(googlePlan.actions.find((row) => row.action === 'run_manifest').client_method, 'runManifest');
 assert.equal(googlePlan.actions.find((row) => row.action === 'run_handoff_readiness').client_method, 'runHandoffReadiness');
 assert.equal(googlePlan.actions.find((row) => row.action === 'provider_event').realtime_role, 'reconcile_and_backfill_only');
@@ -240,6 +265,8 @@ assert.equal(googlePlan.examples.insert_annotation.action, 'insert_annotation');
 assert.equal(googlePlan.examples.observe_platform_candidates.action, 'observe_platform_candidates');
 assert.equal(googlePlan.examples.adapter_route.action, 'adapter_route');
 assert.equal(googlePlan.examples.adapter_routes.action, 'adapter_routes');
+assert.equal(googlePlan.examples.adapter_blueprint.action, 'adapter_blueprint');
+assert.equal(googlePlan.examples.adapter_blueprints.action, 'adapter_blueprints');
 assert.equal(googlePlan.examples.run_manifest.action, 'run_manifest');
 assert.equal(googlePlan.examples.run_handoff_readiness.action, 'run_handoff_readiness');
 assert.equal(googlePlan.examples.insert_annotation.annotation.captured_at_ms, now + 15_000);
@@ -257,6 +284,7 @@ assert.equal(runtimePlanMatrix.transcript_realtime_dependency_count, 0);
 assert.equal(runtimePlanMatrix.rows.some((row) => row.platform === 'microsoft_teams' && row.action === 'speaker_track'), true);
 assert.equal(runtimePlanMatrix.rows.some((row) => row.platform === 'zoom' && row.action === 'observe_platform_candidates'), true);
 assert.equal(runtimePlanMatrix.rows.some((row) => row.platform === 'google_meet' && row.action === 'adapter_routes'), true);
+assert.equal(runtimePlanMatrix.rows.some((row) => row.platform === 'google_meet' && row.action === 'adapter_blueprints'), true);
 assert.equal(runtimePlanMatrix.rows.some((row) => row.platform === 'google_meet' && row.action === 'run_manifest'), true);
 assert.equal(runtimePlanMatrix.rows.some((row) => row.platform === 'zoom' && row.action === 'run_handoff_readiness'), true);
 assert.equal(runtimePlanMatrix.next_actions.includes('include_captured_at_ms_on_every_annotation'), true);
@@ -313,6 +341,14 @@ await runtimeEventClient.adapterRoutes({
   platforms: ['google-meet', 'zoom'],
 });
 assert.equal(capturedRequest.body.action, 'adapter_routes');
+assert.deepEqual(capturedRequest.body.platforms, ['google-meet', 'zoom']);
+await runtimeEventClient.adapterBlueprint('google-meet');
+assert.equal(capturedRequest.body.action, 'adapter_blueprint');
+assert.equal(capturedRequest.body.platform, 'google_meet');
+await runtimeEventClient.adapterBlueprints({
+  platforms: ['google-meet', 'zoom'],
+});
+assert.equal(capturedRequest.body.action, 'adapter_blueprints');
 assert.deepEqual(capturedRequest.body.platforms, ['google-meet', 'zoom']);
 await runtimeEventClient.runManifest({
   platforms: ['google-meet'],
