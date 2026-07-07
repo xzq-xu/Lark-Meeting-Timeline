@@ -411,11 +411,11 @@ const blueprintMatrix = buildMeetingPlatformAdapterBlueprintMatrix({
 也可以直接导出给另一个项目消费：
 
 ```bash
-npm run meeting-platform:adapter-route -- \
+npm run meeting-platform:adapter-blueprint -- \
   --platforms=google-meet,teams,zoom,webex,lark \
   --base-url=https://timeline.example.com \
-  --out-dir=data/meeting-platform-adapter-routes \
-  --report-file=data/meeting-platform-adapter-route-report.json
+  --out-dir=data/meeting-platform-adapter-blueprints \
+  --report-file=data/meeting-platform-adapter-blueprint-report.json
 ```
 
 也可以直接导出策略报告，给别的项目做平台选择或接入面板：

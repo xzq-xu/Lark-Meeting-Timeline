@@ -36,6 +36,8 @@ assert.equal(report.acceptance.manifest, undefined);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').insert_endpoint, `${baseUrl}/api/annotations`);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 16);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_primary_surface, 'browser_extension');
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_provider_blocks_realtime, false);
 assert.equal(report.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 assert.equal(report.manifest.entries.length, 3);
 
@@ -47,7 +49,10 @@ assert.equal(writtenReport.manifest.entries.find((entry) => entry.platform === '
 assert.equal(writtenReport.manifest.entries.find((entry) => entry.platform === 'google_meet').annotations.runtime_event_plan.supported_actions.includes('run_manifest'), true);
 assert.equal(writtenReport.manifest.entries.find((entry) => entry.platform === 'google_meet').sdk.imports.runtime_event, '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event');
 assert.equal(writtenReport.manifest.entries.find((entry) => entry.platform === 'google_meet').sdk.imports.adapter_route, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-route');
+assert.equal(writtenReport.manifest.entries.find((entry) => entry.platform === 'google_meet').sdk.imports.adapter_blueprint, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint');
 assert.equal(writtenReport.manifest.entries.find((entry) => entry.platform === 'google_meet').adapter_route.first_route, 'local_observer_axis');
+assert.equal(writtenReport.manifest.entries.find((entry) => entry.platform === 'google_meet').adapter_blueprint.ready, true);
+assert.equal(writtenReport.manifest.entries.find((entry) => entry.platform === 'google_meet').host.endpoints.adapter_blueprints, '/api/meeting-platform/adapter-blueprints');
 
 const { stdout: compactStdout } = await execFileAsync(process.execPath, [
   'scripts/meeting-platform-registry.mjs',

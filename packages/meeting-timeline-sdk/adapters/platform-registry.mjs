@@ -20,6 +20,9 @@ import {
   buildMeetingPlatformAdapterRoute,
 } from './platform-adapter-route.mjs';
 import {
+  buildMeetingPlatformAdapterBlueprint,
+} from './platform-adapter-blueprint.mjs';
+import {
   normalizeMeetingPlatform,
   platformCapabilityContract,
 } from './platform-setup.mjs';
@@ -142,6 +145,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
   const runtimeBundle = buildMeetingPlatformRuntimeBundle(key, options);
   const runtimeEventPlan = buildMeetingPlatformRuntimeEventPlan(key, options);
   const adapterRoute = buildMeetingPlatformAdapterRoute(key, options);
+  const adapterBlueprint = buildMeetingPlatformAdapterBlueprint(key, options);
   const candidateObservation = runtimeBundle.messaging?.candidate_observation ?? runtimeBundle.browser?.candidate_observation;
   const candidateObservationReady = candidateObservation?.runtime_event_action === 'observe_platform_candidates'
     && runtimeEventPlan.supported_actions?.includes?.('observe_platform_candidates');
@@ -227,6 +231,19 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
       provider_events_block_realtime: adapterRoute.realtime_invariants?.provider_events_block_realtime,
       transcript_blocks_realtime: adapterRoute.realtime_invariants?.transcript_blocks_realtime,
     },
+    adapter_blueprint: {
+      schema: adapterBlueprint.schema,
+      ready: adapterBlueprint.readiness?.ready === true,
+      recommended_mode: adapterBlueprint.recommended_mode,
+      primary_surface: adapterBlueprint.primary_surface,
+      surface_order: adapterBlueprint.surface_order,
+      browser_recommended: adapterBlueprint.surfaces?.browser_extension?.recommended,
+      native_recommended: adapterBlueprint.surfaces?.native_detector?.recommended,
+      provider_blocks_realtime: adapterBlueprint.surfaces?.provider_reconcile?.blocks_realtime,
+      transcript_blocks_realtime: adapterBlueprint.runtime_contract?.transcript_blocks_realtime,
+      realtime_axis_timestamp_field: adapterBlueprint.realtime_axis_contract?.timestamp_field,
+      first_acceptance_gate: adapterBlueprint.acceptance_gates?.realtime_pilot?.[0],
+    },
     transcript: {
       availability: contract.transcript?.availability,
       source: contract.transcript?.source,
@@ -241,6 +258,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
         platform_event: `${hostBasePath}/${key.replaceAll('_', '-')}`,
         annotations: '/api/annotations',
         adapter_routes: '/api/meeting-platform/adapter-routes',
+        adapter_blueprints: '/api/meeting-platform/adapter-blueprints',
         runtime_bundles: '/api/meeting-platform/runtime-bundles',
         runtime_event_plans: '/api/meeting-platform/runtime-event-plans',
         runtime_events: '/api/meeting-platform/runtime-events',
@@ -258,6 +276,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
         runtime_bundle: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
         runtime_event: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event',
         adapter_route: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-route',
+        adapter_blueprint: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint',
         adapter_contract: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract',
         provider_connection: '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection',
         events: capabilities.sdk_modules?.events,
@@ -280,6 +299,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
       print_registry: `npm run meeting-platform:registry -- --platforms=${key}`,
       print_runtime_bundle: `npm run meeting-platform:runtime-bundle -- --platforms=${key}`,
       print_adapter_route: `npm run meeting-platform:adapter-route -- --platforms=${key}`,
+      print_adapter_blueprint: `npm run meeting-platform:adapter-blueprint -- --platforms=${key}`,
       print_runtime_event_plan: `npm run meeting-platform:runtime-event-plan -- --platforms=${key}`,
       print_adaptation_package: `npm run meeting-platform:adaptation-package -- --platforms=${key}`,
       verify_contract: `npm run meeting-platform:adapter-contract -- --platforms=${key} --fail-on-rejected=true`,
@@ -289,6 +309,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
       ...(runtimeBundle.next_actions ?? []),
       ...(contract.next_actions ?? []),
       'choose_platform_from_registry_manifest',
+      'read_adapter_blueprint_before_wiring_external_host',
       'wire_host_runtime_bundles_endpoint_before_building_extension',
       'export_adapter_route_before_wiring_external_host',
       'export_runtime_event_plan_before_wiring_external_host',
@@ -331,6 +352,9 @@ export function buildMeetingPlatformRegistryManifest(options = {}) {
       adapter_route_mode: entry.adapter_route?.recommended_mode,
       adapter_first_route: entry.adapter_route?.first_route,
       adapter_route_count: entry.adapter_route?.route_count ?? 0,
+      adapter_blueprint_ready: entry.adapter_blueprint?.ready === true,
+      adapter_blueprint_primary_surface: entry.adapter_blueprint?.primary_surface,
+      adapter_blueprint_provider_blocks_realtime: entry.adapter_blueprint?.provider_blocks_realtime,
       provider_transport: entry.provider?.transport,
       provider_ready: entry.provider?.ready === true,
       provider_required_for_realtime: entry.readiness?.provider_required_for_realtime === true,

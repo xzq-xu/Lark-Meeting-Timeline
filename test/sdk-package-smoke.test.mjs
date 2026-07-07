@@ -29,6 +29,7 @@ assert.equal(packedFiles.includes('index.mjs'), true);
 assert.equal(packedFiles.includes('index.d.ts'), true);
 assert.equal(packedFiles.includes('bin/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-app-connector-package.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-platform-adapter-blueprint.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-export-package.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-import-plan.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-install-manifest.mjs'), true);
@@ -36,6 +37,7 @@ assert.equal(packedFiles.includes('bin/meeting-platform-adapter-launch-plan.mjs'
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-smoke.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-connector-package.mjs'), true);
+assert.equal(packedFiles.includes('cli/meeting-platform-adapter-blueprint.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-export-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-import-plan.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-install-manifest.mjs'), true);
