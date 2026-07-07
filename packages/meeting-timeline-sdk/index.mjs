@@ -824,9 +824,16 @@ export function createMeetingAppTimelineSdk(options = {}) {
         : undefined;
       const runtimeEventPlanMatrix = runtime.kit.platformRuntimeEventPlanMatrix(merged);
       const adapterBlueprintMatrix = runtime.kit.platformAdapterBlueprintMatrix(merged);
+      const startupPlanInput = firstNonEmpty(
+        connectorOptions.startupInput,
+        connectorOptions.startup_input,
+        {},
+      );
+      const startupPlanMatrix = runtime.kit.platformAdapterStartupPlanMatrix(startupPlanInput, merged);
       const accepted = hostPackage.accepted === true
         && handoffAcceptance.accepted === true
         && adapterBlueprintMatrix.ready_count === adapterBlueprintMatrix.platform_count
+        && startupPlanMatrix.realtime_startup_ready_count === startupPlanMatrix.platform_count
         && (extensionAcceptance ? extensionAcceptance.accepted === true : true);
       return compactObject({
         type: 'meeting_app_timeline_connector_package',
@@ -875,6 +882,18 @@ export function createMeetingAppTimelineSdk(options = {}) {
           command: 'npm run meeting-platform:adapter-blueprint',
           sdk_method: 'sdk.platformAdapterBlueprint(platform)',
         },
+        startup_plans: {
+          matrix: {
+            ...startupPlanMatrix,
+            plans: connectorOptions.includeDetails === true || connectorOptions.include_details === true
+              ? startupPlanMatrix.plans
+              : undefined,
+          },
+          realtime_startup_ready_count: startupPlanMatrix.realtime_startup_ready_count,
+          platform_count: startupPlanMatrix.platform_count,
+          sdk_method: 'sdk.platformAdapterStartupPlan(input)',
+          matrix_sdk_method: 'sdk.platformAdapterStartupPlanMatrix(input)',
+        },
         entrypoints: [
           {
             id: 'select-adapter',
@@ -890,6 +909,11 @@ export function createMeetingAppTimelineSdk(options = {}) {
             id: 'adapter-blueprint',
             method: 'sdk.platformAdapterBlueprint(platform)',
             output: 'meeting_platform_adapter_blueprint',
+          },
+          {
+            id: 'startup-plan',
+            method: 'sdk.platformAdapterStartupPlan(input)',
+            output: 'meeting_platform_adapter_startup_plan',
           },
           {
             id: 'observe',
@@ -915,6 +939,7 @@ export function createMeetingAppTimelineSdk(options = {}) {
           speaker_track_text_required: false,
           participant_track_text_required: false,
           adapter_blueprint_required_before_host_wiring: true,
+          startup_plan_required_before_runtime_install: true,
           production_requires_live_snapshot: true,
         },
         next_actions: connectorNextActions(
@@ -926,6 +951,7 @@ export function createMeetingAppTimelineSdk(options = {}) {
           Object.values(schedulerConfigBySurface),
           [
             'wire_connector_package_entrypoints_into_host_project',
+            'wire_startup_plan_into_host_runtime',
             'run_connector_package_handoff_acceptance_in_ci',
             'collect_live_dom_snapshots_before_production_rollout',
           ],

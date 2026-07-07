@@ -103,6 +103,9 @@ assert.equal(matrix.accepted_count, 3);
 assert.equal(matrix.realtime_ready_count, 3);
 assert.equal(matrix.adapter_blueprint_ready_count, 3);
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_primary_surface, 'browser_extension');
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
+assert.equal(matrix.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
+assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').selected_surface, 'native_detector');
 assert.equal(assertMeetingPlatformAdapterDecisionMatrix({}, {
   baseUrl,
   platforms: ['google-meet', 'zoom'],

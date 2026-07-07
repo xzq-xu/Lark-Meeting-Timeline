@@ -255,6 +255,15 @@ export interface MeetingAppTimelineConnectorPackage {
     command: string;
     sdk_method: string;
   };
+  startup_plans: {
+    matrix: Omit<import('./adapters/platform-adapter-startup.mjs').MeetingPlatformAdapterStartupPlanMatrix, 'plans'> & {
+      plans?: import('./adapters/platform-adapter-startup.mjs').MeetingPlatformAdapterStartupPlanMatrix['plans'];
+    };
+    realtime_startup_ready_count: number;
+    platform_count: number;
+    sdk_method: string;
+    matrix_sdk_method: string;
+  };
   entrypoints: Array<Record<string, unknown>>;
   contracts: Record<string, unknown>;
   next_actions: string[];

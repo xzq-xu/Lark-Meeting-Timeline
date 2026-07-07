@@ -305,6 +305,20 @@ function blueprintSummary(blueprint = {}, selectedSurface) {
   });
 }
 
+function startupSurfaceFromBlueprint(blueprint = {}) {
+  const order = asArray(blueprint.surface_order)
+    .map((surface) => normalizeSurface(surface))
+    .map((surface) => (surface === 'desktop_observer' ? 'native_detector' : surface))
+    .filter((surface) => surface && surface !== 'provider_reconcile');
+  if (order.length > 0) return order[0];
+  const primary = normalizeSurface(blueprint.primary_surface);
+  if (primary === 'desktop_or_browser_observer') return 'native_detector';
+  if (primary === 'browser_extension_or_native_detector') return 'browser_extension';
+  if (primary === 'browser_extension_or_desktop_observer') return 'browser_extension';
+  if (primary === 'desktop_observer') return 'native_detector';
+  return primary;
+}
+
 export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
   const objectInput = typeof input === 'string' || input instanceof URL
     ? { url: String(input) }
@@ -328,11 +342,17 @@ export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
     };
   }
   const platform = platformResolution.platform;
-  const surface = surfaceFromInput(objectInput, options);
   const route = buildMeetingPlatformAdapterRoute(platform, options);
   const routeReadiness = verifyMeetingPlatformAdapterRouteReadiness(route);
   const adapterBlueprint = buildMeetingPlatformAdapterBlueprint(platform, options);
   const adapterBlueprintReady = adapterBlueprint.readiness?.ready === true;
+  const rawSurface = surfaceFromInput(objectInput, options);
+  const surface = rawSurface.source === 'default'
+    ? {
+      surface: startupSurfaceFromBlueprint(adapterBlueprint) ?? rawSurface.surface,
+      source: 'adapter_blueprint',
+    }
+    : rawSurface;
   const capability = buildMeetingAppAdapterCapabilityReport(platform, {
     ...options,
     input: inputForCapability(objectInput, options),

@@ -98,7 +98,9 @@ assert.equal(matrix.accepted_count, 3);
 assert.equal(matrix.realtime_startup_ready_count, 3);
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_ready, true);
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_primary_surface, 'browser_extension');
-assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').install_target, 'manifest_v3_content_script');
+assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').selected_surface, 'native_detector');
+assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').install_target, 'native_or_desktop_observer');
+assert.equal(matrix.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').provider_events_block_realtime, false);
 assert.equal(assertMeetingPlatformAdapterStartupPlanMatrix({}, {
   baseUrl,

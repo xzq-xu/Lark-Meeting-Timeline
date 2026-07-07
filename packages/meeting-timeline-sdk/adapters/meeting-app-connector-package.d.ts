@@ -76,6 +76,13 @@ export interface MeetingAppTimelineConnectorHandoff {
     command?: string;
     rows?: Array<Record<string, unknown>>;
   };
+  startup_plans?: {
+    realtime_startup_ready_count?: number;
+    platform_count?: number;
+    sdk_method?: string;
+    matrix_sdk_method?: string;
+    rows?: Array<Record<string, unknown>>;
+  };
   timestamp_field?: string;
   provider_events_block_realtime?: boolean;
   transcript_blocks_realtime?: boolean;

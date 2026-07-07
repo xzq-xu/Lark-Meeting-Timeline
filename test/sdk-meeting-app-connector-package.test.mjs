@@ -52,6 +52,11 @@ assert.equal(handoff.adapter_blueprints.ready_count, 2);
 assert.equal(handoff.adapter_blueprints.platform_count, 2);
 assert.equal(handoff.adapter_blueprints.sdk_method, 'sdk.platformAdapterBlueprint(platform)');
 assert.equal(handoff.adapter_blueprints.rows.find((row) => row.platform === 'google_meet').primary_surface, 'browser_extension');
+assert.equal(handoff.startup_plans.realtime_startup_ready_count, 2);
+assert.equal(handoff.startup_plans.platform_count, 2);
+assert.equal(handoff.startup_plans.sdk_method, 'sdk.platformAdapterStartupPlan(input)');
+assert.equal(handoff.startup_plans.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
+assert.equal(handoff.startup_plans.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
 assert.equal(handoff.surface_matrix.length, 2);
 assert.equal(handoff.surface_matrix.find((row) => row.surface === 'browser_extension').ready_count, 2);
 assert.equal(handoff.extension.file_paths.includes('manifest.json'), true);
@@ -60,8 +65,13 @@ assert.equal(handoff.ci_gates.includes('require_captured_at_ms_for_realtime_anno
 assert.equal(connectorPackage.adapter_blueprints.ready_count, 2);
 assert.equal(connectorPackage.adapter_blueprints.matrix.schema, 'meeting_platform_adapter_blueprint_matrix');
 assert.equal(connectorPackage.adapter_blueprints.matrix.blueprints, undefined);
+assert.equal(connectorPackage.startup_plans.realtime_startup_ready_count, 2);
+assert.equal(connectorPackage.startup_plans.matrix.schema, 'meeting_platform_adapter_startup_plan_matrix');
+assert.equal(connectorPackage.startup_plans.matrix.plans, undefined);
 assert.equal(connectorPackage.entrypoints.some((entry) => entry.id === 'adapter-blueprint'), true);
+assert.equal(connectorPackage.entrypoints.some((entry) => entry.id === 'startup-plan'), true);
 assert.equal(connectorPackage.contracts.adapter_blueprint_required_before_host_wiring, true);
+assert.equal(connectorPackage.contracts.startup_plan_required_before_runtime_install, true);
 
 let capturedRuntimeRequest = null;
 const connectorRuntimeClient = createMeetingAppTimelineConnectorRuntimeClient(connectorPackage, {
@@ -173,6 +183,13 @@ const missingBlueprintPackage = {
 const missingBlueprintAcceptance = buildMeetingAppTimelineConnectorPackageAcceptanceReport(missingBlueprintPackage);
 assert.equal(missingBlueprintAcceptance.accepted, false);
 assert.equal(missingBlueprintAcceptance.issues.some((issue) => issue.code === 'missing_adapter_blueprint_matrix'), true);
+const missingStartupPackage = {
+  ...connectorPackage,
+  startup_plans: undefined,
+};
+const missingStartupAcceptance = buildMeetingAppTimelineConnectorPackageAcceptanceReport(missingStartupPackage);
+assert.equal(missingStartupAcceptance.accepted, false);
+assert.equal(missingStartupAcceptance.issues.some((issue) => issue.code === 'missing_startup_plan_matrix'), true);
 const unsafeRuntimeClient = createMeetingAppTimelineConnectorRuntimeClient(missingRuntimeActionPackage, {
   assertPackage: false,
   fetch: async () => new Response('{}'),

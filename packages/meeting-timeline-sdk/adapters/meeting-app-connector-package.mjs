@@ -272,6 +272,14 @@ export function buildMeetingAppTimelineConnectorPackageAcceptanceReport(pkg = {}
       platform_count: platforms.length,
     });
   }
+  if (!pkg.startup_plans?.matrix) {
+    addIssue(issues, 'missing_startup_plan_matrix', 'Connector package must include startup plan matrix for host runtime install');
+  } else if ((pkg.startup_plans.realtime_startup_ready_count ?? 0) < platforms.length) {
+    addIssue(issues, 'startup_plans_not_ready', 'Every selected platform must expose a realtime-ready startup plan', {
+      realtime_startup_ready_count: pkg.startup_plans.realtime_startup_ready_count,
+      platform_count: platforms.length,
+    });
+  }
 
   const missingActions = missingRuntimeActions(pkg, platforms, options);
   for (const missing of missingActions) {
@@ -387,6 +395,13 @@ export function buildMeetingAppTimelineConnectorHandoff(pkg = {}, options = {}) 
       sdk_method: pkg.adapter_blueprints.sdk_method,
       command: pkg.adapter_blueprints.command,
       rows: pkg.adapter_blueprints.matrix?.rows,
+    } : undefined,
+    startup_plans: pkg.startup_plans ? {
+      realtime_startup_ready_count: pkg.startup_plans.realtime_startup_ready_count,
+      platform_count: pkg.startup_plans.platform_count,
+      sdk_method: pkg.startup_plans.sdk_method,
+      matrix_sdk_method: pkg.startup_plans.matrix_sdk_method,
+      rows: pkg.startup_plans.matrix?.rows,
     } : undefined,
     timestamp_field: firstNonEmpty(pkg.contracts?.timestamp_field, pkg.host_package?.runtime_contract?.annotation_timestamp_field),
     provider_events_block_realtime: pkg.contracts?.provider_events_block_realtime,
