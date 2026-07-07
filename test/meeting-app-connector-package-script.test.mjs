@@ -81,6 +81,8 @@ assert.equal(report.release_gate.accepted, true);
 assert.equal(report.release_gate.pilot_ready_count, 2);
 assert.equal(report.release_gate.production_ready_count, 0);
 assert.equal(report.release_gate.required_gates.find((gate) => gate.id === 'smoke_run_report').accepted, true);
+assert.equal(report.release_gate.required_gates.find((gate) => gate.id === 'host_adapter_bootstrap_plan_matrix_acceptance').accepted, true);
+assert.equal(report.release_gate.files_to_read_first.includes('host-adapter-bootstrap-plan-matrix-acceptance.json'), true);
 assert.equal(report.platform_roadmap.schema, 'meeting_app_timeline_connector_platform_roadmap');
 assert.equal(report.platform_roadmap.accepted, true);
 assert.equal(report.platform_roadmap.rows.find((row) => row.platform === 'google_meet').recommended_first_surface, 'browser_extension');
@@ -185,7 +187,9 @@ assert.equal(connectorReleaseGate.pilot_ready_count, 2);
 assert.equal(connectorReleaseGate.production_ready_count, 0);
 assert.equal(connectorReleaseGate.rows.every((row) => row.pilot_ready === true), true);
 assert.equal(connectorReleaseGate.required_gates.find((gate) => gate.id === 'bridge_smoke_report').accepted, true);
+assert.equal(connectorReleaseGate.required_gates.find((gate) => gate.id === 'host_adapter_bootstrap_plan_matrix_acceptance').accepted, true);
 assert.equal(connectorReleaseGate.files_to_read_first.includes('connector-release-gate.json'), true);
+assert.equal(connectorReleaseGate.files_to_read_first.includes('host-adapter-bootstrap-plan-matrix-acceptance.json'), true);
 
 const connectorPlatformRoadmap = JSON.parse(await readFile(join(outDir, 'connector-platform-roadmap.json'), 'utf8'));
 assert.equal(connectorPlatformRoadmap.schema, 'meeting_app_timeline_connector_platform_roadmap');

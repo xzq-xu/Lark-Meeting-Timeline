@@ -486,6 +486,33 @@ assert.equal(bootstrapPlanMatrixAcceptance.schema, MEETING_APP_TIMELINE_HOST_ADA
 assert.equal(bootstrapPlanMatrixAcceptance.accepted, true);
 assert.equal(bootstrapPlanMatrixAcceptance.issue_count, 0);
 assert.equal(bootstrapPlanMatrixAcceptance.rows.every((row) => row.startup_order_ready === true), true);
+const releaseGateWithBootstrapAcceptance = buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
+  adoptionIndex,
+  fieldIntakeIndex,
+  bridgeHandoff,
+  bridgeHandoffAcceptance,
+  bridgeSmokeReport,
+  hostInstallChecklistAcceptance,
+  smokePlan,
+  smokePlanAcceptance,
+  smokeRunReport,
+  hostAdapterBootstrapPlanMatrixAcceptanceReport: bootstrapPlanMatrixAcceptance,
+});
+assert.equal(releaseGateWithBootstrapAcceptance.accepted, true);
+assert.equal(
+  releaseGateWithBootstrapAcceptance.required_gates
+    .find((gate) => gate.id === 'host_adapter_bootstrap_plan_matrix_acceptance')
+    .accepted,
+  true,
+);
+assert.equal(
+  releaseGateWithBootstrapAcceptance.files_to_read_first.includes('host-adapter-bootstrap-plan-matrix-acceptance.json'),
+  true,
+);
+assert.equal(
+  releaseGateWithBootstrapAcceptance.source_schemas.host_adapter_bootstrap_plan_matrix_acceptance,
+  MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_ACCEPTANCE_SCHEMA,
+);
 
 const allPlatformSdk = createMeetingAppTimelineSdk({
   baseUrl: 'https://timeline.example.com',
@@ -734,6 +761,29 @@ const brokenBootstrapPlanMatrixAcceptance = buildMeetingAppTimelineHostAdapterBo
 assert.equal(brokenBootstrapPlanMatrixAcceptance.accepted, false);
 assert.equal(
   brokenBootstrapPlanMatrixAcceptance.issues.some((issue) => issue.code === 'row_invalid_startup_order'),
+  true,
+);
+const brokenBootstrapReleaseGate = buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
+  adoptionIndex,
+  fieldIntakeIndex,
+  bridgeHandoff,
+  bridgeHandoffAcceptance,
+  bridgeSmokeReport,
+  hostInstallChecklistAcceptance,
+  smokePlan,
+  smokePlanAcceptance,
+  smokeRunReport,
+  hostAdapterBootstrapPlanMatrixAcceptanceReport: brokenBootstrapPlanMatrixAcceptance,
+});
+assert.equal(brokenBootstrapReleaseGate.accepted, false);
+assert.equal(
+  brokenBootstrapReleaseGate.required_gates
+    .find((gate) => gate.id === 'host_adapter_bootstrap_plan_matrix_acceptance')
+    .accepted,
+  false,
+);
+assert.equal(
+  brokenBootstrapReleaseGate.issues.some((issue) => issue.gate === 'host_adapter_bootstrap_plan_matrix_acceptance'),
   true,
 );
 assert.throws(

@@ -2166,6 +2166,16 @@ export function buildMeetingAppTimelineConnectorReleaseGate(checklistOrPackage =
     options.smokeRunReport,
     options.smoke_run_report,
   );
+  const hostAdapterBootstrapPlanMatrixAcceptance = firstNonEmpty(
+    options.hostAdapterBootstrapPlanMatrixAcceptance,
+    options.host_adapter_bootstrap_plan_matrix_acceptance,
+    options.hostAdapterBootstrapPlanMatrixAcceptanceReport,
+    options.host_adapter_bootstrap_plan_matrix_acceptance_report,
+    options.hostBootstrapPlanMatrixAcceptance,
+    options.host_bootstrap_plan_matrix_acceptance,
+    options.hostBootstrapAcceptanceReport,
+    options.host_bootstrap_acceptance_report,
+  );
   const requireSmokeReports = options.requireSmokeReports === true
     || options.require_smoke_reports === true
     || target === 'production';
@@ -2256,6 +2266,10 @@ export function buildMeetingAppTimelineConnectorReleaseGate(checklistOrPackage =
           && (smokeRunReport.rows ?? []).every((row) => row.observe_before_insert === true && row.captured_at_ms_preserved === true)
         : undefined,
     }),
+    releaseGateComponent('host_adapter_bootstrap_plan_matrix_acceptance', hostAdapterBootstrapPlanMatrixAcceptance, {
+      required: Boolean(hostAdapterBootstrapPlanMatrixAcceptance),
+      sourceSchema: MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_ACCEPTANCE_SCHEMA,
+    }),
   ];
 
   const gateIssues = requiredGates
@@ -2309,6 +2323,7 @@ export function buildMeetingAppTimelineConnectorReleaseGate(checklistOrPackage =
       smoke_plan: smokePlan.schema,
       smoke_plan_acceptance: smokePlanAcceptance.schema,
       smoke_run_report: smokeRunReport?.schema,
+      host_adapter_bootstrap_plan_matrix_acceptance: hostAdapterBootstrapPlanMatrixAcceptance?.schema,
     },
     files_to_read_first: [
       'connector-release-gate.json',
@@ -2319,6 +2334,9 @@ export function buildMeetingAppTimelineConnectorReleaseGate(checklistOrPackage =
       'connector-smoke-run-report.json',
       'host-install-checklist.json',
       'host-install-checklist-acceptance.json',
+      ...(hostAdapterBootstrapPlanMatrixAcceptance
+        ? ['host-adapter-bootstrap-plan-matrix-acceptance.json']
+        : []),
     ],
     required_gates: requiredGates,
     rows,

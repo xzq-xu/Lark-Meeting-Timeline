@@ -115,7 +115,7 @@ function connectorQuickstartMarkdown(pkg = {}) {
     '- `connector-handoff.json`: compact handoff summary for another host project.',
     '- `connector-adoption-index.json`: per-platform P0/P1/P2 adoption status, install target, realtime readiness, bridge readiness, and production evidence gaps.',
     '- `connector-field-intake-index.json`: per-platform live evidence collection paths, required snapshots/events, output files, and validation commands.',
-    '- `connector-release-gate.json`: aggregated pilot/production gate for package acceptance, host checklist, bridge, field intake, and smoke execution.',
+    '- `connector-release-gate.json`: aggregated pilot/production gate for package acceptance, host checklist, bridge, field intake, smoke execution, and host bootstrap acceptance.',
     '- `connector-adapter-matrix.json`: per-platform runtime wiring plan: selected surface, install step, input sources, event order, SDK methods, and evidence contract.',
     '- `connector-adapter-matrix-acceptance.json`: standalone gate for the adapter matrix runtime invariants.',
     '- `host-adapter-config-index.json` and `host-adapter-configs/{platform}.json`: compact per-platform configs a host project can load directly.',
@@ -239,7 +239,7 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   const smokePlan = buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist);
   const smokePlanAcceptance = buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan);
   const smokeRunReport = await runMeetingAppTimelineConnectorSmokePlan(smokePlan);
-  const connectorReleaseGate = buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
+  let connectorReleaseGate = buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
     adoptionIndex: connectorAdoptionIndex,
     fieldIntakeIndex: connectorFieldIntakeIndex,
     bridgeHandoff: connectorBridgeHandoff,
@@ -250,7 +250,7 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
     smokePlanAcceptance,
     smokeRunReport,
   });
-  const connectorPlatformRoadmap = buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
+  let connectorPlatformRoadmap = buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
     releaseGate: connectorReleaseGate,
   });
   const connectorAdapterMatrix = buildMeetingAppTimelineConnectorAdapterMatrix(hostInstallChecklist, {
@@ -264,6 +264,21 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   const adapterConfigIndex = buildMeetingAppTimelineHostAdapterConfigIndex(connectorAdapterMatrix);
   const hostAdapterBootstrapPlanMatrix = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(adapterConfigIndex);
   const hostAdapterBootstrapPlanMatrixAcceptance = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport(hostAdapterBootstrapPlanMatrix);
+  connectorReleaseGate = buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
+    adoptionIndex: connectorAdoptionIndex,
+    fieldIntakeIndex: connectorFieldIntakeIndex,
+    bridgeHandoff: connectorBridgeHandoff,
+    bridgeHandoffAcceptance: connectorBridgeHandoffAcceptance,
+    bridgeSmokeReport: connectorBridgeSmokeReport,
+    hostInstallChecklistAcceptance,
+    smokePlan,
+    smokePlanAcceptance,
+    smokeRunReport,
+    hostAdapterBootstrapPlanMatrixAcceptanceReport: hostAdapterBootstrapPlanMatrixAcceptance,
+  });
+  connectorPlatformRoadmap = buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
+    releaseGate: connectorReleaseGate,
+  });
   await write('connector-adoption-index.json', connectorAdoptionIndex);
   await write('connector-field-intake-index.json', connectorFieldIntakeIndex);
   await write('connector-release-gate.json', connectorReleaseGate);
@@ -335,7 +350,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
   const smokePlan = buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist);
   const smokePlanAcceptance = buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan);
   const smokeRunReport = await runMeetingAppTimelineConnectorSmokePlan(smokePlan);
-  const connectorReleaseGate = buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
+  let connectorReleaseGate = buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
     adoptionIndex: connectorAdoptionIndex,
     fieldIntakeIndex: connectorFieldIntakeIndex,
     bridgeHandoff: connectorBridgeHandoff,
@@ -346,7 +361,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     smokePlanAcceptance,
     smokeRunReport,
   });
-  const connectorPlatformRoadmap = buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
+  let connectorPlatformRoadmap = buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
     releaseGate: connectorReleaseGate,
   });
   const connectorAdapterMatrix = buildMeetingAppTimelineConnectorAdapterMatrix(hostInstallChecklist, {
@@ -360,6 +375,21 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
   const adapterConfigIndex = buildMeetingAppTimelineHostAdapterConfigIndex(connectorAdapterMatrix);
   const hostAdapterBootstrapPlanMatrix = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(adapterConfigIndex);
   const hostAdapterBootstrapPlanMatrixAcceptance = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport(hostAdapterBootstrapPlanMatrix);
+  connectorReleaseGate = buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
+    adoptionIndex: connectorAdoptionIndex,
+    fieldIntakeIndex: connectorFieldIntakeIndex,
+    bridgeHandoff: connectorBridgeHandoff,
+    bridgeHandoffAcceptance: connectorBridgeHandoffAcceptance,
+    bridgeSmokeReport: connectorBridgeSmokeReport,
+    hostInstallChecklistAcceptance,
+    smokePlan,
+    smokePlanAcceptance,
+    smokeRunReport,
+    hostAdapterBootstrapPlanMatrixAcceptanceReport: hostAdapterBootstrapPlanMatrixAcceptance,
+  });
+  connectorPlatformRoadmap = buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
+    releaseGate: connectorReleaseGate,
+  });
   const writtenFiles = await writeConnectorPackageFiles(outDir, pkg);
 
   const report = {
