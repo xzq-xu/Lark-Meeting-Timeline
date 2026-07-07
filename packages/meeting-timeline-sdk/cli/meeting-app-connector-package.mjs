@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import {
+  buildMeetingAppTimelineConnectorHandoff,
   createMeetingAppTimelineSdk,
 } from '../index.mjs';
 
@@ -108,6 +109,9 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   await write('handoff-matrix.json', pkg.handoff_matrix);
   await write('handoff-acceptance.json', pkg.handoff_acceptance);
   await write('runtime-event-plan-matrix.json', pkg.runtime_events?.plan_matrix);
+  await write('adapter-blueprint-matrix.json', pkg.adapter_blueprints?.matrix);
+  await write('startup-plan-matrix.json', pkg.startup_plans?.matrix);
+  await write('connector-handoff.json', buildMeetingAppTimelineConnectorHandoff(pkg));
 
   for (const [surface, plan] of Object.entries(pkg.observer_plan_by_surface ?? {})) {
     await write(`observer-plan-${surfaceFileName(surface)}.json`, plan);
@@ -147,6 +151,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     includeExtensionScaffold,
     observeTracks,
   });
+  const connectorHandoff = buildMeetingAppTimelineConnectorHandoff(pkg);
   const writtenFiles = await writeConnectorPackageFiles(outDir, pkg);
 
   const report = {
@@ -164,6 +169,8 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     extension_scaffold: Boolean(pkg.extension?.scaffold),
     extension_accepted: pkg.extension?.acceptance?.accepted,
     runtime_event_action_count: pkg.runtime_events?.action_count ?? 0,
+    adapter_blueprint_ready_count: pkg.adapter_blueprints?.ready_count ?? 0,
+    startup_plan_ready_count: pkg.startup_plans?.realtime_startup_ready_count ?? 0,
     observer_surface_count: Object.keys(pkg.observer_plan_by_surface ?? {}).length,
     scheduler_surface_count: Object.keys(pkg.scheduler_config_by_surface ?? {}).length,
     written_files: writtenFiles,
@@ -177,6 +184,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
       install_target: row.install_target,
       start_mode: row.start_mode,
     })) ?? [],
+    handoff: connectorHandoff,
     package: includePackage ? pkg : stripConnectorPackage(pkg),
     next_actions: pkg.next_actions,
   };
@@ -187,7 +195,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
 
 export function formatMeetingAppConnectorPackageCliReport(report = {}) {
   const lines = [
-    `meeting_app_timeline_connector_package_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | surfaces=${report.surface_count} | handoffs=${report.handoff_count} | ready=${report.ready_count} | extension=${boolLabel(report.extension_scaffold)} | extension_accepted=${boolLabel(report.extension_accepted)} | runtime_actions=${report.runtime_event_action_count} | written=${report.written_files?.length ?? 0}`,
+    `meeting_app_timeline_connector_package_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | surfaces=${report.surface_count} | handoffs=${report.handoff_count} | ready=${report.ready_count} | blueprint_ready=${report.adapter_blueprint_ready_count} | startup_ready=${report.startup_plan_ready_count} | extension=${boolLabel(report.extension_scaffold)} | extension_accepted=${boolLabel(report.extension_accepted)} | runtime_actions=${report.runtime_event_action_count} | written=${report.written_files?.length ?? 0}`,
   ];
   for (const row of report.rows ?? []) {
     lines.push(`${row.platform}/${row.surface}: ready=${boolLabel(row.ready_to_start)} realtime=${boolLabel(row.realtime_annotation_ready)} speaker=${boolLabel(row.speaker_track_ready)} participant=${boolLabel(row.participant_track_ready)} install=${row.install_target ?? 'n/a'} start=${row.start_mode ?? 'n/a'}`);
@@ -210,4 +218,3 @@ export async function runMeetingAppConnectorPackageCli(argv = process.argv.slice
   if (!report.ok && options.failOnRejected) process.exitCode = 2;
   return report;
 }
-
