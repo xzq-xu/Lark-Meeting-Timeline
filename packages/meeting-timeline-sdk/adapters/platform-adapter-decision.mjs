@@ -11,6 +11,9 @@ import {
   verifyMeetingPlatformAdapterRouteReadiness,
 } from './platform-adapter-route.mjs';
 import {
+  buildMeetingPlatformAdapterBlueprint,
+} from './platform-adapter-blueprint.mjs';
+import {
   MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
@@ -282,6 +285,26 @@ function evidenceRequirements(decision = {}) {
   };
 }
 
+function blueprintSummary(blueprint = {}, selectedSurface) {
+  const surface = selectedSurface ? blueprint.surfaces?.[selectedSurface] : undefined;
+  return compactObject({
+    schema: blueprint.schema,
+    ready: blueprint.readiness?.ready === true,
+    primary_surface: blueprint.primary_surface,
+    surface_order: blueprint.surface_order,
+    selected_surface: selectedSurface,
+    selected_surface_recommended: surface?.recommended === true,
+    selected_surface_priority: surface?.priority,
+    first_acceptance_gate: blueprint.acceptance_gates?.realtime_pilot?.[0],
+    realtime_pilot_gates: blueprint.acceptance_gates?.realtime_pilot,
+    production_gates: blueprint.acceptance_gates?.production,
+    provider_blocks_realtime: blueprint.runtime_contract?.provider_events_block_realtime,
+    transcript_blocks_realtime: blueprint.runtime_contract?.transcript_blocks_realtime,
+    timestamp_field: blueprint.realtime_axis_contract?.timestamp_field,
+    sdk_method: 'platformAdapterBlueprint',
+  });
+}
+
 export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
   const objectInput = typeof input === 'string' || input instanceof URL
     ? { url: String(input) }
@@ -308,6 +331,8 @@ export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
   const surface = surfaceFromInput(objectInput, options);
   const route = buildMeetingPlatformAdapterRoute(platform, options);
   const routeReadiness = verifyMeetingPlatformAdapterRouteReadiness(route);
+  const adapterBlueprint = buildMeetingPlatformAdapterBlueprint(platform, options);
+  const adapterBlueprintReady = adapterBlueprint.readiness?.ready === true;
   const capability = buildMeetingAppAdapterCapabilityReport(platform, {
     ...options,
     input: inputForCapability(objectInput, options),
@@ -320,7 +345,9 @@ export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
   const decision = {
     realtime_ready: realtimeReady,
   };
-  const accepted = realtimeReady && route.realtime_invariants?.provider_events_block_realtime === false;
+  const accepted = realtimeReady
+    && adapterBlueprintReady
+    && route.realtime_invariants?.provider_events_block_realtime === false;
   return compactObject({
     type: 'meeting_platform_adapter_decision',
     schema: MEETING_PLATFORM_ADAPTER_DECISION_SCHEMA,
@@ -340,9 +367,11 @@ export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
     surface_source: surface.source,
     selected_route: firstRoute?.route,
     recommended_mode: route.recommended_mode,
+    adapter_blueprint: blueprintSummary(adapterBlueprint, surface.surface),
     first_blocked_step: executionPlan.first_blocked_step,
     contracts: {
       timestamp_field: 'captured_at_ms',
+      adapter_blueprint_required_before_host_wiring: true,
       provider_events_block_realtime: route.realtime_invariants?.provider_events_block_realtime,
       transcript_blocks_realtime: route.realtime_invariants?.transcript_blocks_realtime,
       local_axis_first: route.realtime_invariants?.primary_axis_must_be_created_before_provider_reconcile,
@@ -370,6 +399,7 @@ export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
     reports: options.includeReports === true || options.include_reports === true ? {
       route,
       route_readiness: routeReadiness,
+      adapter_blueprint: adapterBlueprint,
       capability,
       execution_plan: executionPlan,
     } : undefined,
@@ -399,6 +429,7 @@ export function buildMeetingPlatformAdapterDecisionMatrix(input = {}, options = 
     platform_count: decisions.length,
     accepted_count: decisions.filter((decision) => decision.accepted).length,
     realtime_ready_count: decisions.filter((decision) => decision.realtime_ready).length,
+    adapter_blueprint_ready_count: decisions.filter((decision) => decision.adapter_blueprint?.ready).length,
     browser_surface_count: decisions.filter((decision) => decision.selected_surface === 'browser_extension').length,
     native_surface_count: decisions.filter((decision) => decision.selected_surface === 'native_detector').length,
     provider_reconcile_surface_count: decisions.filter((decision) => decision.selected_surface === 'provider_reconcile').length,
@@ -412,6 +443,9 @@ export function buildMeetingPlatformAdapterDecisionMatrix(input = {}, options = 
       selected_surface: decision.selected_surface,
       selected_route: decision.selected_route,
       recommended_mode: decision.recommended_mode,
+      adapter_blueprint_ready: decision.adapter_blueprint?.ready === true,
+      adapter_blueprint_primary_surface: decision.adapter_blueprint?.primary_surface,
+      adapter_blueprint_first_acceptance_gate: decision.adapter_blueprint?.first_acceptance_gate,
       first_blocked_step: decision.first_blocked_step,
       provider_events_block_realtime: decision.contracts?.provider_events_block_realtime,
       transcript_blocks_realtime: decision.contracts?.transcript_blocks_realtime,

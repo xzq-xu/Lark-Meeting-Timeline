@@ -181,6 +181,13 @@ function startupActions(surface, decision = {}, bundle = {}) {
       sdk_method: 'platformAdapterDecision',
       input: ['url', 'title', 'platform_or_provider'],
     },
+    {
+      id: 'read_adapter_blueprint',
+      phase: 'startup',
+      required: true,
+      sdk_method: 'platformAdapterBlueprint',
+      output: 'meeting_platform_adapter_blueprint',
+    },
     surface === 'browser_extension' || surface === 'webview_preload' ? {
       id: 'install_page_bridge',
       phase: 'startup',
@@ -297,6 +304,13 @@ function readinessIssues(decision = {}, surface, bundle = {}) {
       message: 'Browser/WebView startup requires a content-script or preload bridge install function.',
     });
   }
+  if (decision.adapter_blueprint?.ready !== true) {
+    issues.push({
+      severity: 'error',
+      code: 'adapter_blueprint_not_ready',
+      message: 'Startup plan requires a ready adapter blueprint before host wiring.',
+    });
+  }
   return issues;
 }
 
@@ -349,10 +363,12 @@ export function buildMeetingPlatformAdapterStartupPlan(input = {}, options = {})
     }),
     selected_surface: surface,
     install_target: installTarget(surface),
+    adapter_blueprint: decision.adapter_blueprint,
     decision,
     runtime_contract: {
       annotation_timestamp_field: 'captured_at_ms',
       axis_timebase: 'absolute_unix_ms',
+      adapter_blueprint_required_before_host_wiring: true,
       provider_events_block_realtime: false,
       transcript_blocks_realtime: false,
       per_meeting_annotation_isolation_required: true,
@@ -431,6 +447,9 @@ export function buildMeetingPlatformAdapterStartupPlanMatrix(input = {}, options
       realtime_startup_ready: plan.realtime_startup_ready,
       selected_surface: plan.selected_surface,
       install_target: plan.install_target,
+      adapter_blueprint_ready: plan.adapter_blueprint?.ready === true,
+      adapter_blueprint_primary_surface: plan.adapter_blueprint?.primary_surface,
+      adapter_blueprint_first_acceptance_gate: plan.adapter_blueprint?.first_acceptance_gate,
       runtime_preset: plan.runtime?.preset,
       first_action: plan.actions?.[0]?.id,
       observe_action: plan.actions?.find((action) => action.id === 'observe_axis')?.sdk_method,

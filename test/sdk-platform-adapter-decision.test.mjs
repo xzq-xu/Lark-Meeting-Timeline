@@ -28,7 +28,12 @@ assert.equal(google.platform, 'google_meet');
 assert.equal(google.platform_source, 'url_detection');
 assert.equal(google.selected_surface, 'browser_extension');
 assert.equal(google.selected_route, 'local_observer_axis');
+assert.equal(google.adapter_blueprint.ready, true);
+assert.equal(google.adapter_blueprint.primary_surface, 'browser_extension');
+assert.equal(google.adapter_blueprint.selected_surface_recommended, true);
+assert.equal(google.adapter_blueprint.first_acceptance_gate, 'local_candidate_preflight_accepts_active_meeting');
 assert.equal(google.contracts.timestamp_field, 'captured_at_ms');
+assert.equal(google.contracts.adapter_blueprint_required_before_host_wiring, true);
 assert.equal(google.contracts.provider_events_block_realtime, false);
 assert.equal(google.contracts.transcript_blocks_realtime, false);
 assert.equal(google.route_summary.provider_reconcile.required_for_realtime, false);
@@ -96,6 +101,8 @@ assert.deepEqual(matrix.platforms, ['google_meet', 'zoom', 'microsoft_teams']);
 assert.equal(matrix.platform_count, 3);
 assert.equal(matrix.accepted_count, 3);
 assert.equal(matrix.realtime_ready_count, 3);
+assert.equal(matrix.adapter_blueprint_ready_count, 3);
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_primary_surface, 'browser_extension');
 assert.equal(assertMeetingPlatformAdapterDecisionMatrix({}, {
   baseUrl,
   platforms: ['google-meet', 'zoom'],

@@ -36,6 +36,7 @@ export interface MeetingPlatformAdapterStartupPlan {
   input?: Record<string, unknown>;
   selected_surface?: string;
   install_target?: string;
+  adapter_blueprint?: Record<string, unknown>;
   decision: MeetingPlatformAdapterDecision;
   runtime_contract?: Record<string, unknown>;
   browser?: {

@@ -5,6 +5,9 @@ import type {
 import type {
   MeetingPlatformAdapterRoute,
 } from './platform-adapter-route.mjs';
+import type {
+  MeetingPlatformAdapterBlueprint,
+} from './platform-adapter-blueprint.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_DECISION_SCHEMA: 'meeting_platform_adapter_decision';
 export const MEETING_PLATFORM_ADAPTER_DECISION_MATRIX_SCHEMA: 'meeting_platform_adapter_decision_matrix';
@@ -95,6 +98,7 @@ export interface MeetingPlatformAdapterDecision {
   surface_source?: string;
   selected_route?: string;
   recommended_mode?: string;
+  adapter_blueprint?: Record<string, unknown>;
   first_blocked_step?: string;
   contracts?: Record<string, unknown>;
   timeline_capabilities?: MeetingAppAdapterCapabilityReport['timeline_capabilities'];
@@ -104,6 +108,7 @@ export interface MeetingPlatformAdapterDecision {
   reports?: {
     route?: MeetingPlatformAdapterRoute;
     route_readiness?: Record<string, unknown>;
+    adapter_blueprint?: MeetingPlatformAdapterBlueprint;
     capability?: MeetingAppAdapterCapabilityReport;
     execution_plan?: MeetingAppAdapterExecutionPlan;
   };
@@ -118,6 +123,7 @@ export interface MeetingPlatformAdapterDecisionMatrix {
   platform_count: number;
   accepted_count: number;
   realtime_ready_count: number;
+  adapter_blueprint_ready_count: number;
   browser_surface_count: number;
   native_surface_count: number;
   provider_reconcile_surface_count: number;
