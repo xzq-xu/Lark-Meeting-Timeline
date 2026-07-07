@@ -317,6 +317,7 @@ import {
   buildMeetingAppTimelineConnectorPackageAcceptanceReport as buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot,
   buildMeetingAppTimelineConnectorSmokePlan as buildMeetingAppTimelineConnectorSmokePlanFromRoot,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport as buildMeetingAppTimelineConnectorSmokePlanAcceptanceReportFromRoot,
+  runMeetingAppTimelineConnectorBridgeSmoke as runMeetingAppTimelineConnectorBridgeSmokeFromRoot,
   runMeetingAppTimelineConnectorSmokePlan as runMeetingAppTimelineConnectorSmokePlanFromRoot,
   buildMeetingPlatformAdaptationPackage as buildMeetingPlatformAdaptationPackageFromRoot,
   buildMeetingPlatformAdaptationStrategy as buildMeetingPlatformAdaptationStrategyFromRoot,
@@ -622,6 +623,7 @@ import {
 import {
   assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
+  assertMeetingAppTimelineConnectorBridgeSmoke,
   assertMeetingAppTimelineConnectorSmokePlan,
   assertMeetingAppTimelineConnectorSmokeRun,
   buildMeetingAppTimelineConnectorBridgeHandoff,
@@ -633,6 +635,7 @@ import {
   buildMeetingAppTimelineConnectorSmokePlan,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
   createMeetingAppTimelineConnectorRuntimeClient,
+  runMeetingAppTimelineConnectorBridgeSmoke,
   runMeetingAppTimelineConnectorSmokePlan,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package';
 import {
@@ -831,6 +834,9 @@ assert.equal(buildMeetingAppTimelineConnectorBridgeHandoff(rootConnectorPackage)
 assert.equal(buildMeetingAppTimelineConnectorBridgeHandoffFromRoot(rootConnectorPackage).accepted, true);
 assert.equal(buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(rootConnectorPackage).accepted, true);
 assert.equal(buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReportFromRoot(rootConnectorPackage).schema, 'meeting_app_timeline_connector_bridge_handoff_acceptance_report');
+assert.equal((await runMeetingAppTimelineConnectorBridgeSmoke(rootConnectorPackage)).schema, 'meeting_app_timeline_connector_bridge_smoke_report');
+assert.equal((await runMeetingAppTimelineConnectorBridgeSmokeFromRoot(rootConnectorPackage)).accepted, true);
+assert.equal((await assertMeetingAppTimelineConnectorBridgeSmoke(rootConnectorPackage)).accepted, true);
 assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklist(rootConnectorPackage).schema, 'meeting_app_timeline_connector_host_install_checklist');
 assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(rootConnectorPackage).accepted, true);
 const rootConnectorSmokePlan = buildMeetingAppTimelineConnectorSmokePlan(rootConnectorPackage);

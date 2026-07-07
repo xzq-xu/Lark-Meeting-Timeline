@@ -6,6 +6,7 @@ import {
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA,
   assertMeetingAppTimelineConnectorBridgeHandoff,
+  assertMeetingAppTimelineConnectorBridgeSmoke,
   assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
   assertMeetingAppTimelineConnectorSmokePlan,
@@ -20,6 +21,7 @@ import {
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
   createMeetingAppTimelineSdk,
   createMeetingAppTimelineConnectorRuntimeClient,
+  runMeetingAppTimelineConnectorBridgeSmoke,
   runMeetingAppTimelineConnectorSmokePlan,
   stripMeetingAppTimelineConnectorPackageFileContents,
 } from '../packages/meeting-timeline-sdk/index.mjs';
@@ -117,6 +119,17 @@ assert.equal(bridgeHandoffAcceptance.required_output_runtime_actions.includes('i
 assert.equal(bridgeHandoffAcceptance.issue_count, 0);
 assert.equal(assertMeetingAppTimelineConnectorBridgeHandoff(bridgeHandoff), bridgeHandoff);
 assert.equal(buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(connectorPackage).accepted, true);
+const bridgeSmokeReport = await runMeetingAppTimelineConnectorBridgeSmoke(bridgeHandoff);
+assert.equal(bridgeSmokeReport.schema, 'meeting_app_timeline_connector_bridge_smoke_report');
+assert.equal(bridgeSmokeReport.accepted, true);
+assert.equal(bridgeSmokeReport.bridge_handoff_acceptance_accepted, true);
+assert.equal(bridgeSmokeReport.observe_before_insert, true);
+assert.equal(bridgeSmokeReport.runtime_event_actions.includes('observe_platform_candidates'), true);
+assert.equal(bridgeSmokeReport.runtime_event_actions.includes('insert_annotation'), true);
+assert.equal(bridgeSmokeReport.steps.find((step) => step.id === 'insert_mark_message').handled, true);
+assert.equal(bridgeSmokeReport.steps.find((step) => step.id === 'sample_tracks_message').accepted, true);
+assert.equal(bridgeSmokeReport.calls.find((call) => call.action === 'insert_annotation').annotation_id, 'google_meet-bridge-smoke-mark');
+assert.equal((await assertMeetingAppTimelineConnectorBridgeSmoke(bridgeHandoff)).accepted, true);
 
 const smokePlan = buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist, {
   baseCapturedAtMs: 1_782_614_400_000,
@@ -341,6 +354,13 @@ assert.equal(
 assert.throws(
   () => assertMeetingAppTimelineConnectorBridgeHandoff(brokenBridgeHandoff),
   /bridge handoff is not accepted/,
+);
+const brokenBridgeSmoke = await runMeetingAppTimelineConnectorBridgeSmoke(brokenBridgeHandoff);
+assert.equal(brokenBridgeSmoke.accepted, false);
+assert.equal(brokenBridgeSmoke.issues.some((issue) => issue === 'acceptance:missing_message_type'), true);
+await assert.rejects(
+  () => assertMeetingAppTimelineConnectorBridgeSmoke(brokenBridgeHandoff),
+  /bridge smoke failed/,
 );
 
 const brokenSmokePlan = structuredClone(smokePlan);

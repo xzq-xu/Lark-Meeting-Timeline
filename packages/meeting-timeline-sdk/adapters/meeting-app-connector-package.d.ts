@@ -7,6 +7,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA: 'meet
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_host_install_checklist_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA: 'meeting_app_timeline_connector_bridge_handoff';
 export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_bridge_handoff_acceptance_report';
+export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_SMOKE_REPORT_SCHEMA: 'meeting_app_timeline_connector_bridge_smoke_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA: 'meeting_app_timeline_connector_smoke_plan';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_smoke_plan_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA: 'meeting_app_timeline_connector_smoke_run_report';
@@ -188,6 +189,32 @@ export interface MeetingAppTimelineConnectorBridgeHandoffAcceptanceReport {
   issue_count: number;
   issues: MeetingAppTimelineConnectorPackageIssue[];
   rows: Array<Record<string, unknown>>;
+  next_actions: string[];
+}
+
+export interface MeetingAppTimelineConnectorBridgeSmokeReport {
+  type: 'meeting_app_timeline_connector_bridge_smoke_report';
+  schema: 'meeting_app_timeline_connector_bridge_smoke_report';
+  schema_version: 1;
+  accepted: boolean;
+  bridge_handoff_accepted: boolean;
+  bridge_handoff_acceptance_accepted: boolean;
+  dry_run: boolean;
+  target?: string;
+  package_id?: string;
+  platform: string;
+  platform_count?: number;
+  runtime_event_endpoint?: string;
+  timestamp_field?: string;
+  step_count: number;
+  accepted_step_count: number;
+  runtime_event_count: number;
+  runtime_event_actions: string[];
+  observe_before_insert: boolean;
+  steps: Array<Record<string, unknown>>;
+  calls: Array<Record<string, unknown>>;
+  issue_count: number;
+  issues: string[];
   next_actions: string[];
 }
 
@@ -379,6 +406,16 @@ export function assertMeetingAppTimelineConnectorBridgeHandoff<T extends Meeting
   handoffOrPackageOrChecklist?: T,
   options?: Record<string, unknown>,
 ): T;
+
+export function runMeetingAppTimelineConnectorBridgeSmoke(
+  handoffOrPackageOrChecklist?: MeetingAppTimelineConnectorBridgeHandoff | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): Promise<MeetingAppTimelineConnectorBridgeSmokeReport>;
+
+export function assertMeetingAppTimelineConnectorBridgeSmoke(
+  handoffOrPackageOrChecklist?: MeetingAppTimelineConnectorBridgeHandoff | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): Promise<MeetingAppTimelineConnectorBridgeSmokeReport>;
 
 export function buildMeetingAppTimelineConnectorSmokePlan(
   checklistOrPackage?: MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,

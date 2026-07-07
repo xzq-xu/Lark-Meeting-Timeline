@@ -7,6 +7,9 @@ import {
 import {
   buildMeetingPlatformConsumerHandoff,
 } from './platform-consumer-handoff.mjs';
+import {
+  createMeetingPlatformConnectorContentScriptBridge,
+} from './meeting-platform-connector.mjs';
 
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA = 'meeting_app_timeline_connector_package';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_package_acceptance_report';
@@ -15,6 +18,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA = 'mee
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA = 'meeting_app_timeline_connector_bridge_handoff';
 export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_bridge_handoff_acceptance_report';
+export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_SMOKE_REPORT_SCHEMA = 'meeting_app_timeline_connector_bridge_smoke_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA = 'meeting_app_timeline_connector_smoke_plan';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_smoke_plan_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA = 'meeting_app_timeline_connector_smoke_run_report';
@@ -140,6 +144,112 @@ function sampleUrlForPlatform(platform) {
     webex: 'https://example.webex.com/meet/sample',
     lark: 'https://vc.feishu.cn/j/123456789',
   }[normalizeKey(platform)] ?? 'local://meeting-window/sample';
+}
+
+function bridgeSmokeNode(tagName, attrs = {}, text = '') {
+  return {
+    tagName: String(tagName).toUpperCase(),
+    attributes: attrs,
+    dataset: Object.fromEntries(Object.entries(attrs)
+      .filter(([key]) => key.startsWith('data-'))
+      .map(([key, value]) => [
+        key.slice(5).replace(/-([a-z])/g, (_, char) => char.toUpperCase()),
+        value,
+      ])),
+    innerText: text,
+    textContent: text,
+    getAttribute(name) {
+      return attrs[name] ?? null;
+    },
+  };
+}
+
+function bridgeSmokeSelectorMatches(item, selector) {
+  const text = String(selector);
+  if (text === '*') return true;
+  if (text === 'button') return item.tagName === 'BUTTON';
+  if (text.includes('speaking')) {
+    return /speaking|active speaker|正在发言|正在讲话|正在说话/i.test(item.attributes?.['aria-label'] ?? '');
+  }
+  const attrParts = [...text.matchAll(/\[([a-zA-Z0-9_-]+)([*]?=)?(?:"([^"]*)"|'([^']*)'|([^\]\s]+))?(?:\s+i)?\]/g)];
+  if (!attrParts.length) return false;
+  return attrParts.every((match) => {
+    const [, attrName, operator, doubleQuoted, singleQuoted, bare] = match;
+    const actual = item.attributes?.[attrName];
+    if (operator == null) return actual != null;
+    if (actual == null) return false;
+    const expected = doubleQuoted ?? singleQuoted ?? bare ?? '';
+    if (operator === '*=') return String(actual).toLowerCase().includes(String(expected).toLowerCase());
+    return String(actual) === String(expected);
+  });
+}
+
+function createBridgeSmokeWindow(platform, options = {}) {
+  const url = firstNonEmpty(options.url, options.meeting_url, sampleUrlForPlatform(platform));
+  const nodes = asArray(options.nodes).length > 0
+    ? asArray(options.nodes)
+    : [
+      bridgeSmokeNode('button', { 'aria-label': 'Leave call' }),
+      bridgeSmokeNode('button', { 'aria-label': 'Participants' }),
+      bridgeSmokeNode('div', {
+        'data-participant-id': `${normalizeKey(platform)}-speaker-1`,
+        'aria-label': 'Speaker 1 is speaking',
+      }),
+    ];
+  const document = {
+    nodeType: 9,
+    title: 'Connector bridge smoke',
+    hidden: false,
+    location: { href: url },
+    body: { nodeType: 1 },
+    documentElement: { nodeType: 1 },
+    querySelectorAll(selector) {
+      return nodes.filter((item) => bridgeSmokeSelectorMatches(item, selector));
+    },
+  };
+  return {
+    document,
+    location: { href: url, origin: new URL(url).origin },
+    navigator: { userAgent: 'Connector bridge smoke fixture' },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+}
+
+function createBridgeSmokeRecordingFetch(calls = []) {
+  return async (url, init = {}) => {
+    const body = init.body ? JSON.parse(init.body) : {};
+    calls.push(compactObject({
+      url,
+      method: init.method,
+      action: body.action,
+      platform: body.platform,
+      body,
+    }));
+    const payload = JSON.stringify({
+      ok: true,
+      accepted: true,
+      action: body.action,
+      platform: body.platform,
+      annotation: body.annotation,
+      event: body,
+    });
+    return new Response(payload, {
+      status: 201,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+}
+
+function summarizeBridgeSmokeCall(call = {}) {
+  return compactObject({
+    method: call.method,
+    action: call.action,
+    platform: call.platform,
+    captured_at_ms: call.body?.captured_at_ms ?? call.body?.annotation?.captured_at_ms,
+    annotation_id: call.body?.annotation?.id,
+    url: call.url,
+  });
 }
 
 function smokeStepCapturedAtMs(step = {}) {
@@ -1035,6 +1145,187 @@ export function assertMeetingAppTimelineConnectorBridgeHandoff(handoffOrPackageO
     });
   }
   return handoffOrPackageOrChecklist;
+}
+
+export async function runMeetingAppTimelineConnectorBridgeSmoke(handoffOrPackageOrChecklist = {}, options = {}) {
+  const handoff = handoffOrPackageOrChecklist?.schema === MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA
+    ? handoffOrPackageOrChecklist
+    : buildMeetingAppTimelineConnectorBridgeHandoff(handoffOrPackageOrChecklist, options);
+  const acceptance = buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(handoff);
+  const calls = [];
+  const platform = normalizeKey(firstNonEmpty(options.platform, options.platform_key, handoff.platforms?.[0], 'google_meet'));
+  const baseMs = Number.isFinite(options.baseCapturedAtMs)
+    ? options.baseCapturedAtMs
+    : Number.isFinite(options.base_captured_at_ms)
+      ? options.base_captured_at_ms
+      : 1_782_614_400_000;
+  const window = options.window ?? createBridgeSmokeWindow(platform, options);
+  const fetchImpl = options.fetch ?? options.fetchImpl ?? createBridgeSmokeRecordingFetch(calls);
+  const bridge = createMeetingPlatformConnectorContentScriptBridge({
+    ...options,
+    baseUrl: firstNonEmpty(options.baseUrl, options.base_url, handoff.base_url, 'https://timeline.example.com'),
+    platforms: handoff.platforms,
+    fetch: fetchImpl,
+    window,
+    now: () => baseMs,
+    observeTracks: true,
+    observe_tracks: true,
+    trackRuntimeOptions: {
+      insert: true,
+      ...(options.trackRuntimeOptions ?? {}),
+      ...(options.track_runtime_options ?? {}),
+    },
+  });
+  const steps = [];
+  const pushStep = (step) => {
+    steps.push(compactObject(step));
+    return step;
+  };
+
+  try {
+    const before = calls.length;
+    const result = await bridge.observePlatformCandidates({
+      captured_at_ms: baseMs,
+      tabs: [{
+        active: true,
+        url: sampleUrlForPlatform(platform),
+        title: `${platform} bridge smoke`,
+        in_meeting: true,
+      }],
+    });
+    pushStep({
+      id: 'observe_platform_candidates',
+      mode: 'direct_method',
+      accepted: result?.ok !== false,
+      runtime_event_count: calls.length - before,
+      result_action: result?.action,
+    });
+  } catch (error) {
+    pushStep({
+      id: 'observe_platform_candidates',
+      mode: 'direct_method',
+      accepted: false,
+      error: { name: error.name, message: error.message },
+    });
+  }
+
+  const messageSteps = [
+    {
+      id: 'insert_mark_message',
+      message: {
+        type: 'meeting_timeline.insert_mark',
+        payload: {
+          platform,
+          mark: {
+            id: `${platform}-bridge-smoke-mark`,
+            label: 'bridge smoke mark',
+            captured_at_ms: baseMs + 1_000,
+          },
+        },
+      },
+    },
+    {
+      id: 'sample_tracks_message',
+      message: {
+        type: 'meeting_timeline.sample_tracks',
+        payload: {
+          platform,
+          captured_at_ms: baseMs + 2_000,
+        },
+      },
+    },
+    {
+      id: 'preflight_current_window_message',
+      message: {
+        type: 'meeting_timeline.preflight_current_window',
+        payload: {
+          platform,
+          options: {
+            requireSpeakerTrack: true,
+            observedAtMs: baseMs + 3_000,
+          },
+        },
+      },
+    },
+  ];
+
+  for (const item of messageSteps) {
+    try {
+      const before = calls.length;
+      const result = await bridge.dispatchMessage(item.message);
+      pushStep({
+        id: item.id,
+        mode: 'dispatch_message',
+        message_type: item.message.type,
+        accepted: result?.handled === true && result?.result?.ok !== false,
+        handled: result?.handled === true,
+        action: result?.action,
+        runtime_event_count: calls.length - before,
+        result_schema: result?.result?.schema,
+      });
+    } catch (error) {
+      pushStep({
+        id: item.id,
+        mode: 'dispatch_message',
+        message_type: item.message.type,
+        accepted: false,
+        error: { name: error.name, message: error.message },
+      });
+    }
+  }
+
+  const callActions = calls.map((call) => normalizeMeetingPlatformRuntimeEventAction(call.action));
+  const observeIndex = callActions.indexOf('observe_platform_candidates');
+  const insertIndex = callActions.indexOf('insert_annotation');
+  const issues = [
+    ...(acceptance.accepted ? [] : acceptance.issues.map((issue) => `acceptance:${issue.code}`)),
+    ...(steps.every((step) => step.accepted === true) ? [] : steps.filter((step) => step.accepted !== true).map((step) => `step_failed:${step.id}`)),
+    ...(callActions.includes('observe_platform_candidates') ? [] : ['missing_observe_platform_candidates_runtime_event']),
+    ...(callActions.includes('insert_annotation') ? [] : ['missing_insert_annotation_runtime_event']),
+    ...(observeIndex >= 0 && insertIndex > observeIndex ? [] : ['axis_not_observed_before_insert']),
+  ];
+
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_SMOKE_REPORT_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_SMOKE_REPORT_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    bridge_handoff_accepted: handoff.accepted === true,
+    bridge_handoff_acceptance_accepted: acceptance.accepted === true,
+    dry_run: fetchImpl !== options.fetch && fetchImpl !== options.fetchImpl,
+    target: handoff.target,
+    package_id: handoff.package_id,
+    platform,
+    platform_count: handoff.platform_count,
+    runtime_event_endpoint: handoff.runtime_event_endpoint ?? handoff.host_requirements?.runtime_event_endpoint,
+    timestamp_field: handoff.host_requirements?.timestamp_field,
+    step_count: steps.length,
+    accepted_step_count: steps.filter((step) => step.accepted === true).length,
+    runtime_event_count: calls.length,
+    runtime_event_actions: unique(callActions),
+    observe_before_insert: observeIndex >= 0 && insertIndex > observeIndex,
+    steps,
+    calls: calls.map((call) => summarizeBridgeSmokeCall(call)),
+    issue_count: issues.length,
+    issues: unique(issues),
+    next_actions: issues.length > 0
+      ? unique([
+        ...issues.map((issue) => `fix_${issue}`),
+        ...(handoff.next_actions ?? []),
+      ])
+      : handoff.next_actions ?? [],
+  });
+}
+
+export async function assertMeetingAppTimelineConnectorBridgeSmoke(handoffOrPackageOrChecklist = {}, options = {}) {
+  const report = await runMeetingAppTimelineConnectorBridgeSmoke(handoffOrPackageOrChecklist, options);
+  if (!report.accepted) {
+    throw new MeetingTimelineSdkError('Meeting app timeline connector bridge smoke failed', {
+      report,
+      issues: report.issues,
+    });
+  }
+  return report;
 }
 
 export function buildMeetingAppTimelineConnectorSmokePlan(checklistOrPackage = {}, options = {}) {
