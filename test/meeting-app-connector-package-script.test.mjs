@@ -45,13 +45,15 @@ assert.equal(report.adapter_blueprint_ready_count, 2);
 assert.equal(report.startup_plan_ready_count, 2);
 assert.equal(report.observer_surface_count, 2);
 assert.equal(report.scheduler_surface_count, 2);
-assert.equal(report.written_files.length, 21);
+assert.equal(report.written_files.length, 22);
 assert.equal(report.rows.some((row) => row.platform === 'google_meet' && row.surface === 'browser_extension'), true);
 assert.equal(report.rows.some((row) => row.platform === 'zoom' && row.surface === 'native_detector'), true);
 assert.equal(report.handoff.schema, 'meeting_app_timeline_connector_handoff');
 assert.equal(report.handoff.startup_plans.rows.some((row) => row.platform === 'zoom' && row.selected_surface === 'native_detector'), true);
 assert.equal(report.host_install_checklist.schema, 'meeting_app_timeline_connector_host_install_checklist');
 assert.equal(report.host_install_checklist.rows.some((row) => row.platform === 'zoom' && row.selected_surface === 'native_detector'), true);
+assert.equal(report.host_install_checklist_acceptance.schema, 'meeting_app_timeline_connector_host_install_checklist_acceptance_report');
+assert.equal(report.host_install_checklist_acceptance.accepted, true);
 assert.equal(report.package.extension.scaffold.files.some((file) => 'content' in file), false);
 
 const connectorPackage = JSON.parse(await readFile(join(outDir, 'connector-package.json'), 'utf8'));
@@ -92,9 +94,16 @@ assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'google_me
 assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
 assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'zoom').client_methods.insert_annotation, 'insertAnnotation');
 
+const hostInstallChecklistAcceptance = JSON.parse(await readFile(join(outDir, 'host-install-checklist-acceptance.json'), 'utf8'));
+assert.equal(hostInstallChecklistAcceptance.schema, 'meeting_app_timeline_connector_host_install_checklist_acceptance_report');
+assert.equal(hostInstallChecklistAcceptance.accepted, true);
+assert.equal(hostInstallChecklistAcceptance.ready_count, 2);
+assert.equal(hostInstallChecklistAcceptance.issue_count, 0);
+
 const connectorQuickstart = await readFile(join(outDir, 'connector-quickstart.md'), 'utf8');
 assert.match(connectorQuickstart, /Meeting App Timeline Connector Quickstart/);
 assert.match(connectorQuickstart, /host-install-checklist\.json/);
+assert.match(connectorQuickstart, /host-install-checklist-acceptance\.json/);
 assert.match(connectorQuickstart, /startup-plan-matrix\.json/);
 assert.match(connectorQuickstart, /captured_at_ms/);
 assert.match(connectorQuickstart, /createMeetingAppTimelineConnectorRuntimeClient/);

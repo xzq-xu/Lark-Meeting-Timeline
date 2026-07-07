@@ -615,9 +615,11 @@ import {
   buildMeetingAppAdapterIntegrationPackageMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-adapter-integration-package';
 import {
+  assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
+  buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport,
   createMeetingAppTimelineConnectorRuntimeClient,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package';
@@ -814,6 +816,8 @@ assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot(roo
 assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReport(rootConnectorPackage).accepted, true);
 assert.equal(buildMeetingAppTimelineConnectorHandoff(rootConnectorPackage).schema, 'meeting_app_timeline_connector_handoff');
 assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklist(rootConnectorPackage).schema, 'meeting_app_timeline_connector_host_install_checklist');
+assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(rootConnectorPackage).accepted, true);
+assert.equal(assertMeetingAppTimelineConnectorHostInstallChecklist(rootConnectorPackage), rootConnectorPackage);
 assert.equal(assertMeetingAppTimelineConnectorPackage(rootConnectorPackage), rootConnectorPackage);
 assert.equal(rootMeetingAppSdk.meetingAppAdapterCapability('google-meet').schema, 'meeting_app_adapter_capability_report');
 assert.equal(rootMeetingAppSdk.adapterCapability('google-meet').platform, 'google_meet');

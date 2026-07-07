@@ -9,6 +9,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA = 'meeting_app_timeli
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_package_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA = 'meeting_app_timeline_connector_handoff';
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist';
+export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA = 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION = 1;
 
@@ -517,6 +518,121 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, o
     acceptance,
     next_actions: acceptance.next_actions,
   });
+}
+
+export function buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(checklistOrPackage = {}, options = {}) {
+  const checklist = checklistOrPackage?.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA
+    ? checklistOrPackage
+    : buildMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage, options);
+  const rows = checklist.rows ?? [];
+  const issues = [];
+
+  if (checklist.schema !== MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA) {
+    addIssue(issues, 'invalid_schema', 'Expected a meeting app timeline connector host install checklist', {
+      expected_schema: MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA,
+      actual_schema: checklist.schema,
+    });
+  }
+  if (checklist.accepted !== true) addIssue(issues, 'checklist_not_accepted', 'Host install checklist accepted flag is not true');
+  if (!checklist.runtime_event_endpoint) addIssue(issues, 'missing_runtime_event_endpoint', 'Runtime event endpoint is required');
+  if (checklist.timestamp_field !== 'captured_at_ms') {
+    addIssue(issues, 'invalid_timestamp_contract', 'Host install checklist must use captured_at_ms', {
+      timestamp_field: checklist.timestamp_field,
+    });
+  }
+  if (checklist.contracts?.provider_events_block_realtime !== false) {
+    addIssue(issues, 'provider_events_block_realtime', 'Provider events must not block realtime annotation insertion');
+  }
+  if (checklist.contracts?.transcript_blocks_realtime !== false) {
+    addIssue(issues, 'transcript_blocks_realtime', 'Transcript import must not block realtime annotation insertion');
+  }
+  if (checklist.contracts?.startup_plan_required_before_runtime_install !== true) {
+    addIssue(issues, 'startup_plan_not_required', 'Startup plan must be required before host runtime install');
+  }
+  if (checklist.contracts?.adapter_blueprint_required_before_host_wiring !== true) {
+    addIssue(issues, 'adapter_blueprint_not_required', 'Adapter blueprint must be required before host wiring');
+  }
+  if ((checklist.platform_count ?? 0) <= 0) addIssue(issues, 'missing_platforms', 'Host install checklist must include at least one platform');
+  if (rows.length !== checklist.platform_count) {
+    addIssue(issues, 'row_count_mismatch', 'Host install checklist row count must equal platform_count', {
+      row_count: rows.length,
+      platform_count: checklist.platform_count,
+    });
+  }
+
+  for (const row of rows) {
+    const platform = normalizeKey(row.platform);
+    const runtimeActions = asArray(row.runtime_actions).map((action) => normalizeMeetingPlatformRuntimeEventAction(action));
+    const requiredSteps = asArray(row.required_host_steps);
+    if (!platform) addIssue(issues, 'row_missing_platform', 'Checklist row is missing platform');
+    if (!row.selected_surface) addIssue(issues, 'row_missing_selected_surface', 'Checklist row is missing selected_surface', { platform });
+    if (!row.install_target) addIssue(issues, 'row_missing_install_target', 'Checklist row is missing install_target', { platform });
+    if (row.realtime_startup_ready !== true) addIssue(issues, 'row_not_realtime_startup_ready', 'Checklist row is not realtime startup ready', { platform });
+    if (row.adapter_blueprint_ready !== true) addIssue(issues, 'row_adapter_blueprint_not_ready', 'Checklist row adapter blueprint is not ready', { platform });
+    if (!runtimeActions.includes('observe_platform_candidates')) {
+      addIssue(issues, 'row_missing_observe_platform_candidates_action', 'Checklist row must support observe_platform_candidates', { platform });
+    }
+    if (!runtimeActions.includes('insert_annotation')) {
+      addIssue(issues, 'row_missing_insert_annotation_action', 'Checklist row must support insert_annotation', { platform });
+    }
+    if (row.client_methods?.insert_annotation !== 'insertAnnotation') {
+      addIssue(issues, 'row_missing_insert_annotation_client_method', 'Checklist row must expose insertAnnotation client method', {
+        platform,
+        client_method: row.client_methods?.insert_annotation,
+      });
+    }
+    if (!requiredSteps.includes('insert_annotation_with_captured_at_ms')) {
+      addIssue(issues, 'row_missing_captured_at_ms_step', 'Checklist row must require insert_annotation_with_captured_at_ms', { platform });
+    }
+    if (row.provider_events_block_realtime !== false) {
+      addIssue(issues, 'row_provider_events_block_realtime', 'Provider events must not block realtime annotations for row', { platform });
+    }
+    if (row.transcript_blocks_realtime !== false) {
+      addIssue(issues, 'row_transcript_blocks_realtime', 'Transcript import must not block realtime annotations for row', { platform });
+    }
+  }
+
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    target: checklist.target,
+    package_id: checklist.package_id,
+    platform_count: checklist.platform_count ?? 0,
+    row_count: rows.length,
+    ready_count: rows.filter((row) => row.realtime_startup_ready === true && row.adapter_blueprint_ready === true).length,
+    timestamp_field: checklist.timestamp_field,
+    runtime_event_endpoint: checklist.runtime_event_endpoint,
+    checklist_accepted: checklist.accepted === true,
+    issue_count: issues.length,
+    issues,
+    rows: rows.map((row) => compactObject({
+      platform: row.platform,
+      selected_surface: row.selected_surface,
+      install_target: row.install_target,
+      realtime_startup_ready: row.realtime_startup_ready,
+      adapter_blueprint_ready: row.adapter_blueprint_ready,
+      insert_annotation_client_method: row.client_methods?.insert_annotation,
+    })),
+    next_actions: issues.length > 0
+      ? unique([
+        ...issues.map((issue) => `fix_${issue.code}`),
+        ...(checklist.next_actions ?? []),
+      ])
+      : checklist.next_actions ?? [],
+  });
+}
+
+export function assertMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage = {}, options = {}) {
+  const report = buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(checklistOrPackage, options);
+  if (!report.accepted) {
+    throw new MeetingTimelineSdkError('Meeting app timeline connector host install checklist is not accepted', {
+      report,
+      issues: report.issues,
+    });
+  }
+  return checklistOrPackage;
 }
 
 export function createMeetingAppTimelineConnectorRuntimeClient(pkg = {}, options = {}) {

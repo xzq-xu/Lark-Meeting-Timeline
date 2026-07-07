@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 
 import {
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
+  assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
+  buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport,
   createMeetingAppTimelineSdk,
   createMeetingAppTimelineConnectorRuntimeClient,
@@ -74,6 +76,13 @@ assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'google_me
 assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
 assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'zoom').client_methods.insert_annotation, 'insertAnnotation');
 assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'google_meet').required_host_steps.includes('insert_annotation_with_captured_at_ms'), true);
+const hostInstallChecklistAcceptance = buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(hostInstallChecklist);
+assert.equal(hostInstallChecklistAcceptance.schema, 'meeting_app_timeline_connector_host_install_checklist_acceptance_report');
+assert.equal(hostInstallChecklistAcceptance.accepted, true);
+assert.equal(hostInstallChecklistAcceptance.ready_count, 2);
+assert.equal(hostInstallChecklistAcceptance.issue_count, 0);
+assert.equal(assertMeetingAppTimelineConnectorHostInstallChecklist(hostInstallChecklist), hostInstallChecklist);
+assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(connectorPackage).accepted, true);
 
 assert.equal(connectorPackage.adapter_blueprints.ready_count, 2);
 assert.equal(connectorPackage.adapter_blueprints.matrix.schema, 'meeting_platform_adapter_blueprint_matrix');
@@ -226,6 +235,23 @@ const blockingProviderPackage = {
 const blockingProviderAcceptance = buildMeetingAppTimelineConnectorPackageAcceptanceReport(blockingProviderPackage);
 assert.equal(blockingProviderAcceptance.accepted, false);
 assert.equal(blockingProviderAcceptance.issues.some((issue) => issue.code === 'provider_events_block_realtime'), true);
+
+const brokenHostInstallChecklist = {
+  ...hostInstallChecklist,
+  rows: hostInstallChecklist.rows.map((row) => row.platform === 'zoom'
+    ? { ...row, selected_surface: undefined }
+    : row),
+};
+const brokenHostInstallChecklistAcceptance = buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(brokenHostInstallChecklist);
+assert.equal(brokenHostInstallChecklistAcceptance.accepted, false);
+assert.equal(
+  brokenHostInstallChecklistAcceptance.issues.some((issue) => issue.code === 'row_missing_selected_surface'),
+  true,
+);
+assert.throws(
+  () => assertMeetingAppTimelineConnectorHostInstallChecklist(brokenHostInstallChecklist),
+  /host install checklist is not accepted/,
+);
 
 const productionAcceptance = buildMeetingAppTimelineConnectorPackageAcceptanceReport(connectorPackage, {
   target: 'production',
