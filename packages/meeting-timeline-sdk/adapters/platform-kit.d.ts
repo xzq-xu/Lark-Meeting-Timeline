@@ -82,6 +82,7 @@ import type {
   MeetingPlatformAdapterStartupPlanOptions,
 } from './platform-adapter-startup.mjs';
 import type {
+  MeetingPlatformAdapterCandidatePreflight,
   MeetingPlatformAdapterPreflight,
   MeetingPlatformAdapterPreflightMatrix,
   MeetingPlatformAdapterPreflightOptions,
@@ -471,9 +472,11 @@ export interface MeetingPlatformTimelineKit {
   platformAdapterPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
   platformAdapterCurrentWindowPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
   platformAdapterPreflightMatrix(input?: MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflightMatrix;
+  platformAdapterCandidatePreflight(input?: MeetingPlatformAdapterDecisionInput | MeetingPlatformAdapterDecisionInput[] | Record<string, unknown>, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterCandidatePreflight;
   assertPlatformAdapterPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
   assertPlatformAdapterCurrentWindowPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
   assertPlatformAdapterPreflightMatrix(input?: MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflightMatrix;
+  assertPlatformAdapterCandidatePreflight(input?: MeetingPlatformAdapterDecisionInput | MeetingPlatformAdapterDecisionInput[] | Record<string, unknown>, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterCandidatePreflight;
   platformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
   assertPlatformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
   platformConsumerHandoff(handoffOptions?: MeetingPlatformConsumerHandoffOptions): MeetingPlatformConsumerHandoff;

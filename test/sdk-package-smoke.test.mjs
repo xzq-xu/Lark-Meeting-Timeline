@@ -320,6 +320,7 @@ import {
   buildMeetingPlatformAdapterDecisionMatrix as buildMeetingPlatformAdapterDecisionMatrixFromRoot,
   buildMeetingPlatformAdapterStartupPlan as buildMeetingPlatformAdapterStartupPlanFromRoot,
   buildMeetingPlatformAdapterStartupPlanMatrix as buildMeetingPlatformAdapterStartupPlanMatrixFromRoot,
+  buildMeetingPlatformAdapterCandidatePreflight as buildMeetingPlatformAdapterCandidatePreflightFromRoot,
   buildMeetingPlatformAdapterCurrentWindowPreflight as buildMeetingPlatformAdapterCurrentWindowPreflightFromRoot,
   buildMeetingPlatformAdapterPreflight as buildMeetingPlatformAdapterPreflightFromRoot,
   buildMeetingPlatformAdapterPreflightMatrix as buildMeetingPlatformAdapterPreflightMatrixFromRoot,
@@ -411,6 +412,7 @@ import {
   buildMeetingPlatformAdapterStartupPlanMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-startup';
 import {
+  buildMeetingPlatformAdapterCandidatePreflight,
   buildMeetingPlatformAdapterCurrentWindowPreflight,
   buildMeetingPlatformAdapterPreflight,
   buildMeetingPlatformAdapterPreflightMatrix,
@@ -941,6 +943,16 @@ assert.equal(rootMeetingAppSdk.platformAdapterPreflightMatrix({}, {
     'google-meet': [rootGoogleActiveSnapshot],
   },
 }).realtime_ready_count, 1);
+assert.equal(rootMeetingAppSdk.adapterCandidatePreflight({
+  candidates: [{
+    url: 'https://zoom.us/j/987654321',
+    title: 'Zoom Meeting',
+  }, {
+    document: rootSmokeDocument(),
+  }],
+}, {
+  requireSpeakerTrack: true,
+}).selected_platform, 'google_meet');
 assert.equal(rootMeetingAppSdk.platformAdaptationStrategy('google-meet').adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
 assert.equal(rootMeetingAppSdk.adaptationStrategyMatrix().provider_reconcile_required_count, 1);
 assert.equal(rootMeetingAppSdk.connectorHub().accepted, true);
@@ -990,6 +1002,17 @@ assert.equal(buildMeetingPlatformAdapterCurrentWindowPreflightFromRoot({
   baseUrl: 'http://localhost:8787',
   requireSpeakerTrack: true,
 }).accepted, true);
+assert.equal(buildMeetingPlatformAdapterCandidatePreflightFromRoot({
+  tabs: [{
+    url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+    title: 'Microsoft Teams',
+  }, {
+    document: rootSmokeDocument(),
+  }],
+}, {
+  baseUrl: 'http://localhost:8787',
+  requireSpeakerTrack: true,
+}).accepted_count, 1);
 assert.equal(buildMeetingPlatformAdapterPreflightMatrixFromRoot({}, {
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],
@@ -2407,6 +2430,22 @@ assert.equal(buildMeetingPlatformAdapterCurrentWindowPreflight({
   baseUrl: 'http://localhost:8787',
   requireSpeakerTrack: true,
 }).capture.profile, 'google_meet');
+assert.equal(buildMeetingPlatformAdapterCandidatePreflight({
+  windows: [{
+    id: 'smoke-browser',
+    tabs: [{
+      id: 1,
+      url: 'https://meet.google.com/abc-defg-hij',
+      title: 'Google Meet',
+    }, {
+      id: 2,
+      document: rootSmokeDocument(),
+    }],
+  }],
+}, {
+  baseUrl: 'http://localhost:8787',
+  requireSpeakerTrack: true,
+}).selected_platform, 'google_meet');
 assert.equal(buildMeetingPlatformAdapterPreflightMatrix({}, {
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],
@@ -2438,6 +2477,13 @@ assert.equal(kit.platformAdapterPreflightMatrix({}, {
     'google-meet': [rootGoogleActiveSnapshot],
   },
 }).meeting_start_ready_count, 1);
+assert.equal(kit.platformAdapterCandidatePreflight({
+  candidates: [{
+    document: rootSmokeDocument(),
+  }],
+}, {
+  requireSpeakerTrack: true,
+}).accepted, true);
 assert.equal(kit.platformRealEvidenceIntakePlan('google-meet').schema, 'meeting_platform_real_evidence_intake_plan');
 assert.equal(kit.platformRealEvidenceIntake('google-meet', {}, {
   requireProductionReady: false,

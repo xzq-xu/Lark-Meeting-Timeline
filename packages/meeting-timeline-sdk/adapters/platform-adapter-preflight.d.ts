@@ -15,6 +15,7 @@ import type {
 
 export const MEETING_PLATFORM_ADAPTER_PREFLIGHT_SCHEMA: 'meeting_platform_adapter_preflight';
 export const MEETING_PLATFORM_ADAPTER_PREFLIGHT_MATRIX_SCHEMA: 'meeting_platform_adapter_preflight_matrix';
+export const MEETING_PLATFORM_ADAPTER_CANDIDATE_PREFLIGHT_SCHEMA: 'meeting_platform_adapter_candidate_preflight';
 export const MEETING_PLATFORM_ADAPTER_PREFLIGHT_SCHEMA_VERSION: 1;
 
 export interface MeetingPlatformAdapterPreflightOptions extends MeetingPlatformAdapterStartupPlanOptions {
@@ -87,6 +88,29 @@ export interface MeetingPlatformAdapterPreflightMatrix {
   next_actions: string[];
 }
 
+export interface MeetingPlatformAdapterCandidatePreflight {
+  type: 'meeting_platform_adapter_candidate_preflight';
+  schema: 'meeting_platform_adapter_candidate_preflight';
+  schema_version: 1;
+  accepted: boolean;
+  status: string;
+  candidate_count: number;
+  supported_candidate_count: number;
+  accepted_count: number;
+  realtime_ready_count: number;
+  live_evidence_ready_count: number;
+  meeting_start_ready_count: number;
+  meeting_end_ready_count: number;
+  speaker_track_ready_count: number;
+  selected_candidate_index?: number;
+  selected_platform?: string;
+  selected_status?: string;
+  platforms: string[];
+  rows: Array<Record<string, unknown>>;
+  preflights: MeetingPlatformAdapterPreflight[];
+  next_actions: string[];
+}
+
 export function buildMeetingPlatformAdapterPreflight(
   input?: string | URL | MeetingPlatformAdapterDecisionInput,
   options?: MeetingPlatformAdapterPreflightOptions,
@@ -102,6 +126,11 @@ export function buildMeetingPlatformAdapterPreflightMatrix(
   options?: MeetingPlatformAdapterPreflightOptions,
 ): MeetingPlatformAdapterPreflightMatrix;
 
+export function buildMeetingPlatformAdapterCandidatePreflight(
+  input?: MeetingPlatformAdapterDecisionInput | MeetingPlatformAdapterDecisionInput[] | Record<string, unknown>,
+  options?: MeetingPlatformAdapterPreflightOptions,
+): MeetingPlatformAdapterCandidatePreflight;
+
 export function assertMeetingPlatformAdapterCurrentWindowPreflight(
   input?: MeetingAppDomCaptureInput | Document | MeetingPlatformAdapterDecisionInput,
   options?: MeetingPlatformAdapterPreflightOptions,
@@ -111,6 +140,11 @@ export function assertMeetingPlatformAdapterPreflight(
   input?: string | URL | MeetingPlatformAdapterDecisionInput,
   options?: MeetingPlatformAdapterPreflightOptions,
 ): MeetingPlatformAdapterPreflight;
+
+export function assertMeetingPlatformAdapterCandidatePreflight(
+  input?: MeetingPlatformAdapterDecisionInput | MeetingPlatformAdapterDecisionInput[] | Record<string, unknown>,
+  options?: MeetingPlatformAdapterPreflightOptions,
+): MeetingPlatformAdapterCandidatePreflight;
 
 export function assertMeetingPlatformAdapterPreflightMatrix(
   input?: MeetingPlatformAdapterDecisionInput,

@@ -4,9 +4,11 @@ import {
   buildMeetingAppFixtureSnapshot,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
 import {
+  assertMeetingPlatformAdapterCandidatePreflight,
   assertMeetingPlatformAdapterCurrentWindowPreflight,
   assertMeetingPlatformAdapterPreflight,
   assertMeetingPlatformAdapterPreflightMatrix,
+  buildMeetingPlatformAdapterCandidatePreflight,
   buildMeetingPlatformAdapterCurrentWindowPreflight,
   buildMeetingPlatformAdapterPreflight,
   buildMeetingPlatformAdapterPreflightMatrix,
@@ -257,6 +259,92 @@ assert.equal(zoomCurrentWindow.accepted, true);
 assert.equal(zoomCurrentWindow.captured_snapshot.capture.profile, 'zoom');
 assert.equal(zoomCurrentWindow.capture.participant_count, 1);
 
+const candidatePreflight = buildMeetingPlatformAdapterCandidatePreflight({
+  windows: [{
+    id: 'chrome-main',
+    tabs: [
+      {
+        id: 7,
+        url: 'https://meet.google.com/abc-defg-hij',
+        title: 'Design review - Google Meet',
+        active: false,
+      },
+      {
+        id: 8,
+        url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+        title: 'Weekly Sync | Microsoft Teams',
+        active: false,
+      },
+      {
+        id: 9,
+        url: 'https://us06web.zoom.us/wc/987654321/start',
+        title: 'Zoom Meeting',
+        active: true,
+        document: fakeDocument({
+          url: 'https://us06web.zoom.us/wc/987654321/start',
+          title: 'Zoom Meeting',
+          nodes: [
+            node('button', { 'aria-label': 'Leave Meeting' }),
+            node('button', { 'aria-label': 'Participants' }),
+            node('div', {
+              'data-user-id': 'mira',
+              'aria-label': 'Mira Patel is speaking',
+            }),
+          ],
+        }),
+      },
+    ],
+  }],
+}, {
+  baseUrl,
+  requireSpeakerTrack: true,
+});
+assert.equal(candidatePreflight.schema, 'meeting_platform_adapter_candidate_preflight');
+assert.equal(candidatePreflight.accepted, true);
+assert.equal(candidatePreflight.status, 'ready_for_realtime_annotations');
+assert.equal(candidatePreflight.candidate_count, 3);
+assert.equal(candidatePreflight.supported_candidate_count, 3);
+assert.equal(candidatePreflight.accepted_count, 1);
+assert.equal(candidatePreflight.selected_candidate_index, 2);
+assert.equal(candidatePreflight.selected_platform, 'zoom');
+assert.deepEqual(candidatePreflight.platforms, ['google_meet', 'microsoft_teams', 'zoom']);
+assert.equal(candidatePreflight.rows[0].status, 'needs_live_page_evidence');
+assert.equal(candidatePreflight.rows[0].tab_id, 7);
+assert.equal(candidatePreflight.rows[0].window_id, 'chrome-main');
+assert.equal(candidatePreflight.rows[2].current_window_captured, true);
+assert.equal(candidatePreflight.rows[2].selected, true);
+assert.equal(assertMeetingPlatformAdapterCandidatePreflight({
+  candidates: [{
+    document: fakeDocument({
+      url: 'https://meet.google.com/abc-defg-hij',
+      title: 'Assert candidate - Google Meet',
+      nodes: [
+        node('button', { 'aria-label': 'Leave call' }),
+        node('div', {
+          'data-participant-id': 'ada',
+          'aria-label': 'Ada Lovelace is speaking',
+        }),
+      ],
+    }),
+  }],
+}, {
+  baseUrl,
+  requireSpeakerTrack: true,
+}).selected_platform, 'google_meet');
+assert.throws(
+  () => assertMeetingPlatformAdapterCandidatePreflight({
+    tabs: [{
+      id: 10,
+      url: 'https://meet.google.com/no-live-evidence',
+      title: 'Google Meet',
+    }],
+  }, {
+    baseUrl,
+    requireSpeakerTrack: true,
+  }),
+  /candidate preflight has no accepted realtime candidate/,
+);
+
 const inputSnapshotMatrix = buildMeetingPlatformAdapterPreflightMatrix({
   snapshots: {
     'google-meet': [googleActive],
@@ -298,6 +386,23 @@ assert.equal(kit.platformAdapterPreflightMatrix({}, {
     'google-meet': [googleActive],
   },
 }).realtime_ready_count, 1);
+assert.equal(kit.platformAdapterCandidatePreflight({
+  tabs: [{
+    document: fakeDocument({
+      url: 'https://meet.google.com/abc-defg-hij',
+      title: 'Kit candidate - Google Meet',
+      nodes: [
+        node('button', { 'aria-label': 'Leave call' }),
+        node('div', {
+          'data-participant-id': 'ada',
+          'aria-label': 'Ada Lovelace is speaking',
+        }),
+      ],
+    }),
+  }],
+}, {
+  requireSpeakerTrack: true,
+}).accepted, true);
 assert.equal(kit.platformAdapterCurrentWindowPreflight({
   document: fakeDocument({
     url: 'https://meet.google.com/abc-defg-hij',
@@ -332,6 +437,43 @@ assert.equal(sdk.platformAdapterPreflightMatrix({}, {
     'google-meet': [googleActive],
   },
 }).accepted_count, 1);
+assert.equal(sdk.adapterCandidatePreflight({
+  candidates: [{
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Google Meet',
+  }, {
+    document: fakeDocument({
+      url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+      title: 'SDK candidate - Teams',
+      nodes: [
+        node('button', { 'aria-label': 'Leave' }),
+        node('div', {
+          'data-user-id': 'ada',
+          'aria-label': 'Ada Lovelace speaking',
+        }),
+      ],
+    }),
+  }],
+}, {
+  requireSpeakerTrack: true,
+}).selected_platform, 'microsoft_teams');
+assert.equal(sdk.assertAdapterCandidatePreflight({
+  candidates: [{
+    document: fakeDocument({
+      url: 'https://meet.google.com/abc-defg-hij',
+      title: 'SDK assert candidate - Google Meet',
+      nodes: [
+        node('button', { 'aria-label': 'Leave call' }),
+        node('div', {
+          'data-participant-id': 'ada',
+          'aria-label': 'Ada Lovelace is speaking',
+        }),
+      ],
+    }),
+  }],
+}, {
+  requireSpeakerTrack: true,
+}).accepted, true);
 assert.equal(sdk.assertAdapterPreflight({
   platform: 'google-meet',
   snapshots: [googleActive],

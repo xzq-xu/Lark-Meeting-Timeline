@@ -554,6 +554,11 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
   ): import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightMatrix;
   adapterPreflightMatrix: MeetingAppTimelineSdk['platformAdapterPreflightMatrix'];
+  platformAdapterCandidatePreflight(
+    input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput[] | Record<string, unknown>,
+    options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
+  ): import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterCandidatePreflight;
+  adapterCandidatePreflight: MeetingAppTimelineSdk['platformAdapterCandidatePreflight'];
   assertPlatformAdapterPreflight(
     input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
     options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
@@ -569,6 +574,11 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
   ): import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightMatrix;
   assertAdapterPreflightMatrix: MeetingAppTimelineSdk['assertPlatformAdapterPreflightMatrix'];
+  assertPlatformAdapterCandidatePreflight(
+    input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput[] | Record<string, unknown>,
+    options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
+  ): import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterCandidatePreflight;
+  assertAdapterCandidatePreflight: MeetingAppTimelineSdk['assertPlatformAdapterCandidatePreflight'];
   platformAdaptationStrategy(
     platformOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,

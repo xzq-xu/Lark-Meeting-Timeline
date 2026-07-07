@@ -17,6 +17,7 @@ import {
 
 export const MEETING_PLATFORM_ADAPTER_PREFLIGHT_SCHEMA = 'meeting_platform_adapter_preflight';
 export const MEETING_PLATFORM_ADAPTER_PREFLIGHT_MATRIX_SCHEMA = 'meeting_platform_adapter_preflight_matrix';
+export const MEETING_PLATFORM_ADAPTER_CANDIDATE_PREFLIGHT_SCHEMA = 'meeting_platform_adapter_candidate_preflight';
 export const MEETING_PLATFORM_ADAPTER_PREFLIGHT_SCHEMA_VERSION = 1;
 
 const DEFAULT_PREFLIGHT_PLATFORMS = Object.freeze([
@@ -48,6 +49,14 @@ function isPlainObject(value) {
 function normalizeInput(input = {}) {
   if (typeof input === 'string' || input instanceof URL) return { url: String(input) };
   return input ?? {};
+}
+
+function explicitDocument(input = {}) {
+  if (input?.querySelectorAll && input?.nodeType === 9) return input;
+  if (input?.document?.querySelectorAll) return input.document;
+  if (input?.window?.document?.querySelectorAll) return input.window.document;
+  if (input?.tab?.document?.querySelectorAll) return input.tab.document;
+  return null;
 }
 
 function normalizeMaybePlatform(value) {
@@ -386,6 +395,195 @@ function withoutEvidenceOptions(options = {}) {
   return rest;
 }
 
+function candidateArrays(input = {}, options = {}) {
+  if (Array.isArray(input)) return [input];
+  return [
+    input.candidates,
+    input.candidateTabs,
+    input.candidate_tabs,
+    input.tabs,
+    input.items,
+    input.rows,
+    options.candidates,
+    options.candidateTabs,
+    options.candidate_tabs,
+    options.tabs,
+  ].filter((value) => value != null);
+}
+
+function candidateWindows(input = {}, options = {}) {
+  if (Array.isArray(input)) return [];
+  return [
+    input.windows,
+    input.browserWindows,
+    input.browser_windows,
+    input.window,
+    options.windows,
+    options.browserWindows,
+    options.browser_windows,
+  ].filter((value) => value != null).flatMap((value) => asArray(value));
+}
+
+function candidateUrl(candidate = {}) {
+  if (typeof candidate === 'string' || candidate instanceof URL) return String(candidate);
+  return firstNonEmpty(
+    candidate.url,
+    candidate.href,
+    candidate.meeting_url,
+    candidate.meetingUrl,
+    candidate.join_url,
+    candidate.joinUrl,
+    candidate.location?.href,
+    candidate.document?.location?.href,
+    candidate.tab?.url,
+    candidate.tab?.document?.location?.href,
+    candidate.window?.url,
+    candidate.window?.document?.location?.href,
+    candidate.page?.url,
+    candidate.dom?.url,
+  );
+}
+
+function candidateTitle(candidate = {}) {
+  if (typeof candidate === 'string' || candidate instanceof URL) return undefined;
+  return firstNonEmpty(
+    candidate.title,
+    candidate.meeting_title,
+    candidate.meetingTitle,
+    candidate.document?.title,
+    candidate.tab?.title,
+    candidate.tab?.document?.title,
+    candidate.window?.title,
+    candidate.window?.document?.title,
+    candidate.page?.title,
+    candidate.dom?.title,
+  );
+}
+
+function normalizeCandidate(candidate, meta = {}) {
+  if (typeof candidate === 'string' || candidate instanceof URL) {
+    return compactObject({
+      candidate_index: meta.index,
+      source: meta.source,
+      url: String(candidate),
+    });
+  }
+  const tab = candidate?.tab ?? candidate;
+  return compactObject({
+    ...candidate,
+    candidate_index: meta.index,
+    source: firstNonEmpty(candidate?.source, meta.source),
+    window_id: firstNonEmpty(candidate?.window_id, candidate?.windowId, meta.window_id, meta.windowId),
+    tab_id: firstNonEmpty(candidate?.tab_id, candidate?.tabId, candidate?.id, tab?.id),
+    active: firstNonEmpty(candidate?.active, tab?.active),
+    url: candidateUrl(candidate),
+    title: candidateTitle(candidate),
+  });
+}
+
+function flattenCandidateTabs(input = {}, options = {}) {
+  const candidates = [];
+  for (const source of candidateArrays(input, options)) {
+    for (const candidate of asArray(source)) {
+      candidates.push(normalizeCandidate(candidate, {
+        index: candidates.length,
+        source: 'candidate',
+      }));
+    }
+  }
+  for (const [windowIndex, windowItem] of candidateWindows(input, options).entries()) {
+    const windowId = firstNonEmpty(windowItem?.id, windowItem?.window_id, windowItem?.windowId, windowIndex);
+    const tabs = asArray(firstNonEmpty(windowItem?.tabs, windowItem?.candidateTabs, windowItem?.candidate_tabs));
+    if (tabs.length === 0 && candidateUrl(windowItem)) {
+      candidates.push(normalizeCandidate(windowItem, {
+        index: candidates.length,
+        source: 'window',
+        window_id: windowId,
+      }));
+      continue;
+    }
+    for (const tab of tabs) {
+      candidates.push(normalizeCandidate({
+        ...tab,
+        tab,
+      }, {
+        index: candidates.length,
+        source: 'window_tab',
+        window_id: windowId,
+      }));
+    }
+  }
+  return candidates;
+}
+
+function candidatePreflightInput(candidate = {}) {
+  const snapshot = firstNonEmpty(candidate.snapshot, candidate.captured_snapshot, candidate.capturedSnapshot);
+  const snapshots = [
+    ...asArray(candidate.snapshots),
+    ...asArray(candidate.domSnapshots),
+    ...asArray(candidate.dom_snapshots),
+    ...asArray(snapshot),
+  ];
+  return compactObject({
+    ...candidate,
+    platform: normalizeMaybePlatform(firstNonEmpty(candidate.platform, candidate.provider)),
+    url: candidateUrl(candidate),
+    title: candidateTitle(candidate),
+    snapshots: snapshots.length ? snapshots : undefined,
+  });
+}
+
+function candidatePreflight(candidate = {}, options = {}) {
+  const input = candidatePreflightInput(candidate);
+  if (explicitDocument(candidate)) {
+    return buildMeetingPlatformAdapterCurrentWindowPreflight(input, options);
+  }
+  return buildMeetingPlatformAdapterPreflight(input, options);
+}
+
+function candidateStatus(preflights = []) {
+  if (preflights.length === 0) return 'empty_candidates';
+  if (preflights.some((preflight) => preflight.accepted === true)) return 'ready_for_realtime_annotations';
+  if (preflights.some((preflight) => preflight.readiness?.static_startup_ready === true)) return 'needs_live_page_evidence';
+  if (preflights.some((preflight) => preflight.platform)) return 'startup_not_ready';
+  return 'no_supported_candidates';
+}
+
+function selectedCandidateIndex(preflights = []) {
+  const accepted = preflights.findIndex((preflight) => preflight.accepted === true);
+  if (accepted >= 0) return accepted;
+  const staticReady = preflights.findIndex((preflight) => preflight.readiness?.static_startup_ready === true);
+  if (staticReady >= 0) return staticReady;
+  return preflights.findIndex((preflight) => preflight.platform);
+}
+
+function candidateRow(candidate = {}, preflight = {}, selected = false) {
+  return compactObject({
+    candidate_index: candidate.candidate_index,
+    selected,
+    source: candidate.source,
+    window_id: candidate.window_id,
+    tab_id: candidate.tab_id,
+    active: candidate.active,
+    url: candidate.url,
+    title: candidate.title,
+    platform: preflight.platform,
+    display_name: preflight.display_name,
+    accepted: preflight.accepted,
+    status: preflight.status,
+    startup_ready: preflight.readiness?.static_startup_ready === true,
+    live_evidence_ready: preflight.readiness?.live_evidence_ready === true,
+    realtime_annotation_ready: preflight.readiness?.realtime_annotation_ready === true,
+    production_lifecycle_ready: preflight.readiness?.production_lifecycle_ready === true,
+    meeting_start_ready: preflight.readiness?.meeting_start_ready === true,
+    meeting_end_ready: preflight.readiness?.meeting_end_ready === true,
+    speaker_track_ready: preflight.readiness?.speaker_track_ready === true,
+    current_window_captured: preflight.current_window?.captured === true,
+    issue_codes: (preflight.issues ?? []).map((issue) => issue.code),
+    first_next_action: preflight.next_actions?.[0],
+  });
+}
+
 export function buildMeetingPlatformAdapterPreflight(input = {}, options = {}) {
   const objectInput = normalizeInput(input);
   const startup = buildMeetingPlatformAdapterStartupPlan(objectInput, options);
@@ -501,6 +699,41 @@ export function buildMeetingPlatformAdapterPreflightMatrix(input = {}, options =
   };
 }
 
+export function buildMeetingPlatformAdapterCandidatePreflight(input = {}, options = {}) {
+  const objectInput = normalizeInput(input);
+  const candidates = flattenCandidateTabs(objectInput, options);
+  const preflights = candidates.map((candidate) => candidatePreflight(candidate, {
+    ...options,
+    platforms: undefined,
+    platform_keys: undefined,
+  }));
+  const selectedIndex = selectedCandidateIndex(preflights);
+  const selectedPreflight = selectedIndex >= 0 ? preflights[selectedIndex] : undefined;
+  const rows = preflights.map((preflight, index) => candidateRow(candidates[index], preflight, index === selectedIndex));
+  return compactObject({
+    type: 'meeting_platform_adapter_candidate_preflight',
+    schema: MEETING_PLATFORM_ADAPTER_CANDIDATE_PREFLIGHT_SCHEMA,
+    schema_version: MEETING_PLATFORM_ADAPTER_PREFLIGHT_SCHEMA_VERSION,
+    accepted: preflights.some((preflight) => preflight.accepted === true),
+    status: candidateStatus(preflights),
+    candidate_count: candidates.length,
+    supported_candidate_count: preflights.filter((preflight) => preflight.platform).length,
+    accepted_count: preflights.filter((preflight) => preflight.accepted).length,
+    realtime_ready_count: preflights.filter((preflight) => preflight.readiness?.realtime_annotation_ready === true).length,
+    live_evidence_ready_count: preflights.filter((preflight) => preflight.readiness?.live_evidence_ready === true).length,
+    meeting_start_ready_count: preflights.filter((preflight) => preflight.readiness?.meeting_start_ready === true).length,
+    meeting_end_ready_count: preflights.filter((preflight) => preflight.readiness?.meeting_end_ready === true).length,
+    speaker_track_ready_count: preflights.filter((preflight) => preflight.readiness?.speaker_track_ready === true).length,
+    selected_candidate_index: selectedIndex >= 0 ? selectedIndex : undefined,
+    selected_platform: selectedPreflight?.platform,
+    selected_status: selectedPreflight?.status,
+    platforms: unique(preflights.map((preflight) => preflight.platform).filter(Boolean)),
+    rows,
+    preflights,
+    next_actions: unique(preflights.flatMap((preflight) => preflight.next_actions ?? [])),
+  });
+}
+
 export function assertMeetingPlatformAdapterCurrentWindowPreflight(input = {}, options = {}) {
   const preflight = buildMeetingPlatformAdapterCurrentWindowPreflight(input, options);
   if (preflight.accepted !== true) {
@@ -508,6 +741,20 @@ export function assertMeetingPlatformAdapterCurrentWindowPreflight(input = {}, o
       platform: preflight.platform,
       status: preflight.status,
       issues: preflight.issues,
+      next_actions: preflight.next_actions,
+      preflight,
+    });
+  }
+  return preflight;
+}
+
+export function assertMeetingPlatformAdapterCandidatePreflight(input = {}, options = {}) {
+  const preflight = buildMeetingPlatformAdapterCandidatePreflight(input, options);
+  if (preflight.accepted !== true) {
+    throw new MeetingTimelineSdkError('Meeting platform adapter candidate preflight has no accepted realtime candidate', {
+      status: preflight.status,
+      candidate_count: preflight.candidate_count,
+      rows: preflight.rows,
       next_actions: preflight.next_actions,
       preflight,
     });

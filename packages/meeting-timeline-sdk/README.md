@@ -1889,6 +1889,7 @@ const diagnosis = buildMeetingAppDomAdaptationDiagnosisMatrix({
 
 ```js
 import {
+  buildMeetingPlatformAdapterCandidatePreflight,
   buildMeetingPlatformAdapterCurrentWindowPreflight,
   buildMeetingPlatformAdapterPreflight,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight';
@@ -1918,6 +1919,27 @@ const response = await bridge.dispatchMessage({
   payload: { options: { requireSpeakerTrack: true } },
 });
 // response.result.accepted 表示当前窗口是否能作为实时标注轴来源。
+```
+
+如果宿主拿到的是浏览器扩展 background、Electron preload 或桌面观察器的一批候选窗口/标签，用 `buildMeetingPlatformAdapterCandidatePreflight()` 一次性展开 `windows[].tabs[]` / `tabs[]` / `candidates[]`。URL-only 候选只会验证 startup plan 并返回 `needs_live_page_evidence`；只有明确携带当前 `document` 或 live snapshot 的候选才会被判定为 `ready_for_realtime_annotations`，避免误把静态 URL 匹配当成可实时建轴。
+
+```js
+const candidatePreflight = buildMeetingPlatformAdapterCandidatePreflight({
+  windows: [{
+    id: 'chrome-main',
+    tabs: [
+      { id: 7, url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet' },
+      { id: 8, url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting', title: 'Teams' },
+      { id: 9, url: location.href, title: document.title, document },
+    ],
+  }],
+}, {
+  requireSpeakerTrack: true,
+});
+
+// candidatePreflight.rows[*] 会保留 window_id / tab_id / url / platform / status。
+// candidatePreflight.selected_platform 是当前最适合建实时标注轴的平台。
+// candidatePreflight.accepted === true 表示至少一个候选已经可实时插入 captured_at_ms 标注。
 ```
 
 如果希望 SDK 帮你管理轮询、去重和 keep-alive，可以直接用 `meeting-app-monitor`。它会高频低成本采集 DOM，但只有在页面状态变化、或到达 keep-alive 间隔时才把样本送给 `meeting-source`；即使 DOM 不变，也会按间隔继续送样本，避免 active speaker 的 `minStableMs` 因过度去重而无法触发：

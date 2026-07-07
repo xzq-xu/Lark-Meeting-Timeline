@@ -1314,6 +1314,12 @@ export function createMeetingAppTimelineSdk(options = {}) {
     adapterPreflightMatrix(input = {}, preflightOptions = {}) {
       return sdk.platformAdapterPreflightMatrix(input, preflightOptions);
     },
+    platformAdapterCandidatePreflight(input = {}, preflightOptions = {}) {
+      return runtime.kit.platformAdapterCandidatePreflight(input, sdkPlatformOptions(runtime, preflightOptions));
+    },
+    adapterCandidatePreflight(input = {}, preflightOptions = {}) {
+      return sdk.platformAdapterCandidatePreflight(input, preflightOptions);
+    },
     assertPlatformAdapterPreflight(input = {}, preflightOptions = {}) {
       return runtime.kit.assertPlatformAdapterPreflight(input, sdkPlatformOptions(runtime, preflightOptions));
     },
@@ -1331,6 +1337,12 @@ export function createMeetingAppTimelineSdk(options = {}) {
     },
     assertAdapterPreflightMatrix(input = {}, preflightOptions = {}) {
       return sdk.assertPlatformAdapterPreflightMatrix(input, preflightOptions);
+    },
+    assertPlatformAdapterCandidatePreflight(input = {}, preflightOptions = {}) {
+      return runtime.kit.assertPlatformAdapterCandidatePreflight(input, sdkPlatformOptions(runtime, preflightOptions));
+    },
+    assertAdapterCandidatePreflight(input = {}, preflightOptions = {}) {
+      return sdk.assertPlatformAdapterCandidatePreflight(input, preflightOptions);
     },
     platformAdaptationStrategy(platformOrOptions = {}, strategyOptions = {}) {
       const resolved = singlePlatformInput(runtime, platformOrOptions, strategyOptions);
