@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import {
   MEETING_PLATFORM_HOST_INTEGRATION_ACCEPTANCE_SCHEMA,
@@ -99,6 +103,13 @@ assert.equal(plan.adapter_blueprint_matrix.platform_count, 3);
 assert.equal(plan.adapter_blueprint_matrix.ready_count, 3);
 assert.equal(plan.adapter_blueprint_matrix.rows.find((row) => row.platform === 'google_meet').primary_surface, 'browser_extension');
 assert.equal(plan.adapter_blueprint_matrix.rows.find((row) => row.platform === 'zoom').primary_surface, 'native_detector');
+assert.equal(plan.adapter_runtime_contract.platform_count, 3);
+assert.equal(plan.adapter_runtime_contract.ready_count, 3);
+assert.equal(plan.adapter_runtime_contract.all_ready, true);
+assert.equal(plan.adapter_runtime_contract.index_file, 'src/platform-adapters/index.mjs');
+assert.equal(plan.adapter_runtime_contract.rows.find((row) => row.platform === 'google_meet').adapter_file, 'src/platform-adapters/google_meet.mjs');
+assert.equal(plan.adapter_runtime_contract.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
+assert.equal(plan.adapter_runtime_contract.rows.every((row) => row.timestamp_field === 'captured_at_ms'), true);
 assert.equal(plan.adaptation_strategy_matrix.strategy_count, 3);
 assert.equal(plan.adaptation_strategy_matrix.rows.every((row) => row.provider_blocks_realtime === false), true);
 assert.equal(plan.adapter_contract_matrix.platform_count, 3);
@@ -111,6 +122,7 @@ assert.equal(plan.next_actions.includes('export_meeting_platform_consumer_handof
 assert.equal(plan.next_actions.includes('wire_host_routes_to_handleMeetingPlatformRequest'), true);
 assert.equal(plan.next_actions.includes('wire_observer_plans_to_host_scheduler'), true);
 assert.equal(plan.next_actions.includes('publish_adapter_blueprints_endpoint_for_downstream_hosts'), true);
+assert.equal(plan.next_actions.includes('wire_platform_adapter_runtime_entries_into_host_surface'), true);
 assert.equal(plan.next_actions.includes('run_meeting_platform_integration_runtime_manifest_before_host_handoff'), true);
 assert.equal(plan.next_actions.includes('run_meeting_platform_handoff_readiness_before_host_handoff'), true);
 
@@ -121,7 +133,7 @@ const scaffold = buildMeetingPlatformHostIntegrationScaffold({
 });
 
 assert.equal(scaffold.schema, MEETING_PLATFORM_HOST_INTEGRATION_SCAFFOLD_SCHEMA);
-assert.equal(scaffold.files.length, 25);
+assert.equal(scaffold.files.length, 30);
 assert.equal(file(scaffold, 'package.json').mime, 'application/json');
 const manifest = JSON.parse(file(scaffold, 'package.json').content);
 assert.equal(manifest.name, 'timeline-host-consumer');
@@ -135,6 +147,7 @@ assert.equal(manifest.scripts['meeting-platform:observer-plans'], 'node ./script
 assert.equal(manifest.scripts['meeting-platform:runtime-event-plans'], 'node ./scripts/print-runtime-event-plans.mjs');
 assert.equal(manifest.scripts['meeting-platform:adapter-routes'], 'node ./scripts/print-adapter-routes.mjs');
 assert.equal(manifest.scripts['meeting-platform:adapter-blueprints'], 'node ./scripts/print-adapter-blueprints.mjs');
+assert.equal(manifest.scripts['meeting-platform:adapters'], 'node ./scripts/print-platform-adapters.mjs');
 assert.equal(manifest.scripts['meeting-platform:resolve'], 'node ./scripts/resolve-platform.mjs');
 assert.equal(manifest.scripts['meeting-platform:resolve-candidates'], 'node ./scripts/resolve-platform-candidates.mjs');
 assert.equal(manifest.scripts['meeting-platform:observe-candidates'], 'node ./scripts/observe-platform-candidates.mjs');
@@ -170,6 +183,16 @@ assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('m
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('capturedAtMs'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('speakerTrack'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('participantTrack'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('createMeetingPlatformAdapters'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformAdapter(platform'), true);
+assert.equal(file(scaffold, 'src/platform-adapters/index.mjs').content.includes('createMeetingPlatformAdapter'), true);
+assert.equal(file(scaffold, 'src/platform-adapters/index.mjs').content.includes('createGoogleMeetTimelineAdapter'), true);
+assert.equal(file(scaffold, 'src/platform-adapters/google_meet.mjs').content.includes('createGoogleMeetTimelineAdapter'), true);
+assert.equal(file(scaffold, 'src/platform-adapters/google_meet.mjs').content.includes('observeCandidates'), true);
+assert.equal(file(scaffold, 'src/platform-adapters/google_meet.mjs').content.includes('insertAnnotation'), true);
+assert.equal(file(scaffold, 'src/platform-adapters/google_meet.mjs').content.includes('captured_at_ms'), true);
+assert.equal(file(scaffold, 'src/platform-adapters/microsoft_teams.mjs').content.includes('createMicrosoftTeamsTimelineAdapter'), true);
+assert.equal(file(scaffold, 'src/platform-adapters/zoom.mjs').content.includes('createZoomTimelineAdapter'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('handleFetchRequest'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/contracts'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/conformance'), true);
@@ -199,6 +222,7 @@ assert.equal(file(scaffold, 'scripts/print-observer-plans.mjs').content.includes
 assert.equal(file(scaffold, 'scripts/print-runtime-event-plans.mjs').content.includes('host.runtimeEventPlans()'), true);
 assert.equal(file(scaffold, 'scripts/print-adapter-routes.mjs').content.includes('host.adapterRoutes()'), true);
 assert.equal(file(scaffold, 'scripts/print-adapter-blueprints.mjs').content.includes('host.adapterBlueprints()'), true);
+assert.equal(file(scaffold, 'scripts/print-platform-adapters.mjs').content.includes('host.platformAdapters()'), true);
 assert.equal(file(scaffold, 'scripts/print-strategy.mjs').content.includes('host.adaptationStrategyMatrix()'), true);
 assert.equal(file(scaffold, 'scripts/resolve-platform.mjs').content.includes('host.resolvePlatform'), true);
 assert.equal(file(scaffold, 'scripts/resolve-platform.mjs').content.includes('MEETING_PLATFORM_URL'), true);
@@ -219,6 +243,8 @@ assert.equal(file(scaffold, 'README.md').content.includes('runtimeEventPlans'), 
 assert.equal(file(scaffold, 'README.md').content.includes('adapterRoutes'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('adapterBlueprints'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('Adapter blueprints'), true);
+assert.equal(file(scaffold, 'README.md').content.includes('Adapter runtime entries'), true);
+assert.equal(file(scaffold, 'README.md').content.includes('platformAdapter'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('observerPlans'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('resolvePlatform'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('resolvePlatformCandidates'), true);
@@ -244,6 +270,9 @@ assert.equal(acceptance.candidate_observation_ready, true);
 assert.equal(acceptance.adapter_blueprint_ready, true);
 assert.equal(acceptance.adapter_blueprint_ready_count, 3);
 assert.equal(acceptance.adapter_blueprint_matrix.rows.find((row) => row.platform === 'google_meet').primary_surface, 'browser_extension');
+assert.equal(acceptance.adapter_runtime_ready, true);
+assert.equal(acceptance.adapter_runtime_ready_count, 3);
+assert.equal(acceptance.adapter_runtime_contract.rows.find((row) => row.platform === 'zoom').adapter_file, 'src/platform-adapters/zoom.mjs');
 assert.equal(acceptance.candidate_observer_count, 3);
 assert.equal(acceptance.candidate_observer_missing_count, 0);
 assert.equal(acceptance.candidate_observation_contract.all_ready, true);
@@ -268,6 +297,11 @@ assert.equal(acceptance.required_files.includes('scripts/print-runtime-bundles.m
 assert.equal(acceptance.required_files.includes('scripts/print-observer-plans.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-runtime-event-plans.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-adapter-routes.mjs'), true);
+assert.equal(acceptance.required_files.includes('scripts/print-platform-adapters.mjs'), true);
+assert.equal(acceptance.required_files.includes('src/platform-adapters/index.mjs'), true);
+assert.equal(acceptance.required_files.includes('src/platform-adapters/google_meet.mjs'), true);
+assert.equal(acceptance.required_files.includes('src/platform-adapters/microsoft_teams.mjs'), true);
+assert.equal(acceptance.required_files.includes('src/platform-adapters/zoom.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/resolve-platform.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/resolve-platform-candidates.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/observe-platform-candidates.mjs'), true);
@@ -297,6 +331,14 @@ const missingContractGate = {
 const missingContractGateAcceptance = buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(missingContractGate);
 assert.equal(missingContractGateAcceptance.accepted, false);
 assert.equal(missingContractGateAcceptance.issues.some((item) => item.path === 'scripts/verify-contracts.mjs'), true);
+
+const missingPlatformAdapter = {
+  ...scaffold,
+  files: scaffold.files.filter((item) => item.path !== 'src/platform-adapters/google_meet.mjs'),
+};
+const missingPlatformAdapterAcceptance = buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(missingPlatformAdapter);
+assert.equal(missingPlatformAdapterAcceptance.accepted, false);
+assert.equal(missingPlatformAdapterAcceptance.issues.some((item) => item.path === 'src/platform-adapters/google_meet.mjs'), true);
 
 const missingCandidateObservationContract = {
   ...scaffold,
@@ -335,6 +377,43 @@ assert.equal(
   missingMeetingTrackContractAcceptance.issues.some((item) => item.code === 'meeting_track_contract_not_ready'),
   true,
 );
+
+const adapterTmpDir = await mkdtemp(join(tmpdir(), 'meeting-platform-adapters-'));
+try {
+  for (const item of scaffold.files.filter((entry) => entry.path.startsWith('src/platform-adapters/'))) {
+    const target = join(adapterTmpDir, item.path);
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, item.content);
+  }
+  const adapterModule = await import(pathToFileURL(join(adapterTmpDir, 'src/platform-adapters/index.mjs')).href);
+  const adapterCalls = [];
+  const fakeHost = {
+    resolvePlatform(input) { adapterCalls.push(['resolvePlatform', input]); return { accepted: true, input }; },
+    resolvePlatformCandidates(input) { adapterCalls.push(['resolvePlatformCandidates', input]); return { accepted: true, input }; },
+    observePlatformCandidates(input) { adapterCalls.push(['observePlatformCandidates', input]); return { accepted: true, input }; },
+    insertAnnotation(platform, input) { adapterCalls.push(['insertAnnotation', platform, input]); return { accepted: true, platform, input }; },
+    speakerTrack(platform, input) { adapterCalls.push(['speakerTrack', platform, input]); return { accepted: true, platform, input }; },
+    participantTrack(platform, input) { adapterCalls.push(['participantTrack', platform, input]); return { accepted: true, platform, input }; },
+    ingestProvider(platform, requestOrPayload, payload) {
+      adapterCalls.push(['ingestProvider', platform, requestOrPayload, payload]);
+      return { accepted: true, platform, requestOrPayload, payload };
+    },
+  };
+  const googleAdapter = adapterModule.createMeetingPlatformAdapter(fakeHost, 'google-meet');
+  assert.equal(googleAdapter.platform, 'google_meet');
+  assert.equal(googleAdapter.selected_surface, 'browser_extension');
+  assert.throws(
+    () => googleAdapter.insertAnnotation({ label: 'why?' }),
+    /captured_at_ms/,
+  );
+  const inserted = googleAdapter.insertAnnotation({ label: 'why?', captured_at_ms: 1234 });
+  assert.equal(inserted.platform, 'google_meet');
+  assert.equal(inserted.input.capturedAtMs, 1234);
+  assert.equal(adapterCalls.at(-1)[0], 'insertAnnotation');
+  assert.equal(adapterModule.createMeetingPlatformAdapters(fakeHost).zoom.selected_surface, 'native_detector');
+} finally {
+  await rm(adapterTmpDir, { recursive: true, force: true });
+}
 
 const client = {
   async startMeeting(input) { return { ok: true, input }; },

@@ -37,6 +37,7 @@ export interface MeetingPlatformHostIntegrationPlan {
   extension_install_plan: Record<string, unknown>;
   adapter_route_matrix: MeetingPlatformAdapterRouteMatrix;
   adapter_blueprint_matrix: MeetingPlatformAdapterBlueprintMatrix;
+  adapter_runtime_contract: Record<string, unknown>;
   adaptation_strategy_matrix: Record<string, unknown>;
   runtime_event_plan_matrix: Record<string, unknown>;
   runtime_bundle_matrix: Record<string, unknown>;
@@ -90,6 +91,9 @@ export interface MeetingPlatformHostIntegrationScaffoldAcceptanceReport {
   adapter_blueprint_ready: boolean;
   adapter_blueprint_ready_count: number;
   adapter_blueprint_matrix?: MeetingPlatformAdapterBlueprintMatrix;
+  adapter_runtime_ready: boolean;
+  adapter_runtime_ready_count: number;
+  adapter_runtime_contract?: Record<string, unknown>;
   meeting_track_ready: boolean;
   speaker_track_ready_count: number;
   participant_track_ready_count: number;

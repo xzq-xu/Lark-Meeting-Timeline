@@ -3550,7 +3550,7 @@ npm run meeting-platform:subscription-handoff -- \
 
 报告里 `ready_to_create_count` 表示能直接创建订阅的平台数，`manual_setup_count` 表示必须去平台控制台或长连接配置的平台数，`security_blocked_count` 和 `parameter_missing_count` 直接给 CI/接入面板做失败原因。即使 provider 订阅已全部可创建，实时标注仍然以宿主捕获的 `captured_at_ms` 为准；provider 事件只做 start/end/artifact 的回填和审计。
 
-如果要给另一个项目一个更完整的“可改造骨架”，用 `platform-host-integration` 生成 host scaffold。它会输出 `package.json`、timeline client、host wrapper、framework-neutral HTTP route、strategy/handoff/readiness/runtime-bundle/平台解析/extension-plan/integration-runtime 脚本和 README。生成的 host wrapper 会先创建 `createMeetingPlatformIntegrationRuntime()`，因此下游项目可以优先接统一 runtime，再按需下钻到 platform resolution、strategy、runtime bundle 或 extension plan：
+如果要给另一个项目一个更完整的“可改造骨架”，用 `platform-host-integration` 生成 host scaffold。它会输出 `package.json`、timeline client、host wrapper、per-platform adapter entries、framework-neutral HTTP route、strategy/handoff/readiness/runtime-bundle/平台解析/extension-plan/integration-runtime 脚本和 README。生成的 host wrapper 会先创建 `createMeetingPlatformIntegrationRuntime()`，并暴露 `host.platformAdapter(platform)` / `host.platformAdapters()`；下游项目可以优先接统一 runtime，再按需下钻到 Google Meet、Teams、Zoom、Webex、Lark 各自的 resolve、observeCandidates、insertAnnotation、speakerTrack、participantTrack 或 provider reconcile 入口：
 
 ```js
 import {
@@ -3565,8 +3565,10 @@ const scaffold = buildMeetingPlatformHostIntegrationScaffold({
 });
 
 assertMeetingPlatformHostIntegrationScaffold(scaffold);
-// scaffold.files 里包含 src/meeting-platform-host.mjs 和 src/http-routes.mjs。
+// scaffold.files 里包含 src/meeting-platform-host.mjs、src/http-routes.mjs 和 src/platform-adapters/{platform}.mjs。
+// scaffold.plan.adapter_runtime_contract 会列出每个平台的 adapter file、selected surface、observe/insert 方法和 captured_at_ms 契约。
 // scaffold.plan.candidate_observation_contract 会列出每个平台的 observe-candidates 覆盖率、tabs 权限和 message type。
+// host.platformAdapter('google_meet').insertAnnotation({ label: 'why?', captured_at_ms: Date.now() }) 是每个平台的薄运行时入口。
 // host.adapterRoutes() 和 /api/meeting-platform/adapter-routes 可把 Google Meet/Teams/Zoom 的本地观察、provider 回填、会后转写路线交给宿主决策。
 // host.adaptationStrategyMatrix() 和 /api/meeting-platform/strategy 可给宿主先做平台适配决策。
 // host.resolvePlatform(input) 和 /api/meeting-platform/resolve 可用会议 URL/window/title 判断当前应启用哪个平台适配器。

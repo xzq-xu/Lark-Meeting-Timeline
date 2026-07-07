@@ -1567,6 +1567,9 @@ assert.equal(kit.platformHostIntegrationScaffold({
 }).files.some((file) => file.path === 'src/meeting-platform-host.mjs'), true);
 assert.equal(kit.platformHostIntegrationScaffold({
   platforms: ['zoom'],
+}).files.some((file) => file.path === 'src/platform-adapters/zoom.mjs'), true);
+assert.equal(kit.platformHostIntegrationScaffold({
+  platforms: ['zoom'],
 }).files.some((file) => file.path === 'scripts/print-runtime-bundles.mjs'), true);
 assert.equal(kit.platformHostIntegrationScaffold({
   platforms: ['zoom'],
@@ -2279,6 +2282,8 @@ assert.equal(assertMeetingPlatformHostIntegrationScaffold(buildMeetingPlatformHo
 assert.equal(smokeHostScaffold.files.some((file) => file.path === 'scripts/run-integration-runtime-manifest.mjs'), true);
 assert.equal(smokeHostScaffold.files.some((file) => file.path === 'scripts/verify-conformance.mjs'), true);
 assert.equal(smokeHostScaffold.files.some((file) => file.path === 'scripts/run-handoff-readiness.mjs'), true);
+assert.equal(smokeHostScaffold.files.some((file) => file.path === 'scripts/print-platform-adapters.mjs'), true);
+assert.equal(smokeHostScaffold.files.find((file) => file.path === 'src/platform-adapters/zoom.mjs').content.includes('captured_at_ms'), true);
 assert.equal(smokeHostScaffold.files.find((file) => file.path === 'README.md').content.includes('runIntegrationRuntimeManifest'), true);
 assert.equal(buildMeetingPlatformProviderConnectionPack('zoom', {
   baseUrl: 'http://localhost:8787',
