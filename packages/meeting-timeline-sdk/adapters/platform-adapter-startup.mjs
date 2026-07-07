@@ -337,11 +337,15 @@ export function buildMeetingPlatformAdapterStartupPlan(input = {}, options = {})
     };
   }
   const platform = decision.platform;
-  const bundle = buildMeetingPlatformRuntimeBundle(platform, {
+  const platformOptions = {
     ...options,
+    platform,
+  };
+  const bundle = buildMeetingPlatformRuntimeBundle(platform, {
+    ...platformOptions,
     url: inputUrl(objectInput),
   });
-  const profile = buildMeetingPlatformRuntimeProfile(platform, options);
+  const profile = buildMeetingPlatformRuntimeProfile(platform, platformOptions);
   const surface = decision.selected_surface ?? 'browser_extension';
   const contentScript = contentScriptFor(bundle, inputUrl(objectInput));
   const issues = readinessIssues(decision, surface, bundle);
@@ -426,6 +430,7 @@ export function buildMeetingPlatformAdapterStartupPlanMatrix(input = {}, options
     platform,
   }, {
     ...options,
+    platform,
     platforms: undefined,
     platform_keys: undefined,
   }));

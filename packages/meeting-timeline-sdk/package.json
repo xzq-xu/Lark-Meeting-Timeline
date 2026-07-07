@@ -15,6 +15,7 @@
     "meeting-platform-adapter-launch-plan": "./bin/meeting-platform-adapter-launch-plan.mjs",
     "meeting-platform-adapter-portfolio": "./bin/meeting-platform-adapter-portfolio.mjs",
     "meeting-platform-adapter-smoke": "./bin/meeting-platform-adapter-smoke.mjs",
+    "meeting-platform-adapter-startup": "./bin/meeting-platform-adapter-startup.mjs",
     "meeting-platform-host-integration": "./bin/meeting-platform-host-integration.mjs",
     "meeting-platform-provider-replay": "./bin/meeting-platform-provider-replay.mjs"
   },

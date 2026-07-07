@@ -342,11 +342,15 @@ export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
     };
   }
   const platform = platformResolution.platform;
-  const route = buildMeetingPlatformAdapterRoute(platform, options);
+  const platformOptions = {
+    ...options,
+    platform,
+  };
+  const route = buildMeetingPlatformAdapterRoute(platform, platformOptions);
   const routeReadiness = verifyMeetingPlatformAdapterRouteReadiness(route);
-  const adapterBlueprint = buildMeetingPlatformAdapterBlueprint(platform, options);
+  const adapterBlueprint = buildMeetingPlatformAdapterBlueprint(platform, platformOptions);
   const adapterBlueprintReady = adapterBlueprint.readiness?.ready === true;
-  const rawSurface = surfaceFromInput(objectInput, options);
+  const rawSurface = surfaceFromInput(objectInput, platformOptions);
   const surface = rawSurface.source === 'default'
     ? {
       surface: startupSurfaceFromBlueprint(adapterBlueprint) ?? rawSurface.surface,
@@ -354,10 +358,10 @@ export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
     }
     : rawSurface;
   const capability = buildMeetingAppAdapterCapabilityReport(platform, {
-    ...options,
-    input: inputForCapability(objectInput, options),
+    ...platformOptions,
+    input: inputForCapability(objectInput, platformOptions),
   });
-  const executionPlan = buildMeetingAppAdapterExecutionPlan(capability, options);
+  const executionPlan = buildMeetingAppAdapterExecutionPlan(capability, platformOptions);
   const firstRoute = route.routes?.[0];
   const providerRoute = routeByName(route.routes, 'provider_reconcile');
   const transcriptRoute = routeByName(route.routes, 'post_meeting_artifact_import');
@@ -439,6 +443,7 @@ export function buildMeetingPlatformAdapterDecisionMatrix(input = {}, options = 
     platform,
   }, {
     ...options,
+    platform,
     platforms: undefined,
     platform_keys: undefined,
   }));

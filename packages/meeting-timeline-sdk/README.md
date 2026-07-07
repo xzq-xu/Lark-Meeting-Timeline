@@ -895,6 +895,23 @@ npx meeting-platform-adapter-install-manifest \
 
 `adapter-install-manifest.json` 的关键字段是 `platform_registry`、`adapter_blueprints.rows`、`browser_extension.content_scripts`、`native_detector.rows`、`selected_surfaces`、`provider_reconcile.rows`、`install_sequence` 和 `readiness.issues`。如果你指定了 `--platforms`，某个平台缺少 `adapter-import-plan.json` 会让 CLI report 的 `ok=false`，避免漏装某个会议软件时仍然显示可发布。
 
+宿主项目在真正打开会议窗口前，可以先用 `platformAdapterStartupPlan()` 或 SDK CLI 生成启动计划。它不依赖 install manifest，适合给 Google Meet/Teams/Zoom/Webex/Lark 的扩展、WebView preload 或 native detector 做“第一步该启动什么”的运行时配置：Google Meet 会落到 `browser_extension`，Teams/Zoom 会落到 `native_detector`，每个平台都会列出 `observe_axis`、`insert_realtime_annotation`、speaker/participant marker、provider reconcile 的顺序，并保留 `captured_at_ms` 和 provider/transcript 非阻塞约束。
+
+```sh
+npx meeting-platform-adapter-startup \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --base-url=https://timeline.example.com \
+  --out-dir=meeting-platform-adapter-startup \
+  --report-file=meeting-platform-adapter-startup-report.json
+
+npx meeting-platform-adapter-startup \
+  --platform=google-meet \
+  --url=https://meet.google.com/abc-defg-hij \
+  --out-file=google-meet-startup-plan.json
+```
+
+`adapter-startup-report.json` 的关键字段是 `realtime_startup_ready_count`、`rows[*].selected_surface`、`install_target`、`observe_action`、`insert_action` 和 `provider_events_block_realtime=false`。默认报告只保留轻量摘要，完整 per-platform startup plan 写到 `--out-dir`；如果 CI 或调试需要在报告里带压缩版 plan summary，再显式加 `--include-plans=true`。这份计划用于启动本地实时轴；如果 `selected_surface=provider_reconcile`，报告会明确它不能作为实时标注的 primary surface。
+
 运行时打开某个会议窗口后，用 `platformAdapterLaunchPlan()` 或 CLI 把当前 URL / 显式 platform 映射到具体启动动作。它会消费 `adapter-install-manifest.json` 和其中的 `adapter_blueprints` 索引，自动识别 Google Meet / Zoom / Teams / Webex / Lark URL，选择已安装的 surface，并输出 `adapter_blueprint` 摘要与 `runtime_actions`。如果只选择 `provider-reconcile`，launch plan 会拒绝作为实时启动面，因为 provider 只能会后对齐，不能替代本地轴。
 
 ```sh

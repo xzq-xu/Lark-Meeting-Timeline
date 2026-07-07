@@ -2385,20 +2385,14 @@ export function buildMeetingAppTimelineConnectorPlatformRoadmap(checklistOrPacka
   const hostInstallChecklist = checklistOrPackage.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA
     ? checklistOrPackage
     : buildMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage, options);
-  const releaseGate = firstNonEmpty(
-    options.releaseGate,
-    options.release_gate,
-    buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, options),
-  );
-  const consumerHandoff = firstNonEmpty(
-    options.consumerHandoff,
-    options.consumer_handoff,
-    buildMeetingPlatformConsumerHandoff({
+  const releaseGate = firstNonEmpty(options.releaseGate, options.release_gate)
+    ?? buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, options);
+  const consumerHandoff = firstNonEmpty(options.consumerHandoff, options.consumer_handoff)
+    ?? buildMeetingPlatformConsumerHandoff({
       ...options,
       baseUrl: firstNonEmpty(options.baseUrl, options.base_url, hostInstallChecklist.base_url),
       platforms: (hostInstallChecklist.rows ?? []).map((row) => normalizeKey(row.platform)),
-    }),
-  );
+    });
   const adaptationRoadmap = consumerHandoff.adaptation_roadmap ?? {};
   const surfaceCoverageMatrix = consumerHandoff.surface_coverage_matrix ?? {};
   const releaseByPlatform = new Map((releaseGate.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
@@ -2642,34 +2636,19 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
   const hostInstallChecklist = checklistOrPackage.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA
     ? checklistOrPackage
     : buildMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage, options);
-  const releaseGate = firstNonEmpty(
-    options.releaseGate,
-    options.release_gate,
-    buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, options),
-  );
-  const roadmap = firstNonEmpty(
-    options.platformRoadmap,
-    options.platform_roadmap,
-    buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
+  const releaseGate = firstNonEmpty(options.releaseGate, options.release_gate)
+    ?? buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, options);
+  const roadmap = firstNonEmpty(options.platformRoadmap, options.platform_roadmap)
+    ?? buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
       ...options,
       releaseGate,
-    }),
-  );
-  const fieldIntakeIndex = firstNonEmpty(
-    options.fieldIntakeIndex,
-    options.field_intake_index,
-    buildMeetingAppTimelineConnectorFieldIntakeIndex(hostInstallChecklist, options),
-  );
-  const bridgeHandoff = firstNonEmpty(
-    options.bridgeHandoff,
-    options.bridge_handoff,
-    buildMeetingAppTimelineConnectorBridgeHandoff(hostInstallChecklist, options),
-  );
-  const smokePlan = firstNonEmpty(
-    options.smokePlan,
-    options.smoke_plan,
-    buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist, options),
-  );
+    });
+  const fieldIntakeIndex = firstNonEmpty(options.fieldIntakeIndex, options.field_intake_index)
+    ?? buildMeetingAppTimelineConnectorFieldIntakeIndex(hostInstallChecklist, options);
+  const bridgeHandoff = firstNonEmpty(options.bridgeHandoff, options.bridge_handoff)
+    ?? buildMeetingAppTimelineConnectorBridgeHandoff(hostInstallChecklist, options);
+  const smokePlan = firstNonEmpty(options.smokePlan, options.smoke_plan)
+    ?? buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist, options);
   const releaseByPlatform = new Map((releaseGate.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
   const roadmapByPlatform = new Map((roadmap.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
   const fieldByPlatform = new Map((fieldIntakeIndex.rows ?? []).map((row) => [normalizeKey(row.platform), row]));

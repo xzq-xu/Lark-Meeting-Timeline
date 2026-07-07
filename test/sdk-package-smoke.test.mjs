@@ -36,6 +36,7 @@ assert.equal(packedFiles.includes('bin/meeting-platform-adapter-install-manifest
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-launch-plan.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-portfolio.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-smoke.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-platform-adapter-startup.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-host-integration.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-provider-replay.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-adapter-integration-package.mjs'), true);
@@ -47,6 +48,7 @@ assert.equal(packedFiles.includes('cli/meeting-platform-adapter-install-manifest
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-launch-plan.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-portfolio.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-smoke.mjs'), true);
+assert.equal(packedFiles.includes('cli/meeting-platform-adapter-startup.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-host-integration.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-provider-replay.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
@@ -317,6 +319,26 @@ assert.equal(adapterPortfolioBinReport.built_in_count, 2);
 assert.equal(adapterPortfolioBinReport.rows.find((row) => row.platform === 'google_meet').recommended_first_surface, 'browser_extension');
 assert.equal(adapterPortfolioBinReport.rows.find((row) => row.platform === 'zoom').recommended_first_surface, 'native_detector');
 assert.equal(adapterPortfolioBinReport.written_files.length, 0);
+
+const { stdout: adapterStartupBinStdout } = await execFileAsync(
+  join(consumerDir, 'node_modules', '.bin', 'meeting-platform-adapter-startup'),
+  [
+    '--platforms=google-meet,zoom',
+    '--json=true',
+    '--write-plans=false',
+  ],
+  {
+    cwd: consumerDir,
+  },
+);
+const adapterStartupBinReport = JSON.parse(adapterStartupBinStdout);
+assert.equal(adapterStartupBinReport.type, 'meeting_platform_adapter_startup_plan_report');
+assert.equal(adapterStartupBinReport.ok, true);
+assert.equal(adapterStartupBinReport.platform_count, 2);
+assert.equal(adapterStartupBinReport.realtime_startup_ready_count, 2);
+assert.equal(adapterStartupBinReport.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
+assert.equal(adapterStartupBinReport.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
+assert.equal(adapterStartupBinReport.written_files.length, 0);
 
 const { stdout: adapterSmokeBinStdout } = await execFileAsync(
   join(consumerDir, 'node_modules', '.bin', 'meeting-platform-adapter-smoke'),
@@ -950,53 +972,150 @@ assert.equal(assertMeetingAppTimelineConnectorAdoptionIndex(rootConnectorPackage
 assert.equal(buildMeetingAppTimelineConnectorFieldIntakeIndex(rootConnectorPackage).schema, 'meeting_app_timeline_connector_field_intake_index');
 assert.equal(buildMeetingAppTimelineConnectorFieldIntakeIndexFromRoot(rootConnectorPackage).accepted, true);
 assert.equal(assertMeetingAppTimelineConnectorFieldIntakeIndex(rootConnectorPackage).accepted, true);
-assert.equal(buildMeetingAppTimelineConnectorReleaseGate(rootConnectorPackage).schema, 'meeting_app_timeline_connector_release_gate');
+const rootConnectorReleaseGate = buildMeetingAppTimelineConnectorReleaseGate(rootConnectorPackage);
+assert.equal(rootConnectorReleaseGate.schema, 'meeting_app_timeline_connector_release_gate');
 assert.equal(buildMeetingAppTimelineConnectorReleaseGateFromRoot(rootConnectorPackage).accepted, true);
 assert.equal(assertMeetingAppTimelineConnectorReleaseGate(rootConnectorPackage).accepted, true);
-assert.equal(buildMeetingAppTimelineConnectorPlatformRoadmap(rootConnectorPackage).schema, 'meeting_app_timeline_connector_platform_roadmap');
-assert.equal(buildMeetingAppTimelineConnectorPlatformRoadmapFromRoot(rootConnectorPackage).accepted, true);
-assert.equal(assertMeetingAppTimelineConnectorPlatformRoadmap(rootConnectorPackage).accepted, true);
-assert.equal(buildMeetingAppTimelineConnectorAdapterMatrix(rootConnectorPackage).schema, 'meeting_app_timeline_connector_adapter_matrix');
-assert.equal(buildMeetingAppTimelineConnectorAdapterMatrixFromRoot(rootConnectorPackage).accepted, true);
-assert.equal(buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(rootConnectorPackage).accepted, true);
-assert.equal(buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReportFromRoot(rootConnectorPackage).schema, 'meeting_app_timeline_connector_adapter_matrix_acceptance_report');
-assert.equal(assertMeetingAppTimelineConnectorAdapterMatrix(rootConnectorPackage).accepted, true);
-assert.equal(buildMeetingAppTimelineHostAdapterConfig(rootConnectorPackage, 'google-meet').schema, 'meeting_app_timeline_host_adapter_config');
-assert.equal(buildMeetingAppTimelineHostAdapterConfigFromRoot(rootConnectorPackage, 'google-meet').accepted, true);
-assert.equal(buildMeetingAppTimelineHostAdapterConfigIndex(rootConnectorPackage).schema, 'meeting_app_timeline_host_adapter_config_index');
-assert.equal(buildMeetingAppTimelineHostAdapterConfigIndexFromRoot(rootConnectorPackage).accepted, true);
-assert.equal(assertMeetingAppTimelineHostAdapterConfig(rootConnectorPackage, 'google-meet').accepted, true);
-assert.equal(assertMeetingAppTimelineHostAdapterConfigIndex(rootConnectorPackage).accepted, true);
-assert.equal(resolveMeetingAppTimelineHostAdapterConfig(rootConnectorPackage, 'https://meet.google.com/abc-defg-hij').schema, 'meeting_app_timeline_host_adapter_config_resolution');
-assert.equal(resolveMeetingAppTimelineHostAdapterConfigFromRoot(rootConnectorPackage, 'https://meet.google.com/abc-defg-hij').accepted, true);
-assert.equal(assertMeetingAppTimelineResolvedHostAdapterConfig(rootConnectorPackage, 'https://meet.google.com/abc-defg-hij').platform, 'google_meet');
-assert.equal(buildMeetingAppTimelineHostAdapterBootstrapPlan(rootConnectorPackage, 'https://meet.google.com/abc-defg-hij').schema, 'meeting_app_timeline_host_adapter_bootstrap_plan');
-assert.equal(buildMeetingAppTimelineHostAdapterBootstrapPlanFromRoot(rootConnectorPackage, 'https://meet.google.com/abc-defg-hij').accepted, true);
-assert.equal(assertMeetingAppTimelineHostAdapterBootstrapPlan(rootConnectorPackage, 'https://meet.google.com/abc-defg-hij').platform, 'google_meet');
-assert.equal(buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(rootConnectorPackage).schema, 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix');
-assert.equal(buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixFromRoot(rootConnectorPackage).accepted, true);
-assert.equal(buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport(rootConnectorPackage).accepted, true);
-assert.equal(buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReportFromRoot(rootConnectorPackage).schema, 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix_acceptance_report');
-assert.equal(assertMeetingAppTimelineHostAdapterBootstrapPlanMatrix(rootConnectorPackage).platform_count, 1);
-assert.equal(rootMeetingAppSdk.connectorReleaseGate(rootConnectorPackage).schema, 'meeting_app_timeline_connector_release_gate');
-assert.equal(rootMeetingAppSdk.assertConnectorReleaseGate(rootConnectorPackage).accepted, true);
-assert.equal(rootMeetingAppSdk.connectorPlatformRoadmap(rootConnectorPackage).schema, 'meeting_app_timeline_connector_platform_roadmap');
-assert.equal(rootMeetingAppSdk.assertConnectorPlatformRoadmap(rootConnectorPackage).accepted, true);
-assert.equal(rootMeetingAppSdk.connectorAdapterMatrix(rootConnectorPackage).schema, 'meeting_app_timeline_connector_adapter_matrix');
-assert.equal(rootMeetingAppSdk.connectorAdapterMatrix(rootConnectorPackage).rows[0].provider_replay.accepted, true);
-assert.equal(rootMeetingAppSdk.assertConnectorAdapterMatrix(rootConnectorPackage).accepted, true);
-assert.equal(rootMeetingAppSdk.connectorHostAdapterConfig(rootConnectorPackage, 'google-meet').platform, 'google_meet');
-assert.equal(rootMeetingAppSdk.connectorHostAdapterConfig('google-meet', { surfaces: ['browser-extension'] }).accepted, true);
-assert.equal(rootMeetingAppSdk.assertConnectorHostAdapterConfig(rootConnectorPackage, 'google-meet').accepted, true);
-assert.equal(rootMeetingAppSdk.connectorHostAdapterConfigIndex(rootConnectorPackage).accepted, true);
-assert.equal(rootMeetingAppSdk.assertConnectorHostAdapterConfigIndex(rootConnectorPackage).row_count, 1);
-assert.equal(rootMeetingAppSdk.resolveConnectorHostAdapterConfig('https://meet.google.com/abc-defg-hij', rootConnectorPackage).accepted, true);
-assert.equal(rootMeetingAppSdk.assertResolvedConnectorHostAdapterConfig({ tab: { url: 'https://meet.google.com/abc-defg-hij', active: true } }, rootConnectorPackage).platform, 'google_meet');
-assert.equal(rootMeetingAppSdk.connectorHostAdapterBootstrapPlan('https://meet.google.com/abc-defg-hij', rootConnectorPackage).accepted, true);
-assert.equal(rootMeetingAppSdk.assertConnectorHostAdapterBootstrapPlan('https://meet.google.com/abc-defg-hij', rootConnectorPackage).platform, 'google_meet');
-assert.equal(rootMeetingAppSdk.connectorHostAdapterBootstrapPlanMatrix(rootConnectorPackage).accepted, true);
-assert.equal(rootMeetingAppSdk.connectorHostAdapterBootstrapPlanMatrixAcceptanceReport(rootConnectorPackage).accepted, true);
-assert.equal(rootMeetingAppSdk.assertConnectorHostAdapterBootstrapPlanMatrix(rootConnectorPackage).platform_count, 1);
+const rootConnectorHostInstallChecklist = buildMeetingAppTimelineConnectorHostInstallChecklist(rootConnectorPackage);
+assert.equal(rootConnectorHostInstallChecklist.schema, 'meeting_app_timeline_connector_host_install_checklist');
+assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(rootConnectorHostInstallChecklist).accepted, true);
+const rootConnectorConsumerHandoff = {
+  schema: 'meeting_platform_consumer_handoff',
+  accepted: true,
+  adaptation_roadmap: {
+    schema: 'meeting_platform_adaptation_roadmap',
+    rows: rootConnectorHostInstallChecklist.rows.map((row) => ({
+      platform: row.platform,
+      display_name: row.display_name,
+      priority_tier: 'pilot_ready',
+      recommended_first_surface: row.selected_surface,
+      surface_order: [row.selected_surface],
+      next_phase: 'wire_host_runtime',
+    })),
+  },
+  surface_coverage_matrix: {
+    schema: 'meeting_platform_surface_coverage_matrix',
+    rows: rootConnectorHostInstallChecklist.rows.map((row) => ({
+      platform: row.platform,
+      surface_order: [row.selected_surface],
+      browser_extension: { ready: row.selected_surface === 'browser_extension' },
+      webview_preload: { ready: row.selected_surface === 'webview_preload' },
+      native_detector: { ready: row.selected_surface === 'native_detector' },
+      provider_reconcile: {
+        ready: true,
+        provider_path: 'nonblocking_reconcile',
+        permission_risk: 'low',
+      },
+      post_meeting_backfill: { supported: true },
+      lightweight_connector: { ready: true },
+      speaker_track: { ready: true },
+      participant_track: { ready: true },
+    })),
+  },
+};
+const rootConnectorPlatformRoadmap = buildMeetingAppTimelineConnectorPlatformRoadmap(rootConnectorHostInstallChecklist, {
+  releaseGate: rootConnectorReleaseGate,
+  consumerHandoff: rootConnectorConsumerHandoff,
+});
+assert.equal(rootConnectorPlatformRoadmap.schema, 'meeting_app_timeline_connector_platform_roadmap');
+assert.equal(buildMeetingAppTimelineConnectorPlatformRoadmapFromRoot(rootConnectorHostInstallChecklist, {
+  releaseGate: rootConnectorReleaseGate,
+  consumerHandoff: rootConnectorConsumerHandoff,
+}).accepted, true);
+assert.equal(assertMeetingAppTimelineConnectorPlatformRoadmap(rootConnectorHostInstallChecklist, {
+  releaseGate: rootConnectorReleaseGate,
+  consumerHandoff: rootConnectorConsumerHandoff,
+}).accepted, true);
+const rootConnectorFieldIntakeIndex = buildMeetingAppTimelineConnectorFieldIntakeIndex(rootConnectorHostInstallChecklist);
+const rootConnectorBridgeHandoff = buildMeetingAppTimelineConnectorBridgeHandoff(rootConnectorHostInstallChecklist);
+const rootConnectorSmokePlan = buildMeetingAppTimelineConnectorSmokePlan(rootConnectorHostInstallChecklist);
+const rootConnectorAdapterMatrix = buildMeetingAppTimelineConnectorAdapterMatrix(rootConnectorHostInstallChecklist, {
+  releaseGate: rootConnectorReleaseGate,
+  platformRoadmap: rootConnectorPlatformRoadmap,
+  consumerHandoff: rootConnectorConsumerHandoff,
+  fieldIntakeIndex: rootConnectorFieldIntakeIndex,
+  bridgeHandoff: rootConnectorBridgeHandoff,
+  smokePlan: rootConnectorSmokePlan,
+});
+assert.equal(rootConnectorAdapterMatrix.schema, 'meeting_app_timeline_connector_adapter_matrix');
+assert.equal(buildMeetingAppTimelineConnectorAdapterMatrixFromRoot(rootConnectorHostInstallChecklist, {
+  releaseGate: rootConnectorReleaseGate,
+  platformRoadmap: rootConnectorPlatformRoadmap,
+  consumerHandoff: rootConnectorConsumerHandoff,
+  fieldIntakeIndex: rootConnectorFieldIntakeIndex,
+  bridgeHandoff: rootConnectorBridgeHandoff,
+  smokePlan: rootConnectorSmokePlan,
+}).accepted, true);
+assert.equal(buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(rootConnectorAdapterMatrix).accepted, true);
+assert.equal(buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReportFromRoot(rootConnectorAdapterMatrix).schema, 'meeting_app_timeline_connector_adapter_matrix_acceptance_report');
+assert.equal(assertMeetingAppTimelineConnectorAdapterMatrix(rootConnectorAdapterMatrix).accepted, true);
+const rootConnectorHostAdapterConfig = buildMeetingAppTimelineHostAdapterConfig(rootConnectorAdapterMatrix, 'google-meet');
+assert.equal(rootConnectorHostAdapterConfig.schema, 'meeting_app_timeline_host_adapter_config');
+assert.equal(buildMeetingAppTimelineHostAdapterConfigFromRoot(rootConnectorAdapterMatrix, 'google-meet').accepted, true);
+const rootConnectorHostAdapterConfigIndex = buildMeetingAppTimelineHostAdapterConfigIndex(rootConnectorAdapterMatrix);
+assert.equal(rootConnectorHostAdapterConfigIndex.schema, 'meeting_app_timeline_host_adapter_config_index');
+assert.equal(buildMeetingAppTimelineHostAdapterConfigIndexFromRoot(rootConnectorAdapterMatrix).accepted, true);
+assert.equal(assertMeetingAppTimelineHostAdapterConfig(rootConnectorAdapterMatrix, 'google-meet').accepted, true);
+assert.equal(assertMeetingAppTimelineHostAdapterConfigIndex(rootConnectorHostAdapterConfigIndex).accepted, true);
+const rootConnectorResolvedHostConfig = resolveMeetingAppTimelineHostAdapterConfig(rootConnectorHostAdapterConfigIndex, 'https://meet.google.com/abc-defg-hij');
+assert.equal(rootConnectorResolvedHostConfig.schema, 'meeting_app_timeline_host_adapter_config_resolution');
+assert.equal(resolveMeetingAppTimelineHostAdapterConfigFromRoot(rootConnectorHostAdapterConfigIndex, 'https://meet.google.com/abc-defg-hij').accepted, true);
+assert.equal(assertMeetingAppTimelineResolvedHostAdapterConfig(rootConnectorHostAdapterConfigIndex, 'https://meet.google.com/abc-defg-hij').platform, 'google_meet');
+const rootConnectorHostAdapterBootstrapPlan = buildMeetingAppTimelineHostAdapterBootstrapPlan(rootConnectorResolvedHostConfig);
+assert.equal(rootConnectorHostAdapterBootstrapPlan.schema, 'meeting_app_timeline_host_adapter_bootstrap_plan');
+assert.equal(buildMeetingAppTimelineHostAdapterBootstrapPlanFromRoot(rootConnectorResolvedHostConfig).accepted, true);
+assert.equal(assertMeetingAppTimelineHostAdapterBootstrapPlan(rootConnectorResolvedHostConfig).platform, 'google_meet');
+const rootConnectorHostAdapterBootstrapPlanMatrix = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(rootConnectorHostAdapterConfigIndex);
+assert.equal(rootConnectorHostAdapterBootstrapPlanMatrix.schema, 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix');
+assert.equal(buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixFromRoot(rootConnectorHostAdapterConfigIndex).accepted, true);
+assert.equal(buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport(rootConnectorHostAdapterBootstrapPlanMatrix).accepted, true);
+assert.equal(buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReportFromRoot(rootConnectorHostAdapterBootstrapPlanMatrix).schema, 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix_acceptance_report');
+assert.equal(assertMeetingAppTimelineHostAdapterBootstrapPlanMatrix(rootConnectorHostAdapterBootstrapPlanMatrix).platform_count, 1);
+assert.equal(rootMeetingAppSdk.connectorReleaseGate(rootConnectorHostInstallChecklist).schema, 'meeting_app_timeline_connector_release_gate');
+assert.equal(rootMeetingAppSdk.assertConnectorReleaseGate(rootConnectorHostInstallChecklist).accepted, true);
+assert.equal(rootMeetingAppSdk.connectorPlatformRoadmap(rootConnectorHostInstallChecklist, {
+  releaseGate: rootConnectorReleaseGate,
+  consumerHandoff: rootConnectorConsumerHandoff,
+}).schema, 'meeting_app_timeline_connector_platform_roadmap');
+assert.equal(rootMeetingAppSdk.assertConnectorPlatformRoadmap(rootConnectorHostInstallChecklist, {
+  releaseGate: rootConnectorReleaseGate,
+  consumerHandoff: rootConnectorConsumerHandoff,
+}).accepted, true);
+assert.equal(rootMeetingAppSdk.connectorAdapterMatrix(rootConnectorHostInstallChecklist, {
+  releaseGate: rootConnectorReleaseGate,
+  platformRoadmap: rootConnectorPlatformRoadmap,
+  consumerHandoff: rootConnectorConsumerHandoff,
+  fieldIntakeIndex: rootConnectorFieldIntakeIndex,
+  bridgeHandoff: rootConnectorBridgeHandoff,
+  smokePlan: rootConnectorSmokePlan,
+}).schema, 'meeting_app_timeline_connector_adapter_matrix');
+assert.equal(rootMeetingAppSdk.connectorAdapterMatrix(rootConnectorHostInstallChecklist, {
+  releaseGate: rootConnectorReleaseGate,
+  platformRoadmap: rootConnectorPlatformRoadmap,
+  consumerHandoff: rootConnectorConsumerHandoff,
+  fieldIntakeIndex: rootConnectorFieldIntakeIndex,
+  bridgeHandoff: rootConnectorBridgeHandoff,
+  smokePlan: rootConnectorSmokePlan,
+}).rows[0].provider_replay.accepted, true);
+assert.equal(rootMeetingAppSdk.assertConnectorAdapterMatrix(rootConnectorHostInstallChecklist, {
+  releaseGate: rootConnectorReleaseGate,
+  platformRoadmap: rootConnectorPlatformRoadmap,
+  consumerHandoff: rootConnectorConsumerHandoff,
+  fieldIntakeIndex: rootConnectorFieldIntakeIndex,
+  bridgeHandoff: rootConnectorBridgeHandoff,
+  smokePlan: rootConnectorSmokePlan,
+}).accepted, true);
+assert.equal(rootMeetingAppSdk.connectorHostAdapterConfig(rootConnectorAdapterMatrix, 'google-meet').platform, 'google_meet');
+assert.equal(rootMeetingAppSdk.assertConnectorHostAdapterConfig(rootConnectorAdapterMatrix, 'google-meet').accepted, true);
+assert.equal(rootMeetingAppSdk.connectorHostAdapterConfigIndex(rootConnectorAdapterMatrix).accepted, true);
+assert.equal(rootMeetingAppSdk.assertConnectorHostAdapterConfigIndex(rootConnectorHostAdapterConfigIndex).row_count, 1);
+assert.equal(rootMeetingAppSdk.resolveConnectorHostAdapterConfig('https://meet.google.com/abc-defg-hij', rootConnectorHostAdapterConfigIndex).accepted, true);
+assert.equal(rootMeetingAppSdk.assertResolvedConnectorHostAdapterConfig({ tab: { url: 'https://meet.google.com/abc-defg-hij', active: true } }, rootConnectorHostAdapterConfigIndex).platform, 'google_meet');
+assert.equal(rootMeetingAppSdk.connectorHostAdapterBootstrapPlan('https://meet.google.com/abc-defg-hij', rootConnectorHostAdapterConfigIndex).accepted, true);
+assert.equal(rootMeetingAppSdk.assertConnectorHostAdapterBootstrapPlan('https://meet.google.com/abc-defg-hij', rootConnectorHostAdapterConfigIndex).platform, 'google_meet');
+assert.equal(rootMeetingAppSdk.connectorHostAdapterBootstrapPlanMatrix(rootConnectorHostAdapterConfigIndex).accepted, true);
+assert.equal(rootMeetingAppSdk.connectorHostAdapterBootstrapPlanMatrixAcceptanceReport(rootConnectorHostAdapterBootstrapPlanMatrix).accepted, true);
+assert.equal(rootMeetingAppSdk.assertConnectorHostAdapterBootstrapPlanMatrix(rootConnectorHostAdapterBootstrapPlanMatrix).platform_count, 1);
 const rootProviderReplay = buildMeetingPlatformProviderReplayReport('google-meet');
 assert.equal(rootProviderReplay.schema, 'meeting_platform_provider_replay_report');
 assert.equal(rootProviderReplay.accepted, true);
@@ -1028,9 +1147,6 @@ assert.equal(rootMeetingAppSdk.assertProviderReplayMatrix({
 assert.equal((await runMeetingAppTimelineConnectorBridgeSmoke(rootConnectorPackage)).schema, 'meeting_app_timeline_connector_bridge_smoke_report');
 assert.equal((await runMeetingAppTimelineConnectorBridgeSmokeFromRoot(rootConnectorPackage)).accepted, true);
 assert.equal((await assertMeetingAppTimelineConnectorBridgeSmoke(rootConnectorPackage)).accepted, true);
-assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklist(rootConnectorPackage).schema, 'meeting_app_timeline_connector_host_install_checklist');
-assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(rootConnectorPackage).accepted, true);
-const rootConnectorSmokePlan = buildMeetingAppTimelineConnectorSmokePlan(rootConnectorPackage);
 assert.equal(rootConnectorSmokePlan.schema, 'meeting_app_timeline_connector_smoke_plan');
 assert.equal(rootConnectorSmokePlan.accepted, true);
 assert.equal(rootConnectorSmokePlan.rows[0].steps.some((step) => step.action === 'observe_platform_candidates'), true);
@@ -2846,6 +2962,7 @@ const signals = normalizeGoogleMeetEvent({
 assert.equal(signals.some((signal) => signal.type === 'meeting_started'), true);
 
 console.log('ok consumer package imports');
+process.exit(0);
 `, 'utf8');
 
 const { stdout: smokeStdout } = await execFileAsync(process.execPath, ['smoke.mjs'], {
