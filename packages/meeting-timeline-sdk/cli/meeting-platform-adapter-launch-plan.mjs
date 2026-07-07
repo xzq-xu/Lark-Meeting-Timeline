@@ -83,6 +83,9 @@ export async function buildMeetingPlatformAdapterLaunchPlanCliReport(options = {
     platform: plan.platform,
     detection_reason: plan.detection_reason,
     selected_surface: plan.selected_surface,
+    adapter_blueprint_available: plan.adapter_blueprint?.available === true,
+    adapter_blueprint_primary_surface: plan.adapter_blueprint?.primary_surface,
+    adapter_blueprint_first_gate: plan.adapter_blueprint?.first_acceptance_gate,
     accepted: plan.accepted,
     manifest_read_error: manifestReadError,
     issue_count: plan.readiness?.issue_count ?? 0,
@@ -99,8 +102,9 @@ export async function buildMeetingPlatformAdapterLaunchPlanCliReport(options = {
 
 export function formatMeetingPlatformAdapterLaunchPlanCliReport(report = {}) {
   const lines = [
-    `meeting_platform_adapter_launch_plan_report | ok=${boolLabel(report.ok)} | platform=${report.platform ?? 'n/a'} | surface=${report.selected_surface ?? 'n/a'} | reason=${report.detection_reason ?? 'n/a'} | accepted=${boolLabel(report.accepted)} | actions=${report.runtime_action_count} | issues=${report.issue_count}`,
+    `meeting_platform_adapter_launch_plan_report | ok=${boolLabel(report.ok)} | platform=${report.platform ?? 'n/a'} | surface=${report.selected_surface ?? 'n/a'} | blueprint_surface=${report.adapter_blueprint_primary_surface ?? 'n/a'} | reason=${report.detection_reason ?? 'n/a'} | accepted=${boolLabel(report.accepted)} | actions=${report.runtime_action_count} | issues=${report.issue_count}`,
   ];
+  if (report.adapter_blueprint_first_gate) lines.push(`adapter_blueprint_first_gate=${report.adapter_blueprint_first_gate}`);
   if (report.first_runtime_action) lines.push(`first_runtime_action=${report.first_runtime_action}`);
   if (report.current_url) lines.push(`url=${report.current_url}`);
   if (report.manifest_read_error) lines.push(`manifest_read_error=${report.manifest_read_error}`);

@@ -30,6 +30,7 @@ const exportMatrix = buildMeetingPlatformAdapterExportPackageMatrix({
 }, {
   baseUrl,
   target: 'static',
+  includeArtifacts: true,
 });
 const availableFiles = exportMatrix.packages.flatMap((pkg) => pkg.host_files.map((file) => file.path));
 const importMatrix = buildMeetingPlatformAdapterImportPlanMatrix(exportMatrix.packages, {
@@ -80,6 +81,7 @@ const launchPlan = runner.launchPlan({
 });
 assert.equal(launchPlan.accepted, true);
 assert.equal(launchPlan.platform, 'google_meet');
+assert.equal(launchPlan.adapter_blueprint.primary_surface, 'browser_extension');
 
 const launchPlanRunner = createMeetingPlatformAdapterRunner(launchPlan, adapterClient, {
   clock: () => 321,
@@ -94,6 +96,7 @@ assert.equal(opened.schema, 'meeting_platform_adapter_open_session_event');
 assert.equal(opened.action, 'open_session');
 assert.equal(opened.platform, 'google_meet');
 assert.equal(opened.payload.launch_plan.platform, 'google_meet');
+assert.equal(opened.payload.launch_plan.adapter_blueprint.primary_surface, 'browser_extension');
 assert.equal(opened.payload.observe_event.action, 'observe_axis');
 assert.equal(opened.payload.observe_event.captured_at_ms, 1_782_700_000_123);
 assert.equal(runner.getState().opened, true);

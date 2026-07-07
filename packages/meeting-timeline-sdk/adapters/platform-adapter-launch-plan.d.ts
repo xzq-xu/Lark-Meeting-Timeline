@@ -33,6 +33,7 @@ export interface MeetingPlatformAdapterLaunchPlan {
   detected_meeting?: Record<string, unknown>;
   current_url?: string;
   platform_row?: Record<string, unknown>;
+  adapter_blueprint?: Record<string, unknown>;
   surface_entrypoint?: Record<string, unknown>;
   axis_contract: Record<string, unknown>;
   runtime_actions: Array<Record<string, unknown>>;
@@ -58,6 +59,7 @@ export interface MeetingPlatformAdapterCandidateLaunchPlan {
   launch_input: Record<string, unknown>;
   launch_plan: MeetingPlatformAdapterLaunchPlan;
   axis_contract: Record<string, unknown>;
+  adapter_blueprint?: Record<string, unknown>;
   runtime_actions: Array<Record<string, unknown>>;
   mark_template?: Record<string, unknown>;
   readiness: Record<string, unknown>;

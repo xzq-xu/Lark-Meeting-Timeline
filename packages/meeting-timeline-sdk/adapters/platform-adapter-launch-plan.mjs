@@ -157,6 +157,10 @@ function platformRow(manifest = {}, platform) {
   return asArray(manifest.platform_registry).find((row) => row.platform === platform);
 }
 
+function adapterBlueprintRow(manifest = {}, platform) {
+  return asArray(manifest.adapter_blueprints?.rows).find((row) => row.platform === platform);
+}
+
 function resolvePlatform(manifest = {}, input = {}, options = {}) {
   const url = rawUrl(input, options);
   const explicit = explicitPlatform(input, options);
@@ -394,6 +398,7 @@ export function buildMeetingPlatformAdapterLaunchPlan(manifestOrInput = {}, inpu
   const manifest = manifestFrom(manifestOrInput, input, options);
   const resolved = resolvePlatform(manifest, input, options);
   const row = platformRow(manifest, resolved.platform);
+  const blueprint = adapterBlueprintRow(manifest, resolved.platform);
   const surface = selectedSurface(row, input, options);
   const entrypoint = row ? surfaceEntrypoint(manifest, row, surface, resolved.url) : {};
   const ready = readiness(manifest, row, surface, entrypoint, resolved);
@@ -410,6 +415,7 @@ export function buildMeetingPlatformAdapterLaunchPlan(manifestOrInput = {}, inpu
     detected_meeting: resolved.detected_meeting,
     current_url: resolved.url,
     platform_row: row,
+    adapter_blueprint: blueprint,
     surface_entrypoint: entrypoint,
     axis_contract: {
       timestamp_field: 'captured_at_ms',
@@ -455,6 +461,7 @@ export function buildMeetingPlatformAdapterCandidateLaunchPlan(manifestOrInput =
     launch_input: launchInput,
     launch_plan: launchPlan,
     axis_contract: launchPlan.axis_contract,
+    adapter_blueprint: launchPlan.adapter_blueprint,
     runtime_actions: launchPlan.runtime_actions,
     mark_template: launchPlan.mark_template,
     readiness: ready,

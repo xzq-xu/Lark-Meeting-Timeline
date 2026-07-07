@@ -879,7 +879,7 @@ npx meeting-platform-adapter-install-manifest \
 
 `adapter-install-manifest.json` 的关键字段是 `platform_registry`、`adapter_blueprints.rows`、`browser_extension.content_scripts`、`native_detector.rows`、`selected_surfaces`、`provider_reconcile.rows`、`install_sequence` 和 `readiness.issues`。如果你指定了 `--platforms`，某个平台缺少 `adapter-import-plan.json` 会让 CLI report 的 `ok=false`，避免漏装某个会议软件时仍然显示可发布。
 
-运行时打开某个会议窗口后，用 `platformAdapterLaunchPlan()` 或 CLI 把当前 URL / 显式 platform 映射到具体启动动作。它会消费 `adapter-install-manifest.json`，自动识别 Google Meet / Zoom / Teams / Webex / Lark URL，选择已安装的 surface，并输出 `runtime_actions`。如果只选择 `provider-reconcile`，launch plan 会拒绝作为实时启动面，因为 provider 只能会后对齐，不能替代本地轴。
+运行时打开某个会议窗口后，用 `platformAdapterLaunchPlan()` 或 CLI 把当前 URL / 显式 platform 映射到具体启动动作。它会消费 `adapter-install-manifest.json` 和其中的 `adapter_blueprints` 索引，自动识别 Google Meet / Zoom / Teams / Webex / Lark URL，选择已安装的 surface，并输出 `adapter_blueprint` 摘要与 `runtime_actions`。如果只选择 `provider-reconcile`，launch plan 会拒绝作为实时启动面，因为 provider 只能会后对齐，不能替代本地轴。
 
 ```sh
 npx meeting-platform-adapter-launch-plan \

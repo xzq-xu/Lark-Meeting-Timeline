@@ -32,6 +32,7 @@ const exportMatrix = buildMeetingPlatformAdapterExportPackageMatrix({
 }, {
   baseUrl,
   target: 'static',
+  includeArtifacts: true,
 });
 const availableFiles = exportMatrix.packages.flatMap((pkg) => pkg.host_files.map((file) => file.path));
 const importMatrix = buildMeetingPlatformAdapterImportPlanMatrix(exportMatrix.packages, {
@@ -51,6 +52,8 @@ assert.equal(googlePlan.accepted, true);
 assert.equal(googlePlan.platform, 'google_meet');
 assert.equal(googlePlan.detection_reason, 'meeting_url');
 assert.equal(googlePlan.selected_surface, 'browser_extension');
+assert.equal(googlePlan.adapter_blueprint.primary_surface, 'browser_extension');
+assert.equal(googlePlan.adapter_blueprint.first_acceptance_gate, 'local_candidate_preflight_accepts_active_meeting');
 assert.equal(googlePlan.detected_meeting.meeting_id, 'abc-defg-hij');
 assert.equal(googlePlan.surface_entrypoint.content_script.matches.includes('https://meet.google.com/*'), true);
 assert.equal(googlePlan.runtime_actions.find((action) => action.id === 'observe_platform_candidates').sdk_method, 'observePlatformCandidates');
@@ -89,6 +92,7 @@ assert.equal(candidateLaunchPlan.selected_candidate.tab_id, 2);
 assert.equal(candidateLaunchPlan.candidate_preflight.accepted_count, 1);
 assert.equal(candidateLaunchPlan.launch_plan.accepted, true);
 assert.equal(candidateLaunchPlan.launch_plan.platform, 'google_meet');
+assert.equal(candidateLaunchPlan.adapter_blueprint.primary_surface, 'browser_extension');
 assert.equal(candidateLaunchPlan.runtime_actions[0].id, 'observe_platform_candidates');
 assert.equal(assertMeetingPlatformAdapterCandidateLaunchPlan(candidateLaunchPlan), candidateLaunchPlan);
 
@@ -118,6 +122,7 @@ assert.equal(zoomPlan.accepted, true);
 assert.equal(zoomPlan.platform, 'zoom');
 assert.equal(zoomPlan.detection_reason, 'explicit_platform');
 assert.equal(zoomPlan.selected_surface, 'native_detector');
+assert.equal(zoomPlan.adapter_blueprint.primary_surface, 'native_detector');
 assert.equal(zoomPlan.surface_entrypoint.registry_row.platform, 'zoom');
 
 const nativeCandidateLaunchPlan = buildMeetingPlatformAdapterCandidateLaunchPlan(manifest, {

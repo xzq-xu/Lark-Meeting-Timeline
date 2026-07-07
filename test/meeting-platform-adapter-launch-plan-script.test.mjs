@@ -64,6 +64,8 @@ assert.equal(report.type, 'meeting_platform_adapter_launch_plan_report');
 assert.equal(report.ok, true);
 assert.equal(report.platform, 'google_meet');
 assert.equal(report.selected_surface, 'browser_extension');
+assert.equal(report.adapter_blueprint_primary_surface, 'browser_extension');
+assert.equal(report.adapter_blueprint_first_gate, 'local_candidate_preflight_accepts_active_meeting');
 assert.equal(report.first_runtime_action, 'observe_platform_candidates');
 
 const writtenReport = JSON.parse(await readFile(reportFile, 'utf8'));
@@ -72,6 +74,8 @@ assert.equal(writtenReport.ok, true);
 const launchPlan = JSON.parse(await readFile(launchPlanFile, 'utf8'));
 assert.equal(launchPlan.schema, 'meeting_platform_adapter_launch_plan');
 assert.equal(launchPlan.accepted, true);
+assert.equal(launchPlan.adapter_blueprint.primary_surface, 'browser_extension');
+assert.equal(launchPlan.adapter_blueprint.first_acceptance_gate, 'local_candidate_preflight_accepts_active_meeting');
 assert.equal(launchPlan.surface_entrypoint.content_script.matches.includes('https://meet.google.com/*'), true);
 
 const { stdout: providerStdout } = await execFileAsync(process.execPath, [
@@ -96,5 +100,6 @@ const { stdout: textStdout } = await execFileAsync(process.execPath, [
 });
 assert.match(textStdout, /meeting_platform_adapter_launch_plan_report/);
 assert.match(textStdout, /platform=zoom/);
+assert.match(textStdout, /blueprint_surface=native_detector/);
 
 console.log('ok meeting platform adapter launch plan script');
