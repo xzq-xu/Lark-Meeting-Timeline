@@ -1,5 +1,9 @@
 import type { MeetingPlatformAdapterInstallManifest } from './platform-adapter-install-manifest.mjs';
-import type { MeetingPlatformAdapterLaunchPlan, MeetingPlatformAdapterLaunchPlanOptions } from './platform-adapter-launch-plan.mjs';
+import type {
+  MeetingPlatformAdapterCandidateLaunchPlan,
+  MeetingPlatformAdapterLaunchPlan,
+  MeetingPlatformAdapterLaunchPlanOptions,
+} from './platform-adapter-launch-plan.mjs';
 import type {
   MeetingPlatformAdapterSession,
   MeetingPlatformAdapterSessionClient,
@@ -57,8 +61,10 @@ export interface MeetingPlatformAdapterRunner {
   install_manifest?: MeetingPlatformAdapterInstallManifest;
   getState(): Record<string, unknown>;
   launchPlan(input?: MeetingPlatformAdapterLaunchPlanOptions | MeetingPlatformAdapterLaunchPlan | string | Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): MeetingPlatformAdapterLaunchPlan;
-  open(input?: MeetingPlatformAdapterLaunchPlanOptions | MeetingPlatformAdapterLaunchPlan | string | Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterOpenSessionEvent>;
-  ensureOpen(input?: MeetingPlatformAdapterLaunchPlanOptions | MeetingPlatformAdapterLaunchPlan | string | Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterOpenSessionEvent | undefined>;
+  candidateLaunchPlan(input?: MeetingPlatformAdapterLaunchPlanOptions | MeetingPlatformAdapterCandidateLaunchPlan | string | Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): MeetingPlatformAdapterCandidateLaunchPlan;
+  open(input?: MeetingPlatformAdapterLaunchPlanOptions | MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterCandidateLaunchPlan | string | Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterOpenSessionEvent>;
+  openCandidate(input?: MeetingPlatformAdapterLaunchPlanOptions | MeetingPlatformAdapterCandidateLaunchPlan | string | Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterOpenSessionEvent>;
+  ensureOpen(input?: MeetingPlatformAdapterLaunchPlanOptions | MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterCandidateLaunchPlan | string | Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterOpenSessionEvent | undefined>;
   currentSession(): MeetingPlatformAdapterSession;
   observeAxis(input?: Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterSessionEvent>;
   insertAnnotation(input?: Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterSessionEvent>;
@@ -89,9 +95,9 @@ export function createMeetingPlatformAdapterRunner(
 ): MeetingPlatformAdapterRunner;
 
 export function openMeetingPlatformAdapterSession(
-  manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>,
+  manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterCandidateLaunchPlan | Record<string, unknown>,
   clientOrOptions?: MeetingPlatformAdapterSessionClient | MeetingPlatformAdapterRunnerOptions,
-  input?: MeetingPlatformAdapterLaunchPlanOptions | MeetingPlatformAdapterLaunchPlan | string | Record<string, unknown>,
+  input?: MeetingPlatformAdapterLaunchPlanOptions | MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterCandidateLaunchPlan | string | Record<string, unknown>,
   options?: MeetingPlatformAdapterRunnerOptions,
 ): Promise<MeetingPlatformAdapterOpenSessionEvent>;
 

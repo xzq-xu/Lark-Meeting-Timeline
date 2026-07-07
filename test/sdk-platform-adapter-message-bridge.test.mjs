@@ -17,6 +17,9 @@ import {
   createMeetingPlatformAdapterRunner,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-runner.mjs';
 import {
+  buildMeetingAppFixtureSnapshot,
+} from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
+import {
   createMeetingPlatformTimelineKit,
 } from '../packages/meeting-timeline-sdk/adapters/platform-kit.mjs';
 import {
@@ -68,6 +71,80 @@ const bridge = createMeetingPlatformAdapterMessageBridge(manifest, adapterClient
 
 assert.equal(bridge.schema, 'meeting_platform_adapter_message_bridge');
 assert.equal((await bridge.handleMessage({ type: 'unsupported' })).handled, false);
+
+const googleActiveSnapshot = buildMeetingAppFixtureSnapshot('google-meet', {
+  state: 'active',
+  observedAtMs: 1_782_800_000_123,
+});
+const candidatePlan = await bridge.handleMessage({
+  type: 'meeting_timeline.candidate_launch_plan',
+  request_id: 'candidate-plan-1',
+  payload: {
+    tabs: [
+      { id: 6, url: 'https://zoom.us/j/987654321', title: 'Zoom Meeting' },
+      {
+        id: 7,
+        url: 'https://meet.google.com/abc-defg-hij',
+        title: 'Google Meet',
+        snapshots: [googleActiveSnapshot],
+      },
+    ],
+  },
+}, {
+  requireSpeakerTrack: true,
+});
+assert.equal(candidatePlan.action, 'candidate_launch_plan');
+assert.equal(candidatePlan.request_id, 'candidate-plan-1');
+assert.equal(candidatePlan.result.accepted, true);
+assert.equal(candidatePlan.result.status, 'ready_for_realtime_launch');
+assert.equal(candidatePlan.result.launch_plan.platform, 'google_meet');
+assert.equal(candidatePlan.result.selected_candidate.tab_id, 7);
+
+const urlOnlyCandidatePlan = await bridge.handleMessage({
+  type: 'meeting_timeline.candidate_launch_plan',
+  payload: {
+    tabs: [
+      { id: 8, url: 'https://meet.google.com/abc-defg-hij', title: 'Google Meet' },
+    ],
+  },
+}, {
+  requireSpeakerTrack: true,
+});
+assert.equal(urlOnlyCandidatePlan.action, 'candidate_launch_plan');
+assert.equal(urlOnlyCandidatePlan.result.accepted, false);
+assert.equal(urlOnlyCandidatePlan.result.status, 'needs_live_page_evidence');
+
+const strictCalls = [];
+const strictBridge = createMeetingPlatformAdapterMessageBridge(manifest, {
+  async observePlatformCandidates(payload, options) {
+    strictCalls.push(['observePlatformCandidates', payload, options]);
+    return { ok: true, observed: payload.platform };
+  },
+  async insertAnnotation(platform, payload, options) {
+    strictCalls.push(['insertAnnotation', platform, payload, options]);
+    return { ok: true, platform, label: payload.label };
+  },
+}, {
+  clock: () => 1_782_800_000_456,
+});
+const strictOpened = await strictBridge.handleMessage({
+  type: 'meeting_timeline.open_candidate_session',
+  payload: {
+    tabs: [{
+      id: 9,
+      url: 'https://meet.google.com/abc-defg-hij',
+      title: 'Google Meet',
+      snapshots: [googleActiveSnapshot],
+    }],
+  },
+}, {
+  requireSpeakerTrack: true,
+});
+assert.equal(strictOpened.action, 'open_candidate_session');
+assert.equal(strictOpened.platform, 'google_meet');
+assert.equal(strictOpened.result.payload.launch_plan.platform, 'google_meet');
+assert.equal(strictCalls[0][0], 'observePlatformCandidates');
+assert.equal(strictCalls[0][1].candidates[0].tab_id, 9);
 
 const opened = await bridge.handleMessage({
   type: 'meeting_timeline.observe_candidates',
@@ -148,6 +225,8 @@ assert.equal((await runnerBridge.handleMessage({
 const handoff = buildMeetingPlatformAdapterMessageBridgeHandoff(manifest);
 assert.equal(handoff.schema, 'meeting_platform_adapter_message_bridge_handoff');
 assert.equal(handoff.message_types.includes('meeting_timeline.insert_mark'), true);
+assert.equal(handoff.message_types.includes('meeting_timeline.candidate_launch_plan'), true);
+assert.equal(handoff.message_types.includes('meeting_timeline.open_candidate_session'), true);
 assert.equal(handoff.supported_surfaces.includes('electron_webview_preload'), true);
 
 const timelineCalls = [];

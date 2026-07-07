@@ -1,5 +1,8 @@
 import type { MeetingPlatformAdapterInstallManifest } from './platform-adapter-install-manifest.mjs';
-import type { MeetingPlatformAdapterLaunchPlan } from './platform-adapter-launch-plan.mjs';
+import type {
+  MeetingPlatformAdapterCandidateLaunchPlan,
+  MeetingPlatformAdapterLaunchPlan,
+} from './platform-adapter-launch-plan.mjs';
 import type {
   MeetingPlatformAdapterRunner,
   MeetingPlatformAdapterRunnerOptions,
@@ -44,7 +47,7 @@ export interface MeetingPlatformAdapterMessageBridge {
   getState(): Record<string, unknown>;
   handleMessage(message?: Record<string, unknown>, options?: MeetingPlatformAdapterMessageBridgeOptions): Promise<MeetingPlatformAdapterMessageBridgeEvent>;
   dispatchMessage(message?: Record<string, unknown>, options?: MeetingPlatformAdapterMessageBridgeOptions): Promise<MeetingPlatformAdapterMessageBridgeEvent>;
-  open(input?: Record<string, unknown> | MeetingPlatformAdapterLaunchPlan | string, options?: MeetingPlatformAdapterMessageBridgeOptions): Promise<MeetingPlatformAdapterMessageBridgeEvent>;
+  open(input?: Record<string, unknown> | MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterCandidateLaunchPlan | string, options?: MeetingPlatformAdapterMessageBridgeOptions): Promise<MeetingPlatformAdapterMessageBridgeEvent>;
   insertAnnotation(input?: Record<string, unknown>, options?: MeetingPlatformAdapterMessageBridgeOptions): Promise<MeetingPlatformAdapterMessageBridgeEvent>;
   insertMark(input?: Record<string, unknown>, options?: MeetingPlatformAdapterMessageBridgeOptions): Promise<MeetingPlatformAdapterMessageBridgeEvent>;
 }

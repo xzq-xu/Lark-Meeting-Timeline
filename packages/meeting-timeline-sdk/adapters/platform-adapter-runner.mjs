@@ -1,7 +1,10 @@
 import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
 import {
+  MEETING_PLATFORM_ADAPTER_CANDIDATE_LAUNCH_PLAN_SCHEMA,
   MEETING_PLATFORM_ADAPTER_LAUNCH_PLAN_SCHEMA,
+  assertMeetingPlatformAdapterCandidateLaunchPlan,
   assertMeetingPlatformAdapterLaunchPlan,
+  buildMeetingPlatformAdapterCandidateLaunchPlan,
   buildMeetingPlatformAdapterLaunchPlan,
 } from './platform-adapter-launch-plan.mjs';
 import {
@@ -19,6 +22,10 @@ function firstNonEmpty(...values) {
 
 function isLaunchPlan(value) {
   return value?.schema === MEETING_PLATFORM_ADAPTER_LAUNCH_PLAN_SCHEMA;
+}
+
+function isCandidateLaunchPlan(value) {
+  return value?.schema === MEETING_PLATFORM_ADAPTER_CANDIDATE_LAUNCH_PLAN_SCHEMA;
 }
 
 function isInstallManifest(value) {
@@ -94,6 +101,22 @@ function shouldObserveAxis(options = {}) {
     && options.auto_observe !== false;
 }
 
+function launchPlanFromCandidate(plan) {
+  return assertMeetingPlatformAdapterCandidateLaunchPlan(plan).launch_plan;
+}
+
+function observeInputFor(input = {}) {
+  if (!isCandidateLaunchPlan(input)) return input;
+  return compactObject({
+    platform: input.platform,
+    url: input.selected_candidate?.url,
+    title: input.selected_candidate?.title,
+    active: input.selected_candidate?.active,
+    candidates: input.selected_candidate ? [input.selected_candidate] : undefined,
+    captured_at_ms: input.launch_input?.captured_at_ms ?? input.launch_input?.capturedAtMs,
+  });
+}
+
 function event(action, runner, payload = {}, result) {
   return compactObject({
     type: 'meeting_platform_adapter_open_session_event',
@@ -123,10 +146,16 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
   const installManifest = installManifestFrom(manifestOrInput, defaults);
   const initialLaunchPlan = isLaunchPlan(manifestOrInput)
     ? assertMeetingPlatformAdapterLaunchPlan(manifestOrInput)
+    : isCandidateLaunchPlan(manifestOrInput)
+      ? launchPlanFromCandidate(manifestOrInput)
+    : undefined;
+  const initialCandidateLaunchPlan = isCandidateLaunchPlan(manifestOrInput)
+    ? assertMeetingPlatformAdapterCandidateLaunchPlan(manifestOrInput)
     : undefined;
   const state = {
     opened: false,
     current_launch_plan: initialLaunchPlan,
+    current_candidate_launch_plan: initialCandidateLaunchPlan,
     current_session: undefined,
     last_open_event: undefined,
     last_session_event: undefined,
@@ -142,6 +171,7 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
         opened: state.opened,
         runner_id: runner.id,
         current_launch_plan: state.current_launch_plan,
+        current_candidate_launch_plan: state.current_candidate_launch_plan,
         current_session: state.current_session?.getState?.(),
         last_open_event: state.last_open_event,
         last_session_event: state.last_session_event,
@@ -149,6 +179,7 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
     },
     launchPlan(input = {}, launchOptions = {}) {
       if (isLaunchPlan(input)) return assertMeetingPlatformAdapterLaunchPlan(input);
+      if (isCandidateLaunchPlan(input)) return launchPlanFromCandidate(input);
       if (state.current_launch_plan && isEmptyInput(input)) return state.current_launch_plan;
       if (!installManifest && !launchOptions.installManifest && !launchOptions.install_manifest) {
         throw new MeetingTimelineSdkError('Adapter runner requires an install manifest to build a launch plan', {
@@ -160,19 +191,38 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
         ...launchOptions,
       });
     },
+    candidateLaunchPlan(input = {}, launchOptions = {}) {
+      if (isCandidateLaunchPlan(input)) return assertMeetingPlatformAdapterCandidateLaunchPlan(input);
+      if (state.current_candidate_launch_plan && isEmptyInput(input)) return state.current_candidate_launch_plan;
+      if (!installManifest && !launchOptions.installManifest && !launchOptions.install_manifest) {
+        throw new MeetingTimelineSdkError('Adapter runner requires an install manifest to build a candidate launch plan', {
+          code: 'adapter_runner_missing_install_manifest',
+        });
+      }
+      return buildMeetingPlatformAdapterCandidateLaunchPlan(installManifest, input, {
+        ...defaults,
+        ...launchOptions,
+      });
+    },
     async open(input = {}, openOptions = {}) {
       const mergedOptions = { ...defaults, ...openOptions };
+      const candidateLaunchPlan = isCandidateLaunchPlan(input)
+        ? assertMeetingPlatformAdapterCandidateLaunchPlan(input)
+        : undefined;
       const launchPlan = isLaunchPlan(input)
         ? assertMeetingPlatformAdapterLaunchPlan(input)
+        : candidateLaunchPlan
+          ? candidateLaunchPlan.launch_plan
         : state.current_launch_plan && isEmptyInput(input)
           ? state.current_launch_plan
         : assertMeetingPlatformAdapterLaunchPlan(runner.launchPlan(input, mergedOptions));
       const session = createMeetingPlatformAdapterSession(launchPlan, client, mergedOptions);
       const observeEvent = shouldObserveAxis(mergedOptions)
-        ? await session.observeAxis(input, mergedOptions)
+        ? await session.observeAxis(observeInputFor(input), mergedOptions)
         : undefined;
       state.opened = true;
       state.current_launch_plan = launchPlan;
+      state.current_candidate_launch_plan = candidateLaunchPlan;
       state.current_session = session;
       state.last_session_event = observeEvent;
       state.last_open_event = event('open_session', runner, {
@@ -186,6 +236,13 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
         observe_event: observeEvent,
       }, observeEvent?.result);
       return state.last_open_event;
+    },
+    async openCandidate(input = {}, openOptions = {}) {
+      const mergedOptions = { ...defaults, ...openOptions };
+      const candidateLaunchPlan = assertMeetingPlatformAdapterCandidateLaunchPlan(
+        isCandidateLaunchPlan(input) ? input : runner.candidateLaunchPlan(input, mergedOptions),
+      );
+      return runner.open(candidateLaunchPlan, mergedOptions);
     },
     async ensureOpen(input = {}, openOptions = {}) {
       if (state.current_session) return state.last_open_event;
@@ -225,6 +282,7 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
     reset() {
       state.opened = false;
       state.current_launch_plan = initialLaunchPlan;
+      state.current_candidate_launch_plan = initialCandidateLaunchPlan;
       state.current_session = undefined;
       state.last_open_event = undefined;
       state.last_session_event = undefined;

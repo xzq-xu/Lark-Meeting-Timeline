@@ -64,6 +64,20 @@ const LAUNCH_PLAN_ACTIONS = new Set([
   'meeting_timeline.launch_plan',
 ]);
 
+const CANDIDATE_LAUNCH_PLAN_ACTIONS = new Set([
+  'candidate_launch_plan',
+  'launch_candidates',
+  'meeting_timeline.candidate_launch_plan',
+  'meeting_timeline.launch_candidates',
+]);
+
+const OPEN_CANDIDATE_ACTIONS = new Set([
+  'open_candidate_session',
+  'open_candidates',
+  'meeting_timeline.open_candidate_session',
+  'meeting_timeline.open_candidates',
+]);
+
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
 }
@@ -200,6 +214,22 @@ function launchInputFrom(payload = {}, message = {}, options = {}) {
     in_meeting: firstNonEmpty(payload.in_meeting, payload.inMeeting, best.in_meeting, true),
     captured_at_ms: firstNonEmpty(payload.captured_at_ms, payload.capturedAtMs, message.captured_at_ms, options.captured_at_ms),
     candidates,
+    tabs: payload.tabs,
+    windows: payload.windows,
+  });
+}
+
+function candidateLaunchInputFrom(payload = {}, message = {}, options = {}) {
+  const launchInput = launchInputFrom(payload, message, options);
+  return compactObject({
+    ...payload,
+    platform: launchInput.platform,
+    url: launchInput.url,
+    title: launchInput.title,
+    active: launchInput.active,
+    in_meeting: launchInput.in_meeting,
+    captured_at_ms: launchInput.captured_at_ms,
+    candidates: firstNonEmpty(payload.candidates, launchInput.candidates),
     tabs: payload.tabs,
     windows: payload.windows,
   });
@@ -360,6 +390,14 @@ export function createMeetingPlatformAdapterMessageBridge(manifestOrRunner = {},
         const result = runner.launchPlan(launchInputFrom(payload, message, mergedOptions), mergedOptions);
         return event('launch_plan', bridge, message, payload, result);
       }
+      if (CANDIDATE_LAUNCH_PLAN_ACTIONS.has(type)) {
+        const result = runner.candidateLaunchPlan(candidateLaunchInputFrom(payload, message, mergedOptions), mergedOptions);
+        return event('candidate_launch_plan', bridge, message, payload, result);
+      }
+      if (OPEN_CANDIDATE_ACTIONS.has(type)) {
+        const result = await runner.openCandidate(candidateLaunchInputFrom(payload, message, mergedOptions), mergedOptions);
+        return event('open_candidate_session', bridge, message, payload, result);
+      }
       return event('unsupported', bridge, message, payload, {
         reason: 'unsupported_message_type',
         message_type: type,
@@ -396,6 +434,8 @@ export function buildMeetingPlatformAdapterMessageBridgeHandoff(manifestOrInput 
     message_types: [
       'meeting_timeline.observe_candidates',
       'meeting_timeline.open_session',
+      'meeting_timeline.open_candidate_session',
+      'meeting_timeline.candidate_launch_plan',
       'meeting_timeline.insert_mark',
       'meeting_timeline.insert_annotation',
       'meeting_timeline.speaker_track',
@@ -406,6 +446,7 @@ export function buildMeetingPlatformAdapterMessageBridgeHandoff(manifestOrInput 
     ],
     runtime_sequence: [
       'background_or_native_host_sends_observe_candidates',
+      'optional_candidate_launch_plan_checks_live_evidence',
       'bridge_opens_adapter_runner_session',
       'content_or_device_sends_insert_mark_with_captured_at_ms',
       'bridge_routes_mark_to_current_runner_session',
