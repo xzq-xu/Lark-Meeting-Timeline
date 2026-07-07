@@ -7,6 +7,7 @@ import {
   buildMeetingAppTimelineConnectorSmokePlan,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
   createMeetingAppTimelineSdk,
+  runMeetingAppTimelineConnectorSmokePlan,
 } from '../index.mjs';
 
 function boolLabel(value) {
@@ -103,6 +104,7 @@ function connectorQuickstartMarkdown(pkg = {}) {
     '- `host-install-checklist-acceptance.json`: standalone acceptance report for the host install checklist.',
     '- `connector-smoke-plan.json`: executable per-platform smoke order: observe candidates, insert annotation, then optional speaker/participant markers.',
     '- `connector-smoke-plan-acceptance.json`: standalone gate for the connector smoke plan.',
+    '- `connector-smoke-run-report.json`: dry-run execution report proving the generated smoke plan maps to SDK runtime client methods.',
     '- `startup-plan-matrix.json`: selected runtime surface, install target, bridge, and startup actions per platform.',
     '- `adapter-blueprint-matrix.json`: platform adapter blueprint, acceptance gates, and surface order.',
     '- `runtime-event-plan-matrix.json`: supported runtime actions and client methods.',
@@ -203,6 +205,7 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   await write('host-install-checklist-acceptance.json', buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(pkg));
   await write('connector-smoke-plan.json', buildMeetingAppTimelineConnectorSmokePlan(pkg));
   await write('connector-smoke-plan-acceptance.json', buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(pkg));
+  await write('connector-smoke-run-report.json', await runMeetingAppTimelineConnectorSmokePlan(pkg));
   await write('connector-quickstart.md', connectorQuickstartMarkdown(pkg), true);
 
   for (const [surface, plan] of Object.entries(pkg.observer_plan_by_surface ?? {})) {
@@ -248,6 +251,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
   const hostInstallChecklistAcceptance = buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(hostInstallChecklist);
   const smokePlan = buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist);
   const smokePlanAcceptance = buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan);
+  const smokeRunReport = await runMeetingAppTimelineConnectorSmokePlan(smokePlan);
   const writtenFiles = await writeConnectorPackageFiles(outDir, pkg);
 
   const report = {
@@ -285,6 +289,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     host_install_checklist_acceptance: hostInstallChecklistAcceptance,
     smoke_plan: smokePlan,
     smoke_plan_acceptance: smokePlanAcceptance,
+    smoke_run_report: smokeRunReport,
     package: includePackage ? pkg : stripConnectorPackage(pkg),
     next_actions: pkg.next_actions,
   };

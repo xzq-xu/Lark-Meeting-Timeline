@@ -12,6 +12,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA = 'mee
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA = 'meeting_app_timeline_connector_smoke_plan';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_smoke_plan_acceptance_report';
+export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA = 'meeting_app_timeline_connector_smoke_run_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA = 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION = 1;
 
@@ -134,6 +135,150 @@ function sampleUrlForPlatform(platform) {
     webex: 'https://example.webex.com/meet/sample',
     lark: 'https://vc.feishu.cn/j/123456789',
   }[normalizeKey(platform)] ?? 'local://meeting-window/sample';
+}
+
+function smokeStepCapturedAtMs(step = {}) {
+  return firstNonEmpty(
+    step.input?.annotation?.captured_at_ms,
+    step.input?.captured_at_ms,
+    step.input?.speaker?.captured_at_ms,
+    step.input?.participant?.captured_at_ms,
+  );
+}
+
+function summarizeSmokeRunResult(result = {}) {
+  if (!result || typeof result !== 'object') return { result_type: typeof result };
+  return compactObject({
+    ok: result.ok,
+    accepted: result.accepted,
+    schema: result.schema,
+    action: result.action,
+    method: result.method,
+    platform: result.platform,
+    captured_at_ms: result.captured_at_ms,
+    status: result.status,
+  });
+}
+
+function summarizeSmokeRunCall(call = {}) {
+  return compactObject({
+    method: call.method,
+    platform: call.platform,
+    action: call.action,
+    captured_at_ms: smokeStepCapturedAtMs({ input: call.payload }),
+    label: call.payload?.annotation?.label ?? call.payload?.label,
+    speaker_id: call.payload?.speaker?.id ?? call.payload?.speaker_id,
+    participant_id: call.payload?.participant?.id ?? call.payload?.participant_id,
+    candidate_count: call.payload?.tabs?.length ?? call.payload?.candidates?.length,
+  });
+}
+
+function createRecordingConnectorSmokeRuntimeClient(calls = []) {
+  const push = (method, action, platform, payload = {}, options = {}) => {
+    const call = compactObject({
+      method,
+      action,
+      platform,
+      payload,
+      options,
+    });
+    calls.push(call);
+    return compactObject({
+      ok: true,
+      method,
+      action,
+      platform,
+      captured_at_ms: smokeStepCapturedAtMs({ input: payload }),
+    });
+  };
+  return {
+    observePlatformCandidates(input = {}, options = {}) {
+      return push('observePlatformCandidates', 'observe_platform_candidates', input.platform, input, options);
+    },
+    insertAnnotation(platform, annotation = {}, options = {}) {
+      return push('insertAnnotation', 'insert_annotation', normalizeKey(platform), { platform: normalizeKey(platform), annotation }, options);
+    },
+    speakerTrack(platform, input = {}, options = {}) {
+      return push('speakerTrack', 'speaker_track', normalizeKey(platform), { platform: normalizeKey(platform), ...input }, options);
+    },
+    participantTrack(platform, input = {}, options = {}) {
+      return push('participantTrack', 'participant_track', normalizeKey(platform), { platform: normalizeKey(platform), ...input }, options);
+    },
+  };
+}
+
+async function runConnectorSmokeStep(client, row = {}, step = {}, options = {}) {
+  const action = normalizeMeetingPlatformRuntimeEventAction(step.action);
+  const platform = normalizeKey(firstNonEmpty(step.input?.platform, row.platform));
+  const stepOptions = compactObject({
+    smoke: true,
+    dry_run: options.dryRun === true || options.dry_run === true,
+    smoke_step_id: step.id,
+    smoke_action: action,
+  });
+  const base = {
+    id: step.id,
+    order: step.order,
+    action,
+    client_method: step.client_method,
+    required: step.required === true,
+    platform,
+    captured_at_ms: smokeStepCapturedAtMs(step),
+  };
+  try {
+    let result;
+    if (action === 'observe_platform_candidates') {
+      result = await client.observePlatformCandidates(step.input ?? {}, stepOptions);
+    } else if (action === 'insert_annotation') {
+      result = await client.insertAnnotation(platform, step.input?.annotation ?? {}, stepOptions);
+    } else if (action === 'speaker_track') {
+      result = await client.speakerTrack(platform, {
+        ...(step.input ?? {}),
+        ...(step.input?.speaker ?? {}),
+      }, stepOptions);
+    } else if (action === 'participant_track') {
+      result = await client.participantTrack(platform, {
+        ...(step.input ?? {}),
+        ...(step.input?.participant ?? {}),
+      }, stepOptions);
+    } else {
+      throw new MeetingTimelineSdkError(`Unsupported connector smoke action: ${action}`, { action, step });
+    }
+    return compactObject({
+      ...base,
+      accepted: true,
+      result: summarizeSmokeRunResult(result),
+    });
+  } catch (error) {
+    return compactObject({
+      ...base,
+      accepted: false,
+      error: {
+        name: error.name,
+        message: error.message,
+      },
+    });
+  }
+}
+
+function connectorSmokeRunRowIssues(row = {}, stepResults = []) {
+  const issues = [];
+  const observeIndex = stepResults.findIndex((step) => step.action === 'observe_platform_candidates' && step.accepted === true);
+  const insertIndex = stepResults.findIndex((step) => step.action === 'insert_annotation' && step.accepted === true);
+  const insertStep = stepResults.find((step) => step.action === 'insert_annotation');
+  const failedSteps = stepResults.filter((step) => step.accepted !== true);
+  if (!row.selected_surface) issues.push('missing_selected_surface');
+  if (!row.install_target) issues.push('missing_install_target');
+  if (row.realtime_startup_ready !== true) issues.push('row_not_realtime_startup_ready');
+  if (row.adapter_blueprint_ready !== true) issues.push('row_adapter_blueprint_not_ready');
+  if (observeIndex < 0) issues.push('observe_candidates_not_executed');
+  if (insertIndex < 0) issues.push('insert_annotation_not_executed');
+  if (observeIndex < 0 || insertIndex <= observeIndex) issues.push('axis_not_observed_before_insert');
+  if (insertStep?.captured_at_ms == null) issues.push('insert_annotation_missing_captured_at_ms');
+  for (const failed of failedSteps) {
+    issues.push(failed.required ? `required_step_failed:${failed.action}` : `declared_optional_step_failed:${failed.action}`);
+  }
+  return unique(issues);
 }
 
 function missingRuntimeActions(pkg = {}, platforms = [], options = {}) {
@@ -867,6 +1012,95 @@ export function assertMeetingAppTimelineConnectorSmokePlan(planOrChecklistOrPack
     });
   }
   return planOrChecklistOrPackage;
+}
+
+export async function runMeetingAppTimelineConnectorSmokePlan(planOrChecklistOrPackage = {}, options = {}) {
+  const plan = planOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA
+    ? planOrChecklistOrPackage
+    : buildMeetingAppTimelineConnectorSmokePlan(planOrChecklistOrPackage, options);
+  const planAcceptance = buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(plan);
+  const calls = [];
+  const explicitClient = firstNonEmpty(options.client, options.runtimeClient, options.runtime_client);
+  const dryRun = explicitClient
+    ? options.dryRun === true || options.dry_run === true
+    : options.dryRun !== false && options.dry_run !== false;
+  const client = explicitClient
+    ?? (dryRun
+      ? createRecordingConnectorSmokeRuntimeClient(calls)
+      : createMeetingAppTimelineConnectorRuntimeClient(planOrChecklistOrPackage, options));
+  const rows = [];
+
+  for (const row of plan.rows ?? []) {
+    const sortedSteps = [...(row.steps ?? [])].sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
+    const stepResults = [];
+    for (const step of sortedSteps) {
+      stepResults.push(await runConnectorSmokeStep(client, row, step, { ...options, dryRun }));
+    }
+    const issues = connectorSmokeRunRowIssues(row, stepResults);
+    const observeAcceptedIndex = stepResults.findIndex((step) => step.action === 'observe_platform_candidates' && step.accepted === true);
+    const insertAcceptedIndex = stepResults.findIndex((step) => step.action === 'insert_annotation' && step.accepted === true);
+    const insertStep = stepResults.find((step) => step.action === 'insert_annotation');
+    rows.push(compactObject({
+      platform: normalizeKey(row.platform),
+      selected_surface: row.selected_surface,
+      install_target: row.install_target,
+      accepted: issues.length === 0,
+      required_step_count: stepResults.filter((step) => step.required).length,
+      optional_step_count: stepResults.filter((step) => !step.required).length,
+      executed_step_count: stepResults.length,
+      failed_step_count: stepResults.filter((step) => step.accepted !== true).length,
+      observe_before_insert: observeAcceptedIndex >= 0 && insertAcceptedIndex > observeAcceptedIndex,
+      captured_at_ms_preserved: insertStep?.captured_at_ms != null && (insertStep.result?.captured_at_ms == null || insertStep.result.captured_at_ms === insertStep.captured_at_ms),
+      steps: stepResults,
+      issues,
+    }));
+  }
+
+  const issues = [
+    ...(planAcceptance.accepted ? [] : planAcceptance.issues.map((issue) => `plan:${issue.code}`)),
+    ...rows.flatMap((row) => row.issues.map((issue) => `${row.platform}:${issue}`)),
+  ];
+
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: planAcceptance.accepted === true && rows.every((row) => row.accepted === true),
+    dry_run: dryRun,
+    plan_accepted: planAcceptance.accepted === true,
+    target: plan.target,
+    package_id: plan.package_id,
+    platform_count: plan.platform_count ?? rows.length,
+    row_count: rows.length,
+    timestamp_field: plan.timestamp_field,
+    runtime_event_endpoint: plan.runtime_event_endpoint,
+    required_step_count: rows.reduce((count, row) => count + row.required_step_count, 0),
+    optional_step_count: rows.reduce((count, row) => count + row.optional_step_count, 0),
+    executed_step_count: rows.reduce((count, row) => count + row.executed_step_count, 0),
+    failed_step_count: rows.reduce((count, row) => count + row.failed_step_count, 0),
+    call_count: calls.length,
+    calls: calls.map((call) => summarizeSmokeRunCall(call)),
+    issue_count: issues.length,
+    issues,
+    rows,
+    next_actions: issues.length > 0
+      ? unique([
+        ...issues.map((issue) => `fix_${issue}`),
+        ...(plan.next_actions ?? []),
+      ])
+      : plan.next_actions ?? [],
+  });
+}
+
+export async function assertMeetingAppTimelineConnectorSmokeRun(planOrChecklistOrPackage = {}, options = {}) {
+  const report = await runMeetingAppTimelineConnectorSmokePlan(planOrChecklistOrPackage, options);
+  if (!report.accepted) {
+    throw new MeetingTimelineSdkError('Meeting app timeline connector smoke run failed', {
+      report,
+      issues: report.issues,
+    });
+  }
+  return report;
 }
 
 export function createMeetingAppTimelineConnectorRuntimeClient(pkg = {}, options = {}) {

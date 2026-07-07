@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import {
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA,
+  MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA,
   assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
   assertMeetingAppTimelineConnectorSmokePlan,
+  assertMeetingAppTimelineConnectorSmokeRun,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
@@ -14,6 +16,7 @@ import {
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
   createMeetingAppTimelineSdk,
   createMeetingAppTimelineConnectorRuntimeClient,
+  runMeetingAppTimelineConnectorSmokePlan,
   stripMeetingAppTimelineConnectorPackageFileContents,
 } from '../packages/meeting-timeline-sdk/index.mjs';
 import {
@@ -114,6 +117,22 @@ assert.equal(smokePlanAcceptance.required_step_count, 4);
 assert.equal(smokePlanAcceptance.optional_step_count, 4);
 assert.equal(assertMeetingAppTimelineConnectorSmokePlan(smokePlan), smokePlan);
 assert.equal(buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(connectorPackage).accepted, true);
+
+const smokeRunReport = await runMeetingAppTimelineConnectorSmokePlan(smokePlan);
+assert.equal(smokeRunReport.schema, MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA);
+assert.equal(smokeRunReport.accepted, true);
+assert.equal(smokeRunReport.dry_run, true);
+assert.equal(smokeRunReport.plan_accepted, true);
+assert.equal(smokeRunReport.required_step_count, 4);
+assert.equal(smokeRunReport.optional_step_count, 4);
+assert.equal(smokeRunReport.executed_step_count, 8);
+assert.equal(smokeRunReport.failed_step_count, 0);
+assert.equal(smokeRunReport.call_count, 8);
+assert.equal(smokeRunReport.rows.every((row) => row.observe_before_insert === true), true);
+assert.equal(smokeRunReport.rows.every((row) => row.captured_at_ms_preserved === true), true);
+assert.deepEqual(smokeRunReport.calls.slice(0, 2).map((call) => call.method), ['observePlatformCandidates', 'insertAnnotation']);
+const assertedSmokeRun = await assertMeetingAppTimelineConnectorSmokeRun(smokePlan);
+assert.equal(assertedSmokeRun.accepted, true);
 
 assert.equal(connectorPackage.adapter_blueprints.ready_count, 2);
 assert.equal(connectorPackage.adapter_blueprints.matrix.schema, 'meeting_platform_adapter_blueprint_matrix');
@@ -298,6 +317,10 @@ assert.equal(
 assert.throws(
   () => assertMeetingAppTimelineConnectorSmokePlan(brokenSmokePlan),
   /connector smoke plan is not accepted/,
+);
+await assert.rejects(
+  () => assertMeetingAppTimelineConnectorSmokeRun(brokenSmokePlan),
+  /connector smoke run failed/,
 );
 
 const productionAcceptance = buildMeetingAppTimelineConnectorPackageAcceptanceReport(connectorPackage, {

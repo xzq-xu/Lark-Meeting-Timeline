@@ -45,7 +45,7 @@ assert.equal(report.adapter_blueprint_ready_count, 2);
 assert.equal(report.startup_plan_ready_count, 2);
 assert.equal(report.observer_surface_count, 2);
 assert.equal(report.scheduler_surface_count, 2);
-assert.equal(report.written_files.length, 24);
+assert.equal(report.written_files.length, 25);
 assert.equal(report.rows.some((row) => row.platform === 'google_meet' && row.surface === 'browser_extension'), true);
 assert.equal(report.rows.some((row) => row.platform === 'zoom' && row.surface === 'native_detector'), true);
 assert.equal(report.handoff.schema, 'meeting_app_timeline_connector_handoff');
@@ -60,6 +60,10 @@ assert.equal(report.smoke_plan.rows.find((row) => row.platform === 'google_meet'
 assert.equal(report.smoke_plan.rows.find((row) => row.platform === 'zoom').steps.some((step) => step.action === 'insert_annotation'), true);
 assert.equal(report.smoke_plan_acceptance.schema, 'meeting_app_timeline_connector_smoke_plan_acceptance_report');
 assert.equal(report.smoke_plan_acceptance.accepted, true);
+assert.equal(report.smoke_run_report.schema, 'meeting_app_timeline_connector_smoke_run_report');
+assert.equal(report.smoke_run_report.accepted, true);
+assert.equal(report.smoke_run_report.dry_run, true);
+assert.equal(report.smoke_run_report.executed_step_count, 8);
 assert.equal(report.package.extension.scaffold.files.some((file) => 'content' in file), false);
 
 const connectorPackage = JSON.parse(await readFile(join(outDir, 'connector-package.json'), 'utf8'));
@@ -119,12 +123,21 @@ assert.equal(smokePlanAcceptance.accepted, true);
 assert.equal(smokePlanAcceptance.required_step_count, 4);
 assert.equal(smokePlanAcceptance.optional_step_count, 4);
 
+const smokeRunReport = JSON.parse(await readFile(join(outDir, 'connector-smoke-run-report.json'), 'utf8'));
+assert.equal(smokeRunReport.schema, 'meeting_app_timeline_connector_smoke_run_report');
+assert.equal(smokeRunReport.accepted, true);
+assert.equal(smokeRunReport.dry_run, true);
+assert.equal(smokeRunReport.call_count, 8);
+assert.equal(smokeRunReport.rows.every((row) => row.observe_before_insert === true), true);
+assert.equal(smokeRunReport.rows.every((row) => row.captured_at_ms_preserved === true), true);
+
 const connectorQuickstart = await readFile(join(outDir, 'connector-quickstart.md'), 'utf8');
 assert.match(connectorQuickstart, /Meeting App Timeline Connector Quickstart/);
 assert.match(connectorQuickstart, /host-install-checklist\.json/);
 assert.match(connectorQuickstart, /host-install-checklist-acceptance\.json/);
 assert.match(connectorQuickstart, /connector-smoke-plan\.json/);
 assert.match(connectorQuickstart, /connector-smoke-plan-acceptance\.json/);
+assert.match(connectorQuickstart, /connector-smoke-run-report\.json/);
 assert.match(connectorQuickstart, /startup-plan-matrix\.json/);
 assert.match(connectorQuickstart, /captured_at_ms/);
 assert.match(connectorQuickstart, /createMeetingAppTimelineConnectorRuntimeClient/);

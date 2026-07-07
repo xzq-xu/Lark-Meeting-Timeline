@@ -7,6 +7,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA: 'meet
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_host_install_checklist_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA: 'meeting_app_timeline_connector_smoke_plan';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_smoke_plan_acceptance_report';
+export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA: 'meeting_app_timeline_connector_smoke_run_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA: 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION: 1;
 
@@ -194,6 +195,57 @@ export interface MeetingAppTimelineConnectorSmokePlanAcceptanceReport {
   next_actions: string[];
 }
 
+export interface MeetingAppTimelineConnectorSmokeRunStepResult {
+  id: string;
+  order: number;
+  action: string;
+  client_method?: string;
+  required: boolean;
+  platform?: string;
+  captured_at_ms?: number;
+  accepted: boolean;
+  result?: Record<string, unknown>;
+  error?: Record<string, unknown>;
+}
+
+export interface MeetingAppTimelineConnectorSmokeRunReport {
+  type: 'meeting_app_timeline_connector_smoke_run_report';
+  schema: 'meeting_app_timeline_connector_smoke_run_report';
+  schema_version: 1;
+  accepted: boolean;
+  dry_run: boolean;
+  plan_accepted: boolean;
+  target?: string;
+  package_id?: string;
+  platform_count: number;
+  row_count: number;
+  timestamp_field?: string;
+  runtime_event_endpoint?: string;
+  required_step_count: number;
+  optional_step_count: number;
+  executed_step_count: number;
+  failed_step_count: number;
+  call_count: number;
+  calls: Array<Record<string, unknown>>;
+  issue_count: number;
+  issues: string[];
+  rows: Array<Record<string, unknown> & {
+    platform: string;
+    selected_surface?: string;
+    install_target?: string;
+    accepted: boolean;
+    required_step_count: number;
+    optional_step_count: number;
+    executed_step_count: number;
+    failed_step_count: number;
+    observe_before_insert?: boolean;
+    captured_at_ms_preserved?: boolean;
+    steps: MeetingAppTimelineConnectorSmokeRunStepResult[];
+    issues: string[];
+  }>;
+  next_actions: string[];
+}
+
 export interface MeetingAppTimelineConnectorRuntimeClient {
   type: 'meeting_app_timeline_connector_runtime_client';
   schema: 'meeting_app_timeline_connector_runtime_client';
@@ -276,6 +328,16 @@ export function assertMeetingAppTimelineConnectorSmokePlan<T extends MeetingAppT
   planOrChecklistOrPackage?: T,
   options?: Record<string, unknown>,
 ): T;
+
+export function runMeetingAppTimelineConnectorSmokePlan(
+  planOrChecklistOrPackage?: MeetingAppTimelineConnectorSmokePlan | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): Promise<MeetingAppTimelineConnectorSmokeRunReport>;
+
+export function assertMeetingAppTimelineConnectorSmokeRun(
+  planOrChecklistOrPackage?: MeetingAppTimelineConnectorSmokePlan | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): Promise<MeetingAppTimelineConnectorSmokeRunReport>;
 
 export function createMeetingAppTimelineConnectorRuntimeClient(
   pkg?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,

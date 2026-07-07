@@ -315,6 +315,7 @@ import {
   buildMeetingAppTimelineConnectorPackageAcceptanceReport as buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot,
   buildMeetingAppTimelineConnectorSmokePlan as buildMeetingAppTimelineConnectorSmokePlanFromRoot,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport as buildMeetingAppTimelineConnectorSmokePlanAcceptanceReportFromRoot,
+  runMeetingAppTimelineConnectorSmokePlan as runMeetingAppTimelineConnectorSmokePlanFromRoot,
   buildMeetingPlatformAdaptationPackage as buildMeetingPlatformAdaptationPackageFromRoot,
   buildMeetingPlatformAdaptationStrategy as buildMeetingPlatformAdaptationStrategyFromRoot,
   buildMeetingPlatformAdapterAuthoringPlan as buildMeetingPlatformAdapterAuthoringPlanFromRoot,
@@ -620,6 +621,7 @@ import {
   assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
   assertMeetingAppTimelineConnectorSmokePlan,
+  assertMeetingAppTimelineConnectorSmokeRun,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
@@ -627,6 +629,7 @@ import {
   buildMeetingAppTimelineConnectorSmokePlan,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
   createMeetingAppTimelineConnectorRuntimeClient,
+  runMeetingAppTimelineConnectorSmokePlan,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package';
 import {
   buildMeetingPlatformConnector,
@@ -831,6 +834,9 @@ assert.equal(buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(rootConne
 assert.equal(buildMeetingAppTimelineConnectorSmokePlanFromRoot(rootConnectorPackage).schema, 'meeting_app_timeline_connector_smoke_plan');
 assert.equal(buildMeetingAppTimelineConnectorSmokePlanAcceptanceReportFromRoot(rootConnectorPackage).accepted, true);
 assert.equal(assertMeetingAppTimelineConnectorSmokePlan(rootConnectorSmokePlan), rootConnectorSmokePlan);
+assert.equal((await runMeetingAppTimelineConnectorSmokePlan(rootConnectorSmokePlan)).schema, 'meeting_app_timeline_connector_smoke_run_report');
+assert.equal((await runMeetingAppTimelineConnectorSmokePlanFromRoot(rootConnectorPackage)).accepted, true);
+assert.equal((await assertMeetingAppTimelineConnectorSmokeRun(rootConnectorSmokePlan)).accepted, true);
 assert.equal(assertMeetingAppTimelineConnectorHostInstallChecklist(rootConnectorPackage), rootConnectorPackage);
 assert.equal(assertMeetingAppTimelineConnectorPackage(rootConnectorPackage), rootConnectorPackage);
 assert.equal(rootMeetingAppSdk.meetingAppAdapterCapability('google-meet').schema, 'meeting_app_adapter_capability_report');
