@@ -10,6 +10,8 @@ export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_ACCEPTANCE_SCHEMA = 'meeting
 export const MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA = 'meeting_app_timeline_connector_handoff';
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist';
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist_acceptance_report';
+export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA = 'meeting_app_timeline_connector_smoke_plan';
+export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_smoke_plan_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA = 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION = 1;
 
@@ -121,6 +123,17 @@ function runtimeActionRowsForPlatform(pkg = {}, platform) {
 
 function runtimeActionByName(rows = [], action) {
   return rows.find((row) => row.action === action);
+}
+
+function sampleUrlForPlatform(platform) {
+  return {
+    google_meet: 'https://meet.google.com/abc-defg-hij',
+    teams: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+    microsoft_teams: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+    zoom: 'https://zoom.us/j/987654321',
+    webex: 'https://example.webex.com/meet/sample',
+    lark: 'https://vc.feishu.cn/j/123456789',
+  }[normalizeKey(platform)] ?? 'local://meeting-window/sample';
 }
 
 function missingRuntimeActions(pkg = {}, platforms = [], options = {}) {
@@ -633,6 +646,227 @@ export function assertMeetingAppTimelineConnectorHostInstallChecklist(checklistO
     });
   }
   return checklistOrPackage;
+}
+
+export function buildMeetingAppTimelineConnectorSmokePlan(checklistOrPackage = {}, options = {}) {
+  const checklist = checklistOrPackage?.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA
+    ? checklistOrPackage
+    : buildMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage, options);
+  const baseMs = Number.isFinite(options.baseCapturedAtMs)
+    ? options.baseCapturedAtMs
+    : Number.isFinite(options.base_captured_at_ms)
+      ? options.base_captured_at_ms
+      : 1_782_614_400_000;
+  const rows = (checklist.rows ?? []).map((row, index) => {
+    const platform = normalizeKey(row.platform);
+    const capturedAtMs = baseMs + (index * 10_000);
+    const runtimeActions = asArray(row.runtime_actions).map((action) => normalizeMeetingPlatformRuntimeEventAction(action));
+    const steps = [
+      {
+        id: `${platform}:observe_candidates`,
+        order: 1,
+        action: 'observe_platform_candidates',
+        client_method: row.client_methods?.observe_platform_candidates ?? 'observePlatformCandidates',
+        required: true,
+        input: {
+          captured_at_ms: capturedAtMs,
+          tabs: [{
+            active: true,
+            url: sampleUrlForPlatform(platform),
+            title: row.display_name ?? platform,
+          }],
+        },
+        expected: {
+          creates_or_updates_realtime_axis: true,
+          timestamp_field: 'captured_at_ms',
+        },
+      },
+      {
+        id: `${platform}:insert_annotation`,
+        order: 2,
+        action: 'insert_annotation',
+        client_method: row.client_methods?.insert_annotation ?? 'insertAnnotation',
+        required: true,
+        input: {
+          platform,
+          annotation: {
+            id: `${platform}-smoke-mark`,
+            label: 'smoke mark',
+            captured_at_ms: capturedAtMs + 1_000,
+          },
+        },
+        expected: {
+          inserted_on_current_axis: true,
+          timestamp_field: 'captured_at_ms',
+        },
+      },
+      runtimeActions.includes('speaker_track') ? {
+        id: `${platform}:speaker_track`,
+        order: 3,
+        action: 'speaker_track',
+        client_method: row.client_methods?.speaker_track ?? 'speakerTrack',
+        required: false,
+        input: {
+          platform,
+          speaker: {
+            id: `${platform}-speaker-1`,
+            name: 'Speaker 1',
+          },
+          captured_at_ms: capturedAtMs + 2_000,
+        },
+        expected: {
+          emits_position_marker_without_transcript_text: true,
+        },
+      } : undefined,
+      runtimeActions.includes('participant_track') ? {
+        id: `${platform}:participant_track`,
+        order: 4,
+        action: 'participant_track',
+        client_method: row.client_methods?.participant_track ?? 'participantTrack',
+        required: false,
+        input: {
+          platform,
+          participant: {
+            id: `${platform}-participant-1`,
+            name: 'Participant 1',
+          },
+          captured_at_ms: capturedAtMs + 3_000,
+        },
+        expected: {
+          emits_position_marker_without_transcript_text: true,
+        },
+      } : undefined,
+    ].filter(Boolean);
+    return compactObject({
+      platform,
+      selected_surface: row.selected_surface,
+      install_target: row.install_target,
+      realtime_startup_ready: row.realtime_startup_ready,
+      adapter_blueprint_ready: row.adapter_blueprint_ready,
+      required_action_count: steps.filter((step) => step.required).length,
+      optional_action_count: steps.filter((step) => !step.required).length,
+      steps,
+    });
+  });
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    package_id: checklist.package_id,
+    accepted: checklist.accepted === true && rows.every((row) => row.steps?.some((step) => step.action === 'observe_platform_candidates') && row.steps?.some((step) => step.action === 'insert_annotation')),
+    target: checklist.target,
+    runtime_event_endpoint: checklist.runtime_event_endpoint,
+    platform_count: checklist.platform_count,
+    row_count: rows.length,
+    timestamp_field: 'captured_at_ms',
+    source_checklist_schema: checklist.schema,
+    rows,
+    next_actions: checklist.next_actions,
+  });
+}
+
+export function buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(planOrChecklistOrPackage = {}, options = {}) {
+  const plan = planOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA
+    ? planOrChecklistOrPackage
+    : buildMeetingAppTimelineConnectorSmokePlan(planOrChecklistOrPackage, options);
+  const rows = plan.rows ?? [];
+  const issues = [];
+
+  if (plan.schema !== MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA) {
+    addIssue(issues, 'invalid_schema', 'Expected a meeting app timeline connector smoke plan', {
+      expected_schema: MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA,
+      actual_schema: plan.schema,
+    });
+  }
+  if (plan.accepted !== true) addIssue(issues, 'smoke_plan_not_accepted', 'Connector smoke plan accepted flag is not true');
+  if (!plan.runtime_event_endpoint) addIssue(issues, 'missing_runtime_event_endpoint', 'Smoke plan requires a runtime event endpoint');
+  if (plan.timestamp_field !== 'captured_at_ms') {
+    addIssue(issues, 'invalid_timestamp_contract', 'Smoke plan must use captured_at_ms', {
+      timestamp_field: plan.timestamp_field,
+    });
+  }
+  if ((plan.platform_count ?? 0) <= 0) addIssue(issues, 'missing_platforms', 'Smoke plan must include at least one platform');
+  if (rows.length !== plan.platform_count) {
+    addIssue(issues, 'row_count_mismatch', 'Smoke plan row count must equal platform_count', {
+      row_count: rows.length,
+      platform_count: plan.platform_count,
+    });
+  }
+
+  for (const row of rows) {
+    const platform = normalizeKey(row.platform);
+    const steps = row.steps ?? [];
+    const actions = steps.map((step) => normalizeMeetingPlatformRuntimeEventAction(step.action));
+    const insertStep = steps.find((step) => normalizeMeetingPlatformRuntimeEventAction(step.action) === 'insert_annotation');
+    const observeStep = steps.find((step) => normalizeMeetingPlatformRuntimeEventAction(step.action) === 'observe_platform_candidates');
+    if (!platform) addIssue(issues, 'row_missing_platform', 'Smoke plan row is missing platform');
+    if (!row.selected_surface) addIssue(issues, 'row_missing_selected_surface', 'Smoke plan row is missing selected_surface', { platform });
+    if (!row.install_target) addIssue(issues, 'row_missing_install_target', 'Smoke plan row is missing install_target', { platform });
+    if (row.realtime_startup_ready !== true) addIssue(issues, 'row_not_realtime_startup_ready', 'Smoke plan row is not realtime startup ready', { platform });
+    if (row.adapter_blueprint_ready !== true) addIssue(issues, 'row_adapter_blueprint_not_ready', 'Smoke plan row adapter blueprint is not ready', { platform });
+    if (!actions.includes('observe_platform_candidates')) addIssue(issues, 'row_missing_observe_candidates_step', 'Smoke plan row must include observe_platform_candidates step', { platform });
+    if (!actions.includes('insert_annotation')) addIssue(issues, 'row_missing_insert_annotation_step', 'Smoke plan row must include insert_annotation step', { platform });
+    if (observeStep?.client_method !== 'observePlatformCandidates') {
+      addIssue(issues, 'row_invalid_observe_candidates_client_method', 'observe_platform_candidates step must use observePlatformCandidates', {
+        platform,
+        client_method: observeStep?.client_method,
+      });
+    }
+    if (insertStep?.client_method !== 'insertAnnotation') {
+      addIssue(issues, 'row_invalid_insert_annotation_client_method', 'insert_annotation step must use insertAnnotation', {
+        platform,
+        client_method: insertStep?.client_method,
+      });
+    }
+    if (insertStep?.input?.annotation?.captured_at_ms == null) {
+      addIssue(issues, 'row_insert_annotation_missing_captured_at_ms', 'insert_annotation smoke step must include annotation.captured_at_ms', { platform });
+    }
+    if (observeStep?.input?.captured_at_ms == null) {
+      addIssue(issues, 'row_observe_candidates_missing_captured_at_ms', 'observe_platform_candidates smoke step must include captured_at_ms', { platform });
+    }
+  }
+
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    target: plan.target,
+    package_id: plan.package_id,
+    platform_count: plan.platform_count ?? 0,
+    row_count: rows.length,
+    required_step_count: rows.reduce((count, row) => count + (row.steps ?? []).filter((step) => step.required).length, 0),
+    optional_step_count: rows.reduce((count, row) => count + (row.steps ?? []).filter((step) => !step.required).length, 0),
+    timestamp_field: plan.timestamp_field,
+    runtime_event_endpoint: plan.runtime_event_endpoint,
+    smoke_plan_accepted: plan.accepted === true,
+    issue_count: issues.length,
+    issues,
+    rows: rows.map((row) => compactObject({
+      platform: row.platform,
+      selected_surface: row.selected_surface,
+      install_target: row.install_target,
+      required_action_count: row.required_action_count,
+      optional_action_count: row.optional_action_count,
+    })),
+    next_actions: issues.length > 0
+      ? unique([
+        ...issues.map((issue) => `fix_${issue.code}`),
+        ...(plan.next_actions ?? []),
+      ])
+      : plan.next_actions ?? [],
+  });
+}
+
+export function assertMeetingAppTimelineConnectorSmokePlan(planOrChecklistOrPackage = {}, options = {}) {
+  const report = buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(planOrChecklistOrPackage, options);
+  if (!report.accepted) {
+    throw new MeetingTimelineSdkError('Meeting app timeline connector smoke plan is not accepted', {
+      report,
+      issues: report.issues,
+    });
+  }
+  return planOrChecklistOrPackage;
 }
 
 export function createMeetingAppTimelineConnectorRuntimeClient(pkg = {}, options = {}) {

@@ -45,7 +45,7 @@ assert.equal(report.adapter_blueprint_ready_count, 2);
 assert.equal(report.startup_plan_ready_count, 2);
 assert.equal(report.observer_surface_count, 2);
 assert.equal(report.scheduler_surface_count, 2);
-assert.equal(report.written_files.length, 22);
+assert.equal(report.written_files.length, 24);
 assert.equal(report.rows.some((row) => row.platform === 'google_meet' && row.surface === 'browser_extension'), true);
 assert.equal(report.rows.some((row) => row.platform === 'zoom' && row.surface === 'native_detector'), true);
 assert.equal(report.handoff.schema, 'meeting_app_timeline_connector_handoff');
@@ -54,6 +54,12 @@ assert.equal(report.host_install_checklist.schema, 'meeting_app_timeline_connect
 assert.equal(report.host_install_checklist.rows.some((row) => row.platform === 'zoom' && row.selected_surface === 'native_detector'), true);
 assert.equal(report.host_install_checklist_acceptance.schema, 'meeting_app_timeline_connector_host_install_checklist_acceptance_report');
 assert.equal(report.host_install_checklist_acceptance.accepted, true);
+assert.equal(report.smoke_plan.schema, 'meeting_app_timeline_connector_smoke_plan');
+assert.equal(report.smoke_plan.accepted, true);
+assert.equal(report.smoke_plan.rows.find((row) => row.platform === 'google_meet').steps.some((step) => step.action === 'observe_platform_candidates'), true);
+assert.equal(report.smoke_plan.rows.find((row) => row.platform === 'zoom').steps.some((step) => step.action === 'insert_annotation'), true);
+assert.equal(report.smoke_plan_acceptance.schema, 'meeting_app_timeline_connector_smoke_plan_acceptance_report');
+assert.equal(report.smoke_plan_acceptance.accepted, true);
 assert.equal(report.package.extension.scaffold.files.some((file) => 'content' in file), false);
 
 const connectorPackage = JSON.parse(await readFile(join(outDir, 'connector-package.json'), 'utf8'));
@@ -100,10 +106,25 @@ assert.equal(hostInstallChecklistAcceptance.accepted, true);
 assert.equal(hostInstallChecklistAcceptance.ready_count, 2);
 assert.equal(hostInstallChecklistAcceptance.issue_count, 0);
 
+const smokePlan = JSON.parse(await readFile(join(outDir, 'connector-smoke-plan.json'), 'utf8'));
+assert.equal(smokePlan.schema, 'meeting_app_timeline_connector_smoke_plan');
+assert.equal(smokePlan.accepted, true);
+assert.equal(smokePlan.timestamp_field, 'captured_at_ms');
+assert.equal(smokePlan.rows.find((row) => row.platform === 'google_meet').steps.find((step) => step.action === 'observe_platform_candidates').input.captured_at_ms, 1_782_614_400_000);
+assert.equal(smokePlan.rows.find((row) => row.platform === 'zoom').steps.find((step) => step.action === 'insert_annotation').input.annotation.captured_at_ms, 1_782_614_411_000);
+
+const smokePlanAcceptance = JSON.parse(await readFile(join(outDir, 'connector-smoke-plan-acceptance.json'), 'utf8'));
+assert.equal(smokePlanAcceptance.schema, 'meeting_app_timeline_connector_smoke_plan_acceptance_report');
+assert.equal(smokePlanAcceptance.accepted, true);
+assert.equal(smokePlanAcceptance.required_step_count, 4);
+assert.equal(smokePlanAcceptance.optional_step_count, 4);
+
 const connectorQuickstart = await readFile(join(outDir, 'connector-quickstart.md'), 'utf8');
 assert.match(connectorQuickstart, /Meeting App Timeline Connector Quickstart/);
 assert.match(connectorQuickstart, /host-install-checklist\.json/);
 assert.match(connectorQuickstart, /host-install-checklist-acceptance\.json/);
+assert.match(connectorQuickstart, /connector-smoke-plan\.json/);
+assert.match(connectorQuickstart, /connector-smoke-plan-acceptance\.json/);
 assert.match(connectorQuickstart, /startup-plan-matrix\.json/);
 assert.match(connectorQuickstart, /captured_at_ms/);
 assert.match(connectorQuickstart, /createMeetingAppTimelineConnectorRuntimeClient/);

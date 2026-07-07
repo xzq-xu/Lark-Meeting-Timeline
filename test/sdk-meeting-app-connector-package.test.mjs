@@ -2,12 +2,16 @@ import assert from 'node:assert/strict';
 
 import {
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
+  MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA,
   assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
+  assertMeetingAppTimelineConnectorSmokePlan,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport,
+  buildMeetingAppTimelineConnectorSmokePlan,
+  buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
   createMeetingAppTimelineSdk,
   createMeetingAppTimelineConnectorRuntimeClient,
   stripMeetingAppTimelineConnectorPackageFileContents,
@@ -83,6 +87,33 @@ assert.equal(hostInstallChecklistAcceptance.ready_count, 2);
 assert.equal(hostInstallChecklistAcceptance.issue_count, 0);
 assert.equal(assertMeetingAppTimelineConnectorHostInstallChecklist(hostInstallChecklist), hostInstallChecklist);
 assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(connectorPackage).accepted, true);
+
+const smokePlan = buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist, {
+  baseCapturedAtMs: 1_782_614_400_000,
+});
+assert.equal(smokePlan.schema, MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA);
+assert.equal(smokePlan.accepted, true);
+assert.equal(smokePlan.platform_count, 2);
+assert.equal(smokePlan.row_count, 2);
+assert.equal(smokePlan.timestamp_field, 'captured_at_ms');
+assert.equal(smokePlan.rows.every((row) => row.required_action_count === 2), true);
+assert.equal(smokePlan.rows.every((row) => row.optional_action_count === 2), true);
+const googleSmokeRow = smokePlan.rows.find((row) => row.platform === 'google_meet');
+const zoomSmokeRow = smokePlan.rows.find((row) => row.platform === 'zoom');
+const googleObserveSmokeStep = googleSmokeRow.steps.find((step) => step.action === 'observe_platform_candidates');
+const zoomInsertSmokeStep = zoomSmokeRow.steps.find((step) => step.action === 'insert_annotation');
+assert.equal(googleObserveSmokeStep.client_method, 'observePlatformCandidates');
+assert.equal(googleObserveSmokeStep.input.captured_at_ms, 1_782_614_400_000);
+assert.equal(googleObserveSmokeStep.input.tabs[0].url, 'https://meet.google.com/abc-defg-hij');
+assert.equal(zoomInsertSmokeStep.client_method, 'insertAnnotation');
+assert.equal(zoomInsertSmokeStep.input.annotation.captured_at_ms, 1_782_614_411_000);
+const smokePlanAcceptance = buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan);
+assert.equal(smokePlanAcceptance.schema, 'meeting_app_timeline_connector_smoke_plan_acceptance_report');
+assert.equal(smokePlanAcceptance.accepted, true);
+assert.equal(smokePlanAcceptance.required_step_count, 4);
+assert.equal(smokePlanAcceptance.optional_step_count, 4);
+assert.equal(assertMeetingAppTimelineConnectorSmokePlan(smokePlan), smokePlan);
+assert.equal(buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(connectorPackage).accepted, true);
 
 assert.equal(connectorPackage.adapter_blueprints.ready_count, 2);
 assert.equal(connectorPackage.adapter_blueprints.matrix.schema, 'meeting_platform_adapter_blueprint_matrix');
@@ -251,6 +282,22 @@ assert.equal(
 assert.throws(
   () => assertMeetingAppTimelineConnectorHostInstallChecklist(brokenHostInstallChecklist),
   /host install checklist is not accepted/,
+);
+
+const brokenSmokePlan = structuredClone(smokePlan);
+delete brokenSmokePlan.rows
+  .find((row) => row.platform === 'zoom')
+  .steps.find((step) => step.action === 'insert_annotation')
+  .input.annotation.captured_at_ms;
+const brokenSmokePlanAcceptance = buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(brokenSmokePlan);
+assert.equal(brokenSmokePlanAcceptance.accepted, false);
+assert.equal(
+  brokenSmokePlanAcceptance.issues.some((issue) => issue.code === 'row_insert_annotation_missing_captured_at_ms'),
+  true,
+);
+assert.throws(
+  () => assertMeetingAppTimelineConnectorSmokePlan(brokenSmokePlan),
+  /connector smoke plan is not accepted/,
 );
 
 const productionAcceptance = buildMeetingAppTimelineConnectorPackageAcceptanceReport(connectorPackage, {

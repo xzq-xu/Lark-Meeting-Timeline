@@ -5,6 +5,8 @@ export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_ACCEPTANCE_SCHEMA: 'meeting_
 export const MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA: 'meeting_app_timeline_connector_handoff';
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA: 'meeting_app_timeline_connector_host_install_checklist';
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_host_install_checklist_acceptance_report';
+export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA: 'meeting_app_timeline_connector_smoke_plan';
+export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_smoke_plan_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA: 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION: 1;
 
@@ -137,6 +139,61 @@ export interface MeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport
   next_actions: string[];
 }
 
+export interface MeetingAppTimelineConnectorSmokePlanStep {
+  id: string;
+  order: number;
+  action: string;
+  client_method: string;
+  required: boolean;
+  input: Record<string, unknown>;
+  expected: Record<string, unknown>;
+}
+
+export interface MeetingAppTimelineConnectorSmokePlan {
+  type: 'meeting_app_timeline_connector_smoke_plan';
+  schema: 'meeting_app_timeline_connector_smoke_plan';
+  schema_version: 1;
+  package_id?: string;
+  accepted: boolean;
+  target?: string;
+  runtime_event_endpoint?: string;
+  platform_count: number;
+  row_count: number;
+  timestamp_field: 'captured_at_ms';
+  source_checklist_schema?: string;
+  rows: Array<Record<string, unknown> & {
+    platform: string;
+    selected_surface?: string;
+    install_target?: string;
+    realtime_startup_ready?: boolean;
+    adapter_blueprint_ready?: boolean;
+    required_action_count: number;
+    optional_action_count: number;
+    steps: MeetingAppTimelineConnectorSmokePlanStep[];
+  }>;
+  next_actions: string[];
+}
+
+export interface MeetingAppTimelineConnectorSmokePlanAcceptanceReport {
+  type: 'meeting_app_timeline_connector_smoke_plan_acceptance_report';
+  schema: 'meeting_app_timeline_connector_smoke_plan_acceptance_report';
+  schema_version: 1;
+  accepted: boolean;
+  target?: string;
+  package_id?: string;
+  platform_count: number;
+  row_count: number;
+  required_step_count: number;
+  optional_step_count: number;
+  timestamp_field?: string;
+  runtime_event_endpoint?: string;
+  smoke_plan_accepted: boolean;
+  issue_count: number;
+  issues: MeetingAppTimelineConnectorPackageIssue[];
+  rows: Array<Record<string, unknown>>;
+  next_actions: string[];
+}
+
 export interface MeetingAppTimelineConnectorRuntimeClient {
   type: 'meeting_app_timeline_connector_runtime_client';
   schema: 'meeting_app_timeline_connector_runtime_client';
@@ -202,6 +259,21 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceRe
 
 export function assertMeetingAppTimelineConnectorHostInstallChecklist<T extends MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>>(
   checklistOrPackage?: T,
+  options?: Record<string, unknown>,
+): T;
+
+export function buildMeetingAppTimelineConnectorSmokePlan(
+  checklistOrPackage?: MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineConnectorSmokePlan;
+
+export function buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(
+  planOrChecklistOrPackage?: MeetingAppTimelineConnectorSmokePlan | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineConnectorSmokePlanAcceptanceReport;
+
+export function assertMeetingAppTimelineConnectorSmokePlan<T extends MeetingAppTimelineConnectorSmokePlan | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>>(
+  planOrChecklistOrPackage?: T,
   options?: Record<string, unknown>,
 ): T;
 

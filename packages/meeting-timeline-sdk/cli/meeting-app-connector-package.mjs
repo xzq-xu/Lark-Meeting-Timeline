@@ -4,6 +4,8 @@ import {
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
+  buildMeetingAppTimelineConnectorSmokePlan,
+  buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
   createMeetingAppTimelineSdk,
 } from '../index.mjs';
 
@@ -99,6 +101,8 @@ function connectorQuickstartMarkdown(pkg = {}) {
     '- `connector-handoff.json`: compact handoff summary for another host project.',
     '- `host-install-checklist.json`: machine-readable per-platform install checklist for host CI or setup UI.',
     '- `host-install-checklist-acceptance.json`: standalone acceptance report for the host install checklist.',
+    '- `connector-smoke-plan.json`: executable per-platform smoke order: observe candidates, insert annotation, then optional speaker/participant markers.',
+    '- `connector-smoke-plan-acceptance.json`: standalone gate for the connector smoke plan.',
     '- `startup-plan-matrix.json`: selected runtime surface, install target, bridge, and startup actions per platform.',
     '- `adapter-blueprint-matrix.json`: platform adapter blueprint, acceptance gates, and surface order.',
     '- `runtime-event-plan-matrix.json`: supported runtime actions and client methods.',
@@ -197,6 +201,8 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   await write('connector-handoff.json', buildMeetingAppTimelineConnectorHandoff(pkg));
   await write('host-install-checklist.json', buildMeetingAppTimelineConnectorHostInstallChecklist(pkg));
   await write('host-install-checklist-acceptance.json', buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(pkg));
+  await write('connector-smoke-plan.json', buildMeetingAppTimelineConnectorSmokePlan(pkg));
+  await write('connector-smoke-plan-acceptance.json', buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(pkg));
   await write('connector-quickstart.md', connectorQuickstartMarkdown(pkg), true);
 
   for (const [surface, plan] of Object.entries(pkg.observer_plan_by_surface ?? {})) {
@@ -240,6 +246,8 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
   const connectorHandoff = buildMeetingAppTimelineConnectorHandoff(pkg);
   const hostInstallChecklist = buildMeetingAppTimelineConnectorHostInstallChecklist(pkg);
   const hostInstallChecklistAcceptance = buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(hostInstallChecklist);
+  const smokePlan = buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist);
+  const smokePlanAcceptance = buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan);
   const writtenFiles = await writeConnectorPackageFiles(outDir, pkg);
 
   const report = {
@@ -275,6 +283,8 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     handoff: connectorHandoff,
     host_install_checklist: hostInstallChecklist,
     host_install_checklist_acceptance: hostInstallChecklistAcceptance,
+    smoke_plan: smokePlan,
+    smoke_plan_acceptance: smokePlanAcceptance,
     package: includePackage ? pkg : stripConnectorPackage(pkg),
     next_actions: pkg.next_actions,
   };

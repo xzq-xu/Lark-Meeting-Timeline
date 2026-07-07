@@ -313,6 +313,8 @@ import {
   buildMeetingAppAdapterExecutionPlanMatrix as buildMeetingAppAdapterExecutionPlanMatrixFromRoot,
   buildMeetingAppAdapterIntegrationPackageMatrix as buildMeetingAppAdapterIntegrationPackageMatrixFromRoot,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport as buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot,
+  buildMeetingAppTimelineConnectorSmokePlan as buildMeetingAppTimelineConnectorSmokePlanFromRoot,
+  buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport as buildMeetingAppTimelineConnectorSmokePlanAcceptanceReportFromRoot,
   buildMeetingPlatformAdaptationPackage as buildMeetingPlatformAdaptationPackageFromRoot,
   buildMeetingPlatformAdaptationStrategy as buildMeetingPlatformAdaptationStrategyFromRoot,
   buildMeetingPlatformAdapterAuthoringPlan as buildMeetingPlatformAdapterAuthoringPlanFromRoot,
@@ -617,10 +619,13 @@ import {
 import {
   assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
+  assertMeetingAppTimelineConnectorSmokePlan,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport,
+  buildMeetingAppTimelineConnectorSmokePlan,
+  buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
   createMeetingAppTimelineConnectorRuntimeClient,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package';
 import {
@@ -817,6 +822,15 @@ assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReport(rootConnect
 assert.equal(buildMeetingAppTimelineConnectorHandoff(rootConnectorPackage).schema, 'meeting_app_timeline_connector_handoff');
 assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklist(rootConnectorPackage).schema, 'meeting_app_timeline_connector_host_install_checklist');
 assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(rootConnectorPackage).accepted, true);
+const rootConnectorSmokePlan = buildMeetingAppTimelineConnectorSmokePlan(rootConnectorPackage);
+assert.equal(rootConnectorSmokePlan.schema, 'meeting_app_timeline_connector_smoke_plan');
+assert.equal(rootConnectorSmokePlan.accepted, true);
+assert.equal(rootConnectorSmokePlan.rows[0].steps.some((step) => step.action === 'observe_platform_candidates'), true);
+assert.equal(rootConnectorSmokePlan.rows[0].steps.some((step) => step.action === 'insert_annotation'), true);
+assert.equal(buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(rootConnectorSmokePlan).accepted, true);
+assert.equal(buildMeetingAppTimelineConnectorSmokePlanFromRoot(rootConnectorPackage).schema, 'meeting_app_timeline_connector_smoke_plan');
+assert.equal(buildMeetingAppTimelineConnectorSmokePlanAcceptanceReportFromRoot(rootConnectorPackage).accepted, true);
+assert.equal(assertMeetingAppTimelineConnectorSmokePlan(rootConnectorSmokePlan), rootConnectorSmokePlan);
 assert.equal(assertMeetingAppTimelineConnectorHostInstallChecklist(rootConnectorPackage), rootConnectorPackage);
 assert.equal(assertMeetingAppTimelineConnectorPackage(rootConnectorPackage), rootConnectorPackage);
 assert.equal(rootMeetingAppSdk.meetingAppAdapterCapability('google-meet').schema, 'meeting_app_adapter_capability_report');
