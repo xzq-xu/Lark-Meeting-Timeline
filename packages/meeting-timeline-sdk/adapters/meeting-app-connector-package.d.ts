@@ -14,6 +14,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA: 'meeting_app_time
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_smoke_plan_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA: 'meeting_app_timeline_connector_smoke_run_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA: 'meeting_app_timeline_connector_release_gate';
+export const MEETING_APP_TIMELINE_CONNECTOR_PLATFORM_ROADMAP_SCHEMA: 'meeting_app_timeline_connector_platform_roadmap';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA: 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION: 1;
 
@@ -454,6 +455,49 @@ export interface MeetingAppTimelineConnectorReleaseGate {
   next_actions: string[];
 }
 
+export interface MeetingAppTimelineConnectorPlatformRoadmap {
+  type: 'meeting_app_timeline_connector_platform_roadmap';
+  schema: 'meeting_app_timeline_connector_platform_roadmap';
+  schema_version: 1;
+  accepted: boolean;
+  target?: string;
+  package_id?: string;
+  platform_count: number;
+  row_count: number;
+  pilot_ready_count: number;
+  production_ready_count: number;
+  recommended_first_platform?: string;
+  recommended_first_surface?: string;
+  source_schemas: Record<string, unknown>;
+  files_to_read_first: string[];
+  rows: Array<Record<string, unknown> & {
+    platform: string;
+    display_name?: string;
+    order: number;
+    priority_tier?: string;
+    release_status: string;
+    recommended_first_surface?: string;
+    selected_surface?: string;
+    install_target?: string;
+    surface_order?: string[];
+    pilot_ready: boolean;
+    production_ready: boolean;
+    release_missing: string[];
+    provider_path?: string;
+    provider_permission_risk?: string;
+    next_action?: string;
+    surface_coverage: Record<string, boolean>;
+    runtime_contract: Record<string, unknown>;
+    validation_sequence: string[];
+    sdk_facade_methods: Record<string, string>;
+    reasons: string[];
+    next_actions: string[];
+  }>;
+  issue_count: number;
+  issues: string[];
+  next_actions: string[];
+}
+
 export interface MeetingAppTimelineConnectorRuntimeClient {
   type: 'meeting_app_timeline_connector_runtime_client';
   schema: 'meeting_app_timeline_connector_runtime_client';
@@ -601,6 +645,16 @@ export function assertMeetingAppTimelineConnectorReleaseGate(
   checklistOrPackage?: MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
   options?: Record<string, unknown>,
 ): MeetingAppTimelineConnectorReleaseGate;
+
+export function buildMeetingAppTimelineConnectorPlatformRoadmap(
+  checklistOrPackage?: MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineConnectorPlatformRoadmap;
+
+export function assertMeetingAppTimelineConnectorPlatformRoadmap(
+  checklistOrPackage?: MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineConnectorPlatformRoadmap;
 
 export function createMeetingAppTimelineConnectorRuntimeClient(
   pkg?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,

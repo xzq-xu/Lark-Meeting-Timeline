@@ -8,6 +8,7 @@ import {
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
+  buildMeetingAppTimelineConnectorPlatformRoadmap,
   buildMeetingAppTimelineConnectorReleaseGate,
   buildMeetingAppTimelineConnectorSmokePlan,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
@@ -109,6 +110,7 @@ function connectorQuickstartMarkdown(pkg = {}) {
     '- `connector-adoption-index.json`: per-platform P0/P1/P2 adoption status, install target, realtime readiness, bridge readiness, and production evidence gaps.',
     '- `connector-field-intake-index.json`: per-platform live evidence collection paths, required snapshots/events, output files, and validation commands.',
     '- `connector-release-gate.json`: aggregated pilot/production gate for package acceptance, host checklist, bridge, field intake, and smoke execution.',
+    '- `connector-platform-roadmap.json`: recommended per-platform implementation order, first surface, install target, release status, and next action.',
     '- `connector-bridge-handoff.json`: lightweight connector bridge handoff for browser extension, Electron WebView preload, mobile WebView, or native helper integration.',
     '- `connector-bridge-handoff-acceptance.json`: standalone gate for the lightweight connector bridge handoff.',
     '- `connector-bridge-smoke-report.json`: dry-run bridge message dispatch report for observe candidates, insert mark, tracks, and preflight.',
@@ -234,9 +236,13 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
     smokePlanAcceptance,
     smokeRunReport,
   });
+  const connectorPlatformRoadmap = buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
+    releaseGate: connectorReleaseGate,
+  });
   await write('connector-adoption-index.json', connectorAdoptionIndex);
   await write('connector-field-intake-index.json', connectorFieldIntakeIndex);
   await write('connector-release-gate.json', connectorReleaseGate);
+  await write('connector-platform-roadmap.json', connectorPlatformRoadmap);
   await write('connector-bridge-handoff.json', connectorBridgeHandoff);
   await write('connector-bridge-handoff-acceptance.json', connectorBridgeHandoffAcceptance);
   await write('connector-bridge-smoke-report.json', connectorBridgeSmokeReport);
@@ -307,6 +313,9 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     smokePlanAcceptance,
     smokeRunReport,
   });
+  const connectorPlatformRoadmap = buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
+    releaseGate: connectorReleaseGate,
+  });
   const writtenFiles = await writeConnectorPackageFiles(outDir, pkg);
 
   const report = {
@@ -345,6 +354,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     adoption_index: connectorAdoptionIndex,
     field_intake_index: connectorFieldIntakeIndex,
     release_gate: connectorReleaseGate,
+    platform_roadmap: connectorPlatformRoadmap,
     bridge_handoff: connectorBridgeHandoff,
     bridge_handoff_acceptance: connectorBridgeHandoffAcceptance,
     bridge_smoke_report: connectorBridgeSmokeReport,

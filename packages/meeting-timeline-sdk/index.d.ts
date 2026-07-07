@@ -343,6 +343,11 @@ export interface MeetingAppTimelineSdk {
     releaseGateOptions?: Record<string, unknown>,
   ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineConnectorReleaseGate;
   assertConnectorReleaseGate: MeetingAppTimelineSdk['connectorReleaseGate'];
+  connectorPlatformRoadmap(
+    connectorOptions?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+    roadmapOptions?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineConnectorPlatformRoadmap;
+  assertConnectorPlatformRoadmap: MeetingAppTimelineSdk['connectorPlatformRoadmap'];
   meetingAppAdapterCapability(
     platformOrOptions?: string | import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterCapabilityOptions,
     input?: Record<string, unknown>,

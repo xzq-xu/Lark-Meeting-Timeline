@@ -317,6 +317,7 @@ import {
   buildMeetingAppTimelineConnectorAdoptionIndex as buildMeetingAppTimelineConnectorAdoptionIndexFromRoot,
   buildMeetingAppTimelineConnectorFieldIntakeIndex as buildMeetingAppTimelineConnectorFieldIntakeIndexFromRoot,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport as buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot,
+  buildMeetingAppTimelineConnectorPlatformRoadmap as buildMeetingAppTimelineConnectorPlatformRoadmapFromRoot,
   buildMeetingAppTimelineConnectorReleaseGate as buildMeetingAppTimelineConnectorReleaseGateFromRoot,
   buildMeetingAppTimelineConnectorSmokePlan as buildMeetingAppTimelineConnectorSmokePlanFromRoot,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport as buildMeetingAppTimelineConnectorSmokePlanAcceptanceReportFromRoot,
@@ -629,6 +630,7 @@ import {
   assertMeetingAppTimelineConnectorAdoptionIndex,
   assertMeetingAppTimelineConnectorFieldIntakeIndex,
   assertMeetingAppTimelineConnectorBridgeSmoke,
+  assertMeetingAppTimelineConnectorPlatformRoadmap,
   assertMeetingAppTimelineConnectorReleaseGate,
   assertMeetingAppTimelineConnectorSmokePlan,
   assertMeetingAppTimelineConnectorSmokeRun,
@@ -640,6 +642,7 @@ import {
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport,
+  buildMeetingAppTimelineConnectorPlatformRoadmap,
   buildMeetingAppTimelineConnectorReleaseGate,
   buildMeetingAppTimelineConnectorSmokePlan,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
@@ -852,8 +855,13 @@ assert.equal(assertMeetingAppTimelineConnectorFieldIntakeIndex(rootConnectorPack
 assert.equal(buildMeetingAppTimelineConnectorReleaseGate(rootConnectorPackage).schema, 'meeting_app_timeline_connector_release_gate');
 assert.equal(buildMeetingAppTimelineConnectorReleaseGateFromRoot(rootConnectorPackage).accepted, true);
 assert.equal(assertMeetingAppTimelineConnectorReleaseGate(rootConnectorPackage).accepted, true);
+assert.equal(buildMeetingAppTimelineConnectorPlatformRoadmap(rootConnectorPackage).schema, 'meeting_app_timeline_connector_platform_roadmap');
+assert.equal(buildMeetingAppTimelineConnectorPlatformRoadmapFromRoot(rootConnectorPackage).accepted, true);
+assert.equal(assertMeetingAppTimelineConnectorPlatformRoadmap(rootConnectorPackage).accepted, true);
 assert.equal(rootMeetingAppSdk.connectorReleaseGate(rootConnectorPackage).schema, 'meeting_app_timeline_connector_release_gate');
 assert.equal(rootMeetingAppSdk.assertConnectorReleaseGate(rootConnectorPackage).accepted, true);
+assert.equal(rootMeetingAppSdk.connectorPlatformRoadmap(rootConnectorPackage).schema, 'meeting_app_timeline_connector_platform_roadmap');
+assert.equal(rootMeetingAppSdk.assertConnectorPlatformRoadmap(rootConnectorPackage).accepted, true);
 assert.equal((await runMeetingAppTimelineConnectorBridgeSmoke(rootConnectorPackage)).schema, 'meeting_app_timeline_connector_bridge_smoke_report');
 assert.equal((await runMeetingAppTimelineConnectorBridgeSmokeFromRoot(rootConnectorPackage)).accepted, true);
 assert.equal((await assertMeetingAppTimelineConnectorBridgeSmoke(rootConnectorPackage)).accepted, true);

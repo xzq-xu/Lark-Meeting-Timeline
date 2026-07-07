@@ -28,6 +28,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA = 'meeting_app_tim
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_smoke_plan_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA = 'meeting_app_timeline_connector_smoke_run_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA = 'meeting_app_timeline_connector_release_gate';
+export const MEETING_APP_TIMELINE_CONNECTOR_PLATFORM_ROADMAP_SCHEMA = 'meeting_app_timeline_connector_platform_roadmap';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA = 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION = 1;
 
@@ -2294,6 +2295,167 @@ export function assertMeetingAppTimelineConnectorReleaseGate(checklistOrPackage 
     });
   }
   return gate;
+}
+
+function roadmapRowStatus(releaseRow = {}) {
+  if (releaseRow.production_ready === true) return 'production_ready';
+  if (releaseRow.pilot_ready === true) return 'pilot_ready';
+  return 'blocked';
+}
+
+function roadmapCoverageForPlatform(surfaceCoverageMatrix = {}, platform) {
+  const normalized = normalizeKey(platform);
+  return (surfaceCoverageMatrix.rows ?? []).find((row) => normalizeKey(row.platform) === normalized) ?? {};
+}
+
+function roadmapSelectedAction(row = {}) {
+  if ((row.missing ?? []).length > 0) return `fix_${row.missing[0]}`;
+  if (row.production_ready !== true) return 'capture_live_evidence_before_production_rollout';
+  return 'ship_platform_adapter_to_host_project';
+}
+
+export function buildMeetingAppTimelineConnectorPlatformRoadmap(checklistOrPackage = {}, options = {}) {
+  const hostInstallChecklist = checklistOrPackage.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA
+    ? checklistOrPackage
+    : buildMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage, options);
+  const releaseGate = firstNonEmpty(
+    options.releaseGate,
+    options.release_gate,
+    buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, options),
+  );
+  const consumerHandoff = firstNonEmpty(
+    options.consumerHandoff,
+    options.consumer_handoff,
+    buildMeetingPlatformConsumerHandoff({
+      ...options,
+      baseUrl: firstNonEmpty(options.baseUrl, options.base_url, hostInstallChecklist.base_url),
+      platforms: (hostInstallChecklist.rows ?? []).map((row) => normalizeKey(row.platform)),
+    }),
+  );
+  const adaptationRoadmap = consumerHandoff.adaptation_roadmap ?? {};
+  const surfaceCoverageMatrix = consumerHandoff.surface_coverage_matrix ?? {};
+  const releaseByPlatform = new Map((releaseGate.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
+  const checklistByPlatform = new Map((hostInstallChecklist.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
+  const rows = (adaptationRoadmap.rows ?? []).map((roadmapRow, index) => {
+    const platform = normalizeKey(roadmapRow.platform);
+    const releaseRow = releaseByPlatform.get(platform) ?? {};
+    const checklistRow = checklistByPlatform.get(platform) ?? {};
+    const coverageRow = roadmapCoverageForPlatform(surfaceCoverageMatrix, platform);
+    return compactObject({
+      platform,
+      display_name: roadmapRow.display_name ?? releaseRow.display_name ?? checklistRow.display_name,
+      order: index + 1,
+      priority_tier: roadmapRow.priority_tier ?? roadmapRowStatus(releaseRow),
+      release_status: roadmapRowStatus(releaseRow),
+      recommended_first_surface: roadmapRow.recommended_first_surface,
+      selected_surface: checklistRow.selected_surface ?? releaseRow.selected_surface,
+      install_target: checklistRow.install_target ?? releaseRow.install_target,
+      surface_order: roadmapRow.surface_order ?? coverageRow.surface_order,
+      pilot_ready: releaseRow.pilot_ready === true,
+      production_ready: releaseRow.production_ready === true,
+      release_missing: releaseRow.missing ?? [],
+      provider_path: roadmapRow.provider_path ?? coverageRow.provider_reconcile?.provider_path,
+      provider_permission_risk: roadmapRow.provider_permission_risk ?? coverageRow.provider_reconcile?.permission_risk,
+      next_phase: roadmapRow.next_phase,
+      next_action: roadmapSelectedAction(releaseRow),
+      surface_coverage: {
+        browser_extension_ready: coverageRow.browser_extension?.ready === true,
+        webview_preload_ready: coverageRow.webview_preload?.ready === true,
+        native_detector_ready: coverageRow.native_detector?.ready === true,
+        provider_reconcile_ready: coverageRow.provider_reconcile?.ready === true,
+        post_meeting_backfill_supported: coverageRow.post_meeting_backfill?.supported === true,
+        lightweight_connector_ready: coverageRow.lightweight_connector?.ready === true,
+        speaker_track_ready: coverageRow.speaker_track?.ready === true,
+        participant_track_ready: coverageRow.participant_track?.ready === true,
+      },
+      runtime_contract: {
+        first_axis_action: checklistRow.observe_action ?? 'observePlatformCandidates',
+        mark_action: checklistRow.insert_action ?? 'insertAnnotation',
+        timestamp_field: hostInstallChecklist.timestamp_field,
+        provider_events_block_realtime: checklistRow.provider_events_block_realtime,
+        transcript_blocks_realtime: checklistRow.transcript_blocks_realtime,
+      },
+      validation_sequence: [
+        'connector-release-gate.json',
+        'connector-smoke-run-report.json',
+        checklistRow.selected_surface === 'browser_extension'
+          ? 'install_content_script_bridge_and_observe_candidates'
+          : checklistRow.selected_surface === 'native_detector'
+            ? 'wire_native_detector_observe_candidates'
+            : 'wire_selected_surface_observe_candidates',
+        'insert_annotation_with_captured_at_ms',
+        'capture_live_evidence_before_production_rollout',
+      ],
+      sdk_facade_methods: {
+        connector_package: 'sdk.connectorPackage(options)',
+        connector_release_gate: 'sdk.connectorReleaseGate(connectorPackage)',
+        observe_candidates: 'sdk.observePlatformCandidates(input)',
+        insert_annotation: `sdk.insertAnnotation('${platform}', mark)`,
+        speaker_track: `sdk.speakerTrack('${platform}', sample)`,
+        provider_reconcile: `sdk.ingestProvider('${platform}', providerEvent)`,
+      },
+      reasons: roadmapRow.reasons ?? [],
+      next_actions: unique([
+        roadmapSelectedAction(releaseRow),
+        ...asArray(roadmapRow.next_action),
+        ...asArray(releaseRow.next_actions),
+      ]),
+    });
+  });
+  const issues = [
+    ...(releaseGate.accepted === true ? [] : ['connector_release_gate_not_accepted']),
+    ...(consumerHandoff.accepted === true ? [] : ['consumer_handoff_not_accepted']),
+    ...rows.flatMap((row) => row.pilot_ready === true ? [] : [`${row.platform}:not_pilot_ready`]),
+  ];
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_PLATFORM_ROADMAP_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_PLATFORM_ROADMAP_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    target: releaseGate.target,
+    package_id: hostInstallChecklist.package_id,
+    platform_count: hostInstallChecklist.platform_count ?? rows.length,
+    row_count: rows.length,
+    pilot_ready_count: rows.filter((row) => row.pilot_ready === true).length,
+    production_ready_count: rows.filter((row) => row.production_ready === true).length,
+    recommended_first_platform: rows[0]?.platform,
+    recommended_first_surface: rows[0]?.recommended_first_surface,
+    source_schemas: {
+      host_install_checklist: hostInstallChecklist.schema,
+      connector_release_gate: releaseGate.schema,
+      consumer_handoff: consumerHandoff.schema,
+      adaptation_roadmap: adaptationRoadmap.schema,
+      surface_coverage_matrix: surfaceCoverageMatrix.schema,
+    },
+    files_to_read_first: [
+      'connector-platform-roadmap.json',
+      'connector-release-gate.json',
+      'connector-adoption-index.json',
+      'connector-field-intake-index.json',
+      'startup-plan-matrix.json',
+      'connector-smoke-run-report.json',
+    ],
+    rows,
+    issue_count: unique(issues).length,
+    issues: unique(issues),
+    next_actions: issues.length > 0
+      ? unique([
+        ...issues.map((issue) => `fix_${issue}`),
+        ...rows.flatMap((row) => row.next_actions ?? []),
+      ])
+      : ['start_platform_adapters_in_recommended_order'],
+  });
+}
+
+export function assertMeetingAppTimelineConnectorPlatformRoadmap(checklistOrPackage = {}, options = {}) {
+  const roadmap = buildMeetingAppTimelineConnectorPlatformRoadmap(checklistOrPackage, options);
+  if (!roadmap.accepted) {
+    throw new MeetingTimelineSdkError('Meeting app timeline connector platform roadmap is not accepted', {
+      roadmap,
+      issues: roadmap.issues,
+    });
+  }
+  return roadmap;
 }
 
 export function createMeetingAppTimelineConnectorRuntimeClient(pkg = {}, options = {}) {

@@ -5,6 +5,7 @@ import {
   MEETING_APP_TIMELINE_CONNECTOR_ADOPTION_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
+  MEETING_APP_TIMELINE_CONNECTOR_PLATFORM_ROADMAP_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA,
@@ -14,6 +15,7 @@ import {
   assertMeetingAppTimelineConnectorBridgeSmoke,
   assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
+  assertMeetingAppTimelineConnectorPlatformRoadmap,
   assertMeetingAppTimelineConnectorReleaseGate,
   assertMeetingAppTimelineConnectorSmokePlan,
   assertMeetingAppTimelineConnectorSmokeRun,
@@ -25,6 +27,7 @@ import {
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport,
+  buildMeetingAppTimelineConnectorPlatformRoadmap,
   buildMeetingAppTimelineConnectorReleaseGate,
   buildMeetingAppTimelineConnectorSmokePlan,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
@@ -272,6 +275,22 @@ assert.throws(
   }),
   /release gate is not accepted/,
 );
+
+const platformRoadmap = buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
+  releaseGate,
+});
+assert.equal(platformRoadmap.schema, MEETING_APP_TIMELINE_CONNECTOR_PLATFORM_ROADMAP_SCHEMA);
+assert.equal(platformRoadmap.accepted, true);
+assert.equal(platformRoadmap.pilot_ready_count, 2);
+assert.equal(platformRoadmap.production_ready_count, 0);
+assert.equal(platformRoadmap.recommended_first_platform, 'google_meet');
+assert.equal(platformRoadmap.rows.find((row) => row.platform === 'google_meet').recommended_first_surface, 'browser_extension');
+assert.equal(platformRoadmap.rows.find((row) => row.platform === 'zoom').recommended_first_surface, 'native_detector');
+assert.equal(platformRoadmap.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
+assert.equal(platformRoadmap.rows.find((row) => row.platform === 'zoom').install_target, 'native_or_desktop_observer');
+assert.equal(platformRoadmap.rows.every((row) => row.validation_sequence.includes('connector-release-gate.json')), true);
+assert.equal(platformRoadmap.rows.find((row) => row.platform === 'google_meet').sdk_facade_methods.connector_release_gate, 'sdk.connectorReleaseGate(connectorPackage)');
+assert.equal(assertMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, { releaseGate }).accepted, true);
 
 assert.equal(connectorPackage.adapter_blueprints.ready_count, 2);
 assert.equal(connectorPackage.adapter_blueprints.matrix.schema, 'meeting_platform_adapter_blueprint_matrix');

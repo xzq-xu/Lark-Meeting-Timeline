@@ -149,6 +149,12 @@ const productionConnectorReleaseGate = sdk.connectorReleaseGate(connectorPackage
 });
 assert.equal(productionConnectorReleaseGate.accepted, false);
 assert.equal(productionConnectorReleaseGate.issues.some((issue) => issue.code.includes('production_evidence_accepted')), true);
+const connectorPlatformRoadmap = sdk.connectorPlatformRoadmap(connectorPackage);
+assert.equal(connectorPlatformRoadmap.schema, 'meeting_app_timeline_connector_platform_roadmap');
+assert.equal(connectorPlatformRoadmap.accepted, true);
+assert.equal(connectorPlatformRoadmap.rows.find((row) => row.platform === 'google_meet').recommended_first_surface, 'browser_extension');
+assert.equal(connectorPlatformRoadmap.rows.find((row) => row.platform === 'zoom').recommended_first_surface, 'native_detector');
+assert.equal(sdk.assertConnectorPlatformRoadmap(connectorPackage).accepted, true);
 
 const adapterCapability = sdk.meetingAppAdapterCapability('google-meet', {
   url: 'https://meet.google.com/abc-defg-hij',
