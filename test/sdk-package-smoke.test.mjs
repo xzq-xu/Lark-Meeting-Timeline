@@ -314,6 +314,7 @@ import {
   buildMeetingPlatformAdapterExportPackage as buildMeetingPlatformAdapterExportPackageFromRoot,
   buildMeetingPlatformAdapterImportPlan as buildMeetingPlatformAdapterImportPlanFromRoot,
   buildMeetingPlatformAdapterInstallManifest as buildMeetingPlatformAdapterInstallManifestFromRoot,
+  buildMeetingPlatformAdapterCandidateLaunchPlan as buildMeetingPlatformAdapterCandidateLaunchPlanFromRoot,
   buildMeetingPlatformAdapterLaunchPlan as buildMeetingPlatformAdapterLaunchPlanFromRoot,
   buildMeetingPlatformAdapterPortfolio as buildMeetingPlatformAdapterPortfolioFromRoot,
   buildMeetingPlatformAdapterDecision as buildMeetingPlatformAdapterDecisionFromRoot,
@@ -531,6 +532,7 @@ import {
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-install-manifest';
 import {
   assertMeetingPlatformAdapterLaunchPlan,
+  buildMeetingPlatformAdapterCandidateLaunchPlan,
   buildMeetingPlatformAdapterLaunchPlan,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-launch-plan';
 import {
@@ -833,6 +835,14 @@ assert.equal(rootMeetingAppSdk.assertPlatformAdapterInstallManifest(rootMeetingA
 const rootInstallManifest = rootMeetingAppSdk.adapterInstallManifest([rootGoogleImportPlan]);
 assert.equal(rootMeetingAppSdk.platformAdapterLaunchPlan(rootInstallManifest, { url: 'https://meet.google.com/abc-defg-hij' }).accepted, true);
 assert.equal(rootMeetingAppSdk.adapterLaunchPlan(rootInstallManifest, { platform: 'google-meet' }).platform, 'google_meet');
+assert.equal(rootMeetingAppSdk.adapterCandidateLaunchPlan(rootInstallManifest, {
+  candidates: [{
+    url: 'https://meet.google.com/abc-defg-hij',
+    snapshots: [rootGoogleActiveSnapshot],
+  }],
+}, {
+  requireSpeakerTrack: true,
+}).accepted, true);
 assert.equal(rootMeetingAppSdk.assertPlatformAdapterLaunchPlan(rootMeetingAppSdk.adapterLaunchPlan(rootInstallManifest, { platform: 'google-meet' })).accepted, true);
 const rootGoogleLaunchPlan = rootMeetingAppSdk.platformAdapterLaunchPlan(rootInstallManifest, { url: 'https://meet.google.com/abc-defg-hij' });
 const rootAdapterSessionCalls = [];
@@ -2253,6 +2263,22 @@ assert.equal(buildMeetingPlatformAdapterLaunchPlan(directInstallManifest, {
 assert.equal(buildMeetingPlatformAdapterLaunchPlanFromRoot(directInstallManifest, {
   platform: 'google-meet',
 }).runtime_actions[0].id, 'observe_platform_candidates');
+assert.equal(buildMeetingPlatformAdapterCandidateLaunchPlanFromRoot(directInstallManifest, {
+  candidates: [{
+    url: 'https://meet.google.com/abc-defg-hij',
+    snapshots: [rootGoogleActiveSnapshot],
+  }],
+}, {
+  requireSpeakerTrack: true,
+}).status, 'ready_for_realtime_launch');
+assert.equal(buildMeetingPlatformAdapterCandidateLaunchPlan(directInstallManifest, {
+  tabs: [{
+    url: 'https://meet.google.com/abc-defg-hij',
+    snapshots: [rootGoogleActiveSnapshot],
+  }],
+}, {
+  requireSpeakerTrack: true,
+}).launch_plan.platform, 'google_meet');
 assert.equal(assertMeetingPlatformAdapterLaunchPlan(buildMeetingPlatformAdapterLaunchPlan(directInstallManifest, {
   platform: 'google-meet',
 })).accepted, true);

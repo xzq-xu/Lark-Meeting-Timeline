@@ -316,7 +316,9 @@ import {
   buildMeetingPlatformAdapterInstallManifest,
 } from './platform-adapter-install-manifest.mjs';
 import {
+  assertMeetingPlatformAdapterCandidateLaunchPlan,
   assertMeetingPlatformAdapterLaunchPlan,
+  buildMeetingPlatformAdapterCandidateLaunchPlan,
   buildMeetingPlatformAdapterLaunchPlan,
 } from './platform-adapter-launch-plan.mjs';
 import {
@@ -895,8 +897,14 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     platformAdapterLaunchPlan(manifestOrInput = {}, launchInput = {}, launchOptions = {}) {
       return buildMeetingPlatformAdapterLaunchPlan(manifestOrInput, launchInput, withDefaults(defaults, launchOptions));
     },
+    platformAdapterCandidateLaunchPlan(manifestOrInput = {}, launchInput = {}, launchOptions = {}) {
+      return buildMeetingPlatformAdapterCandidateLaunchPlan(manifestOrInput, launchInput, withDefaults(defaults, launchOptions));
+    },
     assertPlatformAdapterLaunchPlan(planOrInput = {}, launchInput = {}, launchOptions = {}) {
       return assertMeetingPlatformAdapterLaunchPlan(planOrInput, launchInput, withDefaults(defaults, launchOptions));
+    },
+    assertPlatformAdapterCandidateLaunchPlan(planOrInput = {}, launchInput = {}, launchOptions = {}) {
+      return assertMeetingPlatformAdapterCandidateLaunchPlan(planOrInput, launchInput, withDefaults(defaults, launchOptions));
     },
     platformAdapterSession(launchPlanOrInput = {}, clientOrSessionOptions = {}, sessionOptions = {}) {
       const mergedOptions = adapterSessionOptions(defaults, clientOrSessionOptions, sessionOptions);

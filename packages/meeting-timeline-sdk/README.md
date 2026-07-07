@@ -1942,6 +1942,27 @@ const candidatePreflight = buildMeetingPlatformAdapterCandidatePreflight({
 // candidatePreflight.accepted === true 表示至少一个候选已经可实时插入 captured_at_ms 标注。
 ```
 
+如果已经有 `platformAdapterInstallManifest()`，可以进一步用 `platformAdapterCandidateLaunchPlan()` 把“候选窗口验收”和“启动 runtime surface”合成一步。这个对象的 `accepted` 同时要求候选 preflight 通过、install manifest 可用、平台已注册、surface 可启动；通过后把内部的 `launch_plan` 交给 `platformAdapterSession()` 或 runner 即可。
+
+```js
+const launch = sdk.platformAdapterCandidateLaunchPlan(installManifest, {
+  candidates: [{
+    url: 'https://meet.google.com/abc-defg-hij',
+    snapshots: currentWindowLiveSnapshots,
+  }],
+}, {
+  requireSpeakerTrack: true,
+});
+
+if (launch.accepted) {
+  const session = sdk.platformAdapterSession(launch.launch_plan);
+  await session.observeAxis({
+    candidates: [launch.selected_candidate],
+    captured_at_ms: Date.now(),
+  });
+}
+```
+
 如果希望 SDK 帮你管理轮询、去重和 keep-alive，可以直接用 `meeting-app-monitor`。它会高频低成本采集 DOM，但只有在页面状态变化、或到达 keep-alive 间隔时才把样本送给 `meeting-source`；即使 DOM 不变，也会按间隔继续送样本，避免 active speaker 的 `minStableMs` 因过度去重而无法触发：
 
 ```js

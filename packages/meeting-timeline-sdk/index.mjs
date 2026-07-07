@@ -1127,6 +1127,16 @@ export function createMeetingAppTimelineSdk(options = {}) {
     adapterLaunchPlan(manifestOrInput = {}, launchInput = {}, launchOptions = {}) {
       return sdk.platformAdapterLaunchPlan(manifestOrInput, launchInput, launchOptions);
     },
+    platformAdapterCandidateLaunchPlan(manifestOrInput = {}, launchInput = {}, launchOptions = {}) {
+      return runtime.kit.platformAdapterCandidateLaunchPlan(
+        manifestOrInput,
+        launchInput,
+        sdkPlatformOptions(runtime, launchOptions),
+      );
+    },
+    adapterCandidateLaunchPlan(manifestOrInput = {}, launchInput = {}, launchOptions = {}) {
+      return sdk.platformAdapterCandidateLaunchPlan(manifestOrInput, launchInput, launchOptions);
+    },
     assertPlatformAdapterLaunchPlan(planOrInput = {}, launchInput = {}, launchOptions = {}) {
       return runtime.kit.assertPlatformAdapterLaunchPlan(
         planOrInput,
@@ -1136,6 +1146,16 @@ export function createMeetingAppTimelineSdk(options = {}) {
     },
     assertAdapterLaunchPlan(planOrInput = {}, launchInput = {}, launchOptions = {}) {
       return sdk.assertPlatformAdapterLaunchPlan(planOrInput, launchInput, launchOptions);
+    },
+    assertPlatformAdapterCandidateLaunchPlan(planOrInput = {}, launchInput = {}, launchOptions = {}) {
+      return runtime.kit.assertPlatformAdapterCandidateLaunchPlan(
+        planOrInput,
+        launchInput,
+        sdkPlatformOptions(runtime, launchOptions),
+      );
+    },
+    assertAdapterCandidateLaunchPlan(planOrInput = {}, launchInput = {}, launchOptions = {}) {
+      return sdk.assertPlatformAdapterCandidateLaunchPlan(planOrInput, launchInput, launchOptions);
     },
     platformAdapterSession(launchPlanOrInput = {}, clientOrSessionOptions = {}, sessionOptions = {}) {
       return runtime.kit.platformAdapterSession(

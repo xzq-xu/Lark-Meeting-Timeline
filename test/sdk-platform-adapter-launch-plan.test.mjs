@@ -11,9 +11,14 @@ import {
   buildMeetingPlatformAdapterInstallManifest,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-install-manifest.mjs';
 import {
+  assertMeetingPlatformAdapterCandidateLaunchPlan,
   assertMeetingPlatformAdapterLaunchPlan,
+  buildMeetingPlatformAdapterCandidateLaunchPlan,
   buildMeetingPlatformAdapterLaunchPlan,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-launch-plan.mjs';
+import {
+  buildMeetingAppFixtureSnapshot,
+} from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
 import {
   createMeetingPlatformTimelineKit,
 } from '../packages/meeting-timeline-sdk/adapters/platform-kit.mjs';
@@ -53,6 +58,57 @@ assert.equal(googlePlan.runtime_actions.find((action) => action.id === 'insert_r
 assert.equal(googlePlan.mark_template.platform, 'google_meet');
 assert.equal(googlePlan.mark_template.captured_at_ms, 1_782_614_400_000);
 assert.equal(assertMeetingPlatformAdapterLaunchPlan(googlePlan), googlePlan);
+
+const googleActiveSnapshot = buildMeetingAppFixtureSnapshot('google-meet', {
+  state: 'active',
+  observedAtMs: 1_782_614_400_000,
+});
+const candidateLaunchPlan = buildMeetingPlatformAdapterCandidateLaunchPlan(manifest, {
+  windows: [{
+    id: 'chrome-main',
+    tabs: [{
+      id: 1,
+      url: 'https://zoom.us/j/987654321',
+      title: 'Zoom Meeting',
+    }, {
+      id: 2,
+      url: 'https://meet.google.com/abc-defg-hij',
+      title: 'Design review - Google Meet',
+      snapshots: [googleActiveSnapshot],
+    }],
+  }],
+}, {
+  requireSpeakerTrack: true,
+  capturedAtMs: 1_782_614_400_000,
+});
+assert.equal(candidateLaunchPlan.schema, 'meeting_platform_adapter_candidate_launch_plan');
+assert.equal(candidateLaunchPlan.accepted, true);
+assert.equal(candidateLaunchPlan.status, 'ready_for_realtime_launch');
+assert.equal(candidateLaunchPlan.platform, 'google_meet');
+assert.equal(candidateLaunchPlan.selected_candidate.tab_id, 2);
+assert.equal(candidateLaunchPlan.candidate_preflight.accepted_count, 1);
+assert.equal(candidateLaunchPlan.launch_plan.accepted, true);
+assert.equal(candidateLaunchPlan.launch_plan.platform, 'google_meet');
+assert.equal(candidateLaunchPlan.runtime_actions[0].id, 'observe_platform_candidates');
+assert.equal(assertMeetingPlatformAdapterCandidateLaunchPlan(candidateLaunchPlan), candidateLaunchPlan);
+
+const urlOnlyCandidateLaunchPlan = buildMeetingPlatformAdapterCandidateLaunchPlan(manifest, {
+  tabs: [{
+    id: 3,
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Google Meet',
+  }],
+}, {
+  requireSpeakerTrack: true,
+});
+assert.equal(urlOnlyCandidateLaunchPlan.accepted, false);
+assert.equal(urlOnlyCandidateLaunchPlan.status, 'needs_live_page_evidence');
+assert.equal(urlOnlyCandidateLaunchPlan.launch_plan.accepted, true);
+assert.equal(urlOnlyCandidateLaunchPlan.readiness.issues.some((item) => item.code === 'candidate_preflight_not_accepted'), true);
+assert.throws(
+  () => assertMeetingPlatformAdapterCandidateLaunchPlan(urlOnlyCandidateLaunchPlan),
+  /candidate launch plan is not ready/,
+);
 
 const zoomPlan = buildMeetingPlatformAdapterLaunchPlan(manifest, {
   platform: 'zoom',
@@ -114,7 +170,16 @@ const kit = createMeetingPlatformTimelineKit(client, {
   platforms: ['google-meet', 'zoom'],
 });
 assert.equal(kit.platformAdapterLaunchPlan(manifest, { url: 'https://meet.google.com/abc-defg-hij' }).accepted, true);
+assert.equal(kit.platformAdapterCandidateLaunchPlan(manifest, {
+  candidates: [{
+    url: 'https://meet.google.com/abc-defg-hij',
+    snapshots: [googleActiveSnapshot],
+  }],
+}, {
+  requireSpeakerTrack: true,
+}).accepted, true);
 assert.equal(kit.assertPlatformAdapterLaunchPlan(googlePlan), googlePlan);
+assert.equal(kit.assertPlatformAdapterCandidateLaunchPlan(candidateLaunchPlan), candidateLaunchPlan);
 assert.equal(kit.report().platform_adapter_launch_plan.accepted, false);
 
 const sdk = createMeetingAppTimelineSdk({
@@ -123,6 +188,15 @@ const sdk = createMeetingAppTimelineSdk({
 });
 assert.equal(sdk.platformAdapterLaunchPlan(manifest, { url: 'https://meet.google.com/abc-defg-hij' }).accepted, true);
 assert.equal(sdk.adapterLaunchPlan(manifest, { platform: 'zoom' }).platform, 'zoom');
+assert.equal(sdk.adapterCandidateLaunchPlan(manifest, {
+  candidates: [{
+    url: 'https://meet.google.com/abc-defg-hij',
+    snapshots: [googleActiveSnapshot],
+  }],
+}, {
+  requireSpeakerTrack: true,
+}).platform, 'google_meet');
 assert.equal(sdk.assertPlatformAdapterLaunchPlan(googlePlan), googlePlan);
+assert.equal(sdk.assertAdapterCandidateLaunchPlan(candidateLaunchPlan).accepted, true);
 
 console.log('ok meeting platform adapter launch plan');

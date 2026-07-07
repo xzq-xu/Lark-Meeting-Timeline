@@ -430,12 +430,24 @@ export interface MeetingAppTimelineSdk {
     options?: Record<string, unknown>,
   ): import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan;
   adapterLaunchPlan: MeetingAppTimelineSdk['platformAdapterLaunchPlan'];
+  platformAdapterCandidateLaunchPlan(
+    manifestOrInput?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | Record<string, unknown>,
+    input?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterCandidateLaunchPlan;
+  adapterCandidateLaunchPlan: MeetingAppTimelineSdk['platformAdapterCandidateLaunchPlan'];
   assertPlatformAdapterLaunchPlan(
     planOrInput?: import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | Record<string, unknown>,
     input?: Record<string, unknown> | string,
     options?: Record<string, unknown>,
   ): import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan;
   assertAdapterLaunchPlan: MeetingAppTimelineSdk['assertPlatformAdapterLaunchPlan'];
+  assertPlatformAdapterCandidateLaunchPlan(
+    planOrInput?: import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterCandidateLaunchPlan | import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | Record<string, unknown>,
+    input?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterCandidateLaunchPlan;
+  assertAdapterCandidateLaunchPlan: MeetingAppTimelineSdk['assertPlatformAdapterCandidateLaunchPlan'];
   platformAdapterSession(
     launchPlanOrInput?: import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | Record<string, unknown>,
     clientOrOptions?: import('./adapters/platform-adapter-session.mjs').MeetingPlatformAdapterSessionClient | import('./adapters/platform-adapter-session.mjs').MeetingPlatformAdapterSessionOptions,

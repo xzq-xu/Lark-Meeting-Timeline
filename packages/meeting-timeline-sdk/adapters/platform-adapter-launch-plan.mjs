@@ -1,8 +1,12 @@
 import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
 import { detectMeetingFromUrl } from './meeting-url.mjs';
+import {
+  buildMeetingPlatformAdapterCandidatePreflight,
+} from './platform-adapter-preflight.mjs';
 import { normalizeMeetingPlatform } from './platform-setup.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_LAUNCH_PLAN_SCHEMA = 'meeting_platform_adapter_launch_plan';
+export const MEETING_PLATFORM_ADAPTER_CANDIDATE_LAUNCH_PLAN_SCHEMA = 'meeting_platform_adapter_candidate_launch_plan';
 export const MEETING_PLATFORM_ADAPTER_LAUNCH_PLAN_SCHEMA_VERSION = 1;
 
 const SURFACE_ALIASES = Object.freeze({
@@ -321,6 +325,68 @@ function nextActions(plan = {}, ready = {}) {
   ]);
 }
 
+function selectedCandidateRow(candidatePreflight = {}) {
+  return asArray(candidatePreflight.rows).find((row) => row?.selected === true)
+    ?? asArray(candidatePreflight.rows)[candidatePreflight.selected_candidate_index]
+    ?? asArray(candidatePreflight.rows)[0]
+    ?? {};
+}
+
+function candidateLaunchInput(candidatePreflight = {}, input = {}, options = {}) {
+  const row = selectedCandidateRow(candidatePreflight);
+  return compactObject({
+    platform: firstNonEmpty(options.platform, input.platform, input.provider, row.platform, candidatePreflight.selected_platform),
+    url: firstNonEmpty(options.url, options.href, input.url, input.href, row.url),
+    title: firstNonEmpty(options.title, input.title, row.title),
+    surface: firstNonEmpty(options.surface, options.preferredSurface, options.preferred_surface, input.surface, input.preferredSurface, input.preferred_surface),
+    capturedAtMs: firstNonEmpty(options.capturedAtMs, options.captured_at_ms, input.capturedAtMs, input.captured_at_ms),
+    captured_at_ms: firstNonEmpty(options.captured_at_ms, options.capturedAtMs, input.captured_at_ms, input.capturedAtMs),
+    candidate_index: row.candidate_index,
+    window_id: row.window_id,
+    tab_id: row.tab_id,
+    active: row.active,
+  });
+}
+
+function candidateLaunchReadiness(candidatePreflight = {}, launchPlan = {}) {
+  const issues = [
+    candidatePreflight.accepted === true ? undefined : issue('error', 'candidate_preflight_not_accepted', 'No candidate tab/window has live evidence for realtime annotation launch.', {
+      candidate_status: candidatePreflight.status,
+      candidate_count: candidatePreflight.candidate_count,
+      selected_platform: candidatePreflight.selected_platform,
+    }),
+    ...(launchPlan.readiness?.issues ?? []),
+  ].filter(Boolean);
+  return {
+    accepted: issues.filter((item) => item.severity === 'error').length === 0,
+    issue_count: issues.length,
+    candidate_preflight_accepted: candidatePreflight.accepted === true,
+    launch_plan_accepted: launchPlan.accepted === true,
+    issues,
+  };
+}
+
+function candidateLaunchStatus(candidatePreflight = {}, launchPlan = {}, ready = {}) {
+  if (ready.accepted === true) return 'ready_for_realtime_launch';
+  if (candidatePreflight.accepted !== true) return candidatePreflight.status ?? 'candidate_preflight_not_accepted';
+  if (launchPlan.accepted !== true) return 'launch_plan_not_ready';
+  return 'not_ready';
+}
+
+function candidateLaunchNextActions(candidatePreflight = {}, launchPlan = {}, ready = {}) {
+  if (ready.accepted === true) return unique([
+    'start_selected_surface_runtime',
+    'open_adapter_session_from_launch_plan',
+    'observe_platform_candidates_before_first_mark',
+    'insert_realtime_marks_with_captured_at_ms',
+  ]);
+  return unique([
+    ...(ready.issues ?? []).map((item) => item.code),
+    ...(candidatePreflight.next_actions ?? []),
+    ...(launchPlan.next_actions ?? []),
+  ]);
+}
+
 export function buildMeetingPlatformAdapterLaunchPlan(manifestOrInput = {}, input = {}, options = {}) {
   const manifest = manifestFrom(manifestOrInput, input, options);
   const resolved = resolvePlatform(manifest, input, options);
@@ -362,6 +428,37 @@ export function buildMeetingPlatformAdapterLaunchPlan(manifestOrInput = {}, inpu
   };
 }
 
+export function buildMeetingPlatformAdapterCandidateLaunchPlan(manifestOrInput = {}, input = {}, options = {}) {
+  const manifest = manifestFrom(manifestOrInput, input, options);
+  const candidatePreflight = buildMeetingPlatformAdapterCandidatePreflight(input, options);
+  const selectedCandidate = selectedCandidateRow(candidatePreflight);
+  const launchInput = candidateLaunchInput(candidatePreflight, input, options);
+  const launchPlan = buildMeetingPlatformAdapterLaunchPlan(manifest, launchInput, options);
+  const ready = candidateLaunchReadiness(candidatePreflight, launchPlan);
+  return compactObject({
+    type: 'meeting_platform_adapter_candidate_launch_plan',
+    schema: MEETING_PLATFORM_ADAPTER_CANDIDATE_LAUNCH_PLAN_SCHEMA,
+    schema_version: MEETING_PLATFORM_ADAPTER_LAUNCH_PLAN_SCHEMA_VERSION,
+    accepted: ready.accepted,
+    status: candidateLaunchStatus(candidatePreflight, launchPlan, ready),
+    platform: launchPlan.platform,
+    selected_platform: candidatePreflight.selected_platform,
+    selected_surface: launchPlan.selected_surface,
+    selected_candidate_index: candidatePreflight.selected_candidate_index,
+    selected_candidate: selectedCandidate,
+    install_manifest_schema: launchPlan.install_manifest_schema,
+    install_manifest_accepted: launchPlan.install_manifest_accepted,
+    candidate_preflight: candidatePreflight,
+    launch_input: launchInput,
+    launch_plan: launchPlan,
+    axis_contract: launchPlan.axis_contract,
+    runtime_actions: launchPlan.runtime_actions,
+    mark_template: launchPlan.mark_template,
+    readiness: ready,
+    next_actions: candidateLaunchNextActions(candidatePreflight, launchPlan, ready),
+  });
+}
+
 export function assertMeetingPlatformAdapterLaunchPlan(planOrInput = {}, input = {}, options = {}) {
   const plan = planOrInput.schema === MEETING_PLATFORM_ADAPTER_LAUNCH_PLAN_SCHEMA
     ? planOrInput
@@ -372,6 +469,23 @@ export function assertMeetingPlatformAdapterLaunchPlan(planOrInput = {}, input =
       issues: plan.readiness?.issues ?? [],
       platform: plan.platform,
       surface: plan.selected_surface,
+    });
+  }
+  return plan;
+}
+
+export function assertMeetingPlatformAdapterCandidateLaunchPlan(planOrInput = {}, input = {}, options = {}) {
+  const plan = planOrInput.schema === MEETING_PLATFORM_ADAPTER_CANDIDATE_LAUNCH_PLAN_SCHEMA
+    ? planOrInput
+    : buildMeetingPlatformAdapterCandidateLaunchPlan(planOrInput, input, options);
+  if (plan.accepted !== true) {
+    throw new MeetingTimelineSdkError('Meeting platform adapter candidate launch plan is not ready', {
+      code: 'meeting_platform_adapter_candidate_launch_plan_not_ready',
+      status: plan.status,
+      issues: plan.readiness?.issues ?? [],
+      platform: plan.platform,
+      surface: plan.selected_surface,
+      selected_candidate: plan.selected_candidate,
     });
   }
   return plan;

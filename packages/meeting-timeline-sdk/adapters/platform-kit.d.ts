@@ -233,6 +233,7 @@ import type {
   MeetingPlatformAdapterInstallManifestOptions,
 } from './platform-adapter-install-manifest.mjs';
 import type {
+  MeetingPlatformAdapterCandidateLaunchPlan,
   MeetingPlatformAdapterLaunchPlan,
   MeetingPlatformAdapterLaunchPlanOptions,
 } from './platform-adapter-launch-plan.mjs';
@@ -497,7 +498,9 @@ export interface MeetingPlatformTimelineKit {
   platformAdapterInstallManifest(plansOrInput?: MeetingPlatformAdapterImportPlan[] | MeetingPlatformAdapterExportPackage[] | Record<string, unknown>, installInput?: MeetingPlatformAdapterInstallManifestOptions, installOptions?: MeetingPlatformAdapterInstallManifestOptions): MeetingPlatformAdapterInstallManifest;
   assertPlatformAdapterInstallManifest(manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterImportPlan[] | MeetingPlatformAdapterExportPackage[] | Record<string, unknown>, installInput?: MeetingPlatformAdapterInstallManifestOptions, installOptions?: MeetingPlatformAdapterInstallManifestOptions): MeetingPlatformAdapterInstallManifest;
   platformAdapterLaunchPlan(manifestOrInput?: MeetingPlatformAdapterInstallManifest | Record<string, unknown>, launchInput?: MeetingPlatformAdapterLaunchPlanOptions | string, launchOptions?: MeetingPlatformAdapterLaunchPlanOptions): MeetingPlatformAdapterLaunchPlan;
+  platformAdapterCandidateLaunchPlan(manifestOrInput?: MeetingPlatformAdapterInstallManifest | Record<string, unknown>, launchInput?: Record<string, unknown>, launchOptions?: MeetingPlatformAdapterLaunchPlanOptions): MeetingPlatformAdapterCandidateLaunchPlan;
   assertPlatformAdapterLaunchPlan(planOrInput?: MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterInstallManifest | Record<string, unknown>, launchInput?: MeetingPlatformAdapterLaunchPlanOptions | string, launchOptions?: MeetingPlatformAdapterLaunchPlanOptions): MeetingPlatformAdapterLaunchPlan;
+  assertPlatformAdapterCandidateLaunchPlan(planOrInput?: MeetingPlatformAdapterCandidateLaunchPlan | MeetingPlatformAdapterInstallManifest | Record<string, unknown>, launchInput?: Record<string, unknown>, launchOptions?: MeetingPlatformAdapterLaunchPlanOptions): MeetingPlatformAdapterCandidateLaunchPlan;
   platformAdapterSession(launchPlanOrInput?: MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, clientOrSessionOptions?: MeetingPlatformAdapterSessionClient | MeetingPlatformAdapterSessionOptions, sessionOptions?: MeetingPlatformAdapterSessionOptions): MeetingPlatformAdapterSession;
   platformAdapterSessionHandoff(launchPlanOrInput?: MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, handoffOptions?: MeetingPlatformAdapterSessionOptions): MeetingPlatformAdapterSessionHandoff;
   platformAdapterRunner(manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>, clientOrRunnerOptions?: MeetingPlatformAdapterSessionClient | MeetingPlatformAdapterRunnerOptions, runnerOptions?: MeetingPlatformAdapterRunnerOptions): MeetingPlatformAdapterRunner;
