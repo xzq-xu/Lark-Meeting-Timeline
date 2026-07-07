@@ -35,6 +35,18 @@ export interface MeetingPlatformRuntimeProfile {
     end: Record<string, unknown>;
     provider_reconcile: Record<string, unknown>;
   };
+  adapter_surfaces: {
+    primary: string;
+    recommended_order: string[];
+    launch_context: string;
+    realtime_axis_surface: string;
+    provider_reconcile_surface?: string | null;
+    candidate_detection: string[];
+    rationale: string;
+  };
+  launch_requirements: Record<string, unknown>;
+  evidence_thresholds: Record<string, unknown>;
+  fallback_policy: Record<string, unknown>;
   annotations: Record<string, unknown>;
   speaker_markers: {
     enabled: boolean;

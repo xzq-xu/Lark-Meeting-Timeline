@@ -79,6 +79,8 @@ assert.equal(packedFiles.includes('adapters/platform-adapter-message-bridge.mjs'
 assert.equal(packedFiles.includes('adapters/platform-adapter-message-bridge.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-smoke.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-smoke.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-runtime-profile.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-runtime-profile.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-rollout.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
@@ -330,6 +332,7 @@ import {
   buildMeetingPlatformAdapterRunnerHandoff as buildMeetingPlatformAdapterRunnerHandoffFromRoot,
   buildMeetingPlatformAdapterSessionHandoff as buildMeetingPlatformAdapterSessionHandoffFromRoot,
   assertMeetingPlatformAdapterSmoke as assertMeetingPlatformAdapterSmokeFromRoot,
+  buildMeetingPlatformRuntimeProfile as buildMeetingPlatformRuntimeProfileFromRoot,
   buildMeetingPlatformConsumerHandoff as buildMeetingPlatformConsumerHandoffFromRoot,
   buildMeetingPlatformConnector as buildMeetingPlatformConnectorFromRoot,
   buildMeetingPlatformConnectorHub as buildMeetingPlatformConnectorHubFromRoot,
@@ -501,6 +504,10 @@ import {
   buildMeetingPlatformAdaptationPackage,
   buildMeetingPlatformAdaptationPackageMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adaptation-package';
+import {
+  buildMeetingPlatformRuntimeProfile,
+  buildMeetingPlatformRuntimeProfileMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-profile';
 import {
   buildMeetingPlatformRuntimeBundle,
   buildMeetingPlatformRuntimeBundleMatrix,
@@ -978,6 +985,9 @@ assert.equal(buildMeetingPlatformConsumerHandoffFromRoot({
 assert.equal(buildMeetingPlatformImplementationHandoffFromRoot('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).recommended_first_surface, 'browser_extension');
+assert.equal(buildMeetingPlatformRuntimeProfileFromRoot('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).adapter_surfaces.primary, 'browser_extension');
 assert.equal(buildMeetingPlatformRuntimeBundleFromRoot('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).schema, 'meeting_platform_runtime_bundle');
@@ -1891,6 +1901,16 @@ assert.equal(buildMeetingPlatformRuntimeEventPlanMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).transcript_realtime_dependency_count, 0);
+const smokeGoogleRuntimeProfile = buildMeetingPlatformRuntimeProfile('google-meet', {
+  baseUrl: 'http://localhost:8787',
+});
+assert.equal(smokeGoogleRuntimeProfile.adapter_surfaces.primary, 'browser_extension');
+assert.equal(smokeGoogleRuntimeProfile.evidence_thresholds.pilot.provider_records_required, false);
+assert.equal(smokeGoogleRuntimeProfile.launch_requirements.provider_events_block_launch, false);
+assert.equal(buildMeetingPlatformRuntimeProfileMatrix({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet', 'zoom'],
+}).rows.find((row) => row.platform === 'zoom').primary_surface, 'native_detector');
 const smokeGoogleRuntimeBundle = buildMeetingPlatformRuntimeBundle('google-meet', {
   baseUrl: 'http://localhost:8787',
 });

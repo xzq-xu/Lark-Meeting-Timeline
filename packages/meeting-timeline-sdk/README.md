@@ -415,6 +415,7 @@ const runtime = buildMeetingPlatformRuntimeProfileMatrix({
 // 每个平台都要求：标注用 captured_at_ms；provider webhook 和 transcript 不阻塞实时落轴。
 console.log(runtime.rows.map((row) => ({
   platform: row.platform,
+  surface: row.primary_surface,
   start: row.start_create_on,
   end: row.end_create_on,
   speakerStableMs: row.speaker_min_stable_ms,
@@ -427,6 +428,8 @@ console.log(runtime.rows.map((row) => ({
 const googleProfile = kit.platformRuntimeProfile('google-meet');
 // googleProfile.axis.end.fallbacks 描述 Workspace Events 晚到时，本地观察器如何先闭合会议轴。
 // googleProfile.speaker_markers.filter 可直接传给 active-speaker observer。
+// googleProfile.adapter_surfaces 描述推荐接入面：Google Meet 优先 browser_extension，Zoom 优先 native_detector。
+// googleProfile.launch_requirements/evidence_thresholds/fallback_policy 可直接用于接入 UI、preflight gate 和采样验收。
 ```
 
 采真实 Google Meet / Teams / Zoom / Webex 样本时，用 `platform-field-capture` 生成采样清单。它面向现场工具，而不是最终验收：告诉采集器至少要采 active speaker DOM、meeting ended DOM、provider start/end 事件，以及这些数据最后应该导出到哪个 evidence package：

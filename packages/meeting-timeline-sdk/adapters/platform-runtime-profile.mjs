@@ -107,6 +107,63 @@ const END_FALLBACKS = Object.freeze({
   ]),
 });
 
+const SURFACE_RECOMMENDATIONS = Object.freeze({
+  local_detector: Object.freeze({
+    primary: 'host_detector',
+    recommended_order: Object.freeze(['host_detector', 'manual_controller']),
+    launch_context: 'trusted_host_or_device_runtime',
+    realtime_axis_surface: 'host_detector',
+    provider_reconcile_surface: null,
+    candidate_detection: Object.freeze(['explicit_host_signal']),
+    rationale: 'host_detector_is_the_meeting_axis_source_and_does_not_need_a_browser_or_provider_adapter',
+  }),
+  lark: Object.freeze({
+    primary: 'browser_extension_or_desktop_observer',
+    recommended_order: Object.freeze(['browser_extension', 'desktop_observer', 'provider_reconcile']),
+    launch_context: 'browser_tab_or_desktop_client',
+    realtime_axis_surface: 'local_observer',
+    provider_reconcile_surface: 'lark_long_connection_or_event_callback',
+    candidate_detection: Object.freeze(['url_match', 'tabs_permission', 'dom_preflight', 'current_user_meeting_scan_optional']),
+    rationale: 'lark_events_are_useful_for_reconcile_but_local_observer_should_create_the_live_axis_first',
+  }),
+  google_meet: Object.freeze({
+    primary: 'browser_extension',
+    recommended_order: Object.freeze(['browser_extension', 'desktop_observer', 'provider_reconcile']),
+    launch_context: 'browser_tab_or_pwa',
+    realtime_axis_surface: 'local_observer',
+    provider_reconcile_surface: 'google_workspace_events_pubsub',
+    candidate_detection: Object.freeze(['url_match', 'tabs_permission', 'dom_preflight']),
+    rationale: 'meet_is_browser_first_and_workspace_events_should_reconcile_after_the_local_axis_exists',
+  }),
+  microsoft_teams: Object.freeze({
+    primary: 'desktop_or_browser_observer',
+    recommended_order: Object.freeze(['desktop_observer', 'browser_extension', 'provider_reconcile']),
+    launch_context: 'desktop_client_or_browser_tab',
+    realtime_axis_surface: 'local_observer',
+    provider_reconcile_surface: 'microsoft_graph_change_notifications',
+    candidate_detection: Object.freeze(['native_window_match', 'url_match', 'tabs_permission', 'dom_preflight']),
+    rationale: 'teams_usage_often_moves_between_desktop_and_browser_so_the_host_should_keep_both_observer_surfaces_available',
+  }),
+  zoom: Object.freeze({
+    primary: 'native_detector',
+    recommended_order: Object.freeze(['native_detector', 'browser_extension', 'provider_reconcile']),
+    launch_context: 'desktop_client_or_browser_tab',
+    realtime_axis_surface: 'local_observer',
+    provider_reconcile_surface: 'zoom_meeting_webhooks',
+    candidate_detection: Object.freeze(['native_window_match', 'url_match', 'tabs_permission']),
+    rationale: 'zoom_native_client_is_common_so_native_window_detection_should_be_available_before_falling_back_to_browser_observation',
+  }),
+  webex: Object.freeze({
+    primary: 'browser_extension_or_native_detector',
+    recommended_order: Object.freeze(['browser_extension', 'native_detector', 'provider_reconcile']),
+    launch_context: 'browser_tab_or_desktop_client',
+    realtime_axis_surface: 'local_observer',
+    provider_reconcile_surface: 'webex_webhooks',
+    candidate_detection: Object.freeze(['url_match', 'native_window_match', 'tabs_permission', 'dom_preflight']),
+    rationale: 'webex_can_run_in_browser_or_desktop_client_and_provider_webhooks_should_not_block_the_live_axis',
+  }),
+});
+
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
 }
@@ -183,12 +240,108 @@ function endTimeoutPolicy(platform) {
   };
 }
 
+function surfaceRecommendationFor(platform) {
+  return SURFACE_RECOMMENDATIONS[platform] ?? SURFACE_RECOMMENDATIONS.local_detector;
+}
+
+function launchRequirements(platform, surface = {}, strategy = {}) {
+  const localPlatform = platform === 'local_detector';
+  return compactObject({
+    primary_surface: surface.primary,
+    required_before_realtime_annotation: localPlatform
+      ? ['host_detector_absolute_started_at_ms']
+      : ['candidate_observation', 'local_axis_start_or_pending_axis'],
+    required_message_types: localPlatform
+      ? []
+      : [
+        'meeting_timeline.observe_candidates',
+        'meeting_timeline.preflight_current_window',
+        'meeting_timeline.candidate_launch_plan',
+        'meeting_timeline.open_candidate_session',
+      ],
+    browser_permissions: localPlatform ? [] : ['tabs', 'storage'],
+    timestamp_field: 'captured_at_ms',
+    may_insert_before_provider_start_event: true,
+    provider_events_block_launch: false,
+    transcript_blocks_launch: false,
+    preflight: {
+      required_for_auto_launch: !localPlatform,
+      accepted_when: localPlatform
+        ? 'host_detector_selected'
+        : 'candidate_has_supported_platform_and_local_observer_can_emit_absolute_timestamps',
+      recommended_options: {
+        requireSpeakerTrack: false,
+        requireProviderConnection: false,
+      },
+    },
+    local_observer: {
+      required: true,
+      source: strategy.local_observer?.implementation,
+      evidence_input: strategy.local_observer?.evidence_input,
+    },
+  });
+}
+
+function evidenceThresholds(platform, provider = {}, strategy = {}) {
+  const localPlatform = platform === 'local_detector';
+  return compactObject({
+    pilot: {
+      required: localPlatform
+        ? ['host_detector_meeting_started', 'host_detector_meeting_ended_or_manual_stop']
+        : ['active_meeting_observed', 'annotation_with_captured_at_ms', 'meeting_end_fallback_observed_or_manual_stop'],
+      provider_records_required: false,
+      transcript_required: false,
+      pass_condition: 'ready_for_realtime_annotations === true',
+    },
+    production: {
+      required: localPlatform
+        ? ['local_detector_start_end_records']
+        : ['meetingAppRecordSet', 'providerRecords', 'end_fallback_or_provider_end_evidence'],
+      provider_records_required: !localPlatform,
+      transcript_required: false,
+      pass_condition: 'production_ready === true',
+    },
+    provider_connection: {
+      required_for_realtime: false,
+      required_for_production_evidence: !localPlatform,
+      readiness: provider.readiness,
+      missing_env: provider.security?.missing_env ?? [],
+    },
+    sdk_gates: [
+      '@ai-annotation/meeting-timeline-sdk/adapters/platform-field-capture',
+      '@ai-annotation/meeting-timeline-sdk/adapters/platform-evidence-package',
+    ],
+    current_strategy_status: {
+      rollout_status: strategy.rollout_status,
+      production_ready: strategy.production_ready,
+      ready_for_realtime_annotations: strategy.ready_for_realtime_annotations,
+    },
+  });
+}
+
+function fallbackPolicy(platform, surface = {}) {
+  const localPlatform = platform === 'local_detector';
+  return {
+    start: localPlatform
+      ? ['manual_controller_can_create_axis_if_host_signal_is_missing']
+      : ['create_pending_axis_from_annotation_capture_time', 'promote_axis_when_local_observer_confirms_active_meeting'],
+    end: END_FALLBACKS[platform] ?? [],
+    provider_late_or_missing: localPlatform
+      ? 'no_provider_dependency'
+      : 'keep_realtime_marks_on_captured_at_ms_and_reconcile_axis_bounds_later',
+    speaker_track_missing: 'omit_speaker_markers_or_backfill_from_post_meeting_artifacts',
+    transcript_missing: 'do_not_block_realtime_annotations',
+    next_surface_on_preflight_failure: surface.recommended_order?.[1] ?? null,
+  };
+}
+
 export function buildMeetingPlatformRuntimeProfile(platform, options = {}) {
   const key = normalizeMeetingPlatform(platform);
   const capabilities = platformCapabilityContract(key, options);
   const integration = buildPlatformIntegrationPlan(key, options);
   const strategy = buildMeetingPlatformAdaptationStrategy(key, options);
   const provider = buildMeetingPlatformProviderConnectionPack(key, options);
+  const surface = surfaceRecommendationFor(key);
   const startEvents = eventMappingFor(provider, 'meeting_started');
   const endEvents = eventMappingFor(provider, 'meeting_ended');
   const participantEvents = [
@@ -237,6 +390,18 @@ export function buildMeetingPlatformRuntimeProfile(platform, options = {}) {
         required_for_production_evidence: key !== 'local_detector',
       },
     },
+    adapter_surfaces: {
+      primary: surface.primary,
+      recommended_order: [...surface.recommended_order],
+      launch_context: surface.launch_context,
+      realtime_axis_surface: surface.realtime_axis_surface,
+      provider_reconcile_surface: surface.provider_reconcile_surface,
+      candidate_detection: [...surface.candidate_detection],
+      rationale: surface.rationale,
+    },
+    launch_requirements: launchRequirements(key, surface, strategy),
+    evidence_thresholds: evidenceThresholds(key, provider, strategy),
+    fallback_policy: fallbackPolicy(key, surface),
     annotations: {
       insert_policy: 'always_place_by_captured_at_ms_on_active_axis',
       out_of_order_policy: 'keep_mark_time_then_recompute_axis_bounds_when_provider_events_arrive',
@@ -315,10 +480,16 @@ export function buildMeetingPlatformRuntimeProfileMatrix(options = {}) {
       platform: profile.platform,
       display_name: profile.display_name,
       primary_axis_source: profile.axis.primary_source,
+      primary_surface: profile.adapter_surfaces.primary,
+      surface_order: profile.adapter_surfaces.recommended_order,
+      provider_reconcile_surface: profile.adapter_surfaces.provider_reconcile_surface,
       start_create_on: profile.axis.start.create_on,
       end_create_on: profile.axis.end.create_on,
       provider_start_events: profile.axis.start.provider_reconcile_events,
       provider_end_events: profile.axis.end.provider_reconcile_events,
+      pilot_provider_records_required: profile.evidence_thresholds.pilot.provider_records_required,
+      production_provider_records_required: profile.evidence_thresholds.production.provider_records_required,
+      next_surface_on_preflight_failure: profile.fallback_policy.next_surface_on_preflight_failure,
       speaker_primary_source: profile.speaker_markers.primary_source,
       speaker_min_stable_ms: profile.speaker_markers.filter.min_stable_ms,
       speaker_switch_stable_ms: profile.speaker_markers.filter.switch_stable_ms,

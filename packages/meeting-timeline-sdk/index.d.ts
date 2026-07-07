@@ -656,6 +656,7 @@ export * from './adapters/platform-adapter-session.mjs';
 export * from './adapters/platform-adapter-runner.mjs';
 export * from './adapters/platform-adapter-message-bridge.mjs';
 export * from './adapters/platform-adapter-smoke.mjs';
+export * from './adapters/platform-runtime-profile.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-adapter-decision.mjs';
