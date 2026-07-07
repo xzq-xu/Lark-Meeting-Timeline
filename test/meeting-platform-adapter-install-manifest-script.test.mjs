@@ -59,6 +59,7 @@ assert.equal(report.ready_platform_count, 2);
 assert.equal(report.blocked_platform_count, 0);
 assert.equal(report.browser_content_script_count, 1);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_primary_surface, 'browser_extension');
 assert.equal(report.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
 
 const writtenReport = JSON.parse(await readFile(reportFile, 'utf8'));
@@ -67,6 +68,9 @@ assert.equal(writtenReport.ok, true);
 const manifest = JSON.parse(await readFile(manifestFile, 'utf8'));
 assert.equal(manifest.schema, 'meeting_platform_adapter_install_manifest');
 assert.equal(manifest.accepted, true);
+assert.equal(manifest.adapter_blueprints.enabled, true);
+assert.equal(manifest.adapter_blueprints.platform_count, 2);
+assert.equal(manifest.adapter_blueprints.rows.find((row) => row.platform === 'google_meet').primary_surface, 'browser_extension');
 assert.equal(manifest.native_detector.platform_count, 1);
 assert.equal(manifest.browser_extension.host_permissions.includes('https://meet.google.com/*'), true);
 assert.equal(manifest.browser_extension.message_types.includes('meeting_timeline.preflight_current_window'), true);

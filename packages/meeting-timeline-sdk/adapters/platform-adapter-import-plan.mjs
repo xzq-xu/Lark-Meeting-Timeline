@@ -191,11 +191,42 @@ function sdkImports(pkg = {}) {
     sdk_root: imports.sdk_root ?? '@ai-annotation/meeting-timeline-sdk',
     platform_kit: imports.platform_kit ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
     adapter_export_package: imports.adapter_export_package ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-export-package',
+    adapter_blueprint: imports.adapter_blueprint ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint',
     adapter_import_plan: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-import-plan',
     connector: imports.connector ?? '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector',
     runtime_bundle: imports.runtime_bundle ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
     provider_connection: imports.provider_connection ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection',
   };
+}
+
+function adapterBlueprintSummary(pkg = {}, input = {}, options = {}) {
+  const blueprint = firstNonEmpty(
+    options.adapterBlueprint,
+    options.adapter_blueprint,
+    input.adapterBlueprint,
+    input.adapter_blueprint,
+    pkg.artifacts?.adapter_blueprint,
+  );
+  const ref = pkg.artifact_refs?.adapter_blueprint ?? {};
+  return compactObject({
+    available: Boolean(ref.path || blueprint),
+    schema: blueprint?.schema ?? ref.schema ?? (ref.path ? 'meeting_platform_adapter_blueprint' : undefined),
+    path: ref.path,
+    command: pkg.commands?.adapter_blueprint,
+    ready: blueprint?.readiness?.ready,
+    primary_surface: blueprint?.primary_surface,
+    surface_order: blueprint?.surface_order,
+    timestamp_field: firstNonEmpty(
+      blueprint?.annotation_contract?.timestamp_field,
+      blueprint?.realtime_axis_contract?.timestamp_field,
+    ),
+    provider_blocks_realtime: firstNonEmpty(
+      blueprint?.surfaces?.provider_reconcile?.blocks_realtime,
+      blueprint?.runtime_contract?.provider_events_block_realtime,
+    ),
+    transcript_blocks_realtime: blueprint?.runtime_contract?.transcript_blocks_realtime,
+    first_acceptance_gate: blueprint?.acceptance_gates?.realtime_pilot?.[0],
+  });
 }
 
 function installSteps(pkg = {}, surface = '', coverage = {}) {
@@ -279,6 +310,7 @@ export function buildMeetingPlatformAdapterImportPlan(exportPackage = {}, input 
   const surface = surfacePreference(exportPackage, input, options);
   const coverage = hostFileCoverage(exportPackage, input, { ...options, target });
   const ready = readiness(exportPackage, surface, coverage, input, { ...options, target });
+  const blueprint = adapterBlueprintSummary(exportPackage, input, options);
   return {
     type: 'meeting_platform_adapter_import_plan',
     schema: MEETING_PLATFORM_ADAPTER_IMPORT_PLAN_SCHEMA,
@@ -299,6 +331,7 @@ export function buildMeetingPlatformAdapterImportPlan(exportPackage = {}, input 
       provider_events_block_realtime: exportPackage.provider_events_block_realtime === true,
       transcript_blocks_realtime: exportPackage.transcript_blocks_realtime === true,
     },
+    adapter_blueprint: blueprint,
     sdk_imports: sdkImports(exportPackage),
     host_file_coverage: coverage,
     surface_entrypoints: exportPackage.surface_entrypoints,
@@ -318,6 +351,7 @@ export function buildMeetingPlatformAdapterImportPlan(exportPackage = {}, input 
       target: exportPackage.target,
       host_file_count: exportPackage.host_files?.length ?? 0,
       package_role: exportPackage.package_role,
+      adapter_blueprint_path: blueprint.path,
     }),
     next_actions: nextActions(exportPackage, ready, coverage),
   };
@@ -364,6 +398,8 @@ export function buildMeetingPlatformAdapterImportPlanMatrix(packagesOrInput = {}
       hard_contract_ready: plan.readiness.hard_contract_ready,
       selected_surface_ready: plan.readiness.selected_surface_ready,
       file_coverage_ready: plan.readiness.file_coverage_ready,
+      adapter_blueprint_available: plan.adapter_blueprint?.available === true,
+      adapter_blueprint_primary_surface: plan.adapter_blueprint?.primary_surface,
       missing_file_count: plan.host_file_coverage.missing?.length ?? 0,
       first_issue: plan.readiness.issues?.[0]?.code,
       first_next_action: plan.next_actions?.[0],

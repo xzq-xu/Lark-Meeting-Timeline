@@ -100,6 +100,7 @@ function sdkImports(plans = []) {
     sdk_root: first.sdk_root ?? '@ai-annotation/meeting-timeline-sdk',
     platform_kit: first.platform_kit ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
     adapter_import_plan: first.adapter_import_plan ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-import-plan',
+    adapter_blueprint: first.adapter_blueprint ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint',
     adapter_install_manifest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-install-manifest',
     connector: first.connector ?? '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector',
     runtime_bundle: first.runtime_bundle ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
@@ -125,6 +126,9 @@ function platformRow(plan = {}) {
     provider_path: entry.path,
     provider_transport: entry.transport,
     provider_required_for_realtime: entry.required_for_realtime === true,
+    adapter_blueprint_path: plan.adapter_blueprint?.path,
+    adapter_blueprint_primary_surface: plan.adapter_blueprint?.primary_surface,
+    adapter_blueprint_first_gate: plan.adapter_blueprint?.first_acceptance_gate,
     source_package: plan.source_package,
     first_issue: plan.readiness?.issues?.[0]?.code,
   });
@@ -180,6 +184,28 @@ function providerRegistry(plans = []) {
     platform_count: rows.filter((row) => row.provider_path).length,
     realtime_blocking_count: rows.filter((row) => row.required_for_realtime === true || row.blocks_realtime_annotation === true).length,
     rows: rows.filter((row) => row.provider_path),
+  };
+}
+
+function adapterBlueprintRegistry(plans = []) {
+  const rows = plans.map((plan) => compactObject({
+    platform: plan.platform,
+    display_name: plan.display_name,
+    available: plan.adapter_blueprint?.available === true,
+    schema: plan.adapter_blueprint?.schema,
+    path: plan.adapter_blueprint?.path,
+    command: plan.adapter_blueprint?.command,
+    primary_surface: plan.adapter_blueprint?.primary_surface,
+    surface_order: plan.adapter_blueprint?.surface_order,
+    timestamp_field: plan.adapter_blueprint?.timestamp_field,
+    provider_blocks_realtime: plan.adapter_blueprint?.provider_blocks_realtime,
+    transcript_blocks_realtime: plan.adapter_blueprint?.transcript_blocks_realtime,
+    first_acceptance_gate: plan.adapter_blueprint?.first_acceptance_gate,
+  }));
+  return {
+    enabled: rows.some((row) => row.available === true),
+    platform_count: rows.filter((row) => row.available === true).length,
+    rows,
   };
 }
 
@@ -250,6 +276,13 @@ function installSequence(plans = []) {
     },
     {
       step: 2,
+      id: 'load_adapter_blueprints',
+      action: 'read adapter-blueprint.json for surface order, evidence contract, and acceptance gates',
+      required: false,
+      platform_count: platforms.length,
+    },
+    {
+      step: 3,
       id: 'create_sdk_facade',
       action: 'createMeetingAppTimelineSdk({ baseUrl, platforms })',
       required: true,
@@ -257,14 +290,14 @@ function installSequence(plans = []) {
       platforms,
     },
     {
-      step: 3,
+      step: 4,
       id: 'register_selected_surfaces',
       action: 'install the selected local surface for each platform before any provider reconcile path',
       required: true,
       surfaces: unique(plans.map((plan) => plan.selected_surface)),
     },
     {
-      step: 4,
+      step: 5,
       id: 'bind_axis_before_marks',
       action: 'start local candidate observation and bind the current meeting axis',
       required: true,
@@ -272,7 +305,7 @@ function installSequence(plans = []) {
       timestamp_field: 'captured_at_ms',
     },
     {
-      step: 5,
+      step: 6,
       id: 'insert_marks_in_realtime',
       action: 'insert every annotation with captured_at_ms from the local device/app clock',
       required: true,
@@ -280,7 +313,7 @@ function installSequence(plans = []) {
       timestamp_field: 'captured_at_ms',
     },
     {
-      step: 6,
+      step: 7,
       id: 'reconcile_provider_events_later',
       action: 'connect provider events only for reconcile/backfill after the local axis exists',
       required: false,
@@ -328,6 +361,7 @@ export function buildMeetingPlatformAdapterInstallManifest(plansOrInput = {}, in
     webview_preload: surfaceRegistry(plans, 'webview_preload'),
     native_detector: surfaceRegistry(plans, 'native_detector'),
     native_host: surfaceRegistry(plans, 'native_host'),
+    adapter_blueprints: adapterBlueprintRegistry(plans),
     provider_reconcile: providerRegistry(plans),
     install_sequence: installSequence(plans),
     readiness: ready,

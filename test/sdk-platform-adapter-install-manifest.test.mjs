@@ -25,6 +25,7 @@ const exportMatrix = buildMeetingPlatformAdapterExportPackageMatrix({
 }, {
   baseUrl,
   target: 'static',
+  includeArtifacts: true,
 });
 const availableFiles = exportMatrix.packages.flatMap((pkg) => pkg.host_files.map((file) => file.path));
 const importMatrix = buildMeetingPlatformAdapterImportPlanMatrix(exportMatrix.packages, {
@@ -41,6 +42,7 @@ assert.equal(manifest.accepted, true);
 assert.equal(manifest.platform_count, 2);
 assert.deepEqual(manifest.platforms, ['google_meet', 'zoom']);
 assert.deepEqual(manifest.selected_surfaces, ['browser_extension', 'native_detector']);
+assert.equal(manifest.sdk_imports.adapter_blueprint, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint');
 assert.equal(manifest.runtime_contract.timestamp_field, 'captured_at_ms');
 assert.equal(manifest.browser_extension.enabled, true);
 assert.equal(manifest.browser_extension.content_scripts.length, 1);
@@ -50,6 +52,12 @@ assert.equal(manifest.browser_extension.host_permissions.includes('https://meet.
 assert.equal(manifest.browser_extension.message_types.includes('meeting_timeline.preflight_current_window'), true);
 assert.equal(manifest.browser_extension.message_types.includes('meeting_timeline.preflight_candidates'), true);
 assert.equal(manifest.platform_registry.find((row) => row.platform === 'google_meet').mark_insert_method, 'insertAnnotation');
+assert.equal(manifest.platform_registry.find((row) => row.platform === 'google_meet').adapter_blueprint_path, 'google_meet/adapter-blueprint.json');
+assert.equal(manifest.platform_registry.find((row) => row.platform === 'google_meet').adapter_blueprint_primary_surface, 'browser_extension');
+assert.equal(manifest.adapter_blueprints.enabled, true);
+assert.equal(manifest.adapter_blueprints.platform_count, 2);
+assert.equal(manifest.adapter_blueprints.rows.find((row) => row.platform === 'google_meet').primary_surface, 'browser_extension');
+assert.equal(manifest.install_sequence.find((step) => step.id === 'load_adapter_blueprints').required, false);
 assert.equal(manifest.install_sequence.find((step) => step.id === 'bind_axis_before_marks').sdk_method, 'observePlatformCandidates');
 assert.equal(manifest.provider_reconcile.platform_count, 2);
 assert.equal(manifest.provider_reconcile.rows.find((row) => row.platform === 'google_meet').provider_path, 'google_workspace_events_pubsub');

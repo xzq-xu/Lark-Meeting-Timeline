@@ -47,6 +47,14 @@ async function readJson(file) {
   return JSON.parse(await readFile(resolve(file), 'utf8'));
 }
 
+async function readOptionalJson(file) {
+  try {
+    return await readJson(file);
+  } catch {
+    return undefined;
+  }
+}
+
 async function writeJson(file, value) {
   await mkdir(dirname(file), { recursive: true });
   await writeFile(file, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
@@ -78,7 +86,16 @@ async function readPackages(options = {}) {
   const missing = [];
   for (const file of files) {
     try {
-      packages.push(await readJson(file));
+      const pkg = await readJson(file);
+      const blueprintPath = pkg.host_files?.find((hostFile) => hostFile.source === 'adapter_blueprint')?.path;
+      const adapterBlueprint = blueprintPath ? await readOptionalJson(resolve(options.dir, blueprintPath)) : undefined;
+      packages.push(adapterBlueprint ? {
+        ...pkg,
+        artifacts: {
+          ...(pkg.artifacts ?? {}),
+          adapter_blueprint: adapterBlueprint,
+        },
+      } : pkg);
     } catch {
       missing.push(resolve(file));
     }

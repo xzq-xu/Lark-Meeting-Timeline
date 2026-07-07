@@ -32,6 +32,7 @@ export interface MeetingPlatformAdapterImportPlan {
   export_package_target?: string;
   export_package_accepted: boolean;
   runtime_contract: Record<string, unknown>;
+  adapter_blueprint: Record<string, unknown>;
   sdk_imports: Record<string, string>;
   host_file_coverage: Record<string, unknown>;
   surface_entrypoints?: Record<string, Record<string, unknown>>;
