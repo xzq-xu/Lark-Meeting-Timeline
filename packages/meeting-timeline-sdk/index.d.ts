@@ -380,6 +380,10 @@ export interface MeetingAppTimelineSdk {
     connectorOptions?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,
     matrixOptions?: Record<string, unknown>,
   ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineHostAdapterBootstrapPlanMatrix;
+  connectorHostAdapterBootstrapPlanMatrixAcceptanceReport(
+    connectorOptions?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+    acceptanceOptions?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport;
   assertConnectorHostAdapterBootstrapPlanMatrix: MeetingAppTimelineSdk['connectorHostAdapterBootstrapPlanMatrix'];
   providerReplayReport(
     platformOrInput?: string | Record<string, unknown>,

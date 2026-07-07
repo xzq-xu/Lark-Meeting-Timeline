@@ -27,6 +27,7 @@ import {
   buildMeetingAppTimelineConnectorAdapterMatrix,
   buildMeetingAppTimelineHostAdapterBootstrapPlan,
   buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix,
+  buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport,
   buildMeetingAppTimelineHostAdapterConfig,
   buildMeetingAppTimelineHostAdapterConfigIndex,
   buildMeetingAppTimelineConnectorPlatformRoadmap,
@@ -1178,6 +1179,19 @@ export function createMeetingAppTimelineSdk(options = {}) {
       return buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(source, {
         ...sdkPlatformOptions(runtime, isConnectorHostAdapterSource(connectorOptions) ? {} : connectorOptions),
         ...matrixOptions,
+      });
+    },
+    connectorHostAdapterBootstrapPlanMatrixAcceptanceReport(connectorOptions = {}, acceptanceOptions = {}) {
+      const source = connectorOptions?.schema === 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix'
+        ? connectorOptions
+        : (
+          isConnectorHostAdapterSource(connectorOptions)
+            ? connectorOptions
+            : sdk.connectorPackage(connectorOptions)
+        );
+      return buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport(source, {
+        ...sdkPlatformOptions(runtime, isConnectorHostAdapterSource(connectorOptions) ? {} : connectorOptions),
+        ...acceptanceOptions,
       });
     },
     assertConnectorHostAdapterBootstrapPlanMatrix(connectorOptions = {}, matrixOptions = {}) {

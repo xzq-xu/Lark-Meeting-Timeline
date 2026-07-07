@@ -37,6 +37,7 @@ export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA = 'meeting_ap
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA = 'meeting_app_timeline_host_adapter_config_resolution';
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_SCHEMA = 'meeting_app_timeline_host_adapter_bootstrap_plan';
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_SCHEMA = 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix';
+export const MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA = 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION = 1;
 
@@ -3328,6 +3329,27 @@ function bootstrapMatrixRowFromPlan(plan = {}) {
   });
 }
 
+function hostAdapterBootstrapPlanMatrixFrom(matrixOrIndexOrMatrixOrChecklistOrPackage = {}, options = {}) {
+  if (matrixOrIndexOrMatrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_SCHEMA) {
+    return matrixOrIndexOrMatrixOrChecklistOrPackage;
+  }
+  return buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(matrixOrIndexOrMatrixOrChecklistOrPackage, options);
+}
+
+function bootstrapStartupOrderReady(startupOrder = []) {
+  const order = asArray(startupOrder);
+  const resolveIndex = order.indexOf('resolve_meeting_platform');
+  const loadIndex = order.indexOf('load_host_adapter_config');
+  const installIndex = order.indexOf('install_host_adapter');
+  const observeIndex = order.indexOf('runtime_observe_platform_candidates');
+  const insertIndex = order.indexOf('runtime_insert_annotation');
+  return resolveIndex === 0
+    && loadIndex === 1
+    && installIndex === 2
+    && observeIndex > installIndex
+    && insertIndex > observeIndex;
+}
+
 export function buildMeetingAppTimelineHostAdapterBootstrapPlan(indexOrMatrixOrChecklistOrPackage = {}, input = {}, options = {}) {
   const resolved = indexOrMatrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA
     ? indexOrMatrixOrChecklistOrPackage
@@ -3422,6 +3444,9 @@ export function assertMeetingAppTimelineHostAdapterBootstrapPlan(indexOrMatrixOr
 }
 
 export function buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(indexOrMatrixOrChecklistOrPackage = {}, options = {}) {
+  if (indexOrMatrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_SCHEMA) {
+    return indexOrMatrixOrChecklistOrPackage;
+  }
   const index = hostAdapterConfigIndexFrom(indexOrMatrixOrChecklistOrPackage, options);
   const inputsByPlatform = bootstrapMatrixInputsByPlatform(options);
   const plans = {};
@@ -3498,14 +3523,111 @@ export function buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(indexOrMat
 }
 
 export function assertMeetingAppTimelineHostAdapterBootstrapPlanMatrix(indexOrMatrixOrChecklistOrPackage = {}, options = {}) {
-  const matrix = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(indexOrMatrixOrChecklistOrPackage, options);
-  if (matrix.accepted !== true) {
+  const matrix = hostAdapterBootstrapPlanMatrixFrom(indexOrMatrixOrChecklistOrPackage, options);
+  const report = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport(matrix, options);
+  if (report.accepted !== true) {
     throw new MeetingTimelineSdkError('Meeting app timeline host adapter bootstrap plan matrix is not accepted', {
       matrix,
-      issues: matrix.issues,
+      report,
+      issues: report.issues,
     });
   }
   return matrix;
+}
+
+export function buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport(matrixOrIndexOrMatrixOrChecklistOrPackage = {}, options = {}) {
+  const matrix = hostAdapterBootstrapPlanMatrixFrom(matrixOrIndexOrMatrixOrChecklistOrPackage, options);
+  const rows = matrix.rows ?? [];
+  const issues = [];
+  if (matrix.schema !== MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_SCHEMA) {
+    addIssue(issues, 'invalid_schema', 'Expected a meeting app timeline host adapter bootstrap plan matrix', {
+      expected_schema: MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_SCHEMA,
+      actual_schema: matrix.schema,
+    });
+  }
+  if (matrix.accepted !== true) addIssue(issues, 'bootstrap_plan_matrix_not_accepted', 'Host adapter bootstrap plan matrix accepted flag is not true');
+  if ((matrix.platform_count ?? 0) <= 0) addIssue(issues, 'missing_platforms', 'Bootstrap plan matrix must include at least one platform');
+  if (rows.length !== matrix.row_count) {
+    addIssue(issues, 'row_count_mismatch', 'Bootstrap plan matrix rows must match row_count', {
+      row_count: rows.length,
+      expected_row_count: matrix.row_count,
+    });
+  }
+  if ((matrix.accepted_count ?? 0) !== rows.length) {
+    addIssue(issues, 'accepted_count_mismatch', 'All bootstrap plan rows must be accepted', {
+      accepted_count: matrix.accepted_count,
+      row_count: rows.length,
+    });
+  }
+  if (!matrix.runtime_event_endpoint) addIssue(issues, 'missing_runtime_event_endpoint', 'Bootstrap plan matrix must include runtime_event_endpoint');
+  if (matrix.timestamp_field !== 'captured_at_ms') {
+    addIssue(issues, 'invalid_timestamp_contract', 'Bootstrap plan matrix must require captured_at_ms', {
+      timestamp_field: matrix.timestamp_field,
+    });
+  }
+  for (const row of rows) {
+    const platform = normalizeKey(row.platform);
+    if (!platform) addIssue(issues, 'row_missing_platform', 'Bootstrap plan row is missing platform');
+    if (row.accepted !== true) addIssue(issues, 'row_not_accepted', 'Bootstrap plan row is not accepted', { platform });
+    if (!row.selected_surface) addIssue(issues, 'row_missing_selected_surface', 'Bootstrap plan row is missing selected_surface', { platform });
+    if (!row.install_target) addIssue(issues, 'row_missing_install_target', 'Bootstrap plan row is missing install_target', { platform });
+    if (row.first_runtime_action !== 'observe_platform_candidates') {
+      addIssue(issues, 'row_first_runtime_action_not_observe_candidates', 'Bootstrap plan first runtime action must observe candidates', { platform });
+    }
+    if (row.mark_runtime_action !== 'insert_annotation') {
+      addIssue(issues, 'row_mark_runtime_action_not_insert_annotation', 'Bootstrap plan mark runtime action must insert annotation', { platform });
+    }
+    if (!bootstrapStartupOrderReady(row.startup_order)) {
+      addIssue(issues, 'row_invalid_startup_order', 'Bootstrap plan startup order must resolve, load config, install adapter, observe candidates, then insert annotation', {
+        platform,
+        startup_order: row.startup_order,
+      });
+    }
+    if (!(row.required_runtime_actions ?? []).includes('observe_platform_candidates')) {
+      addIssue(issues, 'row_missing_observe_candidates_action', 'Bootstrap plan row is missing observe_platform_candidates runtime action', { platform });
+    }
+    if (!(row.required_runtime_actions ?? []).includes('insert_annotation')) {
+      addIssue(issues, 'row_missing_insert_annotation_action', 'Bootstrap plan row is missing insert_annotation runtime action', { platform });
+    }
+  }
+  return compactObject({
+    type: MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_ACCEPTANCE_SCHEMA,
+    schema: MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_ACCEPTANCE_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    package_id: matrix.package_id,
+    platform_count: matrix.platform_count ?? rows.length,
+    row_count: rows.length,
+    accepted_count: matrix.accepted_count ?? 0,
+    runtime_event_endpoint: matrix.runtime_event_endpoint,
+    timestamp_field: matrix.timestamp_field,
+    required_startup_order: [
+      'resolve_meeting_platform',
+      'load_host_adapter_config',
+      'install_host_adapter',
+      'runtime_observe_platform_candidates',
+      'runtime_insert_annotation',
+    ],
+    issue_count: issues.length,
+    issues,
+    rows: rows.map((row) => compactObject({
+      platform: row.platform,
+      accepted: row.accepted === true,
+      selected_surface: row.selected_surface,
+      adapter_mode: row.adapter_mode,
+      install_target: row.install_target,
+      first_runtime_action: row.first_runtime_action,
+      mark_runtime_action: row.mark_runtime_action,
+      startup_order_ready: bootstrapStartupOrderReady(row.startup_order),
+      required_runtime_actions: row.required_runtime_actions,
+    })),
+    next_actions: issues.length > 0
+      ? unique([
+        ...issues.map((issue) => `fix_${issue.code}`),
+        ...(matrix.next_actions ?? []),
+      ])
+      : matrix.next_actions ?? [],
+  });
 }
 
 export function createMeetingAppTimelineConnectorRuntimeClient(pkg = {}, options = {}) {

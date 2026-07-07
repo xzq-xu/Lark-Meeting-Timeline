@@ -15,6 +15,7 @@ import {
   buildMeetingAppTimelineConnectorSmokePlan,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
   buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix,
+  buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport,
   buildMeetingAppTimelineHostAdapterConfig,
   buildMeetingAppTimelineHostAdapterConfigIndex,
   createMeetingAppTimelineSdk,
@@ -119,6 +120,7 @@ function connectorQuickstartMarkdown(pkg = {}) {
     '- `connector-adapter-matrix-acceptance.json`: standalone gate for the adapter matrix runtime invariants.',
     '- `host-adapter-config-index.json` and `host-adapter-configs/{platform}.json`: compact per-platform configs a host project can load directly.',
     '- `host-adapter-bootstrap-plan-matrix.json`: per-platform host startup plan after URL/window resolution: load config, install adapter, observe candidates, insert annotation.',
+    '- `host-adapter-bootstrap-plan-matrix-acceptance.json`: standalone gate for host startup order, runtime endpoint, captured_at_ms, and required observe/insert actions.',
     '- `connector-platform-roadmap.json`: recommended per-platform implementation order, first surface, install target, release status, and next action.',
     '- `provider-replay-matrix.json`: provider raw event replay across Google Meet, Teams, Zoom, Webex, and Lark; verifies start/end/participant/artifact coverage without blocking realtime annotations.',
     '- `connector-bridge-handoff.json`: lightweight connector bridge handoff for browser extension, Electron WebView preload, mobile WebView, or native helper integration.',
@@ -261,6 +263,7 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   const connectorAdapterMatrixAcceptance = buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(connectorAdapterMatrix);
   const adapterConfigIndex = buildMeetingAppTimelineHostAdapterConfigIndex(connectorAdapterMatrix);
   const hostAdapterBootstrapPlanMatrix = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(adapterConfigIndex);
+  const hostAdapterBootstrapPlanMatrixAcceptance = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport(hostAdapterBootstrapPlanMatrix);
   await write('connector-adoption-index.json', connectorAdoptionIndex);
   await write('connector-field-intake-index.json', connectorFieldIntakeIndex);
   await write('connector-release-gate.json', connectorReleaseGate);
@@ -268,6 +271,7 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   await write('connector-adapter-matrix-acceptance.json', connectorAdapterMatrixAcceptance);
   await write('host-adapter-config-index.json', adapterConfigIndex);
   await write('host-adapter-bootstrap-plan-matrix.json', hostAdapterBootstrapPlanMatrix);
+  await write('host-adapter-bootstrap-plan-matrix-acceptance.json', hostAdapterBootstrapPlanMatrixAcceptance);
   for (const row of connectorAdapterMatrix.rows ?? []) {
     await write(`host-adapter-configs/${row.platform}.json`, buildMeetingAppTimelineHostAdapterConfig(connectorAdapterMatrix, row.platform));
   }
@@ -355,6 +359,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
   const connectorAdapterMatrixAcceptance = buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(connectorAdapterMatrix);
   const adapterConfigIndex = buildMeetingAppTimelineHostAdapterConfigIndex(connectorAdapterMatrix);
   const hostAdapterBootstrapPlanMatrix = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix(adapterConfigIndex);
+  const hostAdapterBootstrapPlanMatrixAcceptance = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport(hostAdapterBootstrapPlanMatrix);
   const writtenFiles = await writeConnectorPackageFiles(outDir, pkg);
 
   const report = {
@@ -362,7 +367,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     ok: pkg.accepted === true
       && connectorReleaseGate.accepted === true
       && connectorAdapterMatrixAcceptance.accepted === true
-      && hostAdapterBootstrapPlanMatrix.accepted === true,
+      && hostAdapterBootstrapPlanMatrixAcceptance.accepted === true,
     base_url: baseUrl,
     out_dir: outDir || undefined,
     platform_count: pkg.platform_count,
@@ -375,8 +380,9 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     adapter_matrix_accepted: connectorAdapterMatrixAcceptance.accepted === true,
     host_adapter_config_accepted: adapterConfigIndex.accepted === true,
     host_adapter_config_count: adapterConfigIndex.row_count,
-    host_adapter_bootstrap_accepted: hostAdapterBootstrapPlanMatrix.accepted === true,
+    host_adapter_bootstrap_accepted: hostAdapterBootstrapPlanMatrixAcceptance.accepted === true,
     host_adapter_bootstrap_count: hostAdapterBootstrapPlanMatrix.row_count,
+    host_adapter_bootstrap_issue_count: hostAdapterBootstrapPlanMatrixAcceptance.issue_count,
     required_platforms: requiredPlatforms,
     surfaces: pkg.surfaces,
     extension_scaffold: Boolean(pkg.extension?.scaffold),
@@ -409,6 +415,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     adapter_matrix_acceptance: connectorAdapterMatrixAcceptance,
     host_adapter_config_index: adapterConfigIndex,
     host_adapter_bootstrap_plan_matrix: hostAdapterBootstrapPlanMatrix,
+    host_adapter_bootstrap_plan_matrix_acceptance: hostAdapterBootstrapPlanMatrixAcceptance,
     platform_roadmap: connectorPlatformRoadmap,
     bridge_handoff: connectorBridgeHandoff,
     bridge_handoff_acceptance: connectorBridgeHandoffAcceptance,

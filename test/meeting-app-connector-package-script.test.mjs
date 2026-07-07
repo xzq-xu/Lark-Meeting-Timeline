@@ -60,7 +60,8 @@ assert.equal(report.host_adapter_config_accepted, true);
 assert.equal(report.host_adapter_config_count, 2);
 assert.equal(report.host_adapter_bootstrap_accepted, true);
 assert.equal(report.host_adapter_bootstrap_count, 2);
-assert.equal(report.written_files.length, 39);
+assert.equal(report.host_adapter_bootstrap_issue_count, 0);
+assert.equal(report.written_files.length, 40);
 assert.equal(report.rows.some((row) => row.platform === 'google_meet' && row.surface === 'browser_extension'), true);
 assert.equal(report.rows.some((row) => row.platform === 'zoom' && row.surface === 'native_detector'), true);
 assert.equal(report.handoff.schema, 'meeting_app_timeline_connector_handoff');
@@ -95,6 +96,9 @@ assert.equal(report.host_adapter_config_index.rows.find((row) => row.platform ==
 assert.equal(report.host_adapter_bootstrap_plan_matrix.schema, 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix');
 assert.equal(report.host_adapter_bootstrap_plan_matrix.accepted, true);
 assert.equal(report.host_adapter_bootstrap_plan_matrix.plans.google_meet.startup_order[3], 'runtime_observe_platform_candidates');
+assert.equal(report.host_adapter_bootstrap_plan_matrix_acceptance.schema, 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix_acceptance_report');
+assert.equal(report.host_adapter_bootstrap_plan_matrix_acceptance.accepted, true);
+assert.equal(report.host_adapter_bootstrap_plan_matrix_acceptance.rows.every((row) => row.startup_order_ready === true), true);
 assert.equal(report.adapter_matrix_acceptance.schema, 'meeting_app_timeline_connector_adapter_matrix_acceptance_report');
 assert.equal(report.adapter_matrix_acceptance.accepted, true);
 assert.equal(report.bridge_handoff.schema, 'meeting_app_timeline_connector_bridge_handoff');
@@ -220,6 +224,12 @@ assert.equal(hostAdapterBootstrapPlanMatrix.rows.find((row) => row.platform === 
 assert.equal(hostAdapterBootstrapPlanMatrix.rows.find((row) => row.platform === 'zoom').install_target, 'native_or_desktop_observer');
 assert.equal(hostAdapterBootstrapPlanMatrix.plans.zoom.startup_order.includes('runtime_insert_annotation'), true);
 
+const hostAdapterBootstrapPlanMatrixAcceptance = JSON.parse(await readFile(join(outDir, 'host-adapter-bootstrap-plan-matrix-acceptance.json'), 'utf8'));
+assert.equal(hostAdapterBootstrapPlanMatrixAcceptance.schema, 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix_acceptance_report');
+assert.equal(hostAdapterBootstrapPlanMatrixAcceptance.accepted, true);
+assert.equal(hostAdapterBootstrapPlanMatrixAcceptance.issue_count, 0);
+assert.equal(hostAdapterBootstrapPlanMatrixAcceptance.rows.find((row) => row.platform === 'google_meet').startup_order_ready, true);
+
 const googleHostAdapterConfig = JSON.parse(await readFile(join(outDir, 'host-adapter-configs', 'google_meet.json'), 'utf8'));
 assert.equal(googleHostAdapterConfig.schema, 'meeting_app_timeline_host_adapter_config');
 assert.equal(googleHostAdapterConfig.platform, 'google_meet');
@@ -300,6 +310,7 @@ assert.match(connectorQuickstart, /connector-release-gate\.json/);
 assert.match(connectorQuickstart, /connector-adapter-matrix\.json/);
 assert.match(connectorQuickstart, /connector-adapter-matrix-acceptance\.json/);
 assert.match(connectorQuickstart, /host-adapter-bootstrap-plan-matrix\.json/);
+assert.match(connectorQuickstart, /host-adapter-bootstrap-plan-matrix-acceptance\.json/);
 assert.match(connectorQuickstart, /connector-platform-roadmap\.json/);
 assert.match(connectorQuickstart, /connector-bridge-handoff\.json/);
 assert.match(connectorQuickstart, /connector-bridge-handoff-acceptance\.json/);

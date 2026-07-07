@@ -7,6 +7,7 @@ import {
   MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_SCHEMA,
+  MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_ACCEPTANCE_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA,
@@ -40,6 +41,7 @@ import {
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineHostAdapterBootstrapPlan,
   buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix,
+  buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport,
   buildMeetingAppTimelineHostAdapterConfig,
   buildMeetingAppTimelineHostAdapterConfigIndex,
   resolveMeetingAppTimelineHostAdapterConfig,
@@ -479,6 +481,11 @@ assert.equal(bootstrapPlanMatrix.rows.find((row) => row.platform === 'google_mee
 assert.equal(bootstrapPlanMatrix.rows.find((row) => row.platform === 'zoom').install_target, 'native_or_desktop_observer');
 assert.equal(bootstrapPlanMatrix.plans.google_meet.startup_order[3], 'runtime_observe_platform_candidates');
 assert.equal(assertMeetingAppTimelineHostAdapterBootstrapPlanMatrix(connectorPackage).accepted, true);
+const bootstrapPlanMatrixAcceptance = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport(bootstrapPlanMatrix);
+assert.equal(bootstrapPlanMatrixAcceptance.schema, MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_ACCEPTANCE_SCHEMA);
+assert.equal(bootstrapPlanMatrixAcceptance.accepted, true);
+assert.equal(bootstrapPlanMatrixAcceptance.issue_count, 0);
+assert.equal(bootstrapPlanMatrixAcceptance.rows.every((row) => row.startup_order_ready === true), true);
 
 const allPlatformSdk = createMeetingAppTimelineSdk({
   baseUrl: 'https://timeline.example.com',
@@ -713,6 +720,25 @@ assert.throws(
 await assert.rejects(
   () => assertMeetingAppTimelineConnectorSmokeRun(brokenSmokePlan),
   /connector smoke run failed/,
+);
+
+const brokenBootstrapPlanMatrix = structuredClone(bootstrapPlanMatrix);
+brokenBootstrapPlanMatrix.rows.find((row) => row.platform === 'zoom').startup_order = [
+  'resolve_meeting_platform',
+  'load_host_adapter_config',
+  'install_host_adapter',
+  'runtime_insert_annotation',
+  'runtime_observe_platform_candidates',
+];
+const brokenBootstrapPlanMatrixAcceptance = buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport(brokenBootstrapPlanMatrix);
+assert.equal(brokenBootstrapPlanMatrixAcceptance.accepted, false);
+assert.equal(
+  brokenBootstrapPlanMatrixAcceptance.issues.some((issue) => issue.code === 'row_invalid_startup_order'),
+  true,
+);
+assert.throws(
+  () => assertMeetingAppTimelineHostAdapterBootstrapPlanMatrix(brokenBootstrapPlanMatrix),
+  /bootstrap plan matrix is not accepted/,
 );
 
 const productionAcceptance = buildMeetingAppTimelineConnectorPackageAcceptanceReport(connectorPackage, {

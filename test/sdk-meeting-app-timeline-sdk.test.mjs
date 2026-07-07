@@ -185,6 +185,10 @@ const connectorHostAdapterBootstrapPlanMatrix = sdk.connectorHostAdapterBootstra
 assert.equal(connectorHostAdapterBootstrapPlanMatrix.schema, 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix');
 assert.equal(connectorHostAdapterBootstrapPlanMatrix.accepted, true);
 assert.equal(connectorHostAdapterBootstrapPlanMatrix.accepted_count, 2);
+const connectorHostAdapterBootstrapPlanMatrixAcceptance = sdk.connectorHostAdapterBootstrapPlanMatrixAcceptanceReport(connectorHostAdapterBootstrapPlanMatrix);
+assert.equal(connectorHostAdapterBootstrapPlanMatrixAcceptance.schema, 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix_acceptance_report');
+assert.equal(connectorHostAdapterBootstrapPlanMatrixAcceptance.accepted, true);
+assert.equal(connectorHostAdapterBootstrapPlanMatrixAcceptance.rows.every((row) => row.startup_order_ready === true), true);
 assert.equal(sdk.assertConnectorHostAdapterBootstrapPlanMatrix(connectorPackage).accepted, true);
 const unsupportedConnectorHostAdapter = sdk.resolveConnectorHostAdapterConfig(
   'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
