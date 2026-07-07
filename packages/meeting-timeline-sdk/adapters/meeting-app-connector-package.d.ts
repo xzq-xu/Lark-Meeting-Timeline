@@ -83,6 +83,17 @@ export interface MeetingAppTimelineConnectorHandoff {
   platform_count: number;
   surface_count: number;
   runtime_event_endpoint?: string;
+  provider_replay?: {
+    accepted?: boolean;
+    accepted_count?: number;
+    platform_count?: number;
+    runtime_event_count?: number;
+    command?: string;
+    bin?: string;
+    sdk_method?: string;
+    rows?: Array<Record<string, unknown>>;
+    provider_events_block_realtime?: boolean;
+  };
   adapter_blueprints?: {
     ready_count?: number;
     platform_count?: number;
@@ -119,6 +130,17 @@ export interface MeetingAppTimelineConnectorHostInstallChecklist {
   target: string;
   base_url?: string;
   runtime_event_endpoint?: string;
+  provider_replay?: {
+    accepted?: boolean;
+    accepted_count?: number;
+    platform_count?: number;
+    runtime_event_count?: number;
+    command?: string;
+    bin?: string;
+    sdk_method?: string;
+    rows?: Array<Record<string, unknown>>;
+    provider_events_block_realtime?: boolean;
+  };
   platform_count: number;
   surface_count: number;
   ready_count: number;
@@ -535,6 +557,19 @@ export interface MeetingAppTimelineConnectorAdapterMatrix {
     can_insert_annotation_on_current_axis: boolean;
     provider_reconcile_blocks_realtime: boolean;
     transcript_blocks_realtime: boolean;
+    provider_replay: Record<string, unknown> & {
+      accepted?: boolean;
+      record_count?: number;
+      runtime_event_count?: number;
+      signal_count?: number;
+      signal_types?: string[];
+      coverage?: Record<string, boolean>;
+      required_coverage?: string[];
+      provider_events_block_realtime?: boolean;
+      file?: string;
+      command?: string;
+      sdk_method?: string;
+    };
     runtime_event_endpoint?: string;
     timestamp_field?: string;
     input_sources: Array<Record<string, unknown>>;

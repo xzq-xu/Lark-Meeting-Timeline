@@ -906,6 +906,7 @@ assert.equal(rootMeetingAppSdk.assertConnectorReleaseGate(rootConnectorPackage).
 assert.equal(rootMeetingAppSdk.connectorPlatformRoadmap(rootConnectorPackage).schema, 'meeting_app_timeline_connector_platform_roadmap');
 assert.equal(rootMeetingAppSdk.assertConnectorPlatformRoadmap(rootConnectorPackage).accepted, true);
 assert.equal(rootMeetingAppSdk.connectorAdapterMatrix(rootConnectorPackage).schema, 'meeting_app_timeline_connector_adapter_matrix');
+assert.equal(rootMeetingAppSdk.connectorAdapterMatrix(rootConnectorPackage).rows[0].provider_replay.accepted, true);
 assert.equal(rootMeetingAppSdk.assertConnectorAdapterMatrix(rootConnectorPackage).accepted, true);
 const rootProviderReplay = buildMeetingPlatformProviderReplayReport('google-meet');
 assert.equal(rootProviderReplay.schema, 'meeting_platform_provider_replay_report');

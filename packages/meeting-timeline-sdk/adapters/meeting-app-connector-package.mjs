@@ -805,6 +805,17 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, o
     target: acceptance.target,
     base_url: pkg.base_url,
     runtime_event_endpoint: pkg.runtime_events?.endpoint,
+    provider_replay: pkg.provider_replay ? {
+      accepted: pkg.provider_replay.accepted,
+      accepted_count: pkg.provider_replay.accepted_count,
+      platform_count: pkg.provider_replay.platform_count,
+      runtime_event_count: pkg.provider_replay.runtime_event_count,
+      command: pkg.provider_replay.command,
+      bin: pkg.provider_replay.bin,
+      sdk_method: pkg.provider_replay.sdk_method,
+      rows: pkg.provider_replay.matrix?.rows,
+      provider_events_block_realtime: pkg.provider_replay.realtime_policy?.provider_events_block_realtime,
+    } : undefined,
     platform_count: acceptance.platform_count,
     surface_count: acceptance.surface_count,
     ready_count: readyCount,
@@ -2584,6 +2595,17 @@ function adapterMatrixRuntimeSequence(row = {}, smokeRow = {}) {
   }));
 }
 
+function providerReplayRowsForMatrix(hostInstallChecklist = {}, options = {}, originalInput = {}) {
+  const providerReplay = firstNonEmpty(
+    options.providerReplay,
+    options.provider_replay,
+    hostInstallChecklist.provider_replay,
+    originalInput.provider_replay,
+  );
+  return new Map((providerReplay?.rows ?? providerReplay?.matrix?.rows ?? [])
+    .map((row) => [normalizeKey(row.platform), row]));
+}
+
 function adapterMatrixRowStatus(row = {}, releaseRow = {}) {
   if (releaseRow.production_ready === true) return 'production_ready';
   if (releaseRow.pilot_ready === true) return 'pilot_ready';
@@ -2628,6 +2650,7 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
   const fieldByPlatform = new Map((fieldIntakeIndex.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
   const bridgeByPlatform = new Map((bridgeHandoff.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
   const smokeByPlatform = new Map((smokePlan.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
+  const providerReplayByPlatform = providerReplayRowsForMatrix(hostInstallChecklist, options, checklistOrPackage);
   const rows = (hostInstallChecklist.rows ?? []).map((row) => {
     const platform = normalizeKey(row.platform);
     const releaseRow = releaseByPlatform.get(platform) ?? {};
@@ -2635,6 +2658,7 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
     const fieldRow = fieldByPlatform.get(platform) ?? {};
     const bridgeRow = bridgeByPlatform.get(platform) ?? {};
     const smokeRow = smokeByPlatform.get(platform) ?? {};
+    const providerReplayRow = providerReplayByPlatform.get(platform) ?? {};
     const selectedSurface = normalizeKey(row.selected_surface);
     const runtimeSequence = adapterMatrixRuntimeSequence(row, smokeRow);
     const missing = [
@@ -2645,6 +2669,8 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
       row.client_methods?.observe_platform_candidates ? undefined : 'observe_platform_candidates_client_method',
       row.client_methods?.insert_annotation === 'insertAnnotation' ? undefined : 'insert_annotation_client_method',
       hostInstallChecklist.timestamp_field === 'captured_at_ms' ? undefined : 'captured_at_ms_contract',
+      providerReplayRow.accepted === true ? undefined : 'provider_replay_accepted',
+      providerReplayRow.provider_events_block_realtime === false ? undefined : 'provider_replay_nonblocking',
       row.provider_events_block_realtime === false ? undefined : 'provider_events_nonblocking',
       row.transcript_blocks_realtime === false ? undefined : 'transcript_nonblocking',
     ].filter(Boolean);
@@ -2662,6 +2688,20 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
       can_insert_annotation_on_current_axis: row.client_methods?.insert_annotation === 'insertAnnotation',
       provider_reconcile_blocks_realtime: row.provider_events_block_realtime !== false,
       transcript_blocks_realtime: row.transcript_blocks_realtime !== false,
+      provider_replay: compactObject({
+        accepted: providerReplayRow.accepted,
+        record_count: providerReplayRow.record_count,
+        runtime_event_count: providerReplayRow.runtime_event_count,
+        signal_count: providerReplayRow.signal_count,
+        signal_types: providerReplayRow.signal_types,
+        coverage: providerReplayRow.coverage,
+        required_coverage: providerReplayRow.required_coverage,
+        provider_events_block_realtime: providerReplayRow.provider_events_block_realtime,
+        issues: providerReplayRow.issues,
+        file: 'provider-replay-matrix.json',
+        command: 'npm run meeting-platform:provider-replay',
+        sdk_method: 'sdk.providerReplayMatrix(options)',
+      }),
       runtime_event_endpoint: hostInstallChecklist.runtime_event_endpoint,
       timestamp_field: hostInstallChecklist.timestamp_field,
       input_sources: adapterMatrixPrimaryInputs(row, fieldRow),
@@ -2680,6 +2720,7 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
         speaker_track: `sdk.speakerTrack('${platform}', sample)`,
         participant_track: `sdk.participantTrack('${platform}', sample)`,
         provider_reconcile: `sdk.ingestProvider('${platform}', providerEvent)`,
+        provider_replay: 'sdk.providerReplayMatrix(options)',
       },
       evidence_contract: {
         pilot_required: [
@@ -2697,6 +2738,7 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
       },
       validation_files: [
         'connector-adapter-matrix.json',
+        'provider-replay-matrix.json',
         'connector-smoke-plan.json',
         'connector-smoke-run-report.json',
         'connector-release-gate.json',
@@ -2747,9 +2789,11 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
       connector_field_intake_index: fieldIntakeIndex.schema,
       connector_bridge_handoff: bridgeHandoff.schema,
       connector_smoke_plan: smokePlan.schema,
+      provider_replay: hostInstallChecklist.provider_replay ? 'meeting_platform_provider_replay_matrix' : undefined,
     },
     files_to_read_first: [
       'connector-adapter-matrix.json',
+      'provider-replay-matrix.json',
       'connector-platform-roadmap.json',
       'connector-release-gate.json',
       'connector-smoke-plan.json',
@@ -2759,6 +2803,7 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
       local_surface_starts_realtime_axis: true,
       provider_reconcile_blocks_realtime: false,
       transcript_import_blocks_realtime: false,
+      provider_replay_blocks_realtime: false,
       first_runtime_action: 'observe_platform_candidates',
       mark_runtime_action: 'insert_annotation',
       mark_timestamp_field: 'captured_at_ms',
@@ -2800,6 +2845,9 @@ export function buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(ma
   if (matrix.transcript_blocks_realtime !== false) {
     addIssue(issues, 'transcript_blocks_realtime', 'Transcript import must not block realtime annotation insertion');
   }
+  if (matrix.runtime_invariants?.provider_replay_blocks_realtime !== false) {
+    addIssue(issues, 'provider_replay_blocks_realtime', 'Provider replay must not block realtime annotation insertion');
+  }
   if ((matrix.platform_count ?? 0) <= 0) addIssue(issues, 'missing_platforms', 'Adapter matrix must include at least one platform');
   if (rows.length !== matrix.platform_count) {
     addIssue(issues, 'row_count_mismatch', 'Adapter matrix row count must equal platform_count', {
@@ -2818,6 +2866,12 @@ export function buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(ma
     }
     if (row.can_insert_annotation_on_current_axis !== true) {
       addIssue(issues, 'row_cannot_insert_annotation_on_current_axis', 'Adapter matrix row must insert annotation on current axis', { platform });
+    }
+    if (row.provider_replay?.accepted !== true) {
+      addIssue(issues, 'row_provider_replay_not_accepted', 'Adapter matrix row must include accepted provider replay', { platform });
+    }
+    if (row.provider_replay?.provider_events_block_realtime !== false) {
+      addIssue(issues, 'row_provider_replay_blocks_realtime', 'Provider replay must not block realtime annotations for row', { platform });
     }
     if (sequence[0]?.action !== 'observe_platform_candidates') {
       addIssue(issues, 'row_first_action_not_observe_candidates', 'First runtime action must observe platform candidates', { platform });
@@ -2854,6 +2908,7 @@ export function buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(ma
       first_action: row.runtime_sequence?.[0]?.action,
       second_action: row.runtime_sequence?.[1]?.action,
       timestamp_field: row.timestamp_field,
+      provider_replay_accepted: row.provider_replay?.accepted,
     })),
     next_actions: issues.length > 0
       ? unique([

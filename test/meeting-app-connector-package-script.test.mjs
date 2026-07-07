@@ -184,10 +184,15 @@ assert.equal(connectorAdapterMatrix.schema, 'meeting_app_timeline_connector_adap
 assert.equal(connectorAdapterMatrix.accepted, true);
 assert.equal(connectorAdapterMatrix.recommended_first_platform, 'google_meet');
 assert.equal(connectorAdapterMatrix.runtime_invariants.mark_timestamp_field, 'captured_at_ms');
+assert.equal(connectorAdapterMatrix.runtime_invariants.provider_replay_blocks_realtime, false);
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').runtime_sequence[1].required_field, 'captured_at_ms');
+assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').provider_replay.accepted, true);
+assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').provider_replay.file, 'provider-replay-matrix.json');
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'zoom').install_step, 'install_native_desktop_observer_or_accessibility_detector');
+assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'zoom').provider_replay.provider_events_block_realtime, false);
 assert.equal(connectorAdapterMatrix.files_to_read_first.includes('connector-adapter-matrix.json'), true);
+assert.equal(connectorAdapterMatrix.files_to_read_first.includes('provider-replay-matrix.json'), true);
 
 const connectorAdapterMatrixAcceptance = JSON.parse(await readFile(join(outDir, 'connector-adapter-matrix-acceptance.json'), 'utf8'));
 assert.equal(connectorAdapterMatrixAcceptance.schema, 'meeting_app_timeline_connector_adapter_matrix_acceptance_report');
