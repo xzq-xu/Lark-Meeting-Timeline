@@ -308,6 +308,12 @@ function shouldAutoOpen(payload = {}, options = {}) {
 
 function event(action, bridge, message = {}, payload = {}, result, handled = true) {
   const state = bridge.runner?.getState?.();
+  const adapterBlueprint = firstNonEmpty(
+    result?.adapter_blueprint,
+    result?.launch_plan?.adapter_blueprint,
+    result?.payload?.launch_plan?.adapter_blueprint,
+    state?.current_launch_plan?.adapter_blueprint,
+  );
   return compactObject({
     type: 'meeting_platform_adapter_message_bridge_event',
     schema: MEETING_PLATFORM_ADAPTER_MESSAGE_BRIDGE_EVENT_SCHEMA,
@@ -319,6 +325,9 @@ function event(action, bridge, message = {}, payload = {}, result, handled = tru
     request_id: requestId(message, payload),
     platform: result?.platform ?? result?.payload?.platform ?? state?.current_launch_plan?.platform,
     selected_surface: result?.selected_surface ?? result?.payload?.selected_surface ?? state?.current_launch_plan?.selected_surface,
+    adapter_blueprint: adapterBlueprint,
+    adapter_blueprint_primary_surface: adapterBlueprint?.primary_surface,
+    adapter_blueprint_first_gate: adapterBlueprint?.first_acceptance_gate,
     result,
     runner_state: state,
   });

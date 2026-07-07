@@ -34,6 +34,9 @@ export interface MeetingPlatformAdapterMessageBridgeEvent {
   request_id?: string;
   platform?: string;
   selected_surface?: string;
+  adapter_blueprint?: Record<string, unknown>;
+  adapter_blueprint_primary_surface?: string;
+  adapter_blueprint_first_gate?: string;
   result?: unknown;
   runner_state?: Record<string, unknown>;
 }

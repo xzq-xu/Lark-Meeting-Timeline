@@ -32,6 +32,7 @@ const exportMatrix = buildMeetingPlatformAdapterExportPackageMatrix({
 }, {
   baseUrl,
   target: 'static',
+  includeArtifacts: true,
 });
 const availableFiles = exportMatrix.packages.flatMap((pkg) => pkg.host_files.map((file) => file.path));
 const importMatrix = buildMeetingPlatformAdapterImportPlanMatrix(exportMatrix.packages, {
@@ -98,6 +99,7 @@ assert.equal(candidatePlan.request_id, 'candidate-plan-1');
 assert.equal(candidatePlan.result.accepted, true);
 assert.equal(candidatePlan.result.status, 'ready_for_realtime_launch');
 assert.equal(candidatePlan.result.launch_plan.platform, 'google_meet');
+assert.equal(candidatePlan.adapter_blueprint_primary_surface, 'browser_extension');
 assert.equal(candidatePlan.result.selected_candidate.tab_id, 7);
 
 const urlOnlyCandidatePlan = await bridge.handleMessage({
@@ -143,6 +145,7 @@ const strictOpened = await strictBridge.handleMessage({
 assert.equal(strictOpened.action, 'open_candidate_session');
 assert.equal(strictOpened.platform, 'google_meet');
 assert.equal(strictOpened.result.payload.launch_plan.platform, 'google_meet');
+assert.equal(strictOpened.adapter_blueprint_primary_surface, 'browser_extension');
 assert.equal(strictCalls[0][0], 'observePlatformCandidates');
 assert.equal(strictCalls[0][1].candidates[0].tab_id, 9);
 
@@ -160,6 +163,8 @@ assert.equal(opened.handled, true);
 assert.equal(opened.action, 'open_session');
 assert.equal(opened.request_id, 'observe-1');
 assert.equal(opened.platform, 'google_meet');
+assert.equal(opened.adapter_blueprint_primary_surface, 'browser_extension');
+assert.equal(opened.adapter_blueprint_first_gate, 'local_candidate_preflight_accepts_active_meeting');
 assert.equal(opened.result.payload.observe_event.action, 'observe_axis');
 assert.equal(opened.result.payload.observe_event.captured_at_ms, 1_782_800_000_123);
 assert.equal(calls[0][0], 'observePlatformCandidates');

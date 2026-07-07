@@ -129,7 +129,7 @@ export function formatMeetingPlatformAdapterSmokeCliReport(report = {}) {
     `meeting_platform_adapter_smoke_cli_report | ok=${boolLabel(report.ok)} | target=${report.target ?? 'static'} | platforms=${report.platform_count ?? 0} | accepted=${report.accepted_count ?? 0} | failed=${report.failed_count ?? 0} | generated_manifest=${boolLabel(report.generated_manifest)}`,
   ];
   for (const row of report.rows ?? []) {
-    lines.push(`${row.platform}: accepted=${boolLabel(row.accepted)} observe_before_insert=${boolLabel(row.observe_before_insert)} captured_at_ms=${boolLabel(row.captured_at_ms_preserved)} speaker=${boolLabel(row.speaker_track_inserted)} participant=${boolLabel(row.participant_track_inserted)} provider_nonblocking=${boolLabel(row.provider_reconcile_nonblocking)} issues=${row.issues?.join(',') || 'none'}`);
+    lines.push(`${row.platform}: accepted=${boolLabel(row.accepted)} surface=${row.selected_surface ?? 'n/a'} blueprint_surface=${row.adapter_blueprint_primary_surface ?? 'n/a'} observe_before_insert=${boolLabel(row.observe_before_insert)} captured_at_ms=${boolLabel(row.captured_at_ms_preserved)} speaker=${boolLabel(row.speaker_track_inserted)} participant=${boolLabel(row.participant_track_inserted)} provider_nonblocking=${boolLabel(row.provider_reconcile_nonblocking)} issues=${row.issues?.join(',') || 'none'}`);
   }
   if (report.manifest_file) lines.push(`manifest_file=${report.manifest_file}`);
   if (report.manifest_read_error) lines.push(`manifest_read_error=${report.manifest_read_error}`);

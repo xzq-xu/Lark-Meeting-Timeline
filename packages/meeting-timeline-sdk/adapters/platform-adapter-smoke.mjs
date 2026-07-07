@@ -94,6 +94,7 @@ function buildDefaultInstallManifest(options = {}) {
   }, {
     ...options,
     target: firstNonEmpty(options.target, 'static'),
+    includeArtifacts: true,
   });
   const availableFiles = exportMatrix.packages.flatMap((pkg) => asArray(pkg.host_files).map((file) => file.path));
   const importMatrix = buildMeetingPlatformAdapterImportPlanMatrix(exportMatrix.packages, {
@@ -217,6 +218,7 @@ function rowIssues(row = {}) {
   if (row.speaker_track_inserted !== true) issues.push('speaker_track_not_routed');
   if (row.participant_track_inserted !== true) issues.push('participant_track_not_routed');
   if (row.provider_reconcile_nonblocking !== true) issues.push('provider_reconcile_not_routed');
+  if (row.adapter_blueprint_available !== true) issues.push('adapter_blueprint_not_available');
   return issues;
 }
 
@@ -292,6 +294,9 @@ async function runPlatformSmoke(manifest = {}, platform, index = 0, options = {}
     const participantIndex = callIndex(calls, 'participantTrack');
     const providerIndex = callIndex(calls, 'ingestProvider');
     const insertedCall = calls[insertIndex] ?? {};
+    const adapterBlueprint = observe.adapter_blueprint
+      ?? observe.result?.payload?.launch_plan?.adapter_blueprint
+      ?? bridge.getState().runner?.current_launch_plan?.adapter_blueprint;
     const row = compactObject({
       type: 'meeting_platform_adapter_smoke_row',
       schema: MEETING_PLATFORM_ADAPTER_SMOKE_ROW_SCHEMA,
@@ -300,6 +305,10 @@ async function runPlatformSmoke(manifest = {}, platform, index = 0, options = {}
       fixture_url: url,
       observed_platform: observe.platform,
       inserted_platform: insert.platform,
+      selected_surface: observe.selected_surface,
+      adapter_blueprint_available: adapterBlueprint?.available === true,
+      adapter_blueprint_primary_surface: adapterBlueprint?.primary_surface,
+      adapter_blueprint_first_gate: adapterBlueprint?.first_acceptance_gate,
       observe_action: observe.action,
       insert_action: insert.action,
       speaker_action: speaker.action,

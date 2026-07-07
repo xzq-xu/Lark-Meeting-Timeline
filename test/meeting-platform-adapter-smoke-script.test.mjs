@@ -32,6 +32,8 @@ assert.equal(generatedReport.generated_manifest, true);
 assert.equal(generatedReport.platform_count, 3);
 assert.equal(generatedReport.accepted_count, 3);
 assert.equal(generatedReport.rows.every((row) => row.captured_at_ms_preserved === true), true);
+assert.equal(generatedReport.rows.every((row) => row.adapter_blueprint_available === true), true);
+assert.equal(generatedReport.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_primary_surface, 'browser_extension');
 
 await execFileAsync(process.execPath, [
   'scripts/meeting-platform-adapter-export-package.mjs',
@@ -81,6 +83,7 @@ assert.equal(report.ok, true);
 assert.equal(report.generated_manifest, false);
 assert.deepEqual(report.platforms, ['google_meet', 'webex', 'lark']);
 assert.equal(report.rows.find((row) => row.platform === 'webex').provider_reconcile_nonblocking, true);
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_first_gate, 'local_candidate_preflight_accepts_active_meeting');
 
 const writtenCliReport = JSON.parse(await readFile(cliReportFile, 'utf8'));
 assert.equal(writtenCliReport.ok, true);
@@ -97,6 +100,7 @@ const { stdout: textStdout } = await execFileAsync(process.execPath, [
 });
 assert.match(textStdout, /meeting_platform_adapter_smoke_cli_report/);
 assert.match(textStdout, /google_meet: accepted=yes/);
+assert.match(textStdout, /blueprint_surface=browser_extension/);
 assert.match(textStdout, /zoom: accepted=yes/);
 
 const { stdout: missingStdout } = await execFileAsync(process.execPath, [

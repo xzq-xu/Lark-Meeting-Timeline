@@ -46,6 +46,10 @@ export interface MeetingPlatformAdapterSmokeRow {
   accepted: boolean;
   observed_platform?: string;
   inserted_platform?: string;
+  selected_surface?: string;
+  adapter_blueprint_available?: boolean;
+  adapter_blueprint_primary_surface?: string;
+  adapter_blueprint_first_gate?: string;
   observe_action?: string;
   insert_action?: string;
   speaker_action?: string;

@@ -40,12 +40,16 @@ assert.equal(directReport.rows.every((row) => row.captured_at_ms_preserved === t
 assert.equal(directReport.rows.every((row) => row.speaker_track_inserted === true), true);
 assert.equal(directReport.rows.every((row) => row.participant_track_inserted === true), true);
 assert.equal(directReport.rows.every((row) => row.provider_reconcile_nonblocking === true), true);
+assert.equal(directReport.rows.every((row) => row.adapter_blueprint_available === true), true);
+assert.equal(directReport.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_primary_surface, 'browser_extension');
+assert.equal(directReport.rows.find((row) => row.platform === 'zoom').adapter_blueprint_primary_surface, 'native_detector');
 
 const exportMatrix = buildMeetingPlatformAdapterExportPackageMatrix({
   platforms: ['google-meet', 'webex', 'lark'],
 }, {
   baseUrl,
   target: 'static',
+  includeArtifacts: true,
 });
 const availableFiles = exportMatrix.packages.flatMap((pkg) => pkg.host_files.map((file) => file.path));
 const importMatrix = buildMeetingPlatformAdapterImportPlanMatrix(exportMatrix.packages, {
@@ -62,6 +66,7 @@ const manifestReport = await runMeetingPlatformAdapterSmoke(manifest, {
 assert.equal(manifestReport.accepted, true);
 assert.deepEqual(manifestReport.platforms, ['google_meet', 'webex', 'lark']);
 assert.equal(manifestReport.rows.find((row) => row.platform === 'lark').fixture_url, 'https://vc.feishu.cn/j/123456789');
+assert.equal(manifestReport.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_first_gate, 'local_candidate_preflight_accepts_active_meeting');
 
 const asserted = await assertMeetingPlatformAdapterSmoke(manifest, {
   captured_at_ms: 1_782_900_200_000,
