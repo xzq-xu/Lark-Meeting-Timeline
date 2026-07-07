@@ -23,6 +23,13 @@ assert.equal(google.supported_surfaces.browser_observer, true);
 assert.equal(google.supported_surfaces.candidate_observation, true);
 assert.equal(google.supported_surfaces.provider_webhook_or_event_subscription, true);
 assert.equal(google.supported_surfaces.realtime_transcript_required, false);
+assert.equal(google.supported_surfaces.primary, 'browser_extension');
+assert.deepEqual(google.supported_surfaces.recommended_order, ['browser_extension', 'desktop_observer', 'provider_reconcile']);
+assert.equal(google.adapter_surfaces.provider_reconcile_surface, 'google_workspace_events_pubsub');
+assert.equal(google.launch_requirements.required_message_types.includes('meeting_timeline.open_candidate_session'), true);
+assert.equal(google.evidence_thresholds.pilot.provider_records_required, false);
+assert.equal(google.evidence_thresholds.production.provider_records_required, true);
+assert.equal(google.fallback_policy.transcript_missing, 'do_not_block_realtime_annotations');
 assert.equal(google.timebase.annotation_timestamp_field, 'captured_at_ms');
 assert.equal(google.timebase.provider_events_block_realtime, false);
 assert.equal(google.timebase.transcript_blocks_realtime, false);
@@ -59,6 +66,7 @@ assert.equal(google.readiness.missing_items.includes('provider_missing:meeting_s
 
 const teams = buildMeetingPlatformAdapterContract('teams', { baseUrl });
 assert.equal(teams.platform, 'microsoft_teams');
+assert.equal(teams.adapter_surfaces.recommended_order[0], 'desktop_observer');
 assert.equal(teams.local_observer.matches.includes('https://teams.microsoft.com/*'), true);
 assert.equal(teams.provider_observer.events.participant_events.includes('meetingCallEvents.updated:rosterUpdated'), true);
 assert.equal(teams.provider_observer.security.verifier, 'verifyMicrosoftGraphClientState');
@@ -84,6 +92,8 @@ assert.equal(matrix.candidate_observer_count, 2);
 assert.equal(matrix.provider_observer_count, 2);
 assert.deepEqual(matrix.platforms, ['google_meet', 'microsoft_teams', 'local_detector']);
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').start_create_on, 'local_observer_active_meeting_detected');
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').primary_surface, 'browser_extension');
+assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').surface_order[0], 'desktop_observer');
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').runtime_events_endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').candidate_observation_ready, true);
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').candidate_observer_message_type, 'meeting_timeline.observe_candidates');
@@ -95,6 +105,7 @@ assert.equal(googleAcceptance.schema, MEETING_PLATFORM_ADAPTER_CONTRACT_ACCEPTAN
 assert.equal(googleAcceptance.platform, 'google_meet');
 assert.equal(googleAcceptance.target, 'contract');
 assert.equal(googleAcceptance.accepted, true);
+assert.equal(googleAcceptance.summary.primary_surface, 'browser_extension');
 assert.equal(googleAcceptance.summary.candidate_observation_ready, true);
 assert.equal(googleAcceptance.summary.insert_mark_endpoint, `${baseUrl}/api/annotations`);
 assert.equal(googleAcceptance.summary.runtime_events_endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);

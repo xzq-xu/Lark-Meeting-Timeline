@@ -818,6 +818,7 @@ assert.equal(rootMeetingAppSdk.adapterExecutionPlan('google-meet').realtime_read
 assert.equal(rootMeetingAppSdk.meetingAppAdapterExecutionPlanMatrix().accepted_count, 1);
 assert.equal(rootMeetingAppSdk.adapterExecutionPlanMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdaptationPackage('google-meet').adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
+assert.equal(rootMeetingAppSdk.platformAdaptationPackage('google-meet').adapter_surfaces.primary, 'browser_extension');
 assert.equal(rootMeetingAppSdk.adaptationPackageMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformConsumerHandoff().schema, 'meeting_platform_consumer_handoff');
 assert.equal(rootMeetingAppSdk.consumerHandoff().accepted, true);
@@ -919,6 +920,7 @@ assert.equal((await assertMeetingPlatformAdapterSmoke(rootInstallManifest, {
 assert.equal(rootMeetingAppSdk.platformRuntimeBundle('google-meet').runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
 assert.equal(rootMeetingAppSdk.runtimeBundleMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterRoute('google-meet').platform, 'google_meet');
+assert.equal(rootMeetingAppSdk.platformAdapterRoute('google-meet').adapter_surfaces.primary, 'browser_extension');
 assert.equal(rootMeetingAppSdk.adapterRouteMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterDecision({
   url: 'https://meet.google.com/abc-defg-hij',
@@ -978,6 +980,9 @@ assert.equal(rootMeetingAppSdk.connectorHub().accepted, true);
 assert.equal(buildMeetingPlatformAdaptationPackageFromRoot('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).adaptation_playbook.integration_path.path, 'google_workspace_events_pubsub');
+assert.equal(buildMeetingPlatformAdaptationPackageFromRoot('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).evidence_thresholds.production.provider_records_required, true);
 assert.equal(buildMeetingPlatformConsumerHandoffFromRoot({
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],
@@ -993,7 +998,7 @@ assert.equal(buildMeetingPlatformRuntimeBundleFromRoot('google-meet', {
 }).schema, 'meeting_platform_runtime_bundle');
 assert.equal(buildMeetingPlatformAdapterRouteFromRoot('google-meet', {
   baseUrl: 'http://localhost:8787',
-}).platform, 'google_meet');
+}).adapter_surfaces.primary, 'browser_extension');
 assert.equal(buildMeetingPlatformAdapterDecisionFromRoot({
   url: 'https://meet.google.com/abc-defg-hij',
 }, {
@@ -2224,6 +2229,9 @@ assert.equal(buildMeetingPlatformArtifactHandoff('google-meet', {
 assert.equal(buildMeetingPlatformAdapterContract('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).supported_surfaces.browser_observer, true);
+assert.equal(buildMeetingPlatformAdapterContract('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).adapter_surfaces.primary, 'browser_extension');
 assert.equal(buildMeetingPlatformAdapterAuthoringPlan('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).browser_surface.matches.includes('https://meet.google.com/*'), true);
@@ -2385,7 +2393,7 @@ assert.equal(buildMeetingPlatformAdapterContract('google-meet', {
 assert.equal(buildMeetingPlatformAdapterContractMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
-}).contracts[0].platform, 'zoom');
+}).contracts[0].adapter_surfaces.primary, 'native_detector');
 assert.equal(buildMeetingPlatformAdapterContractAcceptanceReport('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).accepted, true);
@@ -2520,6 +2528,7 @@ assert.equal(buildMeetingPlatformAdapterPreflightMatrix({}, {
   },
 }).live_evidence_ready_count, 1);
 assert.equal(kit.platformAdapterRoute('google-meet').realtime_invariants.provider_events_block_realtime, false);
+assert.equal(kit.platformAdapterRoute('google-meet').adapter_surfaces.primary, 'browser_extension');
 assert.equal(kit.platformAdapterRouteMatrix({ platforms: ['zoom'] }).rows[0].first_route, 'local_observer_axis');
 assert.equal(kit.platformAdapterDecision({
   url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',

@@ -31,6 +31,10 @@ export interface MeetingPlatformAdapterRoute {
   route_order: string[];
   route_count: number;
   routes: MeetingPlatformAdapterRouteStep[];
+  adapter_surfaces: Record<string, unknown>;
+  launch_requirements: Record<string, unknown>;
+  evidence_thresholds: Record<string, unknown>;
+  fallback_policy: Record<string, unknown>;
   entrypoints: Record<string, unknown>;
   realtime_invariants: {
     primary_axis_must_be_created_before_provider_reconcile?: boolean;
@@ -47,6 +51,8 @@ export interface MeetingPlatformAdapterRoute {
 export interface MeetingPlatformAdapterRouteSummary {
   platform?: string;
   recommended_mode?: string;
+  primary_surface?: string;
+  surface_order?: string[];
   first_route?: string;
   route_count?: number;
   provider_events_block_realtime?: boolean;

@@ -374,12 +374,15 @@ const google = buildMeetingPlatformAdapterRoute('google-meet', {
 });
 
 console.log(google.route_order);
+console.log(google.adapter_surfaces.primary);
 console.log(google.entrypoints.browser_extension.matches);
 
 const routeMatrix = buildMeetingPlatformAdapterRouteMatrix({
   platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
 });
 ```
+
+`platform-adapter-route`、`platform-adapter-contract` 和 `platform-adaptation-package` 都会透出同一份 surface 指南：`adapter_surfaces`、`launch_requirements`、`evidence_thresholds`、`fallback_policy`。下游项目不必自己判断 Google Meet/Teams/Zoom/Webex/Lark 的优先入口；例如 Google Meet 会优先 `browser_extension`，Zoom 会优先 `native_detector`，provider webhook 只作为非阻塞 reconcile 和生产证据。
 
 也可以直接导出给另一个项目消费：
 

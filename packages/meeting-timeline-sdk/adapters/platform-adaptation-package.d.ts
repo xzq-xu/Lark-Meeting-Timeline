@@ -33,6 +33,10 @@ export interface MeetingPlatformAdaptationPackage {
   mode?: string;
   recommended_mode?: string;
   runtime_contract: Record<string, unknown>;
+  adapter_surfaces: Record<string, unknown>;
+  launch_requirements: Record<string, unknown>;
+  evidence_thresholds: Record<string, unknown>;
+  fallback_policy: Record<string, unknown>;
   local_observer: Record<string, unknown>;
   provider_observer?: Record<string, unknown>;
   adaptation_strategy: MeetingPlatformAdaptationStrategy;

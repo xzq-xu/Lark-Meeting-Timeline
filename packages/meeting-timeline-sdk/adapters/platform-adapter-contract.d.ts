@@ -28,7 +28,14 @@ export interface MeetingPlatformAdapterContract {
     provider_webhook_or_event_subscription: boolean;
     post_meeting_transcript_import: string;
     realtime_transcript_required: boolean;
+    primary?: string;
+    recommended_order?: string[];
+    provider_reconcile_surface?: string | null;
   };
+  adapter_surfaces: Record<string, unknown>;
+  launch_requirements: Record<string, unknown>;
+  evidence_thresholds: Record<string, unknown>;
+  fallback_policy: Record<string, unknown>;
   timebase: Record<string, unknown>;
   realtime_axis: Record<string, unknown>;
   annotations: Record<string, unknown>;
