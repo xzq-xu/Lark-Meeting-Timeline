@@ -34,6 +34,7 @@ assert.equal(packedFiles.includes('bin/meeting-platform-adapter-export-package.m
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-import-plan.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-install-manifest.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-launch-plan.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-platform-adapter-portfolio.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-smoke.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-host-integration.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-provider-replay.mjs'), true);
@@ -44,6 +45,7 @@ assert.equal(packedFiles.includes('cli/meeting-platform-adapter-export-package.m
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-import-plan.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-install-manifest.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-launch-plan.mjs'), true);
+assert.equal(packedFiles.includes('cli/meeting-platform-adapter-portfolio.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-smoke.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-host-integration.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-provider-replay.mjs'), true);
@@ -295,6 +297,26 @@ const { stdout: adapterLaunchBinStdout } = await execFileAsync(
 const adapterLaunchBinReport = JSON.parse(adapterLaunchBinStdout);
 assert.equal(adapterLaunchBinReport.type, 'meeting_platform_adapter_launch_plan_report');
 assert.equal(adapterLaunchBinReport.ok, false);
+
+const { stdout: adapterPortfolioBinStdout } = await execFileAsync(
+  join(consumerDir, 'node_modules', '.bin', 'meeting-platform-adapter-portfolio'),
+  [
+    '--platforms=google-meet,zoom',
+    '--json=true',
+    '--write-items=false',
+  ],
+  {
+    cwd: consumerDir,
+  },
+);
+const adapterPortfolioBinReport = JSON.parse(adapterPortfolioBinStdout);
+assert.equal(adapterPortfolioBinReport.type, 'meeting_platform_adapter_portfolio_report');
+assert.equal(adapterPortfolioBinReport.ok, true);
+assert.equal(adapterPortfolioBinReport.platform_count, 2);
+assert.equal(adapterPortfolioBinReport.built_in_count, 2);
+assert.equal(adapterPortfolioBinReport.rows.find((row) => row.platform === 'google_meet').recommended_first_surface, 'browser_extension');
+assert.equal(adapterPortfolioBinReport.rows.find((row) => row.platform === 'zoom').recommended_first_surface, 'native_detector');
+assert.equal(adapterPortfolioBinReport.written_files.length, 0);
 
 const { stdout: adapterSmokeBinStdout } = await execFileAsync(
   join(consumerDir, 'node_modules', '.bin', 'meeting-platform-adapter-smoke'),

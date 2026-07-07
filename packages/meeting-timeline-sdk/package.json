@@ -13,6 +13,7 @@
     "meeting-platform-adapter-import-plan": "./bin/meeting-platform-adapter-import-plan.mjs",
     "meeting-platform-adapter-install-manifest": "./bin/meeting-platform-adapter-install-manifest.mjs",
     "meeting-platform-adapter-launch-plan": "./bin/meeting-platform-adapter-launch-plan.mjs",
+    "meeting-platform-adapter-portfolio": "./bin/meeting-platform-adapter-portfolio.mjs",
     "meeting-platform-adapter-smoke": "./bin/meeting-platform-adapter-smoke.mjs",
     "meeting-platform-host-integration": "./bin/meeting-platform-host-integration.mjs",
     "meeting-platform-provider-replay": "./bin/meeting-platform-provider-replay.mjs"

@@ -68,4 +68,20 @@ assert.match(textStdout, /meeting_platform_adapter_portfolio_report/);
 assert.match(textStdout, /builtin=1/);
 assert.match(textStdout, /webex: status=built_in_adapter_available/);
 
+const { stdout: binStdout } = await execFileAsync(process.execPath, [
+  'packages/meeting-timeline-sdk/bin/meeting-platform-adapter-portfolio.mjs',
+  '--platforms=google-meet,zoom',
+  '--json=true',
+  '--write-items=false',
+], {
+  cwd: repoRoot,
+});
+const binReport = JSON.parse(binStdout);
+assert.equal(binReport.type, 'meeting_platform_adapter_portfolio_report');
+assert.equal(binReport.ok, true);
+assert.equal(binReport.platform_count, 2);
+assert.equal(binReport.rows.find((row) => row.platform === 'google_meet').recommended_first_surface, 'browser_extension');
+assert.equal(binReport.rows.find((row) => row.platform === 'zoom').recommended_first_surface, 'native_detector');
+assert.equal(binReport.written_files.length, 0);
+
 console.log('ok meeting platform adapter portfolio script');

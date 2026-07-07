@@ -828,12 +828,14 @@ npm run meeting-platform:adapter-authoring -- \
 如果要给另一个项目一个“多会议软件接入看板”的单一 JSON，优先用 `platformAdapterPortfolio()` 或 CLI。它会为每个平台列出 `adapter_surfaces`、`launch_requirements`、`p0_realtime_axis`、`p1_provider_reconcile`、`p2_post_meeting_backfill`、`official_doc_count`、`implementation_ready`、`pilot_ready`、`production_ready` 和 `next_action`。这里的 `recommended_first_surface` 会复用 runtime profile 的平台画像：Google Meet 默认 `browser_extension`，Zoom 默认 `native_detector`，Teams 的 desktop observer 会映射到宿主可启动的 native detector；自定义平台仍保留 authoring plan 的浏览器优先骨架，避免误套内置平台策略：
 
 ```sh
-npm run meeting-platform:adapter-portfolio -- \
+npx meeting-platform-adapter-portfolio \
   --platforms=google-meet,teams,zoom,webex,lark \
   --base-url=https://timeline.example.com \
   --out-dir=data/meeting-platform-adapter-portfolio \
   --report-file=data/meeting-platform-adapter-portfolio-report.json
 ```
+
+在当前 demo 仓库内也可以继续用 `npm run meeting-platform:adapter-portfolio`。发布后的 SDK 会把同名 bin 暴露到 `node_modules/.bin/meeting-platform-adapter-portfolio`，所以下游宿主项目不需要复制本仓库的 `scripts/` 目录。
 
 portfolio 解决“该接哪条路”，acceptance checklist 解决“当前能不能过某个目标”。`target=static` 只检查 SDK 静态契约；`target=pilot` 还要求真实本地会议观察证据；`target=production` 还要求 provider reconcile、生产证据和可选 runtime replay：
 
