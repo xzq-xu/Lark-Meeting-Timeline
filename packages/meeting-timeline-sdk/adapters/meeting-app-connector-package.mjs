@@ -8,6 +8,7 @@ import {
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA = 'meeting_app_timeline_connector_package';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_package_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA = 'meeting_app_timeline_connector_handoff';
+export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA = 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION = 1;
 
@@ -110,6 +111,15 @@ function runtimePlatformActionMap(pkg = {}) {
     result.set(row.platform, actions);
   }
   return result;
+}
+
+function runtimeActionRowsForPlatform(pkg = {}, platform) {
+  const normalized = normalizeKey(platform);
+  return runtimeActionRows(pkg).filter((row) => row.platform === normalized);
+}
+
+function runtimeActionByName(rows = [], action) {
+  return rows.find((row) => row.action === action);
 }
 
 function missingRuntimeActions(pkg = {}, platforms = [], options = {}) {
@@ -419,6 +429,91 @@ export function buildMeetingAppTimelineConnectorHandoff(pkg = {}, options = {}) 
       permissions: pkg.extension.manifest?.permissions,
       host_permissions: pkg.extension.manifest?.host_permissions,
     } : undefined,
+    acceptance,
+    next_actions: acceptance.next_actions,
+  });
+}
+
+export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, options = {}) {
+  const acceptance = buildMeetingAppTimelineConnectorPackageAcceptanceReport(pkg, options);
+  const startupRows = pkg.startup_plans?.matrix?.rows ?? [];
+  const blueprintRows = pkg.adapter_blueprints?.matrix?.rows ?? [];
+  const startupByPlatform = new Map(startupRows.map((row) => [normalizeKey(row.platform), row]));
+  const blueprintByPlatform = new Map(blueprintRows.map((row) => [normalizeKey(row.platform), row]));
+  const rows = acceptance.platforms.map((platform) => {
+    const startup = startupByPlatform.get(platform) ?? {};
+    const blueprint = blueprintByPlatform.get(platform) ?? {};
+    const actions = runtimeActionRowsForPlatform(pkg, platform);
+    const observeCandidates = runtimeActionByName(actions, 'observe_platform_candidates');
+    const observeMeetingApp = runtimeActionByName(actions, 'observe_meeting_app');
+    const insertAnnotation = runtimeActionByName(actions, 'insert_annotation');
+    const speakerTrack = runtimeActionByName(actions, 'speaker_track');
+    const participantTrack = runtimeActionByName(actions, 'participant_track');
+    return compactObject({
+      platform,
+      display_name: startup.display_name ?? blueprint.display_name,
+      selected_surface: startup.selected_surface,
+      install_target: startup.install_target,
+      runtime_preset: startup.runtime_preset,
+      realtime_startup_ready: startup.realtime_startup_ready === true,
+      adapter_blueprint_ready: startup.adapter_blueprint_ready === true || blueprint.ready === true,
+      adapter_blueprint_primary_surface: startup.adapter_blueprint_primary_surface ?? blueprint.primary_surface,
+      adapter_blueprint_first_acceptance_gate: startup.adapter_blueprint_first_acceptance_gate ?? blueprint.first_acceptance_gate,
+      first_action: startup.first_action,
+      observe_action: startup.observe_action,
+      insert_action: startup.insert_action,
+      provider_events_block_realtime: startup.provider_events_block_realtime,
+      transcript_blocks_realtime: startup.transcript_blocks_realtime,
+      runtime_actions: actions.map((row) => row.action),
+      client_methods: {
+        observe_platform_candidates: observeCandidates?.client_method,
+        observe_meeting_app: observeMeetingApp?.client_method,
+        insert_annotation: insertAnnotation?.client_method,
+        speaker_track: speakerTrack?.client_method,
+        participant_track: participantTrack?.client_method,
+      },
+      required_host_steps: [
+        'install_selected_surface_runtime',
+        'observe_platform_candidates_before_first_annotation',
+        'insert_annotation_with_captured_at_ms',
+        'keep_provider_events_nonblocking',
+        'keep_transcript_import_nonblocking',
+      ],
+      optional_host_steps: [
+        speakerTrack ? 'emit_speaker_track_markers' : undefined,
+        participantTrack ? 'emit_participant_track_markers' : undefined,
+      ].filter(Boolean),
+    });
+  });
+  const readyCount = rows.filter((row) => row.realtime_startup_ready === true && row.adapter_blueprint_ready === true).length;
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    package_id: pkg.id,
+    accepted: acceptance.accepted === true && readyCount === acceptance.platform_count,
+    target: acceptance.target,
+    base_url: pkg.base_url,
+    runtime_event_endpoint: pkg.runtime_events?.endpoint,
+    platform_count: acceptance.platform_count,
+    surface_count: acceptance.surface_count,
+    ready_count: readyCount,
+    timestamp_field: firstNonEmpty(pkg.contracts?.timestamp_field, pkg.host_package?.runtime_contract?.annotation_timestamp_field),
+    contracts: {
+      timestamp_field: 'captured_at_ms',
+      provider_events_block_realtime: pkg.contracts?.provider_events_block_realtime,
+      transcript_blocks_realtime: pkg.contracts?.transcript_blocks_realtime,
+      startup_plan_required_before_runtime_install: pkg.contracts?.startup_plan_required_before_runtime_install,
+      adapter_blueprint_required_before_host_wiring: pkg.contracts?.adapter_blueprint_required_before_host_wiring,
+    },
+    files_to_read_first: [
+      'connector-handoff.json',
+      'startup-plan-matrix.json',
+      'adapter-blueprint-matrix.json',
+      'runtime-event-plan-matrix.json',
+      'connector-package.json',
+    ],
+    rows,
     acceptance,
     next_actions: acceptance.next_actions,
   });

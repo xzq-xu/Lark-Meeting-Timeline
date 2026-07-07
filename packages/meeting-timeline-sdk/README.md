@@ -929,7 +929,7 @@ npx meeting-app-connector-package \
   --report-file=meeting-app-connector-package-report.json
 ```
 
-CLI 会输出 `connector-package.json`、`connector-handoff.json`、`connector-quickstart.md`、`host-package.json`、handoff/acceptance 矩阵、`adapter-blueprint-matrix.json`、`startup-plan-matrix.json`、按 surface 拆分的 observer plan / scheduler config、runtime event plan，以及可作为起点的浏览器扩展 scaffold。报告会剥离 scaffold 文件内容，避免 CI 日志和交接摘要过大；实际文件会写在 `extension/` 目录下。下游工程应优先打开 `connector-quickstart.md` 和 `startup-plan-matrix.json`，用其中的 selected surface / install target 决定先装 content script、WebView preload 还是 native detector。
+CLI 会输出 `connector-package.json`、`connector-handoff.json`、`connector-quickstart.md`、`host-install-checklist.json`、`host-package.json`、handoff/acceptance 矩阵、`adapter-blueprint-matrix.json`、`startup-plan-matrix.json`、按 surface 拆分的 observer plan / scheduler config、runtime event plan，以及可作为起点的浏览器扩展 scaffold。报告会剥离 scaffold 文件内容，避免 CI 日志和交接摘要过大；实际文件会写在 `extension/` 目录下。下游工程应优先打开 `connector-quickstart.md` 和 `startup-plan-matrix.json`，用其中的 selected surface / install target 决定先装 content script、WebView preload 还是 native detector；CI 或接入面板可以直接读取 `host-install-checklist.json`，逐平台检查 install target、runtime action client method 和 `captured_at_ms` 契约。
 
 下游项目拿到 connector package 后，不需要自己猜哪些字段是硬约束，可以直接用 `meeting-app-connector-package` 子模块验收和生成交接摘要：
 

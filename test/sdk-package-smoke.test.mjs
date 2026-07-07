@@ -617,6 +617,7 @@ import {
 import {
   assertMeetingAppTimelineConnectorPackage,
   buildMeetingAppTimelineConnectorHandoff,
+  buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport,
   createMeetingAppTimelineConnectorRuntimeClient,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package';
@@ -812,6 +813,7 @@ assert.equal(rootConnectorPackage.schema, 'meeting_app_timeline_connector_packag
 assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReportFromRoot(rootConnectorPackage).accepted, true);
 assert.equal(buildMeetingAppTimelineConnectorPackageAcceptanceReport(rootConnectorPackage).accepted, true);
 assert.equal(buildMeetingAppTimelineConnectorHandoff(rootConnectorPackage).schema, 'meeting_app_timeline_connector_handoff');
+assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklist(rootConnectorPackage).schema, 'meeting_app_timeline_connector_host_install_checklist');
 assert.equal(assertMeetingAppTimelineConnectorPackage(rootConnectorPackage), rootConnectorPackage);
 assert.equal(rootMeetingAppSdk.meetingAppAdapterCapability('google-meet').schema, 'meeting_app_adapter_capability_report');
 assert.equal(rootMeetingAppSdk.adapterCapability('google-meet').platform, 'google_meet');

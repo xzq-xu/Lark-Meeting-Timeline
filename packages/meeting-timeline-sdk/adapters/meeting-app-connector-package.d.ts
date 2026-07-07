@@ -3,6 +3,7 @@ import type { MeetingAppTimelineConnectorPackage } from '../index.mjs';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA: 'meeting_app_timeline_connector_package';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_package_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA: 'meeting_app_timeline_connector_handoff';
+export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA: 'meeting_app_timeline_connector_host_install_checklist';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA: 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION: 1;
 
@@ -96,6 +97,26 @@ export interface MeetingAppTimelineConnectorHandoff {
   next_actions: string[];
 }
 
+export interface MeetingAppTimelineConnectorHostInstallChecklist {
+  type: 'meeting_app_timeline_connector_host_install_checklist';
+  schema: 'meeting_app_timeline_connector_host_install_checklist';
+  schema_version: 1;
+  package_id?: string;
+  accepted: boolean;
+  target: string;
+  base_url?: string;
+  runtime_event_endpoint?: string;
+  platform_count: number;
+  surface_count: number;
+  ready_count: number;
+  timestamp_field?: string;
+  contracts: Record<string, unknown>;
+  files_to_read_first: string[];
+  rows: Array<Record<string, unknown>>;
+  acceptance: MeetingAppTimelineConnectorPackageAcceptanceReport;
+  next_actions: string[];
+}
+
 export interface MeetingAppTimelineConnectorRuntimeClient {
   type: 'meeting_app_timeline_connector_runtime_client';
   schema: 'meeting_app_timeline_connector_runtime_client';
@@ -148,6 +169,11 @@ export function buildMeetingAppTimelineConnectorHandoff(
   pkg?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,
   options?: Record<string, unknown>,
 ): MeetingAppTimelineConnectorHandoff;
+
+export function buildMeetingAppTimelineConnectorHostInstallChecklist(
+  pkg?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineConnectorHostInstallChecklist;
 
 export function createMeetingAppTimelineConnectorRuntimeClient(
   pkg?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,

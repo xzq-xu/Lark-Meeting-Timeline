@@ -4,6 +4,7 @@ import {
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
   assertMeetingAppTimelineConnectorPackage,
   buildMeetingAppTimelineConnectorHandoff,
+  buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport,
   createMeetingAppTimelineSdk,
   createMeetingAppTimelineConnectorRuntimeClient,
@@ -62,6 +63,18 @@ assert.equal(handoff.surface_matrix.find((row) => row.surface === 'browser_exten
 assert.equal(handoff.extension.file_paths.includes('manifest.json'), true);
 assert.equal(handoff.extension.file_paths.includes('src/content-script.entry.mjs'), true);
 assert.equal(handoff.ci_gates.includes('require_captured_at_ms_for_realtime_annotations'), true);
+
+const hostInstallChecklist = buildMeetingAppTimelineConnectorHostInstallChecklist(connectorPackage);
+assert.equal(hostInstallChecklist.schema, 'meeting_app_timeline_connector_host_install_checklist');
+assert.equal(hostInstallChecklist.accepted, true);
+assert.equal(hostInstallChecklist.ready_count, 2);
+assert.equal(hostInstallChecklist.timestamp_field, 'captured_at_ms');
+assert.equal(hostInstallChecklist.files_to_read_first.includes('startup-plan-matrix.json'), true);
+assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
+assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
+assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'zoom').client_methods.insert_annotation, 'insertAnnotation');
+assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'google_meet').required_host_steps.includes('insert_annotation_with_captured_at_ms'), true);
+
 assert.equal(connectorPackage.adapter_blueprints.ready_count, 2);
 assert.equal(connectorPackage.adapter_blueprints.matrix.schema, 'meeting_platform_adapter_blueprint_matrix');
 assert.equal(connectorPackage.adapter_blueprints.matrix.blueprints, undefined);
