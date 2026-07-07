@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 
 import {
   MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA,
+  MEETING_APP_TIMELINE_CONNECTOR_ADOPTION_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA,
   assertMeetingAppTimelineConnectorBridgeHandoff,
+  assertMeetingAppTimelineConnectorAdoptionIndex,
   assertMeetingAppTimelineConnectorBridgeSmoke,
   assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
@@ -13,6 +15,7 @@ import {
   assertMeetingAppTimelineConnectorSmokeRun,
   buildMeetingAppTimelineConnectorBridgeHandoff,
   buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport,
+  buildMeetingAppTimelineConnectorAdoptionIndex,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
@@ -96,6 +99,19 @@ assert.equal(hostInstallChecklistAcceptance.ready_count, 2);
 assert.equal(hostInstallChecklistAcceptance.issue_count, 0);
 assert.equal(assertMeetingAppTimelineConnectorHostInstallChecklist(hostInstallChecklist), hostInstallChecklist);
 assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(connectorPackage).accepted, true);
+
+const adoptionIndex = buildMeetingAppTimelineConnectorAdoptionIndex(hostInstallChecklist);
+assert.equal(adoptionIndex.schema, MEETING_APP_TIMELINE_CONNECTOR_ADOPTION_INDEX_SCHEMA);
+assert.equal(adoptionIndex.accepted, true);
+assert.equal(adoptionIndex.realtime_ready_count, 2);
+assert.equal(adoptionIndex.bridge_ready_count, 2);
+assert.equal(adoptionIndex.production_evidence_pending_count, 2);
+assert.equal(adoptionIndex.rows.find((row) => row.platform === 'google_meet').status, 'pilot_ready_needs_live_evidence');
+assert.equal(adoptionIndex.rows.find((row) => row.platform === 'google_meet').p0_axis_bootstrap.must_precede, 'insert_annotation');
+assert.equal(adoptionIndex.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
+assert.equal(adoptionIndex.rows.every((row) => row.can_start_axis_before_provider === true), true);
+assert.equal(adoptionIndex.rows.every((row) => row.production_evidence_required.includes('runtime_host_replay')), true);
+assert.equal(assertMeetingAppTimelineConnectorAdoptionIndex(connectorPackage).accepted, true);
 
 const bridgeHandoff = buildMeetingAppTimelineConnectorBridgeHandoff(connectorPackage);
 assert.equal(bridgeHandoff.schema, MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA);

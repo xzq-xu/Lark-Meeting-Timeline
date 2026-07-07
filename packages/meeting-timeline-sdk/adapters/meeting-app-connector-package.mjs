@@ -16,6 +16,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_ACCEPTANCE_SCHEMA = 'meeting
 export const MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA = 'meeting_app_timeline_connector_handoff';
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist';
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist_acceptance_report';
+export const MEETING_APP_TIMELINE_CONNECTOR_ADOPTION_INDEX_SCHEMA = 'meeting_app_timeline_connector_adoption_index';
 export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA = 'meeting_app_timeline_connector_bridge_handoff';
 export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_bridge_handoff_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_SMOKE_REPORT_SCHEMA = 'meeting_app_timeline_connector_bridge_smoke_report';
@@ -906,6 +907,215 @@ export function assertMeetingAppTimelineConnectorHostInstallChecklist(checklistO
     });
   }
   return checklistOrPackage;
+}
+
+function adoptionEvidenceAccepted(options = {}, platform) {
+  const key = normalizeKey(platform);
+  const byPlatform = firstNonEmpty(
+    options.productionEvidenceAcceptedByPlatform,
+    options.production_evidence_accepted_by_platform,
+    options.liveEvidenceAcceptedByPlatform,
+    options.live_evidence_accepted_by_platform,
+  ) ?? {};
+  return byPlatform[key] === true
+    || byPlatform[platform] === true
+    || options.productionEvidenceAccepted === true
+    || options.production_evidence_accepted === true
+    || options.liveEvidenceAccepted === true
+    || options.live_evidence_accepted === true;
+}
+
+function adoptionStatusFor({ realtimeReady, bridgeReady, productionEvidenceAccepted } = {}) {
+  if (!realtimeReady) return 'blocked_before_realtime_pilot';
+  if (!bridgeReady) return 'needs_bridge_install';
+  if (!productionEvidenceAccepted) return 'pilot_ready_needs_live_evidence';
+  return 'production_evidence_ready';
+}
+
+function adoptionNextActions(row = {}) {
+  const actions = [];
+  for (const missing of row.missing ?? []) actions.push(`fix_${missing}`);
+  if (row.realtime_ready && row.bridge_ready && !row.production_evidence_accepted) {
+    actions.push('capture_live_meeting_app_snapshot');
+    actions.push('capture_provider_reconcile_records');
+    actions.push('run_handoff_readiness_with_runtime_host_replay');
+  }
+  if (row.realtime_ready && row.bridge_ready && row.production_evidence_accepted) {
+    actions.push('ship_platform_adapter_to_host_project');
+  }
+  return unique(actions);
+}
+
+export function buildMeetingAppTimelineConnectorAdoptionIndex(checklistOrPackage = {}, options = {}) {
+  const checklist = checklistOrPackage?.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA
+    ? checklistOrPackage
+    : buildMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage, options);
+  const bridgeHandoff = buildMeetingAppTimelineConnectorBridgeHandoff(checklist, options);
+  const bridgeAcceptance = buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(bridgeHandoff, options);
+  const smokePlan = buildMeetingAppTimelineConnectorSmokePlan(checklist, options);
+  const smokeAcceptance = buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan, options);
+  const bridgeByPlatform = new Map((bridgeHandoff.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
+  const smokeByPlatform = new Map((smokePlan.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
+  const rows = (checklist.rows ?? []).map((row) => {
+    const platform = normalizeKey(row.platform);
+    const actions = asArray(row.runtime_actions).map((action) => normalizeMeetingPlatformRuntimeEventAction(action));
+    const bridgeRow = bridgeByPlatform.get(platform) ?? {};
+    const smokeRow = smokeByPlatform.get(platform) ?? {};
+    const hasObserveCandidates = actions.includes('observe_platform_candidates');
+    const hasInsertAnnotation = actions.includes('insert_annotation');
+    const hasSpeakerTrack = actions.includes('speaker_track');
+    const hasParticipantTrack = actions.includes('participant_track');
+    const providerNonBlocking = row.provider_events_block_realtime === false;
+    const transcriptNonBlocking = row.transcript_blocks_realtime === false;
+    const bridgeMessages = new Set(bridgeRow.supported_message_types ?? []);
+    const bridgeActions = new Set(bridgeRow.output_runtime_actions ?? []);
+    const realtimeReady = row.realtime_startup_ready === true
+      && row.adapter_blueprint_ready === true
+      && hasObserveCandidates
+      && hasInsertAnnotation
+      && providerNonBlocking
+      && transcriptNonBlocking
+      && checklist.timestamp_field === 'captured_at_ms';
+    const bridgeReady = bridgeRow.bridge_factory === 'installMeetingPlatformConnectorContentScriptBridge'
+      && bridgeMessages.has('meeting_timeline.observe_candidates')
+      && bridgeMessages.has('meeting_timeline.insert_mark')
+      && bridgeActions.has('observe_platform_candidates')
+      && bridgeActions.has('insert_annotation');
+    const smokeReady = smokeRow.required_action_count >= 2
+      && (smokeRow.steps ?? []).some((step) => step.action === 'observe_platform_candidates')
+      && (smokeRow.steps ?? []).some((step) => step.action === 'insert_annotation');
+    const productionEvidenceAccepted = adoptionEvidenceAccepted(options, platform);
+    const missing = [
+      row.selected_surface ? undefined : 'selected_surface',
+      row.install_target ? undefined : 'install_target',
+      row.realtime_startup_ready === true ? undefined : 'realtime_startup_ready',
+      row.adapter_blueprint_ready === true ? undefined : 'adapter_blueprint_ready',
+      hasObserveCandidates ? undefined : 'observe_platform_candidates_action',
+      hasInsertAnnotation ? undefined : 'insert_annotation_action',
+      providerNonBlocking ? undefined : 'provider_nonblocking_contract',
+      transcriptNonBlocking ? undefined : 'transcript_nonblocking_contract',
+      checklist.timestamp_field === 'captured_at_ms' ? undefined : 'captured_at_ms_contract',
+      bridgeReady ? undefined : 'connector_bridge_runtime_path',
+      smokeReady ? undefined : 'connector_smoke_plan',
+    ].filter(Boolean);
+    const adoptionRow = compactObject({
+      platform,
+      display_name: row.display_name,
+      status: adoptionStatusFor({ realtimeReady, bridgeReady, productionEvidenceAccepted }),
+      selected_surface: row.selected_surface,
+      install_target: row.install_target,
+      runtime_preset: row.runtime_preset,
+      p0_axis_bootstrap: {
+        source: row.selected_surface === 'browser_extension'
+          ? 'browser_extension_content_script_or_webview_preload'
+          : row.selected_surface === 'native_detector'
+            ? 'native_detector_or_desktop_accessibility'
+            : row.selected_surface,
+        first_action: row.observe_action ?? 'observePlatformCandidates',
+        must_precede: 'insert_annotation',
+        timestamp_field: checklist.timestamp_field,
+      },
+      p0_annotation_intake: {
+        action: row.insert_action ?? 'insertAnnotation',
+        required_field: 'captured_at_ms',
+        provider_events_block_realtime: row.provider_events_block_realtime,
+        transcript_blocks_realtime: row.transcript_blocks_realtime,
+      },
+      p1_tracks: {
+        speaker_track_ready: hasSpeakerTrack,
+        participant_track_ready: hasParticipantTrack,
+        text_required: false,
+      },
+      p1_provider_reconcile: {
+        required_for_realtime: false,
+        required_for_production: platform !== 'local_detector',
+        non_blocking_for_realtime: providerNonBlocking,
+      },
+      p2_post_meeting_backfill: {
+        transcript_blocks_realtime: row.transcript_blocks_realtime,
+        required_for_realtime: false,
+      },
+      runtime_actions: actions,
+      client_methods: row.client_methods,
+      bridge_ready: bridgeReady,
+      bridge_factory: bridgeRow.bridge_factory,
+      bridge_message_types: bridgeRow.supported_message_types,
+      smoke_plan_ready: smokeReady,
+      smoke_required_action_count: smokeRow.required_action_count,
+      smoke_optional_action_count: smokeRow.optional_action_count,
+      realtime_ready: realtimeReady,
+      can_start_axis_before_provider: hasObserveCandidates && providerNonBlocking,
+      can_insert_annotation_on_current_axis: hasInsertAnnotation && checklist.timestamp_field === 'captured_at_ms',
+      production_evidence_accepted: productionEvidenceAccepted,
+      production_evidence_required: productionEvidenceAccepted ? [] : [
+        'live_meeting_app_snapshot',
+        platform === 'local_detector' ? undefined : 'provider_reconcile_records',
+        'runtime_host_replay',
+      ].filter(Boolean),
+      missing,
+    });
+    return {
+      ...adoptionRow,
+      next_actions: adoptionNextActions(adoptionRow),
+    };
+  });
+  const realtimeReadyCount = rows.filter((row) => row.realtime_ready === true).length;
+  const bridgeReadyCount = rows.filter((row) => row.bridge_ready === true).length;
+  const productionEvidenceReadyCount = rows.filter((row) => row.production_evidence_accepted === true).length;
+  const issues = [
+    ...(checklist.accepted === true ? [] : ['host_install_checklist_not_accepted']),
+    ...(bridgeAcceptance.accepted === true ? [] : bridgeAcceptance.issues.map((issue) => `bridge:${issue.code}`)),
+    ...(smokeAcceptance.accepted === true ? [] : smokeAcceptance.issues.map((issue) => `smoke:${issue.code}`)),
+    ...rows.flatMap((row) => (row.realtime_ready && row.bridge_ready ? [] : row.missing.map((item) => `${row.platform}:${item}`))),
+  ];
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_ADOPTION_INDEX_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_ADOPTION_INDEX_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    target: checklist.target,
+    package_id: checklist.package_id,
+    runtime_event_endpoint: checklist.runtime_event_endpoint,
+    timestamp_field: checklist.timestamp_field,
+    platform_count: checklist.platform_count,
+    row_count: rows.length,
+    realtime_ready_count: realtimeReadyCount,
+    bridge_ready_count: bridgeReadyCount,
+    production_evidence_ready_count: productionEvidenceReadyCount,
+    production_evidence_pending_count: Math.max(0, rows.length - productionEvidenceReadyCount),
+    source_schemas: {
+      host_install_checklist: checklist.schema,
+      bridge_handoff: bridgeHandoff.schema,
+      bridge_handoff_acceptance: bridgeAcceptance.schema,
+      smoke_plan: smokePlan.schema,
+      smoke_plan_acceptance: smokeAcceptance.schema,
+    },
+    files_to_read_first: [
+      'connector-adoption-index.json',
+      'host-install-checklist.json',
+      'connector-bridge-handoff.json',
+      'connector-bridge-smoke-report.json',
+      'connector-smoke-plan.json',
+      'startup-plan-matrix.json',
+    ],
+    rows,
+    issue_count: unique(issues).length,
+    issues: unique(issues),
+    next_actions: issues.length > 0
+      ? unique(rows.flatMap((row) => row.next_actions))
+      : ['capture_live_evidence_before_production_rollout'],
+  });
+}
+
+export function assertMeetingAppTimelineConnectorAdoptionIndex(checklistOrPackage = {}, options = {}) {
+  const index = buildMeetingAppTimelineConnectorAdoptionIndex(checklistOrPackage, options);
+  if (!index.accepted) {
+    throw new MeetingTimelineSdkError('Meeting app timeline connector adoption index is not accepted', {
+      index,
+      issues: index.issues,
+    });
+  }
+  return index;
 }
 
 export function buildMeetingAppTimelineConnectorBridgeHandoff(pkgOrChecklist = {}, options = {}) {

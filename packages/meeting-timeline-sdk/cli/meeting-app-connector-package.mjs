@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import {
+  buildMeetingAppTimelineConnectorAdoptionIndex,
   buildMeetingAppTimelineConnectorBridgeHandoff,
   buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport,
   buildMeetingAppTimelineConnectorHandoff,
@@ -103,6 +104,7 @@ function connectorQuickstartMarkdown(pkg = {}) {
     '## Read These Files First',
     '',
     '- `connector-handoff.json`: compact handoff summary for another host project.',
+    '- `connector-adoption-index.json`: per-platform P0/P1/P2 adoption status, install target, realtime readiness, bridge readiness, and production evidence gaps.',
     '- `connector-bridge-handoff.json`: lightweight connector bridge handoff for browser extension, Electron WebView preload, mobile WebView, or native helper integration.',
     '- `connector-bridge-handoff-acceptance.json`: standalone gate for the lightweight connector bridge handoff.',
     '- `connector-bridge-smoke-report.json`: dry-run bridge message dispatch report for observe candidates, insert mark, tracks, and preflight.',
@@ -207,6 +209,7 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   await write('adapter-blueprint-matrix.json', pkg.adapter_blueprints?.matrix);
   await write('startup-plan-matrix.json', pkg.startup_plans?.matrix);
   await write('connector-handoff.json', buildMeetingAppTimelineConnectorHandoff(pkg));
+  await write('connector-adoption-index.json', buildMeetingAppTimelineConnectorAdoptionIndex(pkg));
   await write('connector-bridge-handoff.json', buildMeetingAppTimelineConnectorBridgeHandoff(pkg));
   await write('connector-bridge-handoff-acceptance.json', buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(pkg));
   await write('connector-bridge-smoke-report.json', await runMeetingAppTimelineConnectorBridgeSmoke(pkg));
@@ -256,6 +259,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     observeTracks,
   });
   const connectorHandoff = buildMeetingAppTimelineConnectorHandoff(pkg);
+  const connectorAdoptionIndex = buildMeetingAppTimelineConnectorAdoptionIndex(pkg);
   const connectorBridgeHandoff = buildMeetingAppTimelineConnectorBridgeHandoff(pkg);
   const connectorBridgeHandoffAcceptance = buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(connectorBridgeHandoff);
   const connectorBridgeSmokeReport = await runMeetingAppTimelineConnectorBridgeSmoke(connectorBridgeHandoff);
@@ -297,6 +301,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
       start_mode: row.start_mode,
     })) ?? [],
     handoff: connectorHandoff,
+    adoption_index: connectorAdoptionIndex,
     bridge_handoff: connectorBridgeHandoff,
     bridge_handoff_acceptance: connectorBridgeHandoffAcceptance,
     bridge_smoke_report: connectorBridgeSmokeReport,
