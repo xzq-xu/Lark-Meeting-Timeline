@@ -143,10 +143,11 @@ npm run meeting-app:connector-package
 如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
 
 ```bash
+npm run meeting-platform:provider-replay
 npm run meeting-platform:rollout-matrix
 ```
 
-它会写出 `data/meeting-platform-rollout-matrix.json`，把 provider start/end 事件证据、本地 DOM 证据，以及 `data/meeting-platform-evidence-packages/` 里的 SDK handoff 包合成 `production_ready` / `realtime_ready_provider_pending` / `needs_live_dom_and_provider_evidence` 等状态，用来判断某个平台是否能先进入真实 pilot。
+第一条命令会写出 `data/meeting-platform-provider-replay-report.json`，把 Google Meet / Teams / Zoom / Webex / Lark 的 provider 原始事件或 SDK 内置样本跑过统一 normalizer 和 runtime event contract，检查 start/end/participant/artifact 覆盖，并确认 provider 事件不阻塞实时标注。第二条命令会写出 `data/meeting-platform-rollout-matrix.json`，把 provider start/end 事件证据、本地 DOM 证据，以及 `data/meeting-platform-evidence-packages/` 里的 SDK handoff 包合成 `production_ready` / `realtime_ready_provider_pending` / `needs_live_dom_and_provider_evidence` 等状态，用来判断某个平台是否能先进入真实 pilot。
 
 如果别的项目已经交付了 SDK `platform-evidence-package`，把 JSON 放进 `data/meeting-platform-evidence-packages/` 后直接复验：
 

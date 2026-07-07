@@ -35,6 +35,7 @@ assert.equal(packedFiles.includes('bin/meeting-platform-adapter-import-plan.mjs'
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-install-manifest.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-launch-plan.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-smoke.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-platform-provider-replay.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-connector-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-blueprint.mjs'), true);
@@ -43,6 +44,7 @@ assert.equal(packedFiles.includes('cli/meeting-platform-adapter-import-plan.mjs'
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-install-manifest.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-launch-plan.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-smoke.mjs'), true);
+assert.equal(packedFiles.includes('cli/meeting-platform-provider-replay.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-capability.mjs'), true);
@@ -305,6 +307,22 @@ const adapterSmokeBinReport = JSON.parse(adapterSmokeBinStdout);
 assert.equal(adapterSmokeBinReport.type, 'meeting_platform_adapter_smoke_cli_report');
 assert.equal(adapterSmokeBinReport.ok, true);
 assert.equal(adapterSmokeBinReport.accepted_count, 2);
+
+const { stdout: providerReplayBinStdout } = await execFileAsync(
+  join(consumerDir, 'node_modules', '.bin', 'meeting-platform-provider-replay'),
+  [
+    '--platforms=google-meet,zoom',
+    '--json=true',
+  ],
+  {
+    cwd: consumerDir,
+  },
+);
+const providerReplayBinReport = JSON.parse(providerReplayBinStdout);
+assert.equal(providerReplayBinReport.type, 'meeting_platform_provider_replay_cli_report');
+assert.equal(providerReplayBinReport.ok, true);
+assert.equal(providerReplayBinReport.accepted_count, 2);
+assert.equal(providerReplayBinReport.rows.every((row) => row.provider_events_block_realtime === false), true);
 
 await writeFile(join(consumerDir, 'smoke.mjs'), `
 import assert from 'node:assert/strict';

@@ -2461,7 +2461,17 @@ assertMeetingPlatformProviderReplayMatrix({
 });
 ```
 
-`createMeetingAppTimelineSdk()` 也直接暴露同一层：`sdk.providerReplayReport()`、`sdk.assertProviderReplayReport()`、`sdk.providerReplayMatrix()` 和 `sdk.assertProviderReplayMatrix()`。这适合放进下游项目 CI，证明 provider 样本能被 SDK 识别为开始、结束、参会人或 artifact 事件；真正的实时标注仍必须使用本地观察建轴和 `captured_at_ms`。
+同一能力也随 SDK 包发布为命令行入口，适合下游项目在还没有完整 host 服务时先验 provider 样本：
+
+```sh
+npx meeting-platform-provider-replay \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --records-file=data/provider-events.json \
+  --out-file=data/provider-replay-matrix.json \
+  --report-file=data/provider-replay-report.json
+```
+
+`records-file` 可以是 `{ "recordsByPlatform": { "google_meet": [...] } }`，也可以在只验单个平台时直接传事件数组；不传文件时命令会使用 SDK 内置样本跑通 CI wiring。`createMeetingAppTimelineSdk()` 也直接暴露同一层：`sdk.providerReplayReport()`、`sdk.assertProviderReplayReport()`、`sdk.providerReplayMatrix()` 和 `sdk.assertProviderReplayMatrix()`。这适合放进下游项目 CI，证明 provider 样本能被 SDK 识别为开始、结束、参会人或 artifact 事件；真正的实时标注仍必须使用本地观察建轴和 `captured_at_ms`。
 
 如果要验收一组真实平台样本，而不是单条事件，可以用 `platform-acceptance`。它会合并 setup readiness、integration plan 和样本事件诊断，输出 `accepted / blocked / pending_samples / missing_required_coverage`：
 
