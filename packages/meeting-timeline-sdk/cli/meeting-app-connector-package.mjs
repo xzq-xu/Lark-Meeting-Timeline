@@ -8,6 +8,7 @@ import {
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
+  buildMeetingAppTimelineConnectorReleaseGate,
   buildMeetingAppTimelineConnectorSmokePlan,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
   createMeetingAppTimelineSdk,
@@ -107,6 +108,7 @@ function connectorQuickstartMarkdown(pkg = {}) {
     '- `connector-handoff.json`: compact handoff summary for another host project.',
     '- `connector-adoption-index.json`: per-platform P0/P1/P2 adoption status, install target, realtime readiness, bridge readiness, and production evidence gaps.',
     '- `connector-field-intake-index.json`: per-platform live evidence collection paths, required snapshots/events, output files, and validation commands.',
+    '- `connector-release-gate.json`: aggregated pilot/production gate for package acceptance, host checklist, bridge, field intake, and smoke execution.',
     '- `connector-bridge-handoff.json`: lightweight connector bridge handoff for browser extension, Electron WebView preload, mobile WebView, or native helper integration.',
     '- `connector-bridge-handoff-acceptance.json`: standalone gate for the lightweight connector bridge handoff.',
     '- `connector-bridge-smoke-report.json`: dry-run bridge message dispatch report for observe candidates, insert mark, tracks, and preflight.',
@@ -211,16 +213,38 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   await write('adapter-blueprint-matrix.json', pkg.adapter_blueprints?.matrix);
   await write('startup-plan-matrix.json', pkg.startup_plans?.matrix);
   await write('connector-handoff.json', buildMeetingAppTimelineConnectorHandoff(pkg));
-  await write('connector-adoption-index.json', buildMeetingAppTimelineConnectorAdoptionIndex(pkg));
-  await write('connector-field-intake-index.json', buildMeetingAppTimelineConnectorFieldIntakeIndex(pkg));
-  await write('connector-bridge-handoff.json', buildMeetingAppTimelineConnectorBridgeHandoff(pkg));
-  await write('connector-bridge-handoff-acceptance.json', buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(pkg));
-  await write('connector-bridge-smoke-report.json', await runMeetingAppTimelineConnectorBridgeSmoke(pkg));
-  await write('host-install-checklist.json', buildMeetingAppTimelineConnectorHostInstallChecklist(pkg));
-  await write('host-install-checklist-acceptance.json', buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(pkg));
-  await write('connector-smoke-plan.json', buildMeetingAppTimelineConnectorSmokePlan(pkg));
-  await write('connector-smoke-plan-acceptance.json', buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(pkg));
-  await write('connector-smoke-run-report.json', await runMeetingAppTimelineConnectorSmokePlan(pkg));
+  const connectorAdoptionIndex = buildMeetingAppTimelineConnectorAdoptionIndex(pkg);
+  const connectorFieldIntakeIndex = buildMeetingAppTimelineConnectorFieldIntakeIndex(pkg);
+  const connectorBridgeHandoff = buildMeetingAppTimelineConnectorBridgeHandoff(pkg);
+  const connectorBridgeHandoffAcceptance = buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(connectorBridgeHandoff);
+  const connectorBridgeSmokeReport = await runMeetingAppTimelineConnectorBridgeSmoke(connectorBridgeHandoff);
+  const hostInstallChecklist = buildMeetingAppTimelineConnectorHostInstallChecklist(pkg);
+  const hostInstallChecklistAcceptance = buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(hostInstallChecklist);
+  const smokePlan = buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist);
+  const smokePlanAcceptance = buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan);
+  const smokeRunReport = await runMeetingAppTimelineConnectorSmokePlan(smokePlan);
+  const connectorReleaseGate = buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
+    adoptionIndex: connectorAdoptionIndex,
+    fieldIntakeIndex: connectorFieldIntakeIndex,
+    bridgeHandoff: connectorBridgeHandoff,
+    bridgeHandoffAcceptance: connectorBridgeHandoffAcceptance,
+    bridgeSmokeReport: connectorBridgeSmokeReport,
+    hostInstallChecklistAcceptance,
+    smokePlan,
+    smokePlanAcceptance,
+    smokeRunReport,
+  });
+  await write('connector-adoption-index.json', connectorAdoptionIndex);
+  await write('connector-field-intake-index.json', connectorFieldIntakeIndex);
+  await write('connector-release-gate.json', connectorReleaseGate);
+  await write('connector-bridge-handoff.json', connectorBridgeHandoff);
+  await write('connector-bridge-handoff-acceptance.json', connectorBridgeHandoffAcceptance);
+  await write('connector-bridge-smoke-report.json', connectorBridgeSmokeReport);
+  await write('host-install-checklist.json', hostInstallChecklist);
+  await write('host-install-checklist-acceptance.json', hostInstallChecklistAcceptance);
+  await write('connector-smoke-plan.json', smokePlan);
+  await write('connector-smoke-plan-acceptance.json', smokePlanAcceptance);
+  await write('connector-smoke-run-report.json', smokeRunReport);
   await write('connector-quickstart.md', connectorQuickstartMarkdown(pkg), true);
 
   for (const [surface, plan] of Object.entries(pkg.observer_plan_by_surface ?? {})) {
@@ -272,11 +296,22 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
   const smokePlan = buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist);
   const smokePlanAcceptance = buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan);
   const smokeRunReport = await runMeetingAppTimelineConnectorSmokePlan(smokePlan);
+  const connectorReleaseGate = buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
+    adoptionIndex: connectorAdoptionIndex,
+    fieldIntakeIndex: connectorFieldIntakeIndex,
+    bridgeHandoff: connectorBridgeHandoff,
+    bridgeHandoffAcceptance: connectorBridgeHandoffAcceptance,
+    bridgeSmokeReport: connectorBridgeSmokeReport,
+    hostInstallChecklistAcceptance,
+    smokePlan,
+    smokePlanAcceptance,
+    smokeRunReport,
+  });
   const writtenFiles = await writeConnectorPackageFiles(outDir, pkg);
 
   const report = {
     type: 'meeting_app_timeline_connector_package_report',
-    ok: pkg.accepted === true,
+    ok: pkg.accepted === true && connectorReleaseGate.accepted === true,
     base_url: baseUrl,
     out_dir: outDir || undefined,
     platform_count: pkg.platform_count,
@@ -284,6 +319,8 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     handoff_count: pkg.handoff_count,
     ready_count: pkg.ready_count,
     accepted: pkg.accepted === true,
+    release_gate_accepted: connectorReleaseGate.accepted === true,
+    release_gate_target: connectorReleaseGate.target,
     required_platforms: requiredPlatforms,
     surfaces: pkg.surfaces,
     extension_scaffold: Boolean(pkg.extension?.scaffold),
@@ -307,6 +344,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     handoff: connectorHandoff,
     adoption_index: connectorAdoptionIndex,
     field_intake_index: connectorFieldIntakeIndex,
+    release_gate: connectorReleaseGate,
     bridge_handoff: connectorBridgeHandoff,
     bridge_handoff_acceptance: connectorBridgeHandoffAcceptance,
     bridge_smoke_report: connectorBridgeSmokeReport,
@@ -325,7 +363,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
 
 export function formatMeetingAppConnectorPackageCliReport(report = {}) {
   const lines = [
-    `meeting_app_timeline_connector_package_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | surfaces=${report.surface_count} | handoffs=${report.handoff_count} | ready=${report.ready_count} | blueprint_ready=${report.adapter_blueprint_ready_count} | startup_ready=${report.startup_plan_ready_count} | extension=${boolLabel(report.extension_scaffold)} | extension_accepted=${boolLabel(report.extension_accepted)} | runtime_actions=${report.runtime_event_action_count} | written=${report.written_files?.length ?? 0}`,
+    `meeting_app_timeline_connector_package_report | ok=${boolLabel(report.ok)} | release_gate=${boolLabel(report.release_gate_accepted)} | target=${report.release_gate_target ?? 'pilot'} | platforms=${report.platform_count} | surfaces=${report.surface_count} | handoffs=${report.handoff_count} | ready=${report.ready_count} | blueprint_ready=${report.adapter_blueprint_ready_count} | startup_ready=${report.startup_plan_ready_count} | extension=${boolLabel(report.extension_scaffold)} | extension_accepted=${boolLabel(report.extension_accepted)} | runtime_actions=${report.runtime_event_action_count} | written=${report.written_files?.length ?? 0}`,
   ];
   for (const row of report.rows ?? []) {
     lines.push(`${row.platform}/${row.surface}: ready=${boolLabel(row.ready_to_start)} realtime=${boolLabel(row.realtime_annotation_ready)} speaker=${boolLabel(row.speaker_track_ready)} participant=${boolLabel(row.participant_track_ready)} install=${row.install_target ?? 'n/a'} start=${row.start_mode ?? 'n/a'}`);

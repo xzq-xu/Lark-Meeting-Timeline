@@ -5,6 +5,7 @@ import {
   MEETING_APP_TIMELINE_CONNECTOR_ADOPTION_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
+  MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA,
   assertMeetingAppTimelineConnectorBridgeHandoff,
@@ -13,6 +14,7 @@ import {
   assertMeetingAppTimelineConnectorBridgeSmoke,
   assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
+  assertMeetingAppTimelineConnectorReleaseGate,
   assertMeetingAppTimelineConnectorSmokePlan,
   assertMeetingAppTimelineConnectorSmokeRun,
   buildMeetingAppTimelineConnectorBridgeHandoff,
@@ -23,6 +25,7 @@ import {
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
   buildMeetingAppTimelineConnectorPackageAcceptanceReport,
+  buildMeetingAppTimelineConnectorReleaseGate,
   buildMeetingAppTimelineConnectorSmokePlan,
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport,
   createMeetingAppTimelineSdk,
@@ -204,6 +207,71 @@ assert.equal(smokeRunReport.rows.every((row) => row.captured_at_ms_preserved ===
 assert.deepEqual(smokeRunReport.calls.slice(0, 2).map((call) => call.method), ['observePlatformCandidates', 'insertAnnotation']);
 const assertedSmokeRun = await assertMeetingAppTimelineConnectorSmokeRun(smokePlan);
 assert.equal(assertedSmokeRun.accepted, true);
+
+const releaseGate = buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
+  adoptionIndex,
+  fieldIntakeIndex,
+  bridgeHandoff,
+  bridgeHandoffAcceptance,
+  bridgeSmokeReport,
+  hostInstallChecklistAcceptance,
+  smokePlan,
+  smokePlanAcceptance,
+  smokeRunReport,
+});
+assert.equal(releaseGate.schema, MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA);
+assert.equal(releaseGate.accepted, true);
+assert.equal(releaseGate.target, 'pilot');
+assert.equal(releaseGate.pilot_ready_count, 2);
+assert.equal(releaseGate.production_ready_count, 0);
+assert.equal(releaseGate.realtime_ready_count, 2);
+assert.equal(releaseGate.bridge_ready_count, 2);
+assert.equal(releaseGate.field_intake_ready_count, 2);
+assert.equal(releaseGate.rows.every((row) => row.pilot_ready === true), true);
+assert.equal(releaseGate.rows.every((row) => row.production_ready === false), true);
+assert.equal(releaseGate.required_gates.find((gate) => gate.id === 'smoke_run_report').accepted, true);
+assert.equal(releaseGate.files_to_read_first.includes('connector-release-gate.json'), true);
+assert.equal(assertMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
+  adoptionIndex,
+  fieldIntakeIndex,
+  bridgeHandoff,
+  bridgeHandoffAcceptance,
+  bridgeSmokeReport,
+  hostInstallChecklistAcceptance,
+  smokePlan,
+  smokePlanAcceptance,
+  smokeRunReport,
+}).accepted, true);
+assert.equal(assertMeetingAppTimelineConnectorReleaseGate(connectorPackage).accepted, true);
+const productionReleaseGate = buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
+  target: 'production',
+  adoptionIndex,
+  fieldIntakeIndex,
+  bridgeHandoff,
+  bridgeHandoffAcceptance,
+  bridgeSmokeReport,
+  hostInstallChecklistAcceptance,
+  smokePlan,
+  smokePlanAcceptance,
+  smokeRunReport,
+});
+assert.equal(productionReleaseGate.accepted, false);
+assert.equal(productionReleaseGate.issues.some((issue) => issue.code.includes('production_evidence_accepted')), true);
+assert.throws(
+  () => assertMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
+    target: 'production',
+    adoptionIndex,
+    fieldIntakeIndex,
+    bridgeHandoff,
+    bridgeHandoffAcceptance,
+    bridgeSmokeReport,
+    hostInstallChecklistAcceptance,
+    smokePlan,
+    smokePlanAcceptance,
+    smokeRunReport,
+  }),
+  /release gate is not accepted/,
+);
 
 assert.equal(connectorPackage.adapter_blueprints.ready_count, 2);
 assert.equal(connectorPackage.adapter_blueprints.matrix.schema, 'meeting_platform_adapter_blueprint_matrix');

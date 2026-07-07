@@ -24,6 +24,7 @@ const { stdout } = await execFileAsync(process.execPath, [
 
 assert.match(stdout, /meeting_app_timeline_connector_package_report/);
 assert.match(stdout, /ok=yes/);
+assert.match(stdout, /release_gate=yes/);
 assert.match(stdout, /platforms=2/);
 assert.match(stdout, /surfaces=2/);
 assert.match(stdout, /extension=yes/);
@@ -45,7 +46,9 @@ assert.equal(report.adapter_blueprint_ready_count, 2);
 assert.equal(report.startup_plan_ready_count, 2);
 assert.equal(report.observer_surface_count, 2);
 assert.equal(report.scheduler_surface_count, 2);
-assert.equal(report.written_files.length, 30);
+assert.equal(report.release_gate_accepted, true);
+assert.equal(report.release_gate_target, 'pilot');
+assert.equal(report.written_files.length, 31);
 assert.equal(report.rows.some((row) => row.platform === 'google_meet' && row.surface === 'browser_extension'), true);
 assert.equal(report.rows.some((row) => row.platform === 'zoom' && row.surface === 'native_detector'), true);
 assert.equal(report.handoff.schema, 'meeting_app_timeline_connector_handoff');
@@ -57,6 +60,11 @@ assert.equal(report.adoption_index.bridge_ready_count, 2);
 assert.equal(report.field_intake_index.schema, 'meeting_app_timeline_connector_field_intake_index');
 assert.equal(report.field_intake_index.accepted, true);
 assert.equal(report.field_intake_index.rows.find((row) => row.platform === 'google_meet').provider_endpoint, 'https://timeline.example.com/api/platform-events/google-meet');
+assert.equal(report.release_gate.schema, 'meeting_app_timeline_connector_release_gate');
+assert.equal(report.release_gate.accepted, true);
+assert.equal(report.release_gate.pilot_ready_count, 2);
+assert.equal(report.release_gate.production_ready_count, 0);
+assert.equal(report.release_gate.required_gates.find((gate) => gate.id === 'smoke_run_report').accepted, true);
 assert.equal(report.bridge_handoff.schema, 'meeting_app_timeline_connector_bridge_handoff');
 assert.equal(report.bridge_handoff.accepted, true);
 assert.equal(report.bridge_handoff.factories.install_content_script_bridge, 'installMeetingPlatformConnectorContentScriptBridge');
@@ -127,6 +135,16 @@ assert.equal(connectorFieldIntakeIndex.accepted, true);
 assert.equal(connectorFieldIntakeIndex.rows.find((row) => row.platform === 'google_meet').required_provider_coverage.includes('meeting_start'), true);
 assert.equal(connectorFieldIntakeIndex.rows.find((row) => row.platform === 'zoom').commands.build_field_evidence.includes('meeting-platform:field-evidence'), true);
 
+const connectorReleaseGate = JSON.parse(await readFile(join(outDir, 'connector-release-gate.json'), 'utf8'));
+assert.equal(connectorReleaseGate.schema, 'meeting_app_timeline_connector_release_gate');
+assert.equal(connectorReleaseGate.accepted, true);
+assert.equal(connectorReleaseGate.target, 'pilot');
+assert.equal(connectorReleaseGate.pilot_ready_count, 2);
+assert.equal(connectorReleaseGate.production_ready_count, 0);
+assert.equal(connectorReleaseGate.rows.every((row) => row.pilot_ready === true), true);
+assert.equal(connectorReleaseGate.required_gates.find((gate) => gate.id === 'bridge_smoke_report').accepted, true);
+assert.equal(connectorReleaseGate.files_to_read_first.includes('connector-release-gate.json'), true);
+
 const connectorBridgeHandoff = JSON.parse(await readFile(join(outDir, 'connector-bridge-handoff.json'), 'utf8'));
 assert.equal(connectorBridgeHandoff.schema, 'meeting_app_timeline_connector_bridge_handoff');
 assert.equal(connectorBridgeHandoff.accepted, true);
@@ -185,6 +203,7 @@ const connectorQuickstart = await readFile(join(outDir, 'connector-quickstart.md
 assert.match(connectorQuickstart, /Meeting App Timeline Connector Quickstart/);
 assert.match(connectorQuickstart, /connector-adoption-index\.json/);
 assert.match(connectorQuickstart, /connector-field-intake-index\.json/);
+assert.match(connectorQuickstart, /connector-release-gate\.json/);
 assert.match(connectorQuickstart, /connector-bridge-handoff\.json/);
 assert.match(connectorQuickstart, /connector-bridge-handoff-acceptance\.json/);
 assert.match(connectorQuickstart, /connector-bridge-smoke-report\.json/);

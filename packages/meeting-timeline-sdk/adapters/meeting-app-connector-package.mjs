@@ -27,6 +27,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_SMOKE_REPORT_SCHEMA = 'meetin
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA = 'meeting_app_timeline_connector_smoke_plan';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_smoke_plan_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA = 'meeting_app_timeline_connector_smoke_run_report';
+export const MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA = 'meeting_app_timeline_connector_release_gate';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA = 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION = 1;
 
@@ -1970,6 +1971,329 @@ export async function assertMeetingAppTimelineConnectorSmokeRun(planOrChecklistO
     });
   }
   return report;
+}
+
+function releaseGateTarget(options = {}) {
+  const target = String(firstNonEmpty(
+    options.releaseTarget,
+    options.release_target,
+    options.target,
+    options.requireProductionEvidence === true || options.require_production_evidence === true ? 'production' : undefined,
+    'pilot',
+  )).toLowerCase();
+  return target === 'production' ? 'production' : 'pilot';
+}
+
+function reportIssueCount(report = {}) {
+  if (Number.isFinite(report.issue_count)) return report.issue_count;
+  return asArray(report.issues).length;
+}
+
+function reportIssues(report = {}) {
+  return asArray(report.issues).map((issue) => (typeof issue === 'string'
+    ? issue
+    : issue?.code ?? issue?.message ?? JSON.stringify(issue)));
+}
+
+function releaseGateComponent(id, report, {
+  required = true,
+  severity = 'error',
+  sourceSchema,
+  accepted,
+} = {}) {
+  if (!report) {
+    return compactObject({
+      id,
+      accepted: required !== true,
+      supplied: false,
+      required,
+      severity: required ? severity : 'info',
+      status: required ? 'missing' : 'optional_not_supplied',
+      source_schema: sourceSchema,
+      issue_count: required ? 1 : 0,
+      issues: required ? ['missing_report'] : [],
+    });
+  }
+  const isAccepted = accepted ?? report.accepted === true;
+  return compactObject({
+    id,
+    accepted: isAccepted,
+    supplied: true,
+    required,
+    severity: isAccepted ? 'info' : severity,
+    status: isAccepted ? 'accepted' : 'failed',
+    source_schema: sourceSchema ?? report.schema,
+    issue_count: isAccepted ? 0 : reportIssueCount(report),
+    issues: isAccepted ? [] : reportIssues(report),
+  });
+}
+
+function releaseGateSmokeRowByPlatform(smokeRunReport = {}) {
+  return new Map((smokeRunReport?.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
+}
+
+function releaseGateProductionReady(adoptionRow = {}, fieldRow = {}) {
+  return adoptionRow.production_evidence_accepted === true && fieldRow.production_ready === true;
+}
+
+function releaseGateFieldIntakeReady(fieldRow = {}) {
+  return Boolean(
+    fieldRow.field_evidence_input
+    && fieldRow.evidence_package
+    && fieldRow.commands?.build_field_evidence
+    && fieldRow.commands?.validate_real_intake
+    && asArray(fieldRow.required_local_snapshots).length > 0,
+  );
+}
+
+export function buildMeetingAppTimelineConnectorReleaseGate(checklistOrPackage = {}, options = {}) {
+  const target = releaseGateTarget(options);
+  const packageAcceptance = firstNonEmpty(
+    options.packageAcceptance,
+    options.package_acceptance,
+    options.packageAcceptanceReport,
+    options.package_acceptance_report,
+    checklistOrPackage.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA ? checklistOrPackage.acceptance : undefined,
+    checklistOrPackage.acceptance,
+    checklistOrPackage.schema === MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA
+      ? buildMeetingAppTimelineConnectorPackageAcceptanceReport(checklistOrPackage, {
+        ...options,
+        target: target === 'production' ? 'production' : 'realtime',
+      })
+      : undefined,
+  );
+  const hostInstallChecklist = checklistOrPackage.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA
+    ? checklistOrPackage
+    : buildMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage, {
+      ...options,
+      target: target === 'production' ? 'production' : 'realtime',
+    });
+  const hostInstallChecklistAcceptance = firstNonEmpty(
+    options.hostInstallChecklistAcceptance,
+    options.host_install_checklist_acceptance,
+    options.hostInstallChecklistAcceptanceReport,
+    options.host_install_checklist_acceptance_report,
+    buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(hostInstallChecklist, options),
+  );
+  const fieldIntakeIndex = firstNonEmpty(
+    options.fieldIntakeIndex,
+    options.field_intake_index,
+    buildMeetingAppTimelineConnectorFieldIntakeIndex(hostInstallChecklist, options),
+  );
+  const adoptionIndex = firstNonEmpty(
+    options.adoptionIndex,
+    options.adoption_index,
+    buildMeetingAppTimelineConnectorAdoptionIndex(hostInstallChecklist, options),
+  );
+  const bridgeHandoff = firstNonEmpty(
+    options.bridgeHandoff,
+    options.bridge_handoff,
+    buildMeetingAppTimelineConnectorBridgeHandoff(hostInstallChecklist, options),
+  );
+  const bridgeHandoffAcceptance = firstNonEmpty(
+    options.bridgeHandoffAcceptance,
+    options.bridge_handoff_acceptance,
+    options.bridgeHandoffAcceptanceReport,
+    options.bridge_handoff_acceptance_report,
+    buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(bridgeHandoff, options),
+  );
+  const bridgeSmokeReport = firstNonEmpty(
+    options.bridgeSmokeReport,
+    options.bridge_smoke_report,
+  );
+  const smokePlan = firstNonEmpty(
+    options.smokePlan,
+    options.smoke_plan,
+    buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist, options),
+  );
+  const smokePlanAcceptance = firstNonEmpty(
+    options.smokePlanAcceptance,
+    options.smoke_plan_acceptance,
+    options.smokePlanAcceptanceReport,
+    options.smoke_plan_acceptance_report,
+    buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan, options),
+  );
+  const smokeRunReport = firstNonEmpty(
+    options.smokeRunReport,
+    options.smoke_run_report,
+  );
+  const requireSmokeReports = options.requireSmokeReports === true
+    || options.require_smoke_reports === true
+    || target === 'production';
+
+  const fieldByPlatform = new Map((fieldIntakeIndex.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
+  const smokeRunByPlatform = releaseGateSmokeRowByPlatform(smokeRunReport);
+  const rows = (adoptionIndex.rows ?? []).map((adoptionRow) => {
+    const platform = normalizeKey(adoptionRow.platform);
+    const fieldRow = fieldByPlatform.get(platform) ?? {};
+    const fieldIntakeReady = releaseGateFieldIntakeReady(fieldRow);
+    const smokeRunRow = smokeRunByPlatform.get(platform);
+    const smokeRunReady = !smokeRunReport
+      ? !requireSmokeReports
+      : smokeRunRow?.accepted === true
+        && smokeRunRow?.observe_before_insert === true
+        && smokeRunRow?.captured_at_ms_preserved === true;
+    const pilotReady = adoptionRow.realtime_ready === true
+      && adoptionRow.bridge_ready === true
+      && fieldIntakeReady
+      && smokeRunReady;
+    const productionReady = pilotReady && releaseGateProductionReady(adoptionRow, fieldRow);
+    const missing = [
+      adoptionRow.realtime_ready === true ? undefined : 'realtime_ready',
+      adoptionRow.bridge_ready === true ? undefined : 'bridge_ready',
+      fieldIntakeReady ? undefined : 'field_intake_ready',
+      smokeRunReady ? undefined : 'smoke_run_ready',
+      target === 'production' && adoptionRow.production_evidence_accepted !== true ? 'production_evidence_accepted' : undefined,
+      target === 'production' && fieldRow.production_ready !== true ? 'field_intake_production_ready' : undefined,
+    ].filter(Boolean);
+    return compactObject({
+      platform,
+      display_name: adoptionRow.display_name ?? fieldRow.display_name,
+      pilot_ready: pilotReady,
+      production_ready: productionReady,
+      realtime_ready: adoptionRow.realtime_ready === true,
+      bridge_ready: adoptionRow.bridge_ready === true,
+      field_intake_ready: fieldIntakeReady,
+      smoke_run_ready: smokeRunReady,
+      smoke_run_supplied: Boolean(smokeRunReport),
+      production_evidence_accepted: adoptionRow.production_evidence_accepted === true,
+      selected_surface: adoptionRow.selected_surface,
+      install_target: adoptionRow.install_target,
+      status: productionReady
+        ? 'production_ready'
+        : pilotReady
+          ? 'pilot_ready'
+          : 'not_ready',
+      field_intake_status: fieldRow.status,
+      missing,
+      next_actions: unique([
+        ...asArray(adoptionRow.next_actions),
+        ...asArray(fieldRow.next_actions),
+      ]),
+    });
+  });
+
+  const requiredGates = [
+    releaseGateComponent('package_acceptance', packageAcceptance, {
+      sourceSchema: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_ACCEPTANCE_SCHEMA,
+    }),
+    releaseGateComponent('host_install_checklist_acceptance', hostInstallChecklistAcceptance, {
+      sourceSchema: MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA,
+    }),
+    releaseGateComponent('adoption_index', adoptionIndex, {
+      sourceSchema: MEETING_APP_TIMELINE_CONNECTOR_ADOPTION_INDEX_SCHEMA,
+    }),
+    releaseGateComponent('field_intake_index', fieldIntakeIndex, {
+      sourceSchema: MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA,
+    }),
+    releaseGateComponent('bridge_handoff_acceptance', bridgeHandoffAcceptance, {
+      sourceSchema: MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_ACCEPTANCE_SCHEMA,
+    }),
+    releaseGateComponent('bridge_smoke_report', bridgeSmokeReport, {
+      required: requireSmokeReports || Boolean(bridgeSmokeReport),
+      sourceSchema: MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_SMOKE_REPORT_SCHEMA,
+      accepted: bridgeSmokeReport
+        ? bridgeSmokeReport.accepted === true && bridgeSmokeReport.observe_before_insert === true
+        : undefined,
+    }),
+    releaseGateComponent('smoke_plan_acceptance', smokePlanAcceptance, {
+      sourceSchema: MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA,
+    }),
+    releaseGateComponent('smoke_run_report', smokeRunReport, {
+      required: requireSmokeReports || Boolean(smokeRunReport),
+      sourceSchema: MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA,
+      accepted: smokeRunReport
+        ? smokeRunReport.accepted === true
+          && (smokeRunReport.rows ?? []).every((row) => row.observe_before_insert === true && row.captured_at_ms_preserved === true)
+        : undefined,
+    }),
+  ];
+
+  const gateIssues = requiredGates
+    .filter((gate) => gate.accepted !== true)
+    .flatMap((gate) => (gate.issues?.length > 0 ? gate.issues : ['failed'])
+      .map((issue) => compactObject({
+        code: `${gate.id}_${issue}`,
+        gate: gate.id,
+        message: `${gate.id} failed: ${issue}`,
+      })));
+  const rowIssues = rows.flatMap((row) => row.missing.map((item) => compactObject({
+    code: `${row.platform}_${item}`,
+    platform: row.platform,
+    message: `${row.platform} is missing ${item}`,
+  })));
+  const issues = [...gateIssues, ...rowIssues];
+  const pilotReadyCount = rows.filter((row) => row.pilot_ready === true).length;
+  const productionReadyCount = rows.filter((row) => row.production_ready === true).length;
+  const accepted = issues.length === 0
+    && rows.length > 0
+    && (target === 'production'
+      ? productionReadyCount === rows.length
+      : pilotReadyCount === rows.length);
+
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted,
+    target,
+    package_id: hostInstallChecklist.package_id,
+    runtime_event_endpoint: hostInstallChecklist.runtime_event_endpoint,
+    timestamp_field: hostInstallChecklist.timestamp_field,
+    platform_count: hostInstallChecklist.platform_count ?? rows.length,
+    row_count: rows.length,
+    pilot_ready_count: pilotReadyCount,
+    production_ready_count: productionReadyCount,
+    realtime_ready_count: rows.filter((row) => row.realtime_ready === true).length,
+    bridge_ready_count: rows.filter((row) => row.bridge_ready === true).length,
+    field_intake_ready_count: rows.filter((row) => row.field_intake_ready === true).length,
+    require_smoke_reports: requireSmokeReports,
+    source_schemas: {
+      package_acceptance: packageAcceptance?.schema,
+      host_install_checklist: hostInstallChecklist.schema,
+      host_install_checklist_acceptance: hostInstallChecklistAcceptance.schema,
+      adoption_index: adoptionIndex.schema,
+      field_intake_index: fieldIntakeIndex.schema,
+      bridge_handoff: bridgeHandoff.schema,
+      bridge_handoff_acceptance: bridgeHandoffAcceptance.schema,
+      bridge_smoke_report: bridgeSmokeReport?.schema,
+      smoke_plan: smokePlan.schema,
+      smoke_plan_acceptance: smokePlanAcceptance.schema,
+      smoke_run_report: smokeRunReport?.schema,
+    },
+    files_to_read_first: [
+      'connector-release-gate.json',
+      'connector-adoption-index.json',
+      'connector-field-intake-index.json',
+      'connector-bridge-smoke-report.json',
+      'connector-smoke-run-report.json',
+      'host-install-checklist.json',
+      'host-install-checklist-acceptance.json',
+    ],
+    required_gates: requiredGates,
+    rows,
+    issue_count: issues.length,
+    issues,
+    next_actions: issues.length > 0
+      ? unique([
+        ...issues.map((issue) => `fix_${issue.code}`),
+        ...rows.flatMap((row) => row.next_actions ?? []),
+      ])
+      : target === 'production'
+        ? ['ship_platform_adapters_to_host_project']
+        : ['capture_live_evidence_before_production_rollout'],
+  });
+}
+
+export function assertMeetingAppTimelineConnectorReleaseGate(checklistOrPackage = {}, options = {}) {
+  const gate = buildMeetingAppTimelineConnectorReleaseGate(checklistOrPackage, options);
+  if (!gate.accepted) {
+    throw new MeetingTimelineSdkError('Meeting app timeline connector release gate is not accepted', {
+      gate,
+      issues: gate.issues,
+    });
+  }
+  return gate;
 }
 
 export function createMeetingAppTimelineConnectorRuntimeClient(pkg = {}, options = {}) {

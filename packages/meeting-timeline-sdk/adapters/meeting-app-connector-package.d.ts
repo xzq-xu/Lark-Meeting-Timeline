@@ -13,6 +13,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_SMOKE_REPORT_SCHEMA: 'meeting
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA: 'meeting_app_timeline_connector_smoke_plan';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA: 'meeting_app_timeline_connector_smoke_plan_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA: 'meeting_app_timeline_connector_smoke_run_report';
+export const MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA: 'meeting_app_timeline_connector_release_gate';
 export const MEETING_APP_TIMELINE_CONNECTOR_RUNTIME_CLIENT_SCHEMA: 'meeting_app_timeline_connector_runtime_client';
 export const MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION: 1;
 
@@ -403,6 +404,56 @@ export interface MeetingAppTimelineConnectorSmokeRunReport {
   next_actions: string[];
 }
 
+export interface MeetingAppTimelineConnectorReleaseGate {
+  type: 'meeting_app_timeline_connector_release_gate';
+  schema: 'meeting_app_timeline_connector_release_gate';
+  schema_version: 1;
+  accepted: boolean;
+  target: 'pilot' | 'production';
+  package_id?: string;
+  runtime_event_endpoint?: string;
+  timestamp_field?: string;
+  platform_count: number;
+  row_count: number;
+  pilot_ready_count: number;
+  production_ready_count: number;
+  realtime_ready_count: number;
+  bridge_ready_count: number;
+  field_intake_ready_count: number;
+  require_smoke_reports: boolean;
+  source_schemas: Record<string, unknown>;
+  files_to_read_first: string[];
+  required_gates: Array<Record<string, unknown> & {
+    id: string;
+    accepted: boolean;
+    supplied: boolean;
+    required: boolean;
+    severity: string;
+    status: string;
+    source_schema?: string;
+    issue_count: number;
+    issues: string[];
+  }>;
+  rows: Array<Record<string, unknown> & {
+    platform: string;
+    pilot_ready: boolean;
+    production_ready: boolean;
+    realtime_ready: boolean;
+    bridge_ready: boolean;
+    field_intake_ready: boolean;
+    smoke_run_ready: boolean;
+    production_evidence_accepted: boolean;
+    selected_surface?: string;
+    install_target?: string;
+    status: string;
+    missing: string[];
+    next_actions: string[];
+  }>;
+  issue_count: number;
+  issues: MeetingAppTimelineConnectorPackageIssue[];
+  next_actions: string[];
+}
+
 export interface MeetingAppTimelineConnectorRuntimeClient {
   type: 'meeting_app_timeline_connector_runtime_client';
   schema: 'meeting_app_timeline_connector_runtime_client';
@@ -540,6 +591,16 @@ export function assertMeetingAppTimelineConnectorSmokeRun(
   planOrChecklistOrPackage?: MeetingAppTimelineConnectorSmokePlan | MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
   options?: Record<string, unknown>,
 ): Promise<MeetingAppTimelineConnectorSmokeRunReport>;
+
+export function buildMeetingAppTimelineConnectorReleaseGate(
+  checklistOrPackage?: MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineConnectorReleaseGate;
+
+export function assertMeetingAppTimelineConnectorReleaseGate(
+  checklistOrPackage?: MeetingAppTimelineConnectorHostInstallChecklist | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+  options?: Record<string, unknown>,
+): MeetingAppTimelineConnectorReleaseGate;
 
 export function createMeetingAppTimelineConnectorRuntimeClient(
   pkg?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,
