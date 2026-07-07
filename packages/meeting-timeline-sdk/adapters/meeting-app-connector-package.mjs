@@ -14,6 +14,7 @@ export const MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA = 'meeting_app_timeli
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist';
 export const MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_host_install_checklist_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA = 'meeting_app_timeline_connector_bridge_handoff';
+export const MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_bridge_handoff_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA = 'meeting_app_timeline_connector_smoke_plan';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_smoke_plan_acceptance_report';
 export const MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA = 'meeting_app_timeline_connector_smoke_run_report';
@@ -904,6 +905,136 @@ export function buildMeetingAppTimelineConnectorBridgeHandoff(pkgOrChecklist = {
       ])
       : checklist.next_actions ?? consumerHandoff.next_actions ?? [],
   });
+}
+
+export function buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(handoffOrPackageOrChecklist = {}, options = {}) {
+  const handoff = handoffOrPackageOrChecklist?.schema === MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA
+    ? handoffOrPackageOrChecklist
+    : buildMeetingAppTimelineConnectorBridgeHandoff(handoffOrPackageOrChecklist, options);
+  const rows = handoff.rows ?? [];
+  const issues = [];
+  const messageTypes = new Set(handoff.message_contract?.message_types ?? []);
+  const outputActions = new Set(handoff.message_contract?.output_runtime_actions ?? []);
+  const requiredMessages = [
+    'meeting_timeline.observe_candidates',
+    'meeting_timeline.insert_mark',
+    'meeting_timeline.sample_tracks',
+  ];
+  const requiredOutputActions = [
+    'observe_platform_candidates',
+    'insert_annotation',
+    'speaker_track',
+    'participant_track',
+  ];
+
+  if (handoff.schema !== MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA) {
+    addIssue(issues, 'invalid_schema', 'Expected a meeting app timeline connector bridge handoff', {
+      expected_schema: MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_SCHEMA,
+      actual_schema: handoff.schema,
+    });
+  }
+  if (handoff.accepted !== true) addIssue(issues, 'bridge_handoff_not_accepted', 'Connector bridge handoff accepted flag is not true');
+  if (!handoff.module) addIssue(issues, 'missing_module', 'Connector bridge handoff must declare SDK module');
+  if (handoff.factories?.install_content_script_bridge !== 'installMeetingPlatformConnectorContentScriptBridge') {
+    addIssue(issues, 'missing_install_content_script_bridge_factory', 'Bridge handoff must expose installMeetingPlatformConnectorContentScriptBridge', {
+      actual_factory: handoff.factories?.install_content_script_bridge,
+    });
+  }
+  if (handoff.factories?.create_hub !== 'createMeetingPlatformConnectorHub') {
+    addIssue(issues, 'missing_create_hub_factory', 'Bridge handoff must expose createMeetingPlatformConnectorHub', {
+      actual_factory: handoff.factories?.create_hub,
+    });
+  }
+  if (!handoff.runtime_event_endpoint && !handoff.host_requirements?.runtime_event_endpoint) {
+    addIssue(issues, 'missing_runtime_event_endpoint', 'Bridge handoff must declare runtime event endpoint');
+  }
+  if (handoff.host_requirements?.timestamp_field !== 'captured_at_ms') {
+    addIssue(issues, 'invalid_timestamp_contract', 'Bridge handoff must require captured_at_ms', {
+      timestamp_field: handoff.host_requirements?.timestamp_field,
+    });
+  }
+  if (handoff.host_requirements?.provider_events_block_realtime !== false) {
+    addIssue(issues, 'provider_events_block_realtime', 'Provider events must not block realtime annotation insertion');
+  }
+  for (const message of requiredMessages) {
+    if (!messageTypes.has(message)) addIssue(issues, 'missing_message_type', 'Bridge handoff is missing required message type', { message_type: message });
+  }
+  for (const action of requiredOutputActions) {
+    if (!outputActions.has(action)) addIssue(issues, 'missing_output_runtime_action', 'Bridge handoff is missing required output runtime action', { action });
+  }
+  if ((handoff.platform_count ?? 0) <= 0) addIssue(issues, 'missing_platforms', 'Bridge handoff must include at least one platform');
+  if (rows.length !== handoff.platform_count) {
+    addIssue(issues, 'row_count_mismatch', 'Bridge handoff row count must equal platform_count', {
+      row_count: rows.length,
+      platform_count: handoff.platform_count,
+    });
+  }
+  for (const row of rows) {
+    const platform = normalizeKey(row.platform);
+    if (!platform) addIssue(issues, 'row_missing_platform', 'Bridge handoff row is missing platform');
+    if (!row.selected_surface) addIssue(issues, 'row_missing_selected_surface', 'Bridge handoff row is missing selected_surface', { platform });
+    if (!row.install_target) addIssue(issues, 'row_missing_install_target', 'Bridge handoff row is missing install_target', { platform });
+    if (row.bridge_factory !== 'installMeetingPlatformConnectorContentScriptBridge') {
+      addIssue(issues, 'row_missing_bridge_factory', 'Bridge handoff row must expose install bridge factory', {
+        platform,
+        bridge_factory: row.bridge_factory,
+      });
+    }
+    if (row.client_methods?.insert_annotation !== 'insertAnnotation') {
+      addIssue(issues, 'row_missing_insert_annotation_client_method', 'Bridge handoff row must expose insertAnnotation client method', {
+        platform,
+        client_method: row.client_methods?.insert_annotation,
+      });
+    }
+    if (!(row.supported_message_types ?? []).includes('meeting_timeline.insert_mark')) {
+      addIssue(issues, 'row_missing_insert_mark_message_type', 'Bridge handoff row must support meeting_timeline.insert_mark', { platform });
+    }
+  }
+
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_ACCEPTANCE_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_BRIDGE_HANDOFF_ACCEPTANCE_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    target: handoff.target,
+    package_id: handoff.package_id,
+    platform_count: handoff.platform_count ?? 0,
+    row_count: rows.length,
+    runtime_event_endpoint: handoff.runtime_event_endpoint ?? handoff.host_requirements?.runtime_event_endpoint,
+    timestamp_field: handoff.host_requirements?.timestamp_field,
+    module: handoff.module,
+    install_content_script_bridge_factory: handoff.factories?.install_content_script_bridge,
+    create_hub_factory: handoff.factories?.create_hub,
+    required_message_types: requiredMessages,
+    required_output_runtime_actions: requiredOutputActions,
+    bridge_handoff_accepted: handoff.accepted === true,
+    issue_count: issues.length,
+    issues,
+    rows: rows.map((row) => compactObject({
+      platform: row.platform,
+      selected_surface: row.selected_surface,
+      install_target: row.install_target,
+      bridge_factory: row.bridge_factory,
+      insert_annotation_client_method: row.client_methods?.insert_annotation,
+    })),
+    next_actions: issues.length > 0
+      ? unique([
+        ...issues.map((issue) => `fix_${issue.code}`),
+        ...(handoff.next_actions ?? []),
+      ])
+      : handoff.next_actions ?? [],
+  });
+}
+
+export function assertMeetingAppTimelineConnectorBridgeHandoff(handoffOrPackageOrChecklist = {}, options = {}) {
+  const report = buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(handoffOrPackageOrChecklist, options);
+  if (!report.accepted) {
+    throw new MeetingTimelineSdkError('Meeting app timeline connector bridge handoff is not accepted', {
+      report,
+      issues: report.issues,
+    });
+  }
+  return handoffOrPackageOrChecklist;
 }
 
 export function buildMeetingAppTimelineConnectorSmokePlan(checklistOrPackage = {}, options = {}) {

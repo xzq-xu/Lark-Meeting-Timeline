@@ -45,7 +45,7 @@ assert.equal(report.adapter_blueprint_ready_count, 2);
 assert.equal(report.startup_plan_ready_count, 2);
 assert.equal(report.observer_surface_count, 2);
 assert.equal(report.scheduler_surface_count, 2);
-assert.equal(report.written_files.length, 26);
+assert.equal(report.written_files.length, 27);
 assert.equal(report.rows.some((row) => row.platform === 'google_meet' && row.surface === 'browser_extension'), true);
 assert.equal(report.rows.some((row) => row.platform === 'zoom' && row.surface === 'native_detector'), true);
 assert.equal(report.handoff.schema, 'meeting_app_timeline_connector_handoff');
@@ -53,6 +53,8 @@ assert.equal(report.handoff.startup_plans.rows.some((row) => row.platform === 'z
 assert.equal(report.bridge_handoff.schema, 'meeting_app_timeline_connector_bridge_handoff');
 assert.equal(report.bridge_handoff.accepted, true);
 assert.equal(report.bridge_handoff.factories.install_content_script_bridge, 'installMeetingPlatformConnectorContentScriptBridge');
+assert.equal(report.bridge_handoff_acceptance.schema, 'meeting_app_timeline_connector_bridge_handoff_acceptance_report');
+assert.equal(report.bridge_handoff_acceptance.accepted, true);
 assert.equal(report.host_install_checklist.schema, 'meeting_app_timeline_connector_host_install_checklist');
 assert.equal(report.host_install_checklist.rows.some((row) => row.platform === 'zoom' && row.selected_surface === 'native_detector'), true);
 assert.equal(report.host_install_checklist_acceptance.schema, 'meeting_app_timeline_connector_host_install_checklist_acceptance_report');
@@ -108,6 +110,12 @@ assert.equal(connectorBridgeHandoff.message_contract.message_types.includes('mee
 assert.equal(connectorBridgeHandoff.host_requirements.timestamp_field, 'captured_at_ms');
 assert.equal(connectorBridgeHandoff.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
 
+const connectorBridgeHandoffAcceptance = JSON.parse(await readFile(join(outDir, 'connector-bridge-handoff-acceptance.json'), 'utf8'));
+assert.equal(connectorBridgeHandoffAcceptance.schema, 'meeting_app_timeline_connector_bridge_handoff_acceptance_report');
+assert.equal(connectorBridgeHandoffAcceptance.accepted, true);
+assert.equal(connectorBridgeHandoffAcceptance.required_message_types.includes('meeting_timeline.insert_mark'), true);
+assert.equal(connectorBridgeHandoffAcceptance.required_output_runtime_actions.includes('observe_platform_candidates'), true);
+
 const hostInstallChecklist = JSON.parse(await readFile(join(outDir, 'host-install-checklist.json'), 'utf8'));
 assert.equal(hostInstallChecklist.schema, 'meeting_app_timeline_connector_host_install_checklist');
 assert.equal(hostInstallChecklist.accepted, true);
@@ -145,6 +153,7 @@ assert.equal(smokeRunReport.rows.every((row) => row.captured_at_ms_preserved ===
 const connectorQuickstart = await readFile(join(outDir, 'connector-quickstart.md'), 'utf8');
 assert.match(connectorQuickstart, /Meeting App Timeline Connector Quickstart/);
 assert.match(connectorQuickstart, /connector-bridge-handoff\.json/);
+assert.match(connectorQuickstart, /connector-bridge-handoff-acceptance\.json/);
 assert.match(connectorQuickstart, /host-install-checklist\.json/);
 assert.match(connectorQuickstart, /host-install-checklist-acceptance\.json/);
 assert.match(connectorQuickstart, /connector-smoke-plan\.json/);

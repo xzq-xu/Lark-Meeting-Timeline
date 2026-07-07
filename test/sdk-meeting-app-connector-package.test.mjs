@@ -5,11 +5,13 @@ import {
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_PLAN_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_SMOKE_RUN_REPORT_SCHEMA,
+  assertMeetingAppTimelineConnectorBridgeHandoff,
   assertMeetingAppTimelineConnectorHostInstallChecklist,
   assertMeetingAppTimelineConnectorPackage,
   assertMeetingAppTimelineConnectorSmokePlan,
   assertMeetingAppTimelineConnectorSmokeRun,
   buildMeetingAppTimelineConnectorBridgeHandoff,
+  buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport,
   buildMeetingAppTimelineConnectorHandoff,
   buildMeetingAppTimelineConnectorHostInstallChecklist,
   buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport,
@@ -107,6 +109,14 @@ assert.equal(bridgeHandoff.rows.find((row) => row.platform === 'google_meet').se
 assert.equal(bridgeHandoff.rows.find((row) => row.platform === 'zoom').install_target, 'native_or_desktop_observer');
 assert.equal(bridgeHandoff.sample_messages[0].payload.captured_at_ms, 1_782_614_400_000);
 assert.equal(bridgeHandoff.issue_count, 0);
+const bridgeHandoffAcceptance = buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(bridgeHandoff);
+assert.equal(bridgeHandoffAcceptance.schema, 'meeting_app_timeline_connector_bridge_handoff_acceptance_report');
+assert.equal(bridgeHandoffAcceptance.accepted, true);
+assert.equal(bridgeHandoffAcceptance.required_message_types.includes('meeting_timeline.observe_candidates'), true);
+assert.equal(bridgeHandoffAcceptance.required_output_runtime_actions.includes('insert_annotation'), true);
+assert.equal(bridgeHandoffAcceptance.issue_count, 0);
+assert.equal(assertMeetingAppTimelineConnectorBridgeHandoff(bridgeHandoff), bridgeHandoff);
+assert.equal(buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(connectorPackage).accepted, true);
 
 const smokePlan = buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist, {
   baseCapturedAtMs: 1_782_614_400_000,
@@ -318,6 +328,19 @@ assert.equal(
 assert.throws(
   () => assertMeetingAppTimelineConnectorHostInstallChecklist(brokenHostInstallChecklist),
   /host install checklist is not accepted/,
+);
+
+const brokenBridgeHandoff = structuredClone(bridgeHandoff);
+brokenBridgeHandoff.message_contract.message_types = brokenBridgeHandoff.message_contract.message_types.filter((item) => item !== 'meeting_timeline.insert_mark');
+const brokenBridgeHandoffAcceptance = buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(brokenBridgeHandoff);
+assert.equal(brokenBridgeHandoffAcceptance.accepted, false);
+assert.equal(
+  brokenBridgeHandoffAcceptance.issues.some((issue) => issue.code === 'missing_message_type' && issue.message_type === 'meeting_timeline.insert_mark'),
+  true,
+);
+assert.throws(
+  () => assertMeetingAppTimelineConnectorBridgeHandoff(brokenBridgeHandoff),
+  /bridge handoff is not accepted/,
 );
 
 const brokenSmokePlan = structuredClone(smokePlan);
