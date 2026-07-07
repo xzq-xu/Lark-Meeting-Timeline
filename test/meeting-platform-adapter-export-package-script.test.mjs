@@ -32,10 +32,11 @@ assert.equal(report.platform_count, 1);
 assert.equal(report.accepted_count, 1);
 assert.equal(report.export_ready_count, 1);
 assert.equal(report.written_files.includes(join(outDir, 'google_meet', 'adapter-export-package.json')), true);
+assert.equal(report.written_files.includes(join(outDir, 'google_meet', 'adapter-blueprint.json')), true);
 assert.equal(report.written_files.includes(join(outDir, 'google_meet', 'runtime-bundle.json')), true);
 assert.equal(report.written_files.includes(join(outDir, 'google_meet', 'provider-connection.json')), true);
 assert.equal(report.rows[0].package_file, join(outDir, 'google_meet', 'adapter-export-package.json'));
-assert.equal(report.rows[0].host_file_count >= 7, true);
+assert.equal(report.rows[0].host_file_count >= 8, true);
 assert.equal(report.matrix.packages, undefined);
 
 const writtenReport = JSON.parse(await readFile(reportFile, 'utf8'));
@@ -46,8 +47,14 @@ const exportPackage = JSON.parse(await readFile(join(outDir, 'google_meet', 'ada
 assert.equal(exportPackage.schema, 'meeting_platform_adapter_export_package');
 assert.equal(exportPackage.accepted, true);
 assert.equal(exportPackage.artifacts, undefined);
+assert.equal(exportPackage.host_files.find((file) => file.source === 'adapter_blueprint').path, 'google_meet/adapter-blueprint.json');
 assert.equal(exportPackage.host_files.find((file) => file.source === 'adapter_contract').path, 'google_meet/adapter-contract.json');
 assert.equal(exportPackage.surface_entrypoints.provider_reconcile.blocks_realtime_annotation, false);
+
+const adapterBlueprint = JSON.parse(await readFile(join(outDir, 'google_meet', 'adapter-blueprint.json'), 'utf8'));
+assert.equal(adapterBlueprint.schema, 'meeting_platform_adapter_blueprint');
+assert.equal(adapterBlueprint.platform, 'google_meet');
+assert.equal(adapterBlueprint.surfaces.provider_reconcile.blocks_realtime, false);
 
 const runtimeBundle = JSON.parse(await readFile(join(outDir, 'google_meet', 'runtime-bundle.json'), 'utf8'));
 assert.equal(runtimeBundle.schema, 'meeting_platform_runtime_bundle');

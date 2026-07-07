@@ -7,6 +7,9 @@ import {
   buildMeetingPlatformAdapterPortfolioItem,
 } from './platform-adapter-portfolio.mjs';
 import {
+  buildMeetingPlatformAdapterBlueprint,
+} from './platform-adapter-blueprint.mjs';
+import {
   buildMeetingPlatformAdapterAcceptanceChecklist,
   buildMeetingPlatformAdapterAcceptanceChecklistMatrix,
 } from './platform-adapter-acceptance-checklist.mjs';
@@ -139,6 +142,14 @@ function buildHostFiles(platform, artifacts = {}, builtIn = false) {
       purpose: 'step-by-step host integration flow and SDK entrypoints',
     });
   }
+  if (builtIn || artifacts.adapter_blueprint) {
+    files.push({
+      path: packagePath(platform, 'adapter-blueprint.json'),
+      source: 'adapter_blueprint',
+      required_from: 'static',
+      purpose: 'surface-level adapter contract for browser/native/provider/artifact wiring',
+    });
+  }
   if (builtIn || artifacts.runtime_bundle) {
     files.push({
       path: packagePath(platform, 'runtime-bundle.json'),
@@ -181,6 +192,7 @@ function importPaths() {
     adapter_export_package: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-export-package',
     adapter_authoring: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-authoring',
     adapter_portfolio: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-portfolio',
+    adapter_blueprint: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint',
     adapter_acceptance_checklist: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-acceptance-checklist',
     implementation_handoff: '@ai-annotation/meeting-timeline-sdk/adapters/platform-implementation-handoff',
     runtime_bundle: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
@@ -198,6 +210,7 @@ function commandSet(platform, target, options = {}) {
     export_package: commandWithBase('meeting-platform:adapter-export-package', options, `--platforms=${platform} --target=${target}`),
     adapter_authoring: commandWithBase('meeting-platform:adapter-authoring', options, `--platforms=${platform}`),
     adapter_portfolio: commandWithBase('meeting-platform:adapter-portfolio', options, `--platforms=${platform}`),
+    adapter_blueprint: commandWithBase('meeting-platform:adapter-blueprint', options, `--platforms=${platform}`),
     acceptance_checklist: commandWithBase('meeting-platform:adapter-acceptance-checklist', options, `--platforms=${platform} --target=${target}`),
     implementation_handoff: commandWithBase('meeting-platform:implementation-handoff', options, `--platforms=${platform}`),
     runtime_bundle: commandWithBase('meeting-platform:runtime-bundle', options, `--platforms=${platform}`),
@@ -451,6 +464,7 @@ function artifactRefs(artifacts = {}, files = []) {
     portfolio_item: artifactRef('portfolio_item', artifacts.portfolio_item, undefined, 'static'),
     acceptance_checklist: artifactRef('acceptance_checklist', artifacts.acceptance_checklist, bySource.acceptance_checklist, 'static'),
     implementation_handoff: artifactRef('implementation_handoff', artifacts.implementation_handoff, bySource.implementation_handoff, 'static'),
+    adapter_blueprint: artifactRef('adapter_blueprint', artifacts.adapter_blueprint, bySource.adapter_blueprint, 'static'),
     runtime_bundle: artifactRef('runtime_bundle', artifacts.runtime_bundle, bySource.runtime_bundle, 'static'),
     adapter_contract: artifactRef('adapter_contract', artifacts.adapter_contract, bySource.adapter_contract, 'static'),
     provider_connection: artifactRef('provider_connection', artifacts.provider_connection, bySource.provider_connection, 'production'),
@@ -466,6 +480,13 @@ function builtInArtifactRefs(platform, files = [], refs = {}) {
       name: 'implementation_handoff',
       schema: 'meeting_platform_implementation_handoff',
       path: bySource.implementation_handoff,
+      required_from: 'static',
+      platform,
+    },
+    adapter_blueprint: refs.adapter_blueprint ?? {
+      name: 'adapter_blueprint',
+      schema: 'meeting_platform_adapter_blueprint',
+      path: bySource.adapter_blueprint,
       required_from: 'static',
       platform,
     },
@@ -592,6 +613,7 @@ export function buildMeetingPlatformAdapterExportPackage(platform, input = {}, o
     portfolio_item: portfolioItem,
     acceptance_checklist: checklist,
     implementation_handoff: buildArtifacts ? safeArtifact(builtIn, buildMeetingPlatformImplementationHandoff, key, merged) : undefined,
+    adapter_blueprint: buildArtifacts ? safeArtifact(builtIn, buildMeetingPlatformAdapterBlueprint, key, merged) : undefined,
     runtime_bundle: buildArtifacts ? safeArtifact(builtIn, buildMeetingPlatformRuntimeBundle, key, merged) : undefined,
     provider_connection: buildArtifacts ? safeArtifact(builtIn, buildMeetingPlatformProviderConnectionPack, key, merged) : undefined,
     adapter_contract: buildArtifacts ? safeArtifact(builtIn, buildMeetingPlatformAdapterContract, key, merged) : undefined,

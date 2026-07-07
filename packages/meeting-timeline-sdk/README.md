@@ -832,7 +832,7 @@ npm run meeting-platform:adapter-acceptance-checklist -- \
   --report-file=data/meeting-platform-adapter-acceptance-checklist-report.json
 ```
 
-如果已经决定把某个平台交给另一个项目接入，用 `platformAdapterExportPackage()` 或 CLI 生成“可拿走”的文件包。它会把 `authoring-plan.json`、`acceptance-checklist.json`、`implementation-handoff.json`、`runtime-bundle.json`、`adapter-contract.json`、`provider-connection.json` 和 `adaptation-package.json` 组织到同一平台目录；主 `adapter-export-package.json` 只保留索引、SDK import、surface entrypoint、setup order 和核心硬约束，详细 artifact 拆成独立 JSON，避免一个对象过大：
+如果已经决定把某个平台交给另一个项目接入，用 `platformAdapterExportPackage()` 或 CLI 生成“可拿走”的文件包。它会把 `authoring-plan.json`、`acceptance-checklist.json`、`implementation-handoff.json`、`adapter-blueprint.json`、`runtime-bundle.json`、`adapter-contract.json`、`provider-connection.json` 和 `adaptation-package.json` 组织到同一平台目录；主 `adapter-export-package.json` 只保留索引、SDK import、surface entrypoint、setup order 和核心硬约束，详细 artifact 拆成独立 JSON，避免一个对象过大：
 
 ```sh
 npm run meeting-platform:adapter-export-package -- \

@@ -1,6 +1,7 @@
 import type { MeetingPlatformAdapterAcceptanceChecklistOptions } from './platform-adapter-acceptance-checklist.mjs';
 import type { MeetingPlatformAdapterAuthoringOptions } from './platform-adapter-authoring.mjs';
 import type { MeetingPlatformAdapterPortfolioOptions } from './platform-adapter-portfolio.mjs';
+import type { MeetingPlatformAdapterBlueprintOptions } from './platform-adapter-blueprint.mjs';
 import type { MeetingPlatformImplementationHandoffOptions } from './platform-implementation-handoff.mjs';
 import type { MeetingPlatformRuntimeBundleOptions } from './platform-runtime-bundle.mjs';
 import type { MeetingPlatformProviderConnectionOptions } from './platform-provider-connection.mjs';
@@ -15,6 +16,7 @@ export interface MeetingPlatformAdapterExportPackageOptions
   extends MeetingPlatformAdapterAcceptanceChecklistOptions,
     MeetingPlatformAdapterAuthoringOptions,
     MeetingPlatformAdapterPortfolioOptions,
+    MeetingPlatformAdapterBlueprintOptions,
     MeetingPlatformImplementationHandoffOptions,
     MeetingPlatformRuntimeBundleOptions,
     MeetingPlatformProviderConnectionOptions,
