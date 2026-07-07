@@ -352,6 +352,8 @@ function buildSdkFacadeHandoff(platforms = [], inputs = {}) {
       next_phase: adaptation.next_phase,
       provider_path: adaptation.provider_path,
       provider_permission_risk: adaptation.provider_permission_risk,
+      primary_surface: adaptation.primary_surface ?? runtime.primary_surface ?? route.primary_surface,
+      surface_order: adaptation.surface_order ?? runtime.surface_order ?? route.surface_order,
       adapter_first_route: route.first_route ?? runtime.adapter_first_route,
       runtime_bundle_ready: runtime.runtime_ready,
       lightweight_connector_ready: connectorHub.platforms?.includes(platform) && connectorHub.accepted === true,
@@ -487,9 +489,13 @@ function buildSurfaceCoverageMatrix(platforms = [], inputs = {}) {
       && runtime.provider_required_for_realtime !== true;
     const backfillSupported = adaptation.post_meeting_backfill_supported === true
       || runtime.transcript_blocks_realtime === false;
+    const surfaceOrder = adaptation.surface_order ?? runtime.surface_order ?? route.surface_order ?? [];
+    const primarySurface = adaptation.primary_surface ?? runtime.primary_surface ?? route.primary_surface;
     return {
       platform,
       display_name: adaptation.display_name ?? runtime.display_name ?? handoff.display_name,
+      primary_surface: primarySurface,
+      surface_order: surfaceOrder,
       browser_extension: {
         ready: browserReady,
         browser_match_count: runtime.browser_match_count ?? adaptation.browser_match_count ?? 0,
@@ -505,6 +511,7 @@ function buildSurfaceCoverageMatrix(platforms = [], inputs = {}) {
       },
       native_detector: {
         ready: nativeDetectorReady,
+        aliases: ['native_detector', 'desktop_observer'],
         first_call: 'sdk.observePlatformCandidates({ windows, processes, activeWindow })',
         adapter_first_route: route.first_route ?? runtime.adapter_first_route,
         timestamp_field: 'captured_at_ms',
@@ -555,10 +562,34 @@ function buildSurfaceCoverageMatrix(platforms = [], inputs = {}) {
 }
 
 function recommendedSurface(coverageRow = {}) {
-  if (coverageRow.browser_extension?.ready === true) return 'browser_extension';
-  if (coverageRow.webview_preload?.ready === true) return 'webview_preload';
-  if (coverageRow.native_detector?.ready === true) return 'native_detector';
-  if (coverageRow.provider_reconcile?.ready === true) return 'provider_reconcile';
+  const configuredOrder = asArray(coverageRow.surface_order)
+    .map((surface) => String(surface).replace(/-/g, '_'))
+    .map((surface) => (surface === 'desktop_observer' ? 'native_detector' : surface))
+    .filter((surface) => surface !== 'provider_adapter');
+  const primary = coverageRow.primary_surface
+    ? String(coverageRow.primary_surface).replace(/-/g, '_')
+    : undefined;
+  const preferred = primary === 'desktop_or_browser_observer'
+    ? ['native_detector', 'browser_extension']
+    : primary === 'browser_extension_or_desktop_observer'
+      ? ['browser_extension', 'native_detector']
+      : primary === 'browser_extension_or_native_detector'
+        ? ['browser_extension', 'native_detector']
+        : primary === 'desktop_observer'
+          ? ['native_detector']
+          : primary
+            ? [primary]
+            : [];
+  const order = unique([
+    ...configuredOrder,
+    ...preferred.map((surface) => (surface === 'desktop_observer' ? 'native_detector' : surface)),
+    'browser_extension',
+    'webview_preload',
+    'native_detector',
+    'provider_reconcile',
+  ]);
+  const ready = order.find((surface) => coverageRow[surface]?.ready === true);
+  if (ready) return ready;
   return 'manual_or_local_detector';
 }
 
@@ -619,6 +650,8 @@ function buildAdaptationRoadmap(platforms = [], inputs = {}) {
       display_name: row.display_name ?? adaptation.display_name,
       rank_hint: priorityIndex(platform, order) + 1,
       priority_tier: productionReady ? 'production' : pilotReady ? 'pilot' : 'blocked',
+      primary_surface: coverage.primary_surface,
+      surface_order: coverage.surface_order,
       recommended_first_surface: surface,
       next_phase: adaptation.next_phase ?? row.first_next_action,
       next_action: row.first_next_action ?? adaptation.next_phase ?? gaps[0],
@@ -749,6 +782,9 @@ function platformRow(platform, inputs = {}) {
     adapter_route_ready: route.ready === true || route.adapter_route_ready === true || conformance.adapter_route_ready === true,
     adapter_first_route: route.first_route ?? route.adapter_first_route ?? conformance.adapter_first_route,
     adapter_recommended_mode: route.recommended_mode ?? runtime.adapter_recommended_mode,
+    primary_surface: adaptation.primary_surface ?? runtime.primary_surface ?? route.primary_surface,
+    surface_order: adaptation.surface_order ?? runtime.surface_order ?? route.surface_order,
+    provider_reconcile_surface: adaptation.provider_reconcile_surface ?? runtime.provider_reconcile_surface ?? route.provider_reconcile_surface,
     speaker_track_ready: speakerReady,
     speaker_min_stable_ms: track.speaker_min_stable_ms ?? runtime.speaker_min_stable_ms,
     speaker_switch_stable_ms: track.speaker_switch_stable_ms ?? runtime.speaker_switch_stable_ms,

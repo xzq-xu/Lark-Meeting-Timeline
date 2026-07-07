@@ -49,6 +49,7 @@ assert.equal(report.sdk_facade_handoff.surface_wiring.browser_extension.content_
 assert.equal(report.sdk_facade_handoff.surface_wiring.browser_extension.content_script_messages.includes('meeting_timeline.preflight_current_window'), true);
 assert.equal(report.sdk_facade_handoff.surface_wiring.browser_extension.content_script_messages.includes('meeting_timeline.preflight_candidates'), true);
 assert.equal(report.sdk_facade_handoff.platform_rows.find((row) => row.platform === 'google_meet').provider_path, 'google_workspace_events_pubsub');
+assert.equal(report.sdk_facade_handoff.platform_rows.find((row) => row.platform === 'zoom').primary_surface, 'native_detector');
 assert.equal(report.surface_coverage_matrix.platform_count, 3);
 assert.equal(report.surface_coverage_matrix.browser_extension_ready_count, 3);
 assert.equal(report.surface_coverage_matrix.provider_reconcile_ready_count, 3);
@@ -61,6 +62,7 @@ assert.equal(report.adaptation_roadmap.recommended_first_surface, 'browser_exten
 assert.deepEqual(report.adaptation_roadmap.priority_order.slice(0, 3), ['google_meet', 'zoom', 'microsoft_teams']);
 assert.equal(report.adaptation_roadmap.rows[0].platform, 'google_meet');
 assert.equal(report.adaptation_roadmap.rows[0].recommended_first_surface, 'browser_extension');
+assert.equal(report.adaptation_roadmap.rows.find((row) => row.platform === 'zoom').recommended_first_surface, 'native_detector');
 assert.equal(report.adaptation_roadmap.rows.find((row) => row.platform === 'microsoft_teams').provider_permission_risk, 'tenant_admin_consent_and_subscription_renewal');
 assert.equal(report.rows.find((row) => row.platform === 'microsoft_teams').consumer_ready, true);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');

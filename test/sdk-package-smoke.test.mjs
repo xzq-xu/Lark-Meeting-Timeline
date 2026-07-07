@@ -822,6 +822,7 @@ assert.equal(rootMeetingAppSdk.platformAdaptationPackage('google-meet').adapter_
 assert.equal(rootMeetingAppSdk.adaptationPackageMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformConsumerHandoff().schema, 'meeting_platform_consumer_handoff');
 assert.equal(rootMeetingAppSdk.consumerHandoff().accepted, true);
+assert.equal(rootMeetingAppSdk.consumerHandoff({ platforms: ['zoom'] }).adaptation_roadmap.rows[0].recommended_first_surface, 'native_detector');
 assert.equal(rootMeetingAppSdk.platformImplementationHandoff('google-meet').schema, 'meeting_platform_implementation_handoff');
 assert.equal(rootMeetingAppSdk.implementationHandoff('google-meet').provider_reconcile.path, 'google_workspace_events_pubsub');
 assert.equal(rootMeetingAppSdk.platformImplementationHandoffMatrix().platform_count, 1);
@@ -1339,6 +1340,7 @@ assert.equal(assertMeetingPlatformConsumerHandoff({
   platforms: ['google-meet'],
 }).rows[0].adapter_first_route, 'local_observer_axis');
 assert.equal(kit.platformConsumerHandoff({ platforms: ['zoom'] }).entrypoints.kit_methods.includes('platformConsumerHandoff'), true);
+assert.equal(kit.platformConsumerHandoff({ platforms: ['zoom'] }).adaptation_roadmap.rows[0].recommended_first_surface, 'native_detector');
 assert.equal(kit.platformImplementationHandoff('zoom').provider_reconcile.path, 'zoom_meeting_webhooks');
 assert.equal(kit.platformImplementationHandoffMatrix({ platforms: ['zoom'] }).implementation_ready_count, 1);
 assert.equal(kit.platformAdapterAuthoringPlan('zoom').provider_reconcile.path, 'zoom_meeting_webhooks');

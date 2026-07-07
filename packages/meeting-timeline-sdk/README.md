@@ -763,6 +763,8 @@ await adapterMessageBridge.handleMessage({
 
 `platformConsumerHandoff().adaptation_roadmap` 是给 SDK 消费方的适配路线图：默认优先级是 Google Meet、Zoom、Teams、Webex、Lark，并为每个平台给出 `recommended_first_surface`、`next_phase`、`provider_path`、`provider_permission_risk` 和 `production_gaps`。这个顺序可以通过 `priorityPlatformOrder` 覆盖；当前建议先从 browser extension / WebView 的本地轴落地实时标注，provider 事件只作为 reconcile/backfill，不阻塞用户边开会边写标注。
 
+`recommended_first_surface` 会读取同一份 `adapter_surfaces` 指南，而不是固定写死为浏览器扩展：Google Meet 默认是 `browser_extension`，Zoom 默认是 `native_detector`，Teams 的 `desktop_observer` 会映射成宿主可启动的 `native_detector`。因此接入配置页可以直接展示 `surface_coverage_matrix.rows` 和 `adaptation_roadmap.rows`，不需要另写平台判断。
+
 `platformImplementationHandoff('google-meet')` 是给接入工程师看的单平台执行单：它把 `adaptation_roadmap`、`platformRuntimeBundle()` 和 adapter route 合成一份 JSON，包含 `implementation_flow`、`install_surface`、`runtime_events`、`provider_reconcile`、`contracts` 和 `acceptance.commands`。如果要批量交付给另一个项目，可用：
 
 ```sh
