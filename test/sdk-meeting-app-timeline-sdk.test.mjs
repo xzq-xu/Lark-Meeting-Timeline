@@ -138,6 +138,17 @@ assert.equal(connectorPackage.extension.manifest.permissions.includes('tabs'), t
 assert.equal(connectorPackage.runtime_events.plan_matrix.platform_count, 2);
 assert.equal(connectorPackage.contracts.provider_events_block_realtime, false);
 assert.equal(connectorPackage.entrypoints.some((entry) => entry.id === 'speaker-participant-track'), true);
+const connectorReleaseGate = sdk.connectorReleaseGate(connectorPackage);
+assert.equal(connectorReleaseGate.schema, 'meeting_app_timeline_connector_release_gate');
+assert.equal(connectorReleaseGate.accepted, true);
+assert.equal(connectorReleaseGate.target, 'pilot');
+assert.equal(connectorReleaseGate.pilot_ready_count, 2);
+assert.equal(sdk.assertConnectorReleaseGate(connectorPackage).accepted, true);
+const productionConnectorReleaseGate = sdk.connectorReleaseGate(connectorPackage, {
+  target: 'production',
+});
+assert.equal(productionConnectorReleaseGate.accepted, false);
+assert.equal(productionConnectorReleaseGate.issues.some((issue) => issue.code.includes('production_evidence_accepted')), true);
 
 const adapterCapability = sdk.meetingAppAdapterCapability('google-meet', {
   url: 'https://meet.google.com/abc-defg-hij',

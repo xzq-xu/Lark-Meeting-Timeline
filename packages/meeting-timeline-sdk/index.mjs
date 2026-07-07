@@ -9,6 +9,10 @@ import {
 import {
   createMeetingPlatformRuntimeEventClient,
 } from './adapters/platform-runtime-event.mjs';
+import {
+  assertMeetingAppTimelineConnectorReleaseGate,
+  buildMeetingAppTimelineConnectorReleaseGate,
+} from './adapters/meeting-app-connector-package.mjs';
 
 export const SDK_VERSION = '0.1.0';
 
@@ -960,6 +964,26 @@ export function createMeetingAppTimelineSdk(options = {}) {
     },
     runtimeConnectorPackage(connectorOptions = {}) {
       return sdk.connectorPackage(connectorOptions);
+    },
+    connectorReleaseGate(connectorOptions = {}, releaseGateOptions = {}) {
+      const pkg = connectorOptions?.schema === 'meeting_app_timeline_connector_package'
+        || connectorOptions?.schema === 'meeting_app_timeline_connector_host_install_checklist'
+        ? connectorOptions
+        : sdk.connectorPackage(connectorOptions);
+      return buildMeetingAppTimelineConnectorReleaseGate(pkg, {
+        ...sdkPlatformOptions(runtime, connectorOptions),
+        ...releaseGateOptions,
+      });
+    },
+    assertConnectorReleaseGate(connectorOptions = {}, releaseGateOptions = {}) {
+      const pkg = connectorOptions?.schema === 'meeting_app_timeline_connector_package'
+        || connectorOptions?.schema === 'meeting_app_timeline_connector_host_install_checklist'
+        ? connectorOptions
+        : sdk.connectorPackage(connectorOptions);
+      return assertMeetingAppTimelineConnectorReleaseGate(pkg, {
+        ...sdkPlatformOptions(runtime, connectorOptions),
+        ...releaseGateOptions,
+      });
     },
     meetingAppAdapterCapability(platformOrOptions = {}, input = {}, capabilityOptions = {}) {
       if (platformOrOptions && typeof platformOrOptions === 'object' && !Array.isArray(platformOrOptions)) {

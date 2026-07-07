@@ -338,6 +338,11 @@ export interface MeetingAppTimelineSdk {
   hostPackage: MeetingAppTimelineSdk['runtimeAdapterHostPackage'];
   connectorPackage(options?: Record<string, unknown>): MeetingAppTimelineConnectorPackage;
   runtimeConnectorPackage: MeetingAppTimelineSdk['connectorPackage'];
+  connectorReleaseGate(
+    connectorOptions?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+    releaseGateOptions?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineConnectorReleaseGate;
+  assertConnectorReleaseGate: MeetingAppTimelineSdk['connectorReleaseGate'];
   meetingAppAdapterCapability(
     platformOrOptions?: string | import('./adapters/meeting-app-adapter-capability.mjs').MeetingAppAdapterCapabilityOptions,
     input?: Record<string, unknown>,
