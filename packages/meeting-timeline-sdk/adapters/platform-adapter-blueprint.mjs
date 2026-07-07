@@ -30,6 +30,13 @@ const DEFAULT_BLUEPRINT_PLATFORMS = Object.freeze([
 ]);
 
 const SURFACE_CANDIDATE_CONTRACTS = Object.freeze({
+  host_detector: Object.freeze({
+    evidence_kind: 'host_detector_signal',
+    required_fields: Object.freeze(['meeting_started_or_active_state', 'captured_at_ms']),
+    optional_fields: Object.freeze(['meeting_id', 'meeting_url', 'participants', 'active_speaker', 'manual_controller_state']),
+    start_signal: 'trusted_host_detector_reports_active_meeting',
+    end_signal: 'trusted_host_detector_reports_meeting_ended_or_manual_stop',
+  }),
   browser_extension: Object.freeze({
     evidence_kind: 'dom_snapshot',
     required_fields: Object.freeze(['url_or_tab_url', 'document_title_or_window_title', 'meeting_controls_or_active_call_text', 'captured_at_ms']),
@@ -61,6 +68,7 @@ const SURFACE_CANDIDATE_CONTRACTS = Object.freeze({
 });
 
 const SURFACE_ROLES = Object.freeze({
+  host_detector: 'trusted_host_axis_for_device_or_desktop_runtime',
   browser_extension: 'low_latency_local_axis_and_browser_speaker_positions',
   native_detector: 'low_latency_desktop_axis_and_native_speaker_positions',
   provider_reconcile: 'authoritative_start_end_and_artifact_reconcile_after_local_axis',
@@ -111,8 +119,7 @@ function unique(values = []) {
 
 function selectedPlatforms(options = {}) {
   return unique(asArray(firstNonEmpty(options.platforms, options.platform_keys, DEFAULT_BLUEPRINT_PLATFORMS))
-    .map((platform) => normalizeMeetingPlatform(platform)))
-    .filter((platform) => platform !== 'local_detector');
+    .map((platform) => normalizeMeetingPlatform(platform)));
 }
 
 function safeRuntimeAdapter(platform, options = {}) {
@@ -147,6 +154,24 @@ function browserSurface(platform, runtimeProfile = {}, runtimeAdapter = {}) {
       'meeting_started_axis_when_active_meeting_dom_is_seen',
       'meeting_ended_fallback_when_tab_or_call_controls_disappear',
       'speaker_position_markers_when_active_speaker_can_be_sampled',
+    ],
+    platform,
+  });
+}
+
+function hostDetectorSurface(platform, runtimeProfile = {}, route = {}) {
+  return compactObject({
+    surface: 'host_detector',
+    recommended: surfaceRecommended('host_detector', runtimeProfile),
+    priority: surfacePriority('host_detector', runtimeProfile),
+    role: SURFACE_ROLES.host_detector,
+    evidence: SURFACE_CANDIDATE_CONTRACTS.host_detector,
+    entrypoint: route.entrypoints?.host_detector,
+    launch_when: 'trusted_host_detector_provides_absolute_meeting_axis_signal',
+    use_for: [
+      'meeting_started_axis_when_host_detector_reports_active_meeting',
+      'meeting_ended_axis_when_host_detector_reports_end_or_manual_stop',
+      'speaker_position_markers_when_host_detector_provides_active_speaker_samples',
     ],
     platform,
   });
@@ -225,8 +250,8 @@ function verifyBlueprint(blueprint = {}) {
   const surfaces = blueprint.surfaces ?? {};
   const runtime = blueprint.runtime_contract ?? {};
   const route = blueprint.adapter_route_readiness ?? {};
-  const provider = surfaces.provider_reconcile ?? {};
-  const localSurfaces = [surfaces.browser_extension, surfaces.native_detector].filter((surface) => surface?.recommended === true);
+  const provider = surfaces.provider_reconcile;
+  const localSurfaces = [surfaces.host_detector, surfaces.browser_extension, surfaces.native_detector].filter((surface) => surface?.recommended === true);
   const issues = [
     blueprint.schema === MEETING_PLATFORM_ADAPTER_BLUEPRINT_SCHEMA
       ? undefined
@@ -248,7 +273,7 @@ function verifyBlueprint(blueprint = {}) {
     localSurfaces.length > 0
       ? undefined
       : issue('missing_local_realtime_surface', 'At least one local observer surface must be recommended.'),
-    provider.blocks_realtime === false
+    !provider || provider.blocks_realtime === false
       ? undefined
       : issue('provider_surface_blocks_realtime', 'Provider reconcile surface must be non-blocking for realtime.'),
   ].filter(Boolean);
@@ -286,6 +311,7 @@ export function buildMeetingPlatformAdapterBlueprint(platformOrOptions = {}, opt
     primary_surface: runtimeProfile.adapter_surfaces?.primary,
     surface_order: runtimeProfile.adapter_surfaces?.recommended_order ?? [],
     surfaces: {
+      host_detector: platform === 'local_detector' ? hostDetectorSurface(platform, runtimeProfile, route) : undefined,
       browser_extension: platform === 'local_detector' ? undefined : browserSurface(platform, runtimeProfile, runtimeAdapter),
       native_detector: platform === 'local_detector' ? undefined : nativeSurface(platform, runtimeProfile, route),
       provider_reconcile: platform === 'local_detector' ? undefined : providerSurface(platform, runtimeProfile, provider, route),

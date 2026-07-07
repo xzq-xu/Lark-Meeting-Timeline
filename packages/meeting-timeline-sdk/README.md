@@ -408,6 +408,8 @@ const blueprintMatrix = buildMeetingPlatformAdapterBlueprintMatrix({
 // sdk.adapterBlueprintMatrix()
 ```
 
+批量交付时再用 `platform-registry` 做最后一层静态验收。Registry manifest 现在会统计 `adapter_blueprint_ready_count`，并要求每个平台都有 ready 的 blueprint、主 surface、SDK import、host endpoint，且 blueprint 里 provider/transcript 都不能阻塞实时标注，时间戳字段必须保持 `captured_at_ms`。这样下游项目接 Google Meet/Teams/Zoom/Webex/Lark 时，不会只拿到事件 normalizer，却缺少真实 runtime 接入契约。
+
 也可以直接导出给另一个项目消费：
 
 ```bash

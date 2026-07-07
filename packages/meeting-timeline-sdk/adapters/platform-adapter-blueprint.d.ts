@@ -47,6 +47,7 @@ export interface MeetingPlatformAdapterBlueprint {
   primary_surface?: string;
   surface_order: string[];
   surfaces: {
+    host_detector?: MeetingPlatformAdapterSurfaceBlueprint;
     browser_extension?: MeetingPlatformAdapterSurfaceBlueprint;
     native_detector?: MeetingPlatformAdapterSurfaceBlueprint;
     provider_reconcile?: MeetingPlatformAdapterSurfaceBlueprint;

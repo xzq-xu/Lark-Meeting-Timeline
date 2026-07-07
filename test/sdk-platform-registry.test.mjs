@@ -96,6 +96,7 @@ assert.equal(manifest.normalizer_count, 5);
 assert.equal(manifest.runtime_ready_count, 5);
 assert.equal(manifest.contract_accepted_count, 5);
 assert.equal(manifest.candidate_observer_count, 5);
+assert.equal(manifest.adapter_blueprint_ready_count, 5);
 assert.equal(manifest.provider_required_for_realtime_count, 0);
 assert.equal(manifest.transcript_blocking_count, 0);
 assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').provider_transport, 'Microsoft Graph change notifications');
@@ -107,7 +108,10 @@ assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').adapter
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_ready, true);
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_primary_surface, 'browser_extension');
+assert.deepEqual(manifest.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_surface_order, ['browser_extension', 'desktop_observer', 'provider_reconcile']);
 assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_provider_blocks_realtime, false);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_transcript_blocks_realtime, false);
+assert.equal(manifest.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_first_acceptance_gate, 'local_candidate_preflight_accepts_active_meeting');
 assert.equal(manifest.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 assert.equal(manifest.next_actions.includes('export_runtime_event_plan_before_wiring_external_host'), true);
 assert.equal(manifest.next_actions.includes('export_adapter_route_before_wiring_external_host'), true);
@@ -118,6 +122,7 @@ assert.equal(acceptance.schema, MEETING_PLATFORM_REGISTRY_ACCEPTANCE_SCHEMA);
 assert.equal(acceptance.accepted, true);
 assert.equal(acceptance.blocking_count, 0);
 assert.equal(acceptance.candidate_observer_count, 5);
+assert.equal(acceptance.adapter_blueprint_ready_count, 5);
 assert.equal(assertMeetingPlatformRegistryManifest(manifest).accepted, true);
 
 const brokenManifest = {
@@ -202,6 +207,55 @@ assert.equal(missingAdapterRouteAcceptance.issues.some((item) => item.code === '
 assert.equal(missingAdapterRouteAcceptance.issues.some((item) => item.code === 'entry_missing_adapter_route_import'), true);
 assert.equal(missingAdapterRouteAcceptance.issues.some((item) => item.code === 'entry_missing_adapter_route_endpoint'), true);
 
+const missingAdapterBlueprint = {
+  ...manifest,
+  adapter_blueprint_ready_count: 4,
+  entries: manifest.entries.map((entry) => entry.platform === 'google_meet'
+    ? {
+      ...entry,
+      adapter_blueprint: undefined,
+      sdk: {
+        ...entry.sdk,
+        imports: {
+          ...entry.sdk.imports,
+          adapter_blueprint: undefined,
+        },
+      },
+      host: {
+        ...entry.host,
+        endpoints: {
+          ...entry.host.endpoints,
+          adapter_blueprints: undefined,
+        },
+      },
+    }
+    : entry),
+};
+const missingAdapterBlueprintAcceptance = buildMeetingPlatformRegistryAcceptanceReport(missingAdapterBlueprint);
+assert.equal(missingAdapterBlueprintAcceptance.accepted, false);
+assert.equal(missingAdapterBlueprintAcceptance.issues.some((item) => item.code === 'adapter_blueprint_not_ready'), true);
+assert.equal(missingAdapterBlueprintAcceptance.issues.some((item) => item.code === 'entry_missing_adapter_blueprint'), true);
+assert.equal(missingAdapterBlueprintAcceptance.issues.some((item) => item.code === 'entry_missing_adapter_blueprint_import'), true);
+assert.equal(missingAdapterBlueprintAcceptance.issues.some((item) => item.code === 'entry_missing_adapter_blueprint_endpoint'), true);
+assert.equal(missingAdapterBlueprintAcceptance.issues.some((item) => item.code === 'entry_adapter_blueprint_invalid_timestamp_field'), true);
+
+const blockingAdapterBlueprint = {
+  ...manifest,
+  entries: manifest.entries.map((entry) => entry.platform === 'zoom'
+    ? {
+      ...entry,
+      adapter_blueprint: {
+        ...entry.adapter_blueprint,
+        provider_blocks_realtime: true,
+        transcript_blocks_realtime: true,
+      },
+    }
+    : entry),
+};
+const blockingAdapterBlueprintAcceptance = buildMeetingPlatformRegistryAcceptanceReport(blockingAdapterBlueprint);
+assert.equal(blockingAdapterBlueprintAcceptance.accepted, false);
+assert.equal(blockingAdapterBlueprintAcceptance.issues.some((item) => item.code === 'entry_adapter_blueprint_blocks_realtime'), true);
+
 const missingCandidateObservation = {
   ...manifest,
   candidate_observer_count: 4,
@@ -267,5 +321,6 @@ assert.equal(kit.platformRegistryAcceptance({ platforms: ['zoom'] }).accepted, t
 assert.equal(kit.assertPlatformRegistryManifest({ platforms: ['zoom'] }).accepted, true);
 assert.equal(kit.report().platform_registry_manifest.provider_required_for_realtime_count, 0);
 assert.equal(kit.report().platform_registry_manifest.candidate_observer_count, 2);
+assert.equal(kit.report().platform_registry_manifest.adapter_blueprint_ready_count, 2);
 
 console.log('ok meeting platform registry manifest');

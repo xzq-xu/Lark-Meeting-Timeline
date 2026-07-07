@@ -333,6 +333,7 @@ export function buildMeetingPlatformRegistryManifest(options = {}) {
     runtime_ready_count: entries.filter((entry) => entry.readiness?.runtime_ready).length,
     contract_accepted_count: entries.filter((entry) => entry.readiness?.contract_accepted).length,
     candidate_observer_count: entries.filter((entry) => entry.readiness?.candidate_observation_ready).length,
+    adapter_blueprint_ready_count: entries.filter((entry) => entry.adapter_blueprint?.ready === true).length,
     provider_required_for_realtime_count: entries.filter((entry) => entry.readiness?.provider_required_for_realtime).length,
     transcript_blocking_count: entries.filter((entry) => entry.readiness?.transcript_blocks_realtime).length,
     platforms: entries.map((entry) => entry.platform),
@@ -354,7 +355,10 @@ export function buildMeetingPlatformRegistryManifest(options = {}) {
       adapter_route_count: entry.adapter_route?.route_count ?? 0,
       adapter_blueprint_ready: entry.adapter_blueprint?.ready === true,
       adapter_blueprint_primary_surface: entry.adapter_blueprint?.primary_surface,
+      adapter_blueprint_surface_order: entry.adapter_blueprint?.surface_order,
       adapter_blueprint_provider_blocks_realtime: entry.adapter_blueprint?.provider_blocks_realtime,
+      adapter_blueprint_transcript_blocks_realtime: entry.adapter_blueprint?.transcript_blocks_realtime,
+      adapter_blueprint_first_acceptance_gate: entry.adapter_blueprint?.first_acceptance_gate,
       provider_transport: entry.provider?.transport,
       provider_ready: entry.provider?.ready === true,
       provider_required_for_realtime: entry.readiness?.provider_required_for_realtime === true,
@@ -379,6 +383,7 @@ function registryManifestFrom(input = {}, options = {}) {
       runtime_ready_count: input.readiness?.runtime_ready === true ? 1 : 0,
       contract_accepted_count: input.readiness?.contract_accepted === true ? 1 : 0,
       candidate_observer_count: input.readiness?.candidate_observation_ready === true ? 1 : 0,
+      adapter_blueprint_ready_count: input.adapter_blueprint?.ready === true ? 1 : 0,
       provider_required_for_realtime_count: input.readiness?.provider_required_for_realtime === true ? 1 : 0,
       transcript_blocking_count: input.readiness?.transcript_blocks_realtime === true ? 1 : 0,
       platforms: [input.platform],
@@ -398,6 +403,12 @@ function registryManifestFrom(input = {}, options = {}) {
         adapter_route_mode: input.adapter_route?.recommended_mode,
         adapter_first_route: input.adapter_route?.first_route,
         adapter_route_count: input.adapter_route?.route_count ?? 0,
+        adapter_blueprint_ready: input.adapter_blueprint?.ready === true,
+        adapter_blueprint_primary_surface: input.adapter_blueprint?.primary_surface,
+        adapter_blueprint_surface_order: input.adapter_blueprint?.surface_order,
+        adapter_blueprint_provider_blocks_realtime: input.adapter_blueprint?.provider_blocks_realtime,
+        adapter_blueprint_transcript_blocks_realtime: input.adapter_blueprint?.transcript_blocks_realtime,
+        adapter_blueprint_first_acceptance_gate: input.adapter_blueprint?.first_acceptance_gate,
         provider_transport: input.provider?.transport,
         provider_ready: input.provider?.ready === true,
         provider_required_for_realtime: input.readiness?.provider_required_for_realtime === true,
@@ -445,6 +456,12 @@ function registryAcceptanceIssues(manifest = {}, options = {}) {
   if (manifest.candidate_observer_count !== manifest.platform_count) {
     issues.push(issue('error', 'candidate_observer_not_ready', 'Every selected platform must expose candidate observation for host-level axis binding.', {
       candidate_observer_count: manifest.candidate_observer_count,
+      platform_count: manifest.platform_count,
+    }));
+  }
+  if (manifest.adapter_blueprint_ready_count !== manifest.platform_count) {
+    issues.push(issue('error', 'adapter_blueprint_not_ready', 'Every selected platform must expose a ready adapter blueprint for host wiring.', {
+      adapter_blueprint_ready_count: manifest.adapter_blueprint_ready_count,
       platform_count: manifest.platform_count,
     }));
   }
@@ -526,17 +543,35 @@ function registryAcceptanceIssues(manifest = {}, options = {}) {
     if (!entry.host?.endpoints?.adapter_routes) {
       issues.push(issue('error', 'entry_missing_adapter_route_endpoint', 'Registry entry must include the host adapter route endpoint.', { platform }));
     }
+    if (!entry.host?.endpoints?.adapter_blueprints) {
+      issues.push(issue('error', 'entry_missing_adapter_blueprint_endpoint', 'Registry entry must include the host adapter blueprint endpoint.', { platform }));
+    }
     if (!entry.sdk?.imports?.runtime_bundle) {
       issues.push(issue('error', 'entry_missing_runtime_bundle_import', 'Registry entry must include the runtime bundle SDK import path.', { platform }));
     }
     if (!entry.sdk?.imports?.adapter_route) {
       issues.push(issue('error', 'entry_missing_adapter_route_import', 'Registry entry must include the adapter route SDK import path.', { platform }));
     }
+    if (!entry.sdk?.imports?.adapter_blueprint) {
+      issues.push(issue('error', 'entry_missing_adapter_blueprint_import', 'Registry entry must include the adapter blueprint SDK import path.', { platform }));
+    }
     if (!entry.adapter_route?.recommended_mode || !entry.adapter_route?.first_route) {
       issues.push(issue('error', 'entry_missing_adapter_route', 'Registry entry must include adapter route planning for external host wiring.', { platform }));
     }
     if (entry.adapter_route?.provider_events_block_realtime === true || entry.adapter_route?.transcript_blocks_realtime === true) {
       issues.push(issue('error', 'entry_adapter_route_blocks_realtime', 'Adapter route must keep provider events and transcript non-blocking for realtime annotations.', { platform }));
+    }
+    if (entry.adapter_blueprint?.ready !== true || !entry.adapter_blueprint?.primary_surface) {
+      issues.push(issue('error', 'entry_missing_adapter_blueprint', 'Registry entry must include a ready adapter blueprint with a primary surface.', { platform }));
+    }
+    if (entry.adapter_blueprint?.provider_blocks_realtime === true || entry.adapter_blueprint?.transcript_blocks_realtime === true) {
+      issues.push(issue('error', 'entry_adapter_blueprint_blocks_realtime', 'Adapter blueprint must keep provider events and transcript non-blocking for realtime annotations.', { platform }));
+    }
+    if (entry.adapter_blueprint?.realtime_axis_timestamp_field !== 'captured_at_ms') {
+      issues.push(issue('error', 'entry_adapter_blueprint_invalid_timestamp_field', 'Adapter blueprint must keep realtime axis timestamps on captured_at_ms.', {
+        platform,
+        timestamp_field: entry.adapter_blueprint?.realtime_axis_timestamp_field,
+      }));
     }
     if (requireProviderReady && entry.provider?.ready !== true) {
       issues.push(issue('error', 'entry_provider_not_ready', 'Provider setup must be ready when requireProviderReady=true.', {
@@ -562,6 +597,7 @@ export function buildMeetingPlatformRegistryAcceptanceReport(manifestOrOptions =
     runtime_ready_count: manifest.runtime_ready_count ?? 0,
     contract_accepted_count: manifest.contract_accepted_count ?? 0,
     candidate_observer_count: manifest.candidate_observer_count ?? 0,
+    adapter_blueprint_ready_count: manifest.adapter_blueprint_ready_count ?? 0,
     provider_required_for_realtime_count: manifest.provider_required_for_realtime_count ?? 0,
     transcript_blocking_count: manifest.transcript_blocking_count ?? 0,
     blocking_count: blocking.length,

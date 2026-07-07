@@ -39,6 +39,7 @@ export interface MeetingPlatformRegistryEntry {
   provider: Record<string, unknown>;
   annotations: Record<string, unknown>;
   adapter_route: Record<string, unknown>;
+  adapter_blueprint: Record<string, unknown>;
   transcript: Record<string, unknown>;
   host: Record<string, unknown>;
   sdk: Record<string, unknown>;
@@ -56,6 +57,7 @@ export interface MeetingPlatformRegistryManifest {
   runtime_ready_count: number;
   contract_accepted_count: number;
   candidate_observer_count: number;
+  adapter_blueprint_ready_count: number;
   provider_required_for_realtime_count: number;
   transcript_blocking_count: number;
   platforms: string[];
@@ -74,6 +76,7 @@ export interface MeetingPlatformRegistryAcceptanceReport {
   runtime_ready_count: number;
   contract_accepted_count: number;
   candidate_observer_count: number;
+  adapter_blueprint_ready_count: number;
   provider_required_for_realtime_count: number;
   transcript_blocking_count: number;
   blocking_count: number;

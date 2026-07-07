@@ -68,19 +68,29 @@ assert.equal(zoom.surfaces.native_detector.evidence.evidence_kind, 'native_windo
 assert.equal(zoom.surfaces.provider_reconcile.end_events.includes('meeting.ended'), true);
 assert.equal(zoom.runtime_contract.provider_events_block_realtime, false);
 
+const local = buildMeetingPlatformAdapterBlueprint('local-detector', { baseUrl });
+assert.equal(local.primary_surface, 'host_detector');
+assert.equal(local.readiness.ready, true);
+assert.equal(local.surfaces.host_detector.recommended, true);
+assert.equal(local.surfaces.host_detector.evidence.evidence_kind, 'host_detector_signal');
+assert.equal(local.surfaces.host_detector.evidence.required_fields.includes('captured_at_ms'), true);
+assert.equal(local.surfaces.provider_reconcile, undefined);
+assert.equal(verifyMeetingPlatformAdapterBlueprint(local).ready, true);
+
 const matrix = buildMeetingPlatformAdapterBlueprintMatrix({
   baseUrl,
-  platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
+  platforms: ['local-detector', 'google-meet', 'teams', 'zoom', 'webex', 'lark'],
 });
 assert.equal(matrix.schema, 'meeting_platform_adapter_blueprint_matrix');
-assert.equal(matrix.platform_count, 5);
-assert.equal(matrix.ready_count, 5);
-assert.equal(matrix.provider_non_blocking_count, 5);
-assert.equal(matrix.transcript_non_blocking_count, 5);
+assert.equal(matrix.platform_count, 6);
+assert.equal(matrix.ready_count, 6);
+assert.equal(matrix.provider_non_blocking_count, 6);
+assert.equal(matrix.transcript_non_blocking_count, 6);
+assert.equal(matrix.rows.find((row) => row.platform === 'local_detector').primary_surface, 'host_detector');
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').primary_surface, 'browser_extension');
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').primary_surface, 'native_detector');
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').native_recommended, true);
-assert.equal(assertMeetingPlatformAdapterBlueprintMatrix(matrix).ready_count, 5);
+assert.equal(assertMeetingPlatformAdapterBlueprintMatrix(matrix).ready_count, 6);
 
 const kit = createMeetingPlatformTimelineKit({ baseUrl });
 assert.equal(kit.platformAdapterBlueprint('google-meet').primary_surface, 'browser_extension');
