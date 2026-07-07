@@ -3552,6 +3552,23 @@ npm run meeting-platform:subscription-handoff -- \
 
 如果要给另一个项目一个更完整的“可改造骨架”，用 `platform-host-integration` 生成 host scaffold。它会输出 `package.json`、timeline client、host wrapper、per-platform adapter entries、framework-neutral HTTP route、strategy/handoff/readiness/runtime-bundle/平台解析/extension-plan/integration-runtime 脚本和 README。生成的 host wrapper 会先创建 `createMeetingPlatformIntegrationRuntime()`，并暴露 `host.platformAdapter(platform)` / `host.platformAdapters()`；下游项目可以优先接统一 runtime，再按需下钻到 Google Meet、Teams、Zoom、Webex、Lark 各自的 resolve、observeCandidates、insertAnnotation、speakerTrack、participantTrack 或 provider reconcile 入口：
 
+```sh
+npx meeting-platform-host-integration \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --package-name=meeting-platform-host \
+  --out-dir=./meeting-platform-host \
+  --report-file=./meeting-platform-host-report.json
+```
+
+当前仓库内也可以直接跑：
+
+```sh
+npm run meeting-platform:host-integration
+```
+
+CLI 报告里的 `adapter_runtime_ready`、`candidate_observation_ready`、`meeting_track_ready` 和 `platform_conformance_ready` 必须为 `true`，才说明这个 scaffold 能作为下游项目的可复用 SDK 接入骨架。
+
 ```js
 import {
   buildMeetingPlatformHostIntegrationScaffold,

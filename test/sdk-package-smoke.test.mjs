@@ -35,6 +35,7 @@ assert.equal(packedFiles.includes('bin/meeting-platform-adapter-import-plan.mjs'
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-install-manifest.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-launch-plan.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-smoke.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-platform-host-integration.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-provider-replay.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-connector-package.mjs'), true);
@@ -44,6 +45,7 @@ assert.equal(packedFiles.includes('cli/meeting-platform-adapter-import-plan.mjs'
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-install-manifest.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-launch-plan.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-smoke.mjs'), true);
+assert.equal(packedFiles.includes('cli/meeting-platform-host-integration.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-provider-replay.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
@@ -308,6 +310,25 @@ const adapterSmokeBinReport = JSON.parse(adapterSmokeBinStdout);
 assert.equal(adapterSmokeBinReport.type, 'meeting_platform_adapter_smoke_cli_report');
 assert.equal(adapterSmokeBinReport.ok, true);
 assert.equal(adapterSmokeBinReport.accepted_count, 2);
+
+const { stdout: hostIntegrationBinStdout } = await execFileAsync(
+  join(consumerDir, 'node_modules', '.bin', 'meeting-platform-host-integration'),
+  [
+    '--platforms=google-meet,zoom',
+    '--json=true',
+    '--write-scaffold=false',
+  ],
+  {
+    cwd: consumerDir,
+  },
+);
+const hostIntegrationBinReport = JSON.parse(hostIntegrationBinStdout);
+assert.equal(hostIntegrationBinReport.type, 'meeting_platform_host_integration_scaffold_report');
+assert.equal(hostIntegrationBinReport.ok, true);
+assert.equal(hostIntegrationBinReport.platform_count, 2);
+assert.equal(hostIntegrationBinReport.adapter_runtime_ready, true);
+assert.equal(hostIntegrationBinReport.generated_files.some((file) => file.path === 'src/platform-adapters/google_meet.mjs'), true);
+assert.equal(hostIntegrationBinReport.written_file_count, 0);
 
 const { stdout: providerReplayBinStdout } = await execFileAsync(
   join(consumerDir, 'node_modules', '.bin', 'meeting-platform-provider-replay'),
