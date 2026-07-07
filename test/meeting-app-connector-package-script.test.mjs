@@ -45,7 +45,7 @@ assert.equal(report.adapter_blueprint_ready_count, 2);
 assert.equal(report.startup_plan_ready_count, 2);
 assert.equal(report.observer_surface_count, 2);
 assert.equal(report.scheduler_surface_count, 2);
-assert.equal(report.written_files.length, 19);
+assert.equal(report.written_files.length, 20);
 assert.equal(report.rows.some((row) => row.platform === 'google_meet' && row.surface === 'browser_extension'), true);
 assert.equal(report.rows.some((row) => row.platform === 'zoom' && row.surface === 'native_detector'), true);
 assert.equal(report.handoff.schema, 'meeting_app_timeline_connector_handoff');
@@ -82,6 +82,14 @@ const connectorHandoff = JSON.parse(await readFile(join(outDir, 'connector-hando
 assert.equal(connectorHandoff.schema, 'meeting_app_timeline_connector_handoff');
 assert.equal(connectorHandoff.startup_plans.realtime_startup_ready_count, 2);
 assert.equal(connectorHandoff.adapter_blueprints.ready_count, 2);
+
+const connectorQuickstart = await readFile(join(outDir, 'connector-quickstart.md'), 'utf8');
+assert.match(connectorQuickstart, /Meeting App Timeline Connector Quickstart/);
+assert.match(connectorQuickstart, /startup-plan-matrix\.json/);
+assert.match(connectorQuickstart, /captured_at_ms/);
+assert.match(connectorQuickstart, /createMeetingAppTimelineConnectorRuntimeClient/);
+assert.match(connectorQuickstart, /google_meet/);
+assert.match(connectorQuickstart, /native_detector/);
 
 const browserObserverPlan = JSON.parse(await readFile(join(outDir, 'observer-plan-browser_extension.json'), 'utf8'));
 assert.equal(browserObserverPlan.schema, 'meeting_app_runtime_observer_plan_matrix');

@@ -61,6 +61,85 @@ function surfaceFileName(surface) {
   return String(surface || 'surface').replace(/[^a-z0-9_-]+/gi, '-');
 }
 
+function markdownTable(rows = [], columns = []) {
+  const header = `| ${columns.map((column) => column.label).join(' | ')} |`;
+  const separator = `| ${columns.map(() => '---').join(' | ')} |`;
+  const body = rows.map((row) => `| ${columns.map((column) => String(column.value(row) ?? '')).join(' | ')} |`);
+  return [header, separator, ...body].join('\n');
+}
+
+function connectorQuickstartMarkdown(pkg = {}) {
+  const startupRows = pkg.startup_plans?.matrix?.rows ?? [];
+  const actionRows = pkg.runtime_events?.plan_matrix?.rows ?? [];
+  const startupTable = markdownTable(startupRows, [
+    { label: 'Platform', value: (row) => row.platform },
+    { label: 'Surface', value: (row) => row.selected_surface },
+    { label: 'Install target', value: (row) => row.install_target },
+    { label: 'Runtime preset', value: (row) => row.runtime_preset },
+    { label: 'Ready', value: (row) => row.realtime_startup_ready === true ? 'yes' : 'no' },
+  ]);
+  const actionSummary = markdownTable(actionRows.slice(0, 12), [
+    { label: 'Platform', value: (row) => row.platform },
+    { label: 'Action', value: (row) => row.action },
+    { label: 'Client method', value: (row) => row.client_method },
+    { label: 'Producer', value: (row) => row.producer },
+  ]);
+  return [
+    '# Meeting App Timeline Connector Quickstart',
+    '',
+    `Package: \`${pkg.id ?? 'meeting-app-timeline-connector'}\``,
+    `Runtime event endpoint: \`${pkg.runtime_events?.endpoint ?? '/api/meeting-platform/runtime-events'}\``,
+    `Platforms: ${(pkg.platforms ?? []).map((platform) => `\`${platform}\``).join(', ')}`,
+    `Surfaces: ${(pkg.surfaces ?? []).map((surface) => `\`${surface}\``).join(', ')}`,
+    '',
+    '## Read These Files First',
+    '',
+    '- `connector-handoff.json`: compact handoff summary for another host project.',
+    '- `startup-plan-matrix.json`: selected runtime surface, install target, bridge, and startup actions per platform.',
+    '- `adapter-blueprint-matrix.json`: platform adapter blueprint, acceptance gates, and surface order.',
+    '- `runtime-event-plan-matrix.json`: supported runtime actions and client methods.',
+    '- `connector-package.json`: full package without embedded extension file contents.',
+    '- `extension/`: generated MV3 extension scaffold when browser extension surface is enabled.',
+    '',
+    '## Runtime Contract',
+    '',
+    '- Realtime annotations must carry `captured_at_ms` from the device or ink end time.',
+    '- Provider events and transcript/artifact import must not block realtime annotation insertion.',
+    '- Use `startup-plan-matrix.json` to choose the host runtime surface before installing bridges.',
+    '- Use `connector-handoff.json` for CI and handoff dashboards instead of parsing every raw file.',
+    '',
+    '## Startup Matrix',
+    '',
+    startupTable,
+    '',
+    '## Minimal Runtime Event Wiring',
+    '',
+    '```js',
+    "import connectorPackage from './connector-package.json' assert { type: 'json' };",
+    "import { createMeetingAppTimelineConnectorRuntimeClient } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package';",
+    '',
+    'const client = createMeetingAppTimelineConnectorRuntimeClient(connectorPackage, { fetch });',
+    '',
+    'await client.observePlatformCandidates({',
+    '  tabs,',
+    '  captured_at_ms: Date.now(),',
+    '});',
+    '',
+    "await client.insertAnnotation('google-meet', {",
+    "  id: 'mark-1',",
+    "  label: 'why?',",
+    '  captured_at_ms: Date.now(),',
+    '});',
+    '```',
+    '',
+    '## Runtime Actions',
+    '',
+    actionSummary,
+    actionRows.length > 12 ? `\nShowing 12 of ${actionRows.length} actions. See \`runtime-event-plan-matrix.json\` for the full matrix.` : '',
+    '',
+  ].join('\n');
+}
+
 export function parseMeetingAppConnectorPackageCliArgs(argv = process.argv.slice(2)) {
   const args = new Map();
   for (const raw of argv) {
@@ -112,6 +191,7 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   await write('adapter-blueprint-matrix.json', pkg.adapter_blueprints?.matrix);
   await write('startup-plan-matrix.json', pkg.startup_plans?.matrix);
   await write('connector-handoff.json', buildMeetingAppTimelineConnectorHandoff(pkg));
+  await write('connector-quickstart.md', connectorQuickstartMarkdown(pkg), true);
 
   for (const [surface, plan] of Object.entries(pkg.observer_plan_by_surface ?? {})) {
     await write(`observer-plan-${surfaceFileName(surface)}.json`, plan);
