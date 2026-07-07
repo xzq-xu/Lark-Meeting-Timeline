@@ -33,6 +33,7 @@ export interface MeetingPlatformAdapterInstallManifest {
   platform_registry: Array<Record<string, unknown>>;
   browser_extension: Record<string, unknown>;
   webview_preload: Record<string, unknown>;
+  native_detector: Record<string, unknown>;
   native_host: Record<string, unknown>;
   provider_reconcile: Record<string, unknown>;
   install_sequence: Array<Record<string, unknown>>;

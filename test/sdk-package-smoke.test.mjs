@@ -1355,7 +1355,7 @@ assert.equal(kit.platformAdapterExportPackage('zoom', {}, { target: 'static' }).
 assert.equal(kit.platformAdapterExportPackageMatrix({ platforms: ['zoom'] }, { target: 'static' }).export_ready_count, 1);
 const kitZoomExportPackage = kit.platformAdapterExportPackage('zoom', {}, { target: 'static' });
 const kitZoomExportFiles = kitZoomExportPackage.host_files.map((file) => file.path);
-assert.equal(kit.platformAdapterImportPlan(kitZoomExportPackage, { availableFiles: kitZoomExportFiles }).selected_surface, 'browser_extension');
+assert.equal(kit.platformAdapterImportPlan(kitZoomExportPackage, { availableFiles: kitZoomExportFiles }).selected_surface, 'native_detector');
 assert.equal(kit.platformAdapterImportPlanMatrix([kitZoomExportPackage], { availableFiles: kitZoomExportFiles }).accepted_count, 1);
 assert.equal(kit.platformLiveAdapterHandoff('zoom').sdk.factory, 'createMeetingPlatformLiveAdapter');
 assert.equal(kit.platformLiveAdapterHandoffBundle({

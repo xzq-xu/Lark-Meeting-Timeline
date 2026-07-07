@@ -19,11 +19,13 @@ const SURFACE_ALIASES = Object.freeze({
   webview_preload: 'webview_preload',
   'webview-preload': 'webview_preload',
   electron: 'webview_preload',
-  native: 'native_host',
-  native_host: 'native_host',
-  'native-host': 'native_host',
-  host: 'native_host',
-  detector: 'native_host',
+  native: 'native_detector',
+  native_detector: 'native_detector',
+  'native-detector': 'native_detector',
+  native_host: 'native_detector',
+  'native-host': 'native_detector',
+  host: 'native_detector',
+  detector: 'native_detector',
   provider: 'provider_reconcile',
   provider_reconcile: 'provider_reconcile',
   'provider-reconcile': 'provider_reconcile',
@@ -79,9 +81,17 @@ function surfacePreference(pkg = {}, input = {}, options = {}) {
   if (pkg.surface_entrypoints?.[recommended]) return recommended;
   if (pkg.surface_entrypoints?.browser_extension?.ready === true) return 'browser_extension';
   if (pkg.surface_entrypoints?.webview_preload?.ready === true) return 'webview_preload';
-  if (pkg.surface_entrypoints?.native_host?.ready === true) return 'native_host';
+  if (pkg.surface_entrypoints?.native_detector?.ready === true) return 'native_detector';
+  if (pkg.surface_entrypoints?.native_host?.ready === true) return 'native_detector';
   if (pkg.surface_entrypoints?.provider_reconcile?.ready === true) return 'provider_reconcile';
-  return recommended || 'native_host';
+  return recommended || 'native_detector';
+}
+
+function surfaceEntrypoint(pkg = {}, surface = '') {
+  if (surface === 'native_detector') {
+    return pkg.surface_entrypoints?.native_detector ?? pkg.surface_entrypoints?.native_host;
+  }
+  return pkg.surface_entrypoints?.[surface];
 }
 
 function normalizedPaths(values = []) {
@@ -123,7 +133,7 @@ function issue(severity, code, message, details = {}) {
 
 function readiness(pkg = {}, surface = '', coverage = {}, input = {}, options = {}) {
   const target = targetFrom(input, options);
-  const selected = pkg.surface_entrypoints?.[surface] ?? {};
+  const selected = surfaceEntrypoint(pkg, surface) ?? {};
   const allowCustomAuthoring = firstNonEmpty(
     options.allowCustomAuthoring,
     options.allow_custom_authoring,
@@ -189,7 +199,7 @@ function sdkImports(pkg = {}) {
 }
 
 function installSteps(pkg = {}, surface = '', coverage = {}) {
-  const selected = pkg.surface_entrypoints?.[surface] ?? {};
+  const selected = surfaceEntrypoint(pkg, surface) ?? {};
   return [
     {
       step: 1,
@@ -292,7 +302,7 @@ export function buildMeetingPlatformAdapterImportPlan(exportPackage = {}, input 
     sdk_imports: sdkImports(exportPackage),
     host_file_coverage: coverage,
     surface_entrypoints: exportPackage.surface_entrypoints,
-    surface_entrypoint: exportPackage.surface_entrypoints?.[surface],
+    surface_entrypoint: surfaceEntrypoint(exportPackage, surface),
     install_steps: installSteps(exportPackage, surface, coverage),
     commands: compactObject({
       export_package: exportPackage.commands?.export_package,

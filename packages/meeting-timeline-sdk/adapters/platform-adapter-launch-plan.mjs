@@ -18,10 +18,12 @@ const SURFACE_ALIASES = Object.freeze({
   webview_preload: 'webview_preload',
   'webview-preload': 'webview_preload',
   electron: 'webview_preload',
-  native: 'native_host',
-  native_host: 'native_host',
-  'native-host': 'native_host',
-  host: 'native_host',
+  native: 'native_detector',
+  native_detector: 'native_detector',
+  'native-detector': 'native_detector',
+  native_host: 'native_detector',
+  'native-host': 'native_detector',
+  host: 'native_detector',
   provider: 'provider_reconcile',
   provider_reconcile: 'provider_reconcile',
   'provider-reconcile': 'provider_reconcile',
@@ -209,8 +211,9 @@ function surfaceEntrypoint(manifest = {}, row = {}, surface = '', url) {
       mark_insert_method: registryRow?.mark_insert_method ?? 'insertAnnotation',
     });
   }
-  if (surface === 'native_host') {
-    const registryRow = asArray(manifest.native_host?.rows).find((item) => item.platform === row.platform);
+  if (surface === 'native_detector') {
+    const registryRow = asArray(manifest.native_detector?.rows).find((item) => item.platform === row.platform)
+      ?? asArray(manifest.native_host?.rows).find((item) => item.platform === row.platform);
     return compactObject({
       surface,
       platform: row.platform,
@@ -297,7 +300,7 @@ function readiness(manifest = {}, row = null, surface = '', entrypoint = {}, res
       platform: resolved.platform,
       url: resolved.url,
     }) : undefined,
-    (surface === 'webview_preload' || surface === 'native_host') && !entrypoint.registry_row ? issue('error', 'surface_not_registered_for_platform', 'Selected launch surface is not registered for this platform in the install manifest.', {
+    (surface === 'webview_preload' || surface === 'native_detector') && !entrypoint.registry_row ? issue('error', 'surface_not_registered_for_platform', 'Selected launch surface is not registered for this platform in the install manifest.', {
       platform: resolved.platform,
       surface,
     }) : undefined,

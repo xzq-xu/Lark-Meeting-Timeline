@@ -8,7 +8,7 @@ export interface MeetingPlatformAdapterImportPlanOptions {
   target?: 'static' | 'pilot' | 'production' | string;
   acceptanceTarget?: 'static' | 'pilot' | 'production' | string;
   acceptance_target?: 'static' | 'pilot' | 'production' | string;
-  surface?: 'browser_extension' | 'webview_preload' | 'native_host' | 'provider_reconcile' | string;
+  surface?: 'browser_extension' | 'webview_preload' | 'native_detector' | 'native_host' | 'provider_reconcile' | string;
   preferredSurface?: string;
   preferred_surface?: string;
   availableFiles?: string[];

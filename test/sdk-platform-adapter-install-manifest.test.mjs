@@ -40,10 +40,12 @@ assert.equal(manifest.schema, 'meeting_platform_adapter_install_manifest');
 assert.equal(manifest.accepted, true);
 assert.equal(manifest.platform_count, 2);
 assert.deepEqual(manifest.platforms, ['google_meet', 'zoom']);
-assert.deepEqual(manifest.selected_surfaces, ['browser_extension']);
+assert.deepEqual(manifest.selected_surfaces, ['browser_extension', 'native_detector']);
 assert.equal(manifest.runtime_contract.timestamp_field, 'captured_at_ms');
 assert.equal(manifest.browser_extension.enabled, true);
-assert.equal(manifest.browser_extension.content_scripts.length, 2);
+assert.equal(manifest.browser_extension.content_scripts.length, 1);
+assert.equal(manifest.native_detector.enabled, true);
+assert.equal(manifest.native_detector.platform_count, 1);
 assert.equal(manifest.browser_extension.host_permissions.includes('https://meet.google.com/*'), true);
 assert.equal(manifest.browser_extension.message_types.includes('meeting_timeline.preflight_current_window'), true);
 assert.equal(manifest.browser_extension.message_types.includes('meeting_timeline.preflight_candidates'), true);
@@ -116,7 +118,8 @@ const sdk = createMeetingAppTimelineSdk({
   platforms: ['google-meet', 'zoom'],
 });
 assert.equal(sdk.platformAdapterInstallManifest(importMatrix.plans).accepted, true);
-assert.equal(sdk.adapterInstallManifest(importMatrix.plans).browser_extension.platform_count, 2);
+assert.equal(sdk.adapterInstallManifest(importMatrix.plans).browser_extension.platform_count, 1);
+assert.equal(sdk.adapterInstallManifest(importMatrix.plans).native_detector.platform_count, 1);
 assert.equal(sdk.assertPlatformAdapterInstallManifest(manifest), manifest);
 
 console.log('ok meeting platform adapter install manifest');

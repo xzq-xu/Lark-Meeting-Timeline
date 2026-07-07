@@ -92,7 +92,7 @@ assert.equal(matrix.schema, 'meeting_platform_adapter_import_plan_matrix');
 assert.equal(matrix.package_count, 2);
 assert.equal(matrix.accepted_count, 2);
 assert.equal(matrix.missing_file_count, 0);
-assert.equal(matrix.rows.find((row) => row.platform === 'zoom').selected_surface, 'browser_extension');
+assert.equal(matrix.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
 
 const client = {
   async startMeeting(input) {

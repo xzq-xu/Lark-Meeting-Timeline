@@ -326,6 +326,7 @@ export function buildMeetingPlatformAdapterInstallManifest(plansOrInput = {}, in
     platform_registry: rows,
     browser_extension: browserRegistry(plans, input, options),
     webview_preload: surfaceRegistry(plans, 'webview_preload'),
+    native_detector: surfaceRegistry(plans, 'native_detector'),
     native_host: surfaceRegistry(plans, 'native_host'),
     provider_reconcile: providerRegistry(plans),
     install_sequence: installSequence(plans),

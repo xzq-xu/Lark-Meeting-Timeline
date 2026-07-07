@@ -117,6 +117,8 @@ const zoomPlan = buildMeetingPlatformAdapterLaunchPlan(manifest, {
 assert.equal(zoomPlan.accepted, true);
 assert.equal(zoomPlan.platform, 'zoom');
 assert.equal(zoomPlan.detection_reason, 'explicit_platform');
+assert.equal(zoomPlan.selected_surface, 'native_detector');
+assert.equal(zoomPlan.surface_entrypoint.registry_row.platform, 'zoom');
 
 const googleExportPackage = exportMatrix.packages.find((pkg) => pkg.platform === 'google_meet');
 const googleWebviewImportPlan = buildMeetingPlatformAdapterImportPlan(googleExportPackage, {

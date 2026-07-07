@@ -582,9 +582,7 @@ export function buildMeetingPlatformAdapterExportPackage(platform, input = {}, o
   const key = authoringPlan.platform;
   const buildArtifacts = includeArtifacts || boolOption(merged, 'buildArtifacts', 'build_artifacts', false);
   const buildFullCompanions = buildArtifacts || boolOption(merged, 'fullCompanions', 'full_companions', false);
-  const portfolioItem = buildFullCompanions
-    ? buildMeetingPlatformAdapterPortfolioItem(platform, merged)
-    : lightweightPortfolioItem(authoringPlan);
+  const portfolioItem = buildMeetingPlatformAdapterPortfolioItem(platform, merged);
   const checklist = buildFullCompanions
     ? buildMeetingPlatformAdapterAcceptanceChecklist(platform, input, merged)
     : lightweightAcceptanceChecklist(authoringPlan, portfolioItem, target);
@@ -625,6 +623,7 @@ export function buildMeetingPlatformAdapterExportPackage(platform, input = {}, o
     surface_entrypoints: {
       browser_extension: browserSurface(artifacts.runtime_bundle, portfolioItem),
       webview_preload: webviewSurface(artifacts.runtime_bundle, portfolioItem),
+      native_detector: nativeSurface(portfolioItem, artifacts.implementation_handoff),
       native_host: nativeSurface(portfolioItem, artifacts.implementation_handoff),
       provider_reconcile: providerSurface(artifacts.provider_connection, portfolioItem),
     },
@@ -648,6 +647,7 @@ export function buildMeetingPlatformAdapterExportPackage(platform, input = {}, o
       display_name: portfolioItem.display_name,
       adapter_status: portfolioItem.adapter_status,
       recommended_first_surface: portfolioItem.recommended_first_surface,
+      adapter_surfaces: portfolioItem.adapter_surfaces,
       p0_realtime_axis: portfolioItem.p0_realtime_axis,
       p1_provider_reconcile: portfolioItem.p1_provider_reconcile,
       p2_post_meeting_backfill: portfolioItem.p2_post_meeting_backfill,

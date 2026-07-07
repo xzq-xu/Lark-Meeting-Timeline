@@ -93,6 +93,8 @@ const kit = createMeetingPlatformTimelineKit(client, {
   platforms: ['google-meet', 'zoom'],
 });
 assert.equal(kit.platformAdapterExportPackage('zoom', {}, { target: 'static' }).accepted, true);
+assert.equal(kit.platformAdapterExportPackage('zoom', {}, { target: 'static' }).recommended_first_surface, 'native_detector');
+assert.equal(kit.platformAdapterExportPackage('zoom', {}, { target: 'static' }).surface_entrypoints.native_detector.ready, true);
 assert.equal(kit.platformAdapterExportPackageMatrix({}, { target: 'static' }).platform_count, 2);
 
 const sdk = createMeetingAppTimelineSdk({
