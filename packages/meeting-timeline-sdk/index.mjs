@@ -1268,6 +1268,40 @@ export function createMeetingAppTimelineSdk(options = {}) {
     adapterRouteMatrix(routeOptions = {}) {
       return sdk.platformAdapterRouteMatrix(routeOptions);
     },
+    platformAdapterBlueprint(platformOrOptions = {}, blueprintOptions = {}) {
+      const resolved = singlePlatformInput(runtime, platformOrOptions, blueprintOptions);
+      return runtime.kit.platformAdapterBlueprint(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
+    },
+    adapterBlueprint(platformOrOptions = {}, blueprintOptions = {}) {
+      return sdk.platformAdapterBlueprint(platformOrOptions, blueprintOptions);
+    },
+    platformAdapterBlueprintMatrix(blueprintOptions = {}) {
+      return runtime.kit.platformAdapterBlueprintMatrix(sdkPlatformOptions(runtime, blueprintOptions));
+    },
+    adapterBlueprintMatrix(blueprintOptions = {}) {
+      return sdk.platformAdapterBlueprintMatrix(blueprintOptions);
+    },
+    verifyPlatformAdapterBlueprint(blueprintOrPlatform = {}, blueprintOptions = {}) {
+      return runtime.kit.verifyPlatformAdapterBlueprint(
+        blueprintOrPlatform,
+        sdkPlatformOptions(runtime, blueprintOptions),
+      );
+    },
+    assertPlatformAdapterBlueprint(blueprintOrPlatform = {}, blueprintOptions = {}) {
+      return runtime.kit.assertPlatformAdapterBlueprint(
+        blueprintOrPlatform,
+        sdkPlatformOptions(runtime, blueprintOptions),
+      );
+    },
+    assertAdapterBlueprint(blueprintOrPlatform = {}, blueprintOptions = {}) {
+      return sdk.assertPlatformAdapterBlueprint(blueprintOrPlatform, blueprintOptions);
+    },
+    assertPlatformAdapterBlueprintMatrix(matrixOrOptions = {}) {
+      return runtime.kit.assertPlatformAdapterBlueprintMatrix(sdkPlatformOptions(runtime, matrixOrOptions));
+    },
+    assertAdapterBlueprintMatrix(matrixOrOptions = {}) {
+      return sdk.assertPlatformAdapterBlueprintMatrix(matrixOrOptions);
+    },
     platformAdapterDecision(input = {}, decisionOptions = {}) {
       return runtime.kit.platformAdapterDecision(input, sdkPlatformOptions(runtime, decisionOptions));
     },
@@ -1478,6 +1512,7 @@ export * from './adapters/platform-adapter-smoke.mjs';
 export * from './adapters/platform-runtime-profile.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
+export * from './adapters/platform-adapter-blueprint.mjs';
 export * from './adapters/platform-adapter-decision.mjs';
 export * from './adapters/platform-adapter-startup.mjs';
 export * from './adapters/platform-adapter-preflight.mjs';

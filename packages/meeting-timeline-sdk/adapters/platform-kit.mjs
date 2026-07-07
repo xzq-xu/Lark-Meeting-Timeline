@@ -174,6 +174,13 @@ import {
   buildMeetingPlatformAdapterRouteMatrix,
 } from './platform-adapter-route.mjs';
 import {
+  assertMeetingPlatformAdapterBlueprint,
+  assertMeetingPlatformAdapterBlueprintMatrix,
+  buildMeetingPlatformAdapterBlueprint,
+  buildMeetingPlatformAdapterBlueprintMatrix,
+  verifyMeetingPlatformAdapterBlueprint,
+} from './platform-adapter-blueprint.mjs';
+import {
   assertMeetingPlatformAdapterDecision,
   assertMeetingPlatformAdapterDecisionMatrix,
   buildMeetingPlatformAdapterDecision,
@@ -630,6 +637,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_adaptation_runbook: buildMeetingPlatformAdaptationRunbookSummary(options),
     platform_adaptation_strategy: buildMeetingPlatformAdaptationStrategyMatrix(options),
     platform_adapter_route_matrix: buildMeetingPlatformAdapterRouteMatrix(options),
+    platform_adapter_blueprint_matrix: buildMeetingPlatformAdapterBlueprintMatrix(options),
     platform_adapter_decision_matrix: buildMeetingPlatformAdapterDecisionMatrix(options),
     platform_adapter_startup_plan_matrix: buildMeetingPlatformAdapterStartupPlanMatrix(options),
     platform_live_adapter_matrix: buildMeetingPlatformLiveAdapterMatrix(options),
@@ -788,6 +796,21 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdapterRouteMatrix(routeOptions = {}) {
       return buildMeetingPlatformAdapterRouteMatrix(withDefaults(defaults, routeOptions));
+    },
+    platformAdapterBlueprint(platform, blueprintOptions = {}) {
+      return buildMeetingPlatformAdapterBlueprint(platform, withDefaults(defaults, blueprintOptions));
+    },
+    platformAdapterBlueprintMatrix(blueprintOptions = {}) {
+      return buildMeetingPlatformAdapterBlueprintMatrix(withDefaults(defaults, blueprintOptions));
+    },
+    verifyPlatformAdapterBlueprint(blueprintOrPlatform = {}, blueprintOptions = {}) {
+      return verifyMeetingPlatformAdapterBlueprint(blueprintOrPlatform, withDefaults(defaults, blueprintOptions));
+    },
+    assertPlatformAdapterBlueprint(blueprintOrPlatform = {}, blueprintOptions = {}) {
+      return assertMeetingPlatformAdapterBlueprint(blueprintOrPlatform, withDefaults(defaults, blueprintOptions));
+    },
+    assertPlatformAdapterBlueprintMatrix(matrixOrOptions = {}) {
+      return assertMeetingPlatformAdapterBlueprintMatrix(withDefaults(defaults, matrixOrOptions));
     },
     platformAdapterDecision(input = {}, decisionOptions = {}) {
       return buildMeetingPlatformAdapterDecision(input, withDefaults(defaults, decisionOptions));

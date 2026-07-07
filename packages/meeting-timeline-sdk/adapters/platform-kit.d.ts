@@ -71,6 +71,12 @@ import type {
   MeetingPlatformAdapterRouteOptions,
 } from './platform-adapter-route.mjs';
 import type {
+  MeetingPlatformAdapterBlueprint,
+  MeetingPlatformAdapterBlueprintMatrix,
+  MeetingPlatformAdapterBlueprintOptions,
+  MeetingPlatformAdapterBlueprintReadiness,
+} from './platform-adapter-blueprint.mjs';
+import type {
   MeetingPlatformAdapterDecision,
   MeetingPlatformAdapterDecisionInput,
   MeetingPlatformAdapterDecisionMatrix,
@@ -462,6 +468,19 @@ export interface MeetingPlatformTimelineKit {
   platformAdaptationStrategyMatrix(strategyOptions?: MeetingPlatformRolloutOptions): MeetingPlatformAdaptationStrategyMatrix;
   platformAdapterRoute(platform: string, routeOptions?: MeetingPlatformAdapterRouteOptions): MeetingPlatformAdapterRoute;
   platformAdapterRouteMatrix(routeOptions?: MeetingPlatformAdapterRouteOptions): MeetingPlatformAdapterRouteMatrix;
+  platformAdapterBlueprint(platform: string, blueprintOptions?: MeetingPlatformAdapterBlueprintOptions): MeetingPlatformAdapterBlueprint;
+  platformAdapterBlueprintMatrix(blueprintOptions?: MeetingPlatformAdapterBlueprintOptions): MeetingPlatformAdapterBlueprintMatrix;
+  verifyPlatformAdapterBlueprint(
+    blueprintOrPlatform?: string | MeetingPlatformAdapterBlueprint | Record<string, unknown>,
+    blueprintOptions?: MeetingPlatformAdapterBlueprintOptions,
+  ): MeetingPlatformAdapterBlueprintReadiness;
+  assertPlatformAdapterBlueprint(
+    blueprintOrPlatform?: string | MeetingPlatformAdapterBlueprint | Record<string, unknown>,
+    blueprintOptions?: MeetingPlatformAdapterBlueprintOptions,
+  ): MeetingPlatformAdapterBlueprint;
+  assertPlatformAdapterBlueprintMatrix(
+    matrixOrOptions?: MeetingPlatformAdapterBlueprintOptions | MeetingPlatformAdapterBlueprintMatrix,
+  ): MeetingPlatformAdapterBlueprintMatrix;
   platformAdapterDecision(input?: string | URL | MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecision;
   platformAdapterDecisionMatrix(input?: MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecisionMatrix;
   assertPlatformAdapterDecision(input?: string | URL | MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecision;

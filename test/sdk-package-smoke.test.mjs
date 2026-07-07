@@ -87,6 +87,8 @@ assert.equal(packedFiles.includes('adapters/platform-strategy.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-strategy.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-route.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-route.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-blueprint.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-blueprint.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-decision.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-decision.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-startup.mjs'), true);
@@ -924,6 +926,9 @@ assert.equal(rootMeetingAppSdk.runtimeBundleMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterRoute('google-meet').platform, 'google_meet');
 assert.equal(rootMeetingAppSdk.platformAdapterRoute('google-meet').adapter_surfaces.primary, 'browser_extension');
 assert.equal(rootMeetingAppSdk.adapterRouteMatrix().platform_count, 1);
+assert.equal(rootMeetingAppSdk.platformAdapterBlueprint('google-meet').platform, 'google_meet');
+assert.equal(rootMeetingAppSdk.platformAdapterBlueprint('google-meet').surfaces.provider_reconcile.blocks_realtime, false);
+assert.equal(rootMeetingAppSdk.adapterBlueprintMatrix().platform_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterDecision({
   url: 'https://meet.google.com/abc-defg-hij',
 }).selected_surface, 'browser_extension');
