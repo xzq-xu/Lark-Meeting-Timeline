@@ -19,6 +19,7 @@ import {
   buildMeetingAppExtensionMatchPatterns,
   buildMeetingAppExtensionObserveCandidatesMessage,
   buildMeetingAppExtensionPackageJson,
+  buildMeetingAppExtensionPreflightCandidatesMessage,
   buildMeetingAppExtensionScaffold,
   buildMeetingAppExtensionScaffoldAcceptanceReport,
   buildMeetingAppExtensionStatusMessage,
@@ -40,6 +41,58 @@ function installGeneratedBackground(source) {
   const storage = {};
   const fetchCalls = [];
   const tabMessages = [];
+  const meetingTabs = [
+    {
+      id: 7,
+      windowId: 1,
+      active: true,
+      audible: false,
+      pinned: false,
+      discarded: false,
+      status: 'complete',
+      title: 'Google Meet',
+      url: 'https://meet.google.com/abc-defg-hij',
+    },
+    {
+      id: 8,
+      windowId: 1,
+      active: false,
+      audible: true,
+      pinned: false,
+      discarded: false,
+      status: 'complete',
+      title: 'Teams meeting',
+      url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+    },
+    {
+      id: 9,
+      windowId: 1,
+      active: false,
+      audible: false,
+      pinned: false,
+      discarded: false,
+      status: 'complete',
+      title: 'Zoom meeting',
+      url: 'https://us06web.zoom.us/wc/987654321/start',
+    },
+    {
+      id: 10,
+      windowId: 1,
+      active: false,
+      audible: false,
+      pinned: false,
+      discarded: false,
+      status: 'complete',
+      title: 'Lark meeting',
+      url: 'https://vc.feishu.cn/j/123456',
+    },
+  ];
+  const platformForUrl = (url = '') => {
+    if (url.includes('teams.microsoft.com')) return 'microsoft_teams';
+    if (url.includes('zoom.us')) return 'zoom';
+    if (url.includes('feishu.cn') || url.includes('larksuite.com') || url.includes('larkoffice.com')) return 'lark';
+    return 'google_meet';
+  };
   globalThis.chrome = {
     runtime: {
       onMessage: {
@@ -63,29 +116,20 @@ function installGeneratedBackground(source) {
     },
     tabs: {
       query(_query, callback) {
-        callback?.([{
-          id: 7,
-          windowId: 1,
-          active: true,
-          audible: false,
-          pinned: false,
-          discarded: false,
-          status: 'complete',
-          title: 'Google Meet',
-          url: 'https://meet.google.com/abc-defg-hij',
-        }]);
+        callback?.(meetingTabs);
       },
       sendMessage(tabId, message, options, callback) {
         const sendOptions = typeof options === 'function' ? {} : (options ?? {});
         const sendCallback = typeof options === 'function' ? options : callback;
         tabMessages.push({ tabId, message, options: sendOptions });
+        const tab = meetingTabs.find((item) => item.id === tabId);
         sendCallback?.({
           handled: true,
           action: 'preflightCurrentWindow',
           result: {
             schema: 'meeting_platform_adapter_preflight',
             accepted: true,
-            platform: message.platform ?? message.input?.platform ?? 'google_meet',
+            platform: message.platform ?? message.input?.platform ?? platformForUrl(message.input?.url ?? message.url ?? tab?.url),
             readiness: { realtime_annotation_ready: true },
           },
         });
@@ -302,6 +346,7 @@ assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached, 'meeting_ti
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status, 'meeting_timeline.extension_status');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates, 'meeting_timeline.observe_candidates');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window, 'meeting_timeline.preflight_current_window');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates, 'meeting_timeline.preflight_candidates');
 assert.equal(MEETING_APP_EXTENSION_STATUS_STORAGE_KEY, 'meeting_timeline_extension_status');
 assert.equal(MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS.insertMarks, '/api/annotations/batch');
 assert.equal(normalizeMeetingAppExtensionMessageType('client_call'), MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call);
@@ -309,6 +354,7 @@ assert.equal(normalizeMeetingAppExtensionMessageType('attached'), MEETING_APP_EX
 assert.equal(normalizeMeetingAppExtensionMessageType('extension-status'), MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status);
 assert.equal(normalizeMeetingAppExtensionMessageType('observe-platform-candidates'), MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates);
 assert.equal(normalizeMeetingAppExtensionMessageType('current-window-preflight'), MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window);
+assert.equal(normalizeMeetingAppExtensionMessageType('preflight-platform-candidates'), MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates);
 assert.equal(meetingAppExtensionTimelineEndpoint('insertMarks'), '/api/annotations/batch');
 assert.throws(
   () => meetingAppExtensionTimelineEndpoint('deleteEverything'),
@@ -356,6 +402,20 @@ assert.deepEqual(currentWindowPreflightMessage, {
   platform: 'google_meet',
   url: 'https://meet.google.com/abc-defg-hij',
   title: 'Design review',
+  options: { requireSpeakerTrack: true },
+});
+
+const preflightCandidatesMessage = buildMeetingAppExtensionPreflightCandidatesMessage({
+  requestId: 'preflight-candidates-001',
+  capturedAtMs: 126,
+  query: { active: false },
+  options: { requireSpeakerTrack: true },
+});
+assert.deepEqual(preflightCandidatesMessage, {
+  type: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates,
+  request_id: 'preflight-candidates-001',
+  captured_at_ms: 126,
+  query: { active: false },
   options: { requireSpeakerTrack: true },
 });
 
@@ -454,6 +514,10 @@ assert.deepEqual(plan.runtime_contract.live_capture_methods, [
 assert.deepEqual(plan.runtime_contract.message_types, MEETING_APP_EXTENSION_MESSAGE_TYPES);
 assert.equal(
   plan.runtime_contract.local_content_script_messages.includes(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window),
+  true,
+);
+assert.equal(
+  plan.runtime_contract.local_content_script_messages.includes(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates),
   true,
 );
 assert.equal(plan.runtime_contract.status_storage_key, MEETING_APP_EXTENSION_STATUS_STORAGE_KEY);
@@ -574,6 +638,7 @@ assert.match(backgroundSource, /meeting_timeline\.extension_attached/);
 assert.match(backgroundSource, /meeting_timeline\.extension_status/);
 assert.match(backgroundSource, /meeting_timeline\.observe_candidates/);
 assert.match(backgroundSource, /meeting_timeline\.preflight_current_window/);
+assert.match(backgroundSource, /meeting_timeline\.preflight_candidates/);
 assert.match(backgroundSource, /tabs\.sendMessage/);
 assert.match(backgroundSource, /createMeetingPlatformRuntimeEventClient/);
 assert.match(backgroundSource, /observePlatformCandidates/);
@@ -682,6 +747,29 @@ try {
   assert.equal(backgroundRuntime.tabMessages[1].tabId, 8);
   assert.equal(backgroundRuntime.tabMessages[1].message.input.url, 'https://vc.feishu.cn/j/123456');
   assert.equal(backgroundRuntime.fetchCalls.length, 2);
+
+  const batchPreflightResponse = await backgroundRuntime.send({
+    type: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates,
+    request_id: 'preflight-candidates-001',
+    query: {},
+    options: { requireSpeakerTrack: true },
+  });
+  assert.equal(batchPreflightResponse.ok, true);
+  assert.equal(batchPreflightResponse.type, MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates);
+  assert.equal(batchPreflightResponse.candidate_count, 4);
+  assert.equal(batchPreflightResponse.preflight_count, 4);
+  assert.equal(batchPreflightResponse.accepted_count, 4);
+  assert.deepEqual(batchPreflightResponse.rows.map((row) => row.preflight.platform), [
+    'google_meet',
+    'microsoft_teams',
+    'zoom',
+    'lark',
+  ]);
+  assert.equal(backgroundRuntime.tabMessages.length, 6);
+  assert.deepEqual(backgroundRuntime.tabMessages.slice(2).map((item) => item.tabId), [7, 8, 9, 10]);
+  assert.equal(backgroundRuntime.tabMessages[4].message.input.url, 'https://us06web.zoom.us/wc/987654321/start');
+  assert.equal(backgroundRuntime.tabMessages[5].message.type, MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window);
+  assert.equal(backgroundRuntime.fetchCalls.length, 2);
 } finally {
   backgroundRuntime.restore();
 }
@@ -739,9 +827,11 @@ assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.m
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /observePlatformCandidates/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /meeting_timeline\.observe_candidates/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /meeting_timeline\.preflight_current_window/);
+assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /meeting_timeline\.preflight_candidates/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /npm run build/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /observe_candidates/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /preflight_current_window/);
+assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /preflight_candidates/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /diagnose\(\)/);
 
 const scaffoldReport = buildMeetingAppExtensionScaffoldAcceptanceReport(scaffold);

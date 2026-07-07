@@ -69,6 +69,7 @@ assert.equal(handoff.sdk_facade_handoff.minimal_realtime_flow[0].method, 'create
 assert.equal(handoff.sdk_facade_handoff.minimal_realtime_flow.some((step) => String(step.method).includes('sdk.insertAnnotation')), true);
 assert.equal(handoff.sdk_facade_handoff.surface_wiring.browser_extension.content_script_messages.includes('meeting_timeline.sample_tracks'), true);
 assert.equal(handoff.sdk_facade_handoff.surface_wiring.browser_extension.content_script_messages.includes('meeting_timeline.preflight_current_window'), true);
+assert.equal(handoff.sdk_facade_handoff.surface_wiring.browser_extension.content_script_messages.includes('meeting_timeline.preflight_candidates'), true);
 assert.equal(handoff.sdk_facade_handoff.surface_wiring.provider_adapter.realtime_blocking, false);
 assert.equal(handoff.sdk_facade_handoff.timestamp_field, 'captured_at_ms');
 assert.equal(handoff.sdk_facade_handoff.platform_rows.find((row) => row.platform === 'google_meet').provider_path, 'google_workspace_events_pubsub');

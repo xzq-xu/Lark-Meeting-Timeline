@@ -663,6 +663,7 @@ import {
   MEETING_APP_EXTENSION_MESSAGE_TYPES,
   buildMeetingAppExtensionBackgroundSource,
   buildMeetingAppExtensionCurrentWindowPreflightMessage,
+  buildMeetingAppExtensionPreflightCandidatesMessage,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-extension';
 import {
   buildMeetingAppFixtureTrackReadinessReport,
@@ -1008,13 +1009,20 @@ assert.equal(buildMeetingPlatformConnectorMatrix({ platforms: ['google-meet', 't
 assert.equal(buildMeetingPlatformConnectorHubFromRoot({ platforms: ['google-meet', 'teams'] }).schema, 'meeting_platform_connector_hub');
 assert.equal(buildMeetingPlatformConnectorHub({ platforms: ['google-meet', 'teams'] }).accepted, true);
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window, 'meeting_timeline.preflight_current_window');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates, 'meeting_timeline.preflight_candidates');
 assert.equal(buildMeetingAppExtensionCurrentWindowPreflightMessage({
   platform: 'google-meet',
   capturedAtMs: 123,
 }).type, 'meeting_timeline.preflight_current_window');
+assert.equal(buildMeetingAppExtensionPreflightCandidatesMessage({
+  capturedAtMs: 124,
+}).type, 'meeting_timeline.preflight_candidates');
 assert.match(buildMeetingAppExtensionBackgroundSource({
   baseUrl: 'http://localhost:8787',
 }), /meeting_timeline\.preflight_current_window/);
+assert.match(buildMeetingAppExtensionBackgroundSource({
+  baseUrl: 'http://localhost:8787',
+}), /meeting_timeline\.preflight_candidates/);
 assert.match(buildMeetingAppExtensionBackgroundSource({
   baseUrl: 'http://localhost:8787',
 }), /tabs\.sendMessage/);
@@ -1847,8 +1855,10 @@ assert.equal(smokeGoogleRuntimeBundle.runtime.content_script_bridge.install_func
 assert.equal(smokeGoogleRuntimeBundle.runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
 assert.equal(smokeGoogleRuntimeBundle.messaging.lightweight_connector_message_types.includes('meeting_timeline.sample_tracks'), true);
 assert.equal(smokeGoogleRuntimeBundle.messaging.lightweight_connector_message_types.includes('meeting_timeline.preflight_current_window'), true);
+assert.equal(smokeGoogleRuntimeBundle.messaging.background_message_types.includes('meeting_timeline.preflight_candidates'), true);
 assert.equal(smokeGoogleRuntimeBundle.messaging.runtime_event.plan.realtime_contract.transcript_required_for_realtime, false);
 assert.equal(smokeGoogleRuntimeBundle.messaging.examples.preflight_current_window.type, 'meeting_timeline.preflight_current_window');
+assert.equal(smokeGoogleRuntimeBundle.messaging.examples.preflight_candidates.type, 'meeting_timeline.preflight_candidates');
 assert.equal(smokeGoogleRuntimeBundle.messaging.examples.content_script_insert_annotation.type, 'meeting_timeline.insert_mark');
 assert.equal(buildMeetingPlatformRuntimeBundleMatrix({
   baseUrl: 'http://localhost:8787',

@@ -10,7 +10,8 @@ export type MeetingAppExtensionMessageType =
   | 'meeting_timeline.extension_attached'
   | 'meeting_timeline.extension_status'
   | 'meeting_timeline.observe_candidates'
-  | 'meeting_timeline.preflight_current_window';
+  | 'meeting_timeline.preflight_current_window'
+  | 'meeting_timeline.preflight_candidates';
 
 export type MeetingAppExtensionClientCallMethod =
   | 'startMeeting'
@@ -189,6 +190,7 @@ export const MEETING_APP_EXTENSION_MESSAGE_TYPES: Readonly<{
   extension_status: 'meeting_timeline.extension_status';
   observe_candidates: 'meeting_timeline.observe_candidates';
   preflight_current_window: 'meeting_timeline.preflight_current_window';
+  preflight_candidates: 'meeting_timeline.preflight_candidates';
 }>;
 export const MEETING_APP_EXTENSION_STATUS_STORAGE_KEY: 'meeting_timeline_extension_status';
 export const MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS: Readonly<Record<MeetingAppExtensionClientCallMethod, string>>;
@@ -216,6 +218,20 @@ export function buildMeetingAppExtensionObserveCandidatesMessage(
 
 export function buildMeetingAppExtensionCurrentWindowPreflightMessage(
   input?: MeetingAppExtensionMessageOptions & {
+    input?: Record<string, unknown>;
+    options?: Record<string, unknown>;
+    preflightOptions?: Record<string, unknown>;
+    preflight_options?: Record<string, unknown>;
+  },
+  options?: MeetingAppExtensionMessageOptions,
+): Record<string, unknown>;
+
+export function buildMeetingAppExtensionPreflightCandidatesMessage(
+  input?: MeetingAppExtensionMessageOptions & {
+    query?: Record<string, unknown>;
+    tabs?: Record<string, unknown>[];
+    browser_tabs?: Record<string, unknown>[];
+    browserTabs?: Record<string, unknown>[];
     input?: Record<string, unknown>;
     options?: Record<string, unknown>;
     preflightOptions?: Record<string, unknown>;

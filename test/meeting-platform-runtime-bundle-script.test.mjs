@@ -49,6 +49,7 @@ assert.equal(googleBundle.runtime.lightweight_connector_bridge.install_function,
 assert.equal(googleBundle.runtime.lightweight_connector_bridge.options.baseUrl, baseUrl);
 assert.equal(googleBundle.messaging.lightweight_connector_message_types.includes('meeting_timeline.sample_tracks'), true);
 assert.equal(googleBundle.messaging.lightweight_connector_message_types.includes('meeting_timeline.preflight_current_window'), true);
+assert.equal(googleBundle.messaging.background_message_types.includes('meeting_timeline.preflight_candidates'), true);
 assert.equal(googleBundle.messaging.accepted_methods.includes('insertMark'), true);
 assert.equal(googleBundle.provider_reconcile.required_for_realtime, false);
 assert.equal(googleBundle.transcript.blocks_realtime_annotation, false);

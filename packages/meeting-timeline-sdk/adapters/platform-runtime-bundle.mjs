@@ -19,6 +19,7 @@ import {
   buildMeetingAppExtensionClientCallMessage,
   buildMeetingAppExtensionCurrentWindowPreflightMessage,
   buildMeetingAppExtensionObserveCandidatesMessage,
+  buildMeetingAppExtensionPreflightCandidatesMessage,
   buildMeetingAppExtensionStatusMessage,
 } from './meeting-app-extension.mjs';
 import {
@@ -119,6 +120,14 @@ function messageExamples(platform, options = {}) {
       platform: extensionPlatform,
       capturedAtMs,
       url,
+      options: {
+        requireSpeakerTrack: true,
+      },
+    }),
+    preflight_candidates: buildMeetingAppExtensionPreflightCandidatesMessage({
+      requestId: 'preflight-candidates-001',
+      capturedAtMs,
+      query: { active: false },
       options: {
         requireSpeakerTrack: true,
       },
@@ -378,6 +387,8 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
       ],
       background_message_types: [
         MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+        MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+        MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates,
       ],
       candidate_observation: adaptationPackage.candidate_observation,
       accepted_methods: Object.keys(endpoints).filter((method) => endpoints[method]),

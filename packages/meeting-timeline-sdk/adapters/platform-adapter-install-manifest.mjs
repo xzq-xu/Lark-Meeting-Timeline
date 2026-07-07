@@ -13,6 +13,7 @@ const DEFAULT_MESSAGE_TYPES = Object.freeze([
   'meeting_timeline.status',
   'meeting_timeline.observe_candidates',
   'meeting_timeline.preflight_current_window',
+  'meeting_timeline.preflight_candidates',
   'meeting_timeline.insert_mark',
   'meeting_timeline.sample_tracks',
 ]);

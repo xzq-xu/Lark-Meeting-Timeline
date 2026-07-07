@@ -643,9 +643,11 @@ assert.equal(extensionPlan.platforms.length, 5);
 assert.equal(extensionPlan.runtime_contract.message_types.client_call, 'meeting_timeline.client_call');
 assert.equal(extensionPlan.runtime_contract.message_types.observe_candidates, 'meeting_timeline.observe_candidates');
 assert.equal(extensionPlan.runtime_contract.message_types.preflight_current_window, 'meeting_timeline.preflight_current_window');
+assert.equal(extensionPlan.runtime_contract.message_types.preflight_candidates, 'meeting_timeline.preflight_candidates');
 assert.equal(kit.normalizeMeetingAppExtensionMessageType('attached'), 'meeting_timeline.extension_attached');
 assert.equal(kit.normalizeMeetingAppExtensionMessageType('observe-platform-candidates'), 'meeting_timeline.observe_candidates');
 assert.equal(kit.normalizeMeetingAppExtensionMessageType('current-window-preflight'), 'meeting_timeline.preflight_current_window');
+assert.equal(kit.normalizeMeetingAppExtensionMessageType('preflight-platform-candidates'), 'meeting_timeline.preflight_candidates');
 assert.equal(kit.meetingAppExtensionTimelineEndpoint('endMeeting'), '/api/meeting-session/end');
 assert.deepEqual(kit.meetingAppExtensionAttachedMessage({
   platform: 'google-meet',

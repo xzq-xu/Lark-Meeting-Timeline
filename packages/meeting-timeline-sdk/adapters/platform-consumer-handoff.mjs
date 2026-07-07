@@ -434,6 +434,7 @@ function buildSdkFacadeHandoff(platforms = [], inputs = {}) {
           'meeting_timeline.sample',
           'meeting_timeline.sample_tracks',
           'meeting_timeline.preflight_current_window',
+          'meeting_timeline.preflight_candidates',
           'meeting_timeline.insert_mark',
           'meeting_timeline.provider_event',
           'meeting_timeline.observe_candidates',

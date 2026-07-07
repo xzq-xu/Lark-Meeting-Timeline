@@ -46,6 +46,7 @@ assert.equal(manifest.browser_extension.enabled, true);
 assert.equal(manifest.browser_extension.content_scripts.length, 2);
 assert.equal(manifest.browser_extension.host_permissions.includes('https://meet.google.com/*'), true);
 assert.equal(manifest.browser_extension.message_types.includes('meeting_timeline.preflight_current_window'), true);
+assert.equal(manifest.browser_extension.message_types.includes('meeting_timeline.preflight_candidates'), true);
 assert.equal(manifest.platform_registry.find((row) => row.platform === 'google_meet').mark_insert_method, 'insertAnnotation');
 assert.equal(manifest.install_sequence.find((step) => step.id === 'bind_axis_before_marks').sdk_method, 'observePlatformCandidates');
 assert.equal(manifest.provider_reconcile.platform_count, 2);

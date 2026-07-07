@@ -63,6 +63,8 @@ assert.equal(google.messaging.lightweight_connector_message_types.includes('meet
 assert.equal(google.messaging.lightweight_connector_message_types.includes('meeting_timeline.observe_candidates'), true);
 assert.equal(google.messaging.lightweight_connector_message_types.includes('meeting_timeline.preflight_current_window'), true);
 assert.equal(google.messaging.background_message_types.includes('meeting_timeline.observe_candidates'), true);
+assert.equal(google.messaging.background_message_types.includes('meeting_timeline.preflight_current_window'), true);
+assert.equal(google.messaging.background_message_types.includes('meeting_timeline.preflight_candidates'), true);
 assert.equal(google.messaging.candidate_observation.message_type, 'meeting_timeline.observe_candidates');
 assert.equal(google.messaging.accepted_methods.includes('insertMark'), true);
 assert.equal(google.messaging.accepted_methods.includes('runtimeEvents'), true);
@@ -78,6 +80,8 @@ assert.equal(google.messaging.examples.observe_candidates.type, 'meeting_timelin
 assert.equal(google.messaging.examples.observe_candidates.tabs[0].url, 'https://meet.google.com/');
 assert.equal(google.messaging.examples.preflight_current_window.type, 'meeting_timeline.preflight_current_window');
 assert.equal(google.messaging.examples.preflight_current_window.options.requireSpeakerTrack, true);
+assert.equal(google.messaging.examples.preflight_candidates.type, 'meeting_timeline.preflight_candidates');
+assert.equal(google.messaging.examples.preflight_candidates.options.requireSpeakerTrack, true);
 assert.equal(google.messaging.examples.insert_annotation.input.captured_at_ms, 1_782_614_400_000);
 assert.equal(google.messaging.examples.content_script_insert_annotation.type, 'meeting_timeline.insert_mark');
 assert.equal(google.messaging.examples.content_script_insert_annotation.payload.mark.captured_at_ms, 1_782_614_400_000);
