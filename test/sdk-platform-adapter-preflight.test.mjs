@@ -259,6 +259,30 @@ assert.equal(zoomCurrentWindow.accepted, true);
 assert.equal(zoomCurrentWindow.captured_snapshot.capture.profile, 'zoom');
 assert.equal(zoomCurrentWindow.capture.participant_count, 1);
 
+const zoomNativePreflight = buildMeetingPlatformAdapterPreflight({
+  platform: 'zoom',
+  window: {
+    id: 'zoom-native-main',
+    title: 'Zoom Meeting',
+    active: true,
+    visible: true,
+    inMeeting: true,
+    meeting_id: '987654321',
+  },
+  process: { name: 'Zoom Workplace' },
+  audio: { call_active: true },
+  observedAtMs: 1_782_614_400_000,
+}, {
+  baseUrl,
+});
+assert.equal(zoomNativePreflight.accepted, true);
+assert.equal(zoomNativePreflight.summary.evidence_kind, 'native_window');
+assert.equal(zoomNativePreflight.summary.selected_surface, 'native_detector');
+assert.equal(zoomNativePreflight.summary.native_selected_process, 'Zoom Workplace');
+assert.equal(zoomNativePreflight.native_diagnosis.selected_meeting.meeting_id, '987654321');
+assert.equal(zoomNativePreflight.dom_diagnosis, undefined);
+assert.equal(zoomNativePreflight.readiness.meeting_start_ready, true);
+
 const candidatePreflight = buildMeetingPlatformAdapterCandidatePreflight({
   windows: [{
     id: 'chrome-main',
@@ -313,6 +337,33 @@ assert.equal(candidatePreflight.rows[0].tab_id, 7);
 assert.equal(candidatePreflight.rows[0].window_id, 'chrome-main');
 assert.equal(candidatePreflight.rows[2].current_window_captured, true);
 assert.equal(candidatePreflight.rows[2].selected, true);
+
+const nativeCandidatePreflight = buildMeetingPlatformAdapterCandidatePreflight({
+  platform: 'zoom',
+  process: { name: 'Zoom Workplace' },
+  audio: { call_active: true },
+  windows: [{
+    id: 'zoom-native-main',
+    window: {
+      title: 'Zoom Meeting',
+      active: true,
+      visible: true,
+      inMeeting: true,
+      meeting_id: '987654321',
+    },
+    observedAtMs: 1_782_614_400_000,
+  }],
+}, {
+  baseUrl,
+});
+assert.equal(nativeCandidatePreflight.accepted, true);
+assert.equal(nativeCandidatePreflight.candidate_count, 1);
+assert.equal(nativeCandidatePreflight.selected_platform, 'zoom');
+assert.equal(nativeCandidatePreflight.rows[0].selected_surface, 'native_detector');
+assert.equal(nativeCandidatePreflight.rows[0].window_id, 'zoom-native-main');
+assert.equal(nativeCandidatePreflight.rows[0].current_window_captured, false);
+assert.equal(nativeCandidatePreflight.rows[0].meeting_start_ready, true);
+
 assert.equal(assertMeetingPlatformAdapterCandidatePreflight({
   candidates: [{
     document: fakeDocument({

@@ -62,6 +62,7 @@ export interface MeetingPlatformAdapterPreflight {
   input?: Record<string, unknown>;
   startup?: MeetingPlatformAdapterStartupPlan;
   dom_diagnosis?: MeetingAppDomAdaptationDiagnosis | Record<string, unknown>;
+  native_diagnosis?: Record<string, unknown>;
   readiness: MeetingPlatformAdapterPreflightReadiness;
   summary?: Record<string, unknown>;
   current_window?: Record<string, unknown>;

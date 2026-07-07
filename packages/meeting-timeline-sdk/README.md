@@ -1893,7 +1893,7 @@ const diagnosis = buildMeetingAppDomAdaptationDiagnosisMatrix({
 // 对应本地 observer 是否能产生时间轴 start、speaker marker 和 end。
 ```
 
-如果宿主项目只需要在当前会议窗口启动前做一次低成本检查，用 `platform-adapter-preflight`。它会先跑 URL/title/platform 的 startup plan，再把 live DOM snapshots 喂给 DOM diagnosis，最后压成 `static_startup_ready`、`live_evidence_ready`、`meeting_start_ready`、`speaker_track_ready`、`meeting_end_ready` 和 `realtime_annotation_ready`。没有真实 snapshots 时不会宣称 realtime ready；provider events 和 transcript 都只作为非阻塞回填。
+如果宿主项目只需要在当前会议窗口启动前做一次低成本检查，用 `platform-adapter-preflight`。它会先跑 URL/title/platform/native context 的 startup plan，再按 surface 选择证据诊断：browser extension / WebView 用 live DOM snapshots，native detector 用窗口、进程、Accessibility 或音频通话状态。最后统一压成 `static_startup_ready`、`live_evidence_ready`、`meeting_start_ready`、`speaker_track_ready`、`meeting_end_ready` 和 `realtime_annotation_ready`。没有真实 DOM 或 native-window 证据时不会宣称 realtime ready；provider events 和 transcript 都只作为非阻塞回填。
 
 ```js
 import {
@@ -1913,6 +1913,15 @@ const preflight = buildMeetingPlatformAdapterPreflight({
 // preflight.readiness.realtime_annotation_ready === true
 // preflight.readiness.meeting_end_ready 可以单独提示“结束态还没验证”。
 
+const nativePreflight = buildMeetingPlatformAdapterPreflight({
+  platform: 'zoom',
+  window: { title: 'Zoom Meeting', active: true, inMeeting: true, meeting_id: '987654321' },
+  process: { name: 'Zoom Workplace' },
+  audio: { call_active: true },
+});
+// nativePreflight.summary.evidence_kind === 'native_window'
+// nativePreflight.summary.selected_surface === 'native_detector'
+
 const currentWindowPreflight = buildMeetingPlatformAdapterCurrentWindowPreflight({
   window,
   document,
@@ -1929,7 +1938,7 @@ const response = await bridge.dispatchMessage({
 // response.result.accepted 表示当前窗口是否能作为实时标注轴来源。
 ```
 
-如果宿主拿到的是浏览器扩展 background、Electron preload 或桌面观察器的一批候选窗口/标签，用 `buildMeetingPlatformAdapterCandidatePreflight()` 一次性展开 `windows[].tabs[]` / `tabs[]` / `candidates[]`。URL-only 候选只会验证 startup plan 并返回 `needs_live_page_evidence`；只有明确携带当前 `document` 或 live snapshot 的候选才会被判定为 `ready_for_realtime_annotations`，避免误把静态 URL 匹配当成可实时建轴。
+如果宿主拿到的是浏览器扩展 background、Electron preload 或桌面观察器的一批候选窗口/标签，用 `buildMeetingPlatformAdapterCandidatePreflight()` 一次性展开 `windows[].tabs[]` / `tabs[]` / `candidates[]`。URL-only 候选只会验证 startup plan 并返回 `needs_live_page_evidence`；浏览器候选需要明确携带当前 `document` 或 live snapshot，native 候选需要携带 platform/process/window/call state，才会被判定为 `ready_for_realtime_annotations`，避免误把静态 URL 匹配当成可实时建轴。
 
 ```js
 const candidatePreflight = buildMeetingPlatformAdapterCandidatePreflight({

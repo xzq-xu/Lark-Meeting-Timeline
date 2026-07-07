@@ -12,6 +12,9 @@ import {
   buildMeetingAppDomAdaptationDiagnosis,
 } from './meeting-app-profile.mjs';
 import {
+  selectNativeMeetingCandidate,
+} from './native-meeting.mjs';
+import {
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
 
@@ -44,6 +47,25 @@ function unique(values = []) {
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getPath(raw, path) {
+  const parts = path.split('.');
+  let node = raw;
+  for (const part of parts) node = node?.[part];
+  return node;
+}
+
+function firstPath(raw, paths = []) {
+  return firstNonEmpty(...paths.map((path) => getPath(raw, path)));
+}
+
+function firstBoolean(raw, paths = []) {
+  for (const path of paths) {
+    const value = getPath(raw, path);
+    if (typeof value === 'boolean') return value;
+  }
+  return undefined;
 }
 
 function normalizeInput(input = {}) {
@@ -198,6 +220,140 @@ function buildDomDiagnosis(platform, input = {}, options = {}) {
   });
 }
 
+function nativeInputForPlatform(platform, input = {}, options = {}) {
+  return compactObject({
+    ...input,
+    platform,
+    preferredPlatform: platform,
+    preferred_platform: platform,
+    observedAtMs: firstNonEmpty(input.observedAtMs, input.observed_at_ms, options.observedAtMs, options.observed_at_ms),
+  });
+}
+
+function nativeMeetingActive(candidate = {}) {
+  return firstBoolean(candidate, [
+    'in_meeting',
+    'inMeeting',
+    'meeting.active',
+    'window.in_meeting',
+    'window.inMeeting',
+    'window.active',
+    'active',
+    'focused',
+    'selected',
+    'accessibility.call_active',
+    'accessibility.callActive',
+    'audio.call_active',
+    'audio.callActive',
+    'call.active',
+    'callActive',
+    'call_active',
+  ]) === true;
+}
+
+function nativeMeetingEnded(candidate = {}) {
+  return firstBoolean(candidate, [
+    'in_meeting',
+    'inMeeting',
+    'meeting.active',
+    'window.in_meeting',
+    'window.inMeeting',
+    'accessibility.call_active',
+    'accessibility.callActive',
+    'audio.call_active',
+    'audio.callActive',
+    'call.active',
+    'callActive',
+    'call_active',
+  ]) === false;
+}
+
+function nativeSpeakerReady(candidate = {}, input = {}) {
+  return Boolean(firstPath(candidate, [
+    'activeSpeaker',
+    'active_speaker',
+    'speaker',
+    'window.activeSpeaker',
+    'window.active_speaker',
+    'accessibility.activeSpeaker',
+    'accessibility.active_speaker',
+    'audio.activeSpeaker',
+    'audio.active_speaker',
+  ]) ?? firstPath(input, [
+    'activeSpeaker',
+    'active_speaker',
+    'speaker',
+    'accessibility.activeSpeaker',
+    'accessibility.active_speaker',
+    'audio.activeSpeaker',
+    'audio.active_speaker',
+  ]));
+}
+
+function buildNativeDiagnosis(platform, input = {}, options = {}) {
+  const nativeInput = nativeInputForPlatform(platform, input, options);
+  const selection = selectNativeMeetingCandidate(nativeInput, {
+    ...options,
+    preferredPlatform: platform,
+    preferred_platform: platform,
+  });
+  const selected = selection.selectedSnapshot;
+  const candidateCount = selection.normalizedCandidates?.length ?? 0;
+  const platformMatched = selected?.meeting?.platform === platform || selected?.platform === platform;
+  const meetingStarted = Boolean(selected) && platformMatched && nativeMeetingActive(selected);
+  const meetingEnded = Boolean(selected) && nativeMeetingEnded(selected);
+  const speakerStarted = nativeSpeakerReady(selected ?? {}, nativeInput);
+  const accepted = candidateCount > 0 && meetingStarted;
+  const issues = [
+    candidateCount > 0 ? undefined : preflightIssue('error', 'missing_native_candidate_evidence', 'No native meeting window/process candidate was supplied for this preflight.'),
+    selected && !platformMatched ? preflightIssue('error', 'native_candidate_platform_mismatch', 'Native meeting candidate resolved to a different platform.', {
+      expected_platform: platform,
+      actual_platform: selected?.meeting?.platform ?? selected?.platform,
+    }) : undefined,
+    candidateCount > 0 && !meetingStarted ? preflightIssue('error', 'missing_native_meeting_start', 'Native evidence did not prove an active meeting window or call state.') : undefined,
+  ].filter(Boolean);
+  return compactObject({
+    type: 'meeting_platform_native_evidence_diagnosis',
+    schema: 'meeting_platform_native_evidence_diagnosis',
+    platform,
+    accepted,
+    production_ready: false,
+    evidence_count: candidateCount,
+    record_count: candidateCount,
+    selected_candidate: selected,
+    selected_meeting: selection.detectedMeeting,
+    normalized_candidate_count: candidateCount,
+    selector_probe: {
+      matched: {
+        controls: meetingStarted,
+        participants: Boolean(firstPath(selected ?? nativeInput, ['participants', 'meeting.participants', 'accessibility.participants'])),
+        active_speaker: speakerStarted,
+      },
+    },
+    observer_probe: {
+      coverage: {
+        meeting_started: meetingStarted,
+        meeting_ended: meetingEnded,
+        speaker_started: speakerStarted,
+      },
+    },
+    runtime_probe: {
+      native_detector: true,
+      selected_process_name: selected?.processName ?? selected?.discovery?.process_name,
+      selected_bundle_id: selected?.bundleId ?? selected?.discovery?.bundle_id,
+    },
+    issues,
+    next_actions: accepted
+      ? ['open_adapter_session_and_insert_marks_with_captured_at_ms']
+      : ['collect_native_window_process_or_accessibility_sample'],
+  });
+}
+
+function buildEvidenceDiagnosis(platform, input = {}, startup = {}, options = {}) {
+  if (startup.selected_surface === 'native_detector') return buildNativeDiagnosis(platform, input, options);
+  return buildDomDiagnosis(platform, input, options);
+}
+
 function diagnosisCoverage(diagnosis = {}) {
   return diagnosis.observer_probe?.coverage ?? {};
 }
@@ -246,10 +402,10 @@ function computedIssues(startup = {}, diagnosis = {}, readiness = {}) {
     issues.push(preflightIssue('error', 'static_startup_not_ready', 'The platform is not ready to start a realtime local axis.'));
   }
   if ((diagnosis.record_count ?? diagnosis.evidence_count ?? 0) === 0) {
-    issues.push(preflightIssue('error', 'missing_live_page_evidence', 'No live meeting page snapshots were supplied for this current-window preflight.'));
+    issues.push(preflightIssue('error', 'missing_live_page_evidence', 'No live meeting page or native-window evidence was supplied for this preflight.'));
   }
   if (readiness.meeting_start_ready !== true) {
-    issues.push(preflightIssue('error', 'missing_realtime_meeting_start', 'The live page evidence did not prove a meeting_started signal.'));
+    issues.push(preflightIssue('error', 'missing_realtime_meeting_start', 'The live evidence did not prove a meeting_started signal.'));
   }
   if (readiness.speaker_track_required && readiness.speaker_track_ready !== true) {
     issues.push(preflightIssue('error', 'missing_speaker_track_signal', 'Speaker track was required but active-speaker evidence was not stable.'));
@@ -294,6 +450,7 @@ function nextActions(startup = {}, diagnosis = {}, readiness = {}, issues = []) 
   ];
   if (readiness.static_startup_ready !== true) actions.push('resolve_supported_meeting_platform_and_install_local_surface');
   if (readiness.live_evidence_ready !== true) actions.push('collect_live_dom_snapshots_from_current_meeting_window');
+  if (startup.selected_surface === 'native_detector' && readiness.live_evidence_ready !== true) actions.push('collect_native_window_process_or_accessibility_sample');
   if (readiness.meeting_start_ready !== true) actions.push('keep_local_bridge_attached_during_join_until_meeting_started');
   if (readiness.speaker_track_required && readiness.speaker_track_ready !== true) actions.push('tune_active_speaker_selectors_or_audio_level_signal');
   if (readiness.meeting_end_ready !== true) actions.push('capture_leave_or_ended_state_to_validate_end_axis');
@@ -309,10 +466,14 @@ function preflightSummary(startup = {}, diagnosis = {}, readiness = {}) {
     selected_surface: startup.selected_surface,
     install_target: startup.install_target,
     runtime_preset: startup.runtime?.preset,
+    evidence_kind: startup.selected_surface === 'native_detector' ? 'native_window' : 'dom_snapshot',
     browser_match_count: startup.browser?.matches?.length ?? 0,
     content_script_match_count: startup.browser?.content_script?.matches?.length ?? 0,
     evidence_count: diagnosis.evidence_count ?? 0,
     record_count: diagnosis.record_count ?? 0,
+    native_candidate_count: diagnosis.normalized_candidate_count,
+    native_selected_process: diagnosis.runtime_probe?.selected_process_name,
+    native_selected_bundle_id: diagnosis.runtime_probe?.selected_bundle_id,
     controls_matched: diagnosis.selector_probe?.matched?.controls === true,
     participants_matched: diagnosis.selector_probe?.matched?.participants === true,
     active_speaker_matched: diagnosis.selector_probe?.matched?.active_speaker === true,
@@ -491,11 +652,16 @@ function flattenCandidateTabs(input = {}, options = {}) {
       }));
     }
   }
+  const nativeContext = nativeCandidateContext(input);
   for (const [windowIndex, windowItem] of candidateWindows(input, options).entries()) {
+    const windowCandidate = compactObject({
+      ...nativeContext,
+      ...windowItem,
+    });
     const windowId = firstNonEmpty(windowItem?.id, windowItem?.window_id, windowItem?.windowId, windowIndex);
     const tabs = asArray(firstNonEmpty(windowItem?.tabs, windowItem?.candidateTabs, windowItem?.candidate_tabs));
-    if (tabs.length === 0 && candidateUrl(windowItem)) {
-      candidates.push(normalizeCandidate(windowItem, {
+    if (tabs.length === 0 && (candidateUrl(windowCandidate) || candidateHasNativeEvidence(windowCandidate))) {
+      candidates.push(normalizeCandidate(windowCandidate, {
         index: candidates.length,
         source: 'window',
         window_id: windowId,
@@ -504,6 +670,7 @@ function flattenCandidateTabs(input = {}, options = {}) {
     }
     for (const tab of tabs) {
       candidates.push(normalizeCandidate({
+        ...nativeContext,
         ...tab,
         tab,
       }, {
@@ -514,6 +681,41 @@ function flattenCandidateTabs(input = {}, options = {}) {
     }
   }
   return candidates;
+}
+
+function nativeCandidateContext(input = {}) {
+  return compactObject({
+    platform: input.platform,
+    provider: input.provider,
+    process: input.process,
+    app: input.app,
+    application: input.application,
+    accessibility: input.accessibility,
+    audio: input.audio,
+    native: input.native,
+    native_detector: input.native_detector,
+  });
+}
+
+function candidateHasNativeEvidence(candidate = {}) {
+  return Boolean(firstNonEmpty(
+    candidate.platform,
+    candidate.provider,
+    candidate.process,
+    candidate.app,
+    candidate.application,
+    candidate.accessibility,
+    candidate.audio,
+    candidate.native,
+    candidate.native_detector,
+    candidate.processName,
+    candidate.process_name,
+    candidate.bundleId,
+    candidate.bundle_id,
+    candidate.window?.ownerName,
+    candidate.window?.appName,
+    candidate.window?.app_name,
+  ));
 }
 
 function candidatePreflightInput(candidate = {}) {
@@ -569,6 +771,7 @@ function candidateRow(candidate = {}, preflight = {}, selected = false) {
     title: candidate.title,
     platform: preflight.platform,
     display_name: preflight.display_name,
+    selected_surface: preflight.summary?.selected_surface ?? preflight.startup?.selected_surface,
     accepted: preflight.accepted,
     status: preflight.status,
     startup_ready: preflight.readiness?.static_startup_ready === true,
@@ -606,7 +809,7 @@ export function buildMeetingPlatformAdapterPreflight(input = {}, options = {}) {
       next_actions: nextActions(startup, {}, {}, issues),
     };
   }
-  const diagnosis = buildDomDiagnosis(platform, objectInput, options);
+  const diagnosis = buildEvidenceDiagnosis(platform, objectInput, startup, options);
   const readiness = buildReadiness(startup, diagnosis, options);
   const issues = computedIssues(startup, diagnosis, readiness);
   const blockingIssues = issues.filter((issue) => issue.severity === 'error');
@@ -621,7 +824,8 @@ export function buildMeetingPlatformAdapterPreflight(input = {}, options = {}) {
     display_name: startup.display_name ?? diagnosis.display_name,
     input: startup.input,
     startup,
-    dom_diagnosis: diagnosis,
+    dom_diagnosis: startup.selected_surface === 'native_detector' ? undefined : diagnosis,
+    native_diagnosis: startup.selected_surface === 'native_detector' ? diagnosis : undefined,
     readiness,
     summary: preflightSummary(startup, diagnosis, readiness),
     issues,

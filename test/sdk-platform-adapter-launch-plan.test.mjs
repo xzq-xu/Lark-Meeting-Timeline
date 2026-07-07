@@ -120,6 +120,31 @@ assert.equal(zoomPlan.detection_reason, 'explicit_platform');
 assert.equal(zoomPlan.selected_surface, 'native_detector');
 assert.equal(zoomPlan.surface_entrypoint.registry_row.platform, 'zoom');
 
+const nativeCandidateLaunchPlan = buildMeetingPlatformAdapterCandidateLaunchPlan(manifest, {
+  windows: [{
+    id: 'zoom-native-main',
+    platform: 'zoom',
+    window: {
+      title: 'Zoom Meeting',
+      active: true,
+      visible: true,
+      inMeeting: true,
+      meeting_id: '987654321',
+    },
+    process: { name: 'Zoom Workplace' },
+    audio: { call_active: true },
+    observedAtMs: 1_782_614_400_000,
+  }],
+}, {
+  capturedAtMs: 1_782_614_400_000,
+});
+assert.equal(nativeCandidateLaunchPlan.accepted, true);
+assert.equal(nativeCandidateLaunchPlan.platform, 'zoom');
+assert.equal(nativeCandidateLaunchPlan.selected_surface, 'native_detector');
+assert.equal(nativeCandidateLaunchPlan.selected_candidate.window_id, 'zoom-native-main');
+assert.equal(nativeCandidateLaunchPlan.launch_plan.accepted, true);
+assert.equal(nativeCandidateLaunchPlan.launch_plan.surface_entrypoint.registry_row.platform, 'zoom');
+
 const googleExportPackage = exportMatrix.packages.find((pkg) => pkg.platform === 'google_meet');
 const googleWebviewImportPlan = buildMeetingPlatformAdapterImportPlan(googleExportPackage, {
   availableFiles: googleExportPackage.host_files.map((file) => file.path),
