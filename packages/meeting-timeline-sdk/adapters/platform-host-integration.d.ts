@@ -1,3 +1,4 @@
+import type { MeetingPlatformAdapterBlueprintMatrix } from './platform-adapter-blueprint.mjs';
 import type { MeetingPlatformAdapterRouteMatrix } from './platform-adapter-route.mjs';
 import type { MeetingPlatformConformanceReport } from './platform-conformance.mjs';
 
@@ -35,6 +36,7 @@ export interface MeetingPlatformHostIntegrationPlan {
   integration_plans: Record<string, Record<string, unknown>>;
   extension_install_plan: Record<string, unknown>;
   adapter_route_matrix: MeetingPlatformAdapterRouteMatrix;
+  adapter_blueprint_matrix: MeetingPlatformAdapterBlueprintMatrix;
   adaptation_strategy_matrix: Record<string, unknown>;
   runtime_event_plan_matrix: Record<string, unknown>;
   runtime_bundle_matrix: Record<string, unknown>;
@@ -85,6 +87,9 @@ export interface MeetingPlatformHostIntegrationScaffoldAcceptanceReport {
   observer_plan_ready_count: number;
   observer_plan_preflight_accepted_count: number;
   observer_plan_matrix?: Record<string, unknown>;
+  adapter_blueprint_ready: boolean;
+  adapter_blueprint_ready_count: number;
+  adapter_blueprint_matrix?: MeetingPlatformAdapterBlueprintMatrix;
   meeting_track_ready: boolean;
   speaker_track_ready_count: number;
   participant_track_ready_count: number;
