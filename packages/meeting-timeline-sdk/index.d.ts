@@ -246,6 +246,15 @@ export interface MeetingAppTimelineConnectorPackage {
     plan_matrix: import('./adapters/platform-runtime-event.mjs').MeetingPlatformRuntimeEventPlanMatrix;
     action_count: number;
   };
+  adapter_blueprints: {
+    matrix: Omit<import('./adapters/platform-adapter-blueprint.mjs').MeetingPlatformAdapterBlueprintMatrix, 'blueprints'> & {
+      blueprints?: import('./adapters/platform-adapter-blueprint.mjs').MeetingPlatformAdapterBlueprintMatrix['blueprints'];
+    };
+    ready_count: number;
+    platform_count: number;
+    command: string;
+    sdk_method: string;
+  };
   entrypoints: Array<Record<string, unknown>>;
   contracts: Record<string, unknown>;
   next_actions: string[];

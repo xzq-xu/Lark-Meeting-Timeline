@@ -823,8 +823,10 @@ export function createMeetingAppTimelineSdk(options = {}) {
         ? runtime.kit.meetingAppExtensionAcceptance(connectorExtensionOptions(merged, connectorOptions))
         : undefined;
       const runtimeEventPlanMatrix = runtime.kit.platformRuntimeEventPlanMatrix(merged);
+      const adapterBlueprintMatrix = runtime.kit.platformAdapterBlueprintMatrix(merged);
       const accepted = hostPackage.accepted === true
         && handoffAcceptance.accepted === true
+        && adapterBlueprintMatrix.ready_count === adapterBlueprintMatrix.platform_count
         && (extensionAcceptance ? extensionAcceptance.accepted === true : true);
       return compactObject({
         type: 'meeting_app_timeline_connector_package',
@@ -861,6 +863,18 @@ export function createMeetingAppTimelineSdk(options = {}) {
           plan_matrix: runtimeEventPlanMatrix,
           action_count: runtimeEventPlanMatrix.rows?.length ?? 0,
         },
+        adapter_blueprints: {
+          matrix: {
+            ...adapterBlueprintMatrix,
+            blueprints: connectorOptions.includeDetails === true || connectorOptions.include_details === true
+              ? adapterBlueprintMatrix.blueprints
+              : undefined,
+          },
+          ready_count: adapterBlueprintMatrix.ready_count,
+          platform_count: adapterBlueprintMatrix.platform_count,
+          command: 'npm run meeting-platform:adapter-blueprint',
+          sdk_method: 'sdk.platformAdapterBlueprint(platform)',
+        },
         entrypoints: [
           {
             id: 'select-adapter',
@@ -871,6 +885,11 @@ export function createMeetingAppTimelineSdk(options = {}) {
             id: 'handoff',
             method: 'sdk.handoff(selectionOrInput, { surface })',
             output: 'meeting_app_runtime_adapter_handoff',
+          },
+          {
+            id: 'adapter-blueprint',
+            method: 'sdk.platformAdapterBlueprint(platform)',
+            output: 'meeting_platform_adapter_blueprint',
           },
           {
             id: 'observe',
@@ -895,6 +914,7 @@ export function createMeetingAppTimelineSdk(options = {}) {
           local_observer_first: true,
           speaker_track_text_required: false,
           participant_track_text_required: false,
+          adapter_blueprint_required_before_host_wiring: true,
           production_requires_live_snapshot: true,
         },
         next_actions: connectorNextActions(

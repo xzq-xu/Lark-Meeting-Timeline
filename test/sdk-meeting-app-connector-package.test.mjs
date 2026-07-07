@@ -48,11 +48,20 @@ assert.equal(handoff.runtime_event_endpoint, 'https://timeline.example.com/api/m
 assert.equal(handoff.timestamp_field, 'captured_at_ms');
 assert.equal(handoff.provider_events_block_realtime, false);
 assert.equal(handoff.transcript_blocks_realtime, false);
+assert.equal(handoff.adapter_blueprints.ready_count, 2);
+assert.equal(handoff.adapter_blueprints.platform_count, 2);
+assert.equal(handoff.adapter_blueprints.sdk_method, 'sdk.platformAdapterBlueprint(platform)');
+assert.equal(handoff.adapter_blueprints.rows.find((row) => row.platform === 'google_meet').primary_surface, 'browser_extension');
 assert.equal(handoff.surface_matrix.length, 2);
 assert.equal(handoff.surface_matrix.find((row) => row.surface === 'browser_extension').ready_count, 2);
 assert.equal(handoff.extension.file_paths.includes('manifest.json'), true);
 assert.equal(handoff.extension.file_paths.includes('src/content-script.entry.mjs'), true);
 assert.equal(handoff.ci_gates.includes('require_captured_at_ms_for_realtime_annotations'), true);
+assert.equal(connectorPackage.adapter_blueprints.ready_count, 2);
+assert.equal(connectorPackage.adapter_blueprints.matrix.schema, 'meeting_platform_adapter_blueprint_matrix');
+assert.equal(connectorPackage.adapter_blueprints.matrix.blueprints, undefined);
+assert.equal(connectorPackage.entrypoints.some((entry) => entry.id === 'adapter-blueprint'), true);
+assert.equal(connectorPackage.contracts.adapter_blueprint_required_before_host_wiring, true);
 
 let capturedRuntimeRequest = null;
 const connectorRuntimeClient = createMeetingAppTimelineConnectorRuntimeClient(connectorPackage, {
@@ -77,6 +86,7 @@ assert.equal(connectorRuntimeClient.schema, 'meeting_app_timeline_connector_runt
 assert.equal(connectorRuntimeClient.endpoint, 'https://timeline.example.com/api/meeting-platform/runtime-events');
 assert.equal(connectorRuntimeClient.supports('insert_annotation', 'google-meet'), true);
 assert.equal(connectorRuntimeClient.supports('provider_event', 'google-meet'), true);
+assert.equal(connectorRuntimeClient.supports('adapter_blueprint', 'google-meet'), true);
 assert.equal(connectorRuntimeClient.supports('missing_action', 'google-meet'), false);
 assert.equal(connectorRuntimeClient.supported_actions_by_platform.google_meet.includes('speaker_track'), true);
 const builtInsertEvent = connectorRuntimeClient.buildEvent({
@@ -115,6 +125,14 @@ assert.equal(capturedRuntimeRequest.body.tabs[0].url, 'https://meet.google.com/a
 await connectorRuntimeClient.runManifest({ platforms: ['google-meet'], target: 'realtime' });
 assert.equal(capturedRuntimeRequest.body.action, 'run_manifest');
 
+await connectorRuntimeClient.adapterBlueprint('google-meet');
+assert.equal(capturedRuntimeRequest.body.action, 'adapter_blueprint');
+assert.equal(capturedRuntimeRequest.body.platform, 'google_meet');
+
+await connectorRuntimeClient.adapterBlueprints({ platforms: ['google-meet', 'zoom'] });
+assert.equal(capturedRuntimeRequest.body.action, 'adapter_blueprints');
+assert.deepEqual(capturedRuntimeRequest.body.platforms, ['google-meet', 'zoom']);
+
 const stripped = stripMeetingAppTimelineConnectorPackageFileContents(connectorPackage);
 assert.equal(stripped.extension.scaffold.files.some((file) => 'content' in file), false);
 assert.equal(connectorPackage.extension.scaffold.files.some((file) => 'content' in file), true);
@@ -147,6 +165,14 @@ assert.throws(
   }),
   /not accepted for runtime client/,
 );
+
+const missingBlueprintPackage = {
+  ...connectorPackage,
+  adapter_blueprints: undefined,
+};
+const missingBlueprintAcceptance = buildMeetingAppTimelineConnectorPackageAcceptanceReport(missingBlueprintPackage);
+assert.equal(missingBlueprintAcceptance.accepted, false);
+assert.equal(missingBlueprintAcceptance.issues.some((issue) => issue.code === 'missing_adapter_blueprint_matrix'), true);
 const unsafeRuntimeClient = createMeetingAppTimelineConnectorRuntimeClient(missingRuntimeActionPackage, {
   assertPackage: false,
   fetch: async () => new Response('{}'),

@@ -141,6 +141,12 @@ assert.equal(google.browser_observer.required_permission, 'tabs');
 assert.equal(google.runtime_events.endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);
 assert.equal(google.runtime_events.supported_actions.includes('insert_annotation'), true);
 assert.equal(google.runtime_events.supported_actions.includes('observe_platform_candidates'), true);
+assert.equal(google.runtime_events.supported_actions.includes('adapter_blueprint'), true);
+assert.equal(google.runtime_events.supported_actions.includes('adapter_blueprints'), true);
+assert.equal(google.adapter_blueprint.ready, true);
+assert.equal(google.adapter_blueprint.endpoint, '/api/meeting-platform/adapter-blueprints');
+assert.equal(google.adapter_blueprint.primary_surface, 'browser_extension');
+assert.equal(google.adapter_blueprint.realtime_axis_timestamp_field, 'captured_at_ms');
 assert.equal(google.timeline_ingest.insert_endpoint, `${baseUrl}/api/annotations`);
 assert.equal(google.timeline_ingest.timestamp_field, 'captured_at_ms');
 assert.equal(google.realtime_policy.provider_events_block_realtime, false);
@@ -164,6 +170,9 @@ assert.equal(matrix.platform_count, 5);
 assert.equal(matrix.accepted_count, 5);
 assert.equal(matrix.realtime_ready_count, 5);
 assert.equal(matrix.candidate_observer_count, 5);
+assert.equal(matrix.adapter_blueprint_ready_count, 5);
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_ready, true);
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_primary_surface, 'browser_extension');
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').browser_observer_enabled, true);
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').runtime_action_count, 18);
 assert.equal(matrix.registry_manifest.platform_count, 5);
@@ -183,6 +192,8 @@ assert.equal(hub.default_platform, 'google_meet');
 assert.equal(hub.routing.url_detection_ready, true);
 assert.equal(hub.routing.detected_platforms.includes('microsoft_teams'), true);
 assert.equal(hub.matrix.accepted_count, 5);
+assert.equal(hub.adapter_blueprint_ready_count, 5);
+assert.equal(hub.readiness.adapter_blueprint_ready, true);
 
 const defaultHub = buildDefaultMeetingPlatformConnectorHub({ baseUrl });
 assert.equal(defaultHub.platforms.includes('local_detector'), false);
@@ -316,6 +327,14 @@ await runtime.speakerTrack({
 assert.equal(calls.at(-1).body.action, 'speaker_track');
 assert.equal(calls.at(-1).body.platform, 'google_meet');
 
+await runtime.adapterBlueprint();
+assert.equal(calls.at(-1).body.action, 'adapter_blueprint');
+assert.equal(calls.at(-1).body.platform, 'google_meet');
+
+await runtime.adapterBlueprints();
+assert.equal(calls.at(-1).body.action, 'adapter_blueprints');
+assert.deepEqual(calls.at(-1).body.platforms, ['google_meet']);
+
 const hubRuntime = createMeetingPlatformConnectorHub({
   baseUrl,
   fetch: fetchImpl,
@@ -328,6 +347,14 @@ assert.equal(hubRuntime.resolvePlatform({ url: 'https://zoom.us/j/987654321' }).
 assert.equal(hubRuntime.connectorFor({ url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample' }).platform, 'microsoft_teams');
 assert.equal(hubRuntime.runtimeFor({ url: 'https://meet.google.com/abc-defg-hij' }).platform, 'google_meet');
 assert.equal(hubRuntime.supports({ url: 'https://meet.google.com/abc-defg-hij' }, 'insert_annotation'), true);
+
+await hubRuntime.adapterBlueprint({ url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample' });
+assert.equal(calls.at(-1).body.action, 'adapter_blueprint');
+assert.equal(calls.at(-1).body.platform, 'microsoft_teams');
+
+await hubRuntime.adapterBlueprints();
+assert.equal(calls.at(-1).body.action, 'adapter_blueprints');
+assert.deepEqual(calls.at(-1).body.platforms, ['google_meet']);
 
 await hubRuntime.insertAnnotation({
   url: 'https://meet.google.com/abc-defg-hij',

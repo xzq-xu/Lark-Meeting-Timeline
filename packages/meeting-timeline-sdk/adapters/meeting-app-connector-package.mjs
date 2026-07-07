@@ -264,6 +264,14 @@ export function buildMeetingAppTimelineConnectorPackageAcceptanceReport(pkg = {}
   }
   if (!pkg.runtime_events?.endpoint) addIssue(issues, 'missing_runtime_event_endpoint', 'Runtime event endpoint is required');
   if ((pkg.runtime_events?.action_count ?? 0) <= 0) addIssue(issues, 'missing_runtime_event_actions', 'Runtime event plan has no actions');
+  if (!pkg.adapter_blueprints?.matrix) {
+    addIssue(issues, 'missing_adapter_blueprint_matrix', 'Connector package must include adapter blueprint matrix for external host wiring');
+  } else if ((pkg.adapter_blueprints.ready_count ?? 0) < platforms.length) {
+    addIssue(issues, 'adapter_blueprints_not_ready', 'Every selected platform must expose a ready adapter blueprint', {
+      ready_count: pkg.adapter_blueprints.ready_count,
+      platform_count: platforms.length,
+    });
+  }
 
   const missingActions = missingRuntimeActions(pkg, platforms, options);
   for (const missing of missingActions) {
@@ -373,6 +381,13 @@ export function buildMeetingAppTimelineConnectorHandoff(pkg = {}, options = {}) 
     platform_count: platforms.length,
     surface_count: surfaces.length,
     runtime_event_endpoint: pkg.runtime_events?.endpoint,
+    adapter_blueprints: pkg.adapter_blueprints ? {
+      ready_count: pkg.adapter_blueprints.ready_count,
+      platform_count: pkg.adapter_blueprints.platform_count,
+      sdk_method: pkg.adapter_blueprints.sdk_method,
+      command: pkg.adapter_blueprints.command,
+      rows: pkg.adapter_blueprints.matrix?.rows,
+    } : undefined,
     timestamp_field: firstNonEmpty(pkg.contracts?.timestamp_field, pkg.host_package?.runtime_contract?.annotation_timestamp_field),
     provider_events_block_realtime: pkg.contracts?.provider_events_block_realtime,
     transcript_blocks_realtime: pkg.contracts?.transcript_blocks_realtime,
@@ -530,6 +545,14 @@ export function createMeetingAppTimelineConnectorRuntimeClient(pkg = {}, options
     adapterRoutes(routeOptions = {}) {
       assertSupported('adapter_routes', undefined, routeOptions);
       return client.adapterRoutes(routeOptions);
+    },
+    adapterBlueprint(platform, blueprintOptions = {}) {
+      assertSupported('adapter_blueprint', platform, blueprintOptions);
+      return client.adapterBlueprint(platform, blueprintOptions);
+    },
+    adapterBlueprints(blueprintOptions = {}) {
+      assertSupported('adapter_blueprints', undefined, blueprintOptions);
+      return client.adapterBlueprints(blueprintOptions);
     },
     runManifest(manifestOptions = {}) {
       assertSupported('run_manifest', undefined, manifestOptions);

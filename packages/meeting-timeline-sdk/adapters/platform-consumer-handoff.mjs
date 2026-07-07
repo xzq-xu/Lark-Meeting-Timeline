@@ -17,6 +17,9 @@ import {
 import {
   buildMeetingPlatformConnectorHub,
 } from './meeting-platform-connector.mjs';
+import {
+  buildMeetingPlatformAdapterBlueprintMatrix,
+} from './platform-adapter-blueprint.mjs';
 
 export const MEETING_PLATFORM_CONSUMER_HANDOFF_SCHEMA = 'meeting_platform_consumer_handoff';
 export const MEETING_PLATFORM_CONSUMER_HANDOFF_SCHEMA_VERSION = 1;
@@ -105,6 +108,7 @@ function buildConsumerCommands(options = {}) {
     integration_runtime_manifest: commandWithBase('meeting-platform:integration-runtime-manifest', options),
     runtime_bundles: commandWithBase('meeting-platform:runtime-bundle', options),
     adapter_routes: commandWithBase('meeting-platform:adapter-route', options),
+    adapter_blueprints: commandWithBase('meeting-platform:adapter-blueprint', options),
     runtime_event_plans: commandWithBase('meeting-platform:runtime-event-plan', options),
     adaptation_packages: commandWithBase('meeting-platform:adaptation-package', options),
     handoff_readiness: commandWithBase('meeting-platform:handoff-readiness', options),
@@ -136,6 +140,13 @@ function buildBootOrder(hostPlan = {}, commands = {}) {
     },
     {
       step: 3,
+      action: 'read_adapter_blueprints_and_choose_platform_surfaces',
+      command: commands.adapter_blueprints,
+      output_schema: 'meeting_platform_adapter_blueprint_matrix',
+      required_before: 'building_browser_native_or_provider_adapter',
+    },
+    {
+      step: 4,
       action: 'choose_lightweight_connector_or_full_integration_runtime',
       lightweight_entrypoint: 'createMeetingPlatformConnectorHub',
       content_script_bridge: 'installMeetingPlatformConnectorContentScriptBridge',
@@ -143,21 +154,21 @@ function buildBootOrder(hostPlan = {}, commands = {}) {
       full_runtime_entrypoint: 'createMeetingPlatformIntegrationRuntime',
     },
     {
-      step: 4,
+      step: 5,
       action: 'wire_local_observer_candidate_binding',
       endpoint: hostPlan.endpoints?.platform_candidate_observation,
       runtime_event_action: 'observe_platform_candidates',
       required_before: 'insert_realtime_annotation',
     },
     {
-      step: 5,
+      step: 6,
       action: 'insert_realtime_annotations_by_capture_time',
       endpoint: hostPlan.endpoints?.annotations,
       runtime_event_endpoint: hostPlan.endpoints?.runtime_events,
       required_field: 'captured_at_ms',
     },
     {
-      step: 6,
+      step: 7,
       action: 'emit_speaker_and_participant_positions',
       endpoints: [
         hostPlan.endpoints?.runtime_events,
@@ -165,13 +176,13 @@ function buildBootOrder(hostPlan = {}, commands = {}) {
       source_priority: ['local_observer_samples', 'provider_reconcile', 'post_meeting_artifacts'],
     },
     {
-      step: 7,
+      step: 8,
       action: 'connect_provider_events_as_reconcile_backfill',
       endpoint: hostPlan.endpoints?.platform_events,
       blocks_realtime_annotation: false,
     },
     {
-      step: 8,
+      step: 9,
       action: 'collect_real_evidence_and_run_handoff_readiness',
       command: commands.handoff_readiness,
       required_for: ['pilot', 'production'],
@@ -195,8 +206,14 @@ function buildEntrypoints(hostPlan = {}, options = {}) {
       conformance: hostPlan.sdk?.platform_conformance_module,
       runtime_event: hostPlan.sdk?.runtime_event_module,
       live_adapter: hostPlan.sdk?.live_adapter_module,
+      adapter_blueprint: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint',
     },
     kit_methods: [
+      'platformAdapterBlueprint',
+      'platformAdapterBlueprintMatrix',
+      'verifyPlatformAdapterBlueprint',
+      'assertPlatformAdapterBlueprint',
+      'assertPlatformAdapterBlueprintMatrix',
       'platformConsumerHandoff',
       'assertPlatformConsumerHandoff',
       'platformImplementationHandoff',
@@ -246,6 +263,7 @@ function buildLightweightConnectorHandoff(connectorHub = {}, hostPlan = {}) {
     accepted_count: connectorHub.accepted_count,
     realtime_ready_count: connectorHub.realtime_ready_count,
     candidate_observer_count: connectorHub.candidate_observer_count,
+    adapter_blueprint_ready_count: connectorHub.adapter_blueprint_ready_count,
     platforms: connectorHub.platforms,
     runtime_event_endpoint: connectorHub.runtime_event_endpoint,
     module: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector',
@@ -300,6 +318,7 @@ function buildLightweightConnectorHandoff(connectorHub = {}, hostPlan = {}) {
       runtime_event_endpoint: hostPlan.endpoints?.runtime_events ?? connectorHub.runtime_event_endpoint,
       annotation_endpoint: hostPlan.endpoints?.annotations,
       candidate_observation_endpoint: hostPlan.endpoints?.platform_candidate_observation,
+      adapter_blueprint_endpoint: hostPlan.endpoints?.adapter_blueprints,
       timestamp_field: 'captured_at_ms',
       provider_events_block_realtime: false,
       transcript_blocks_realtime: false,
@@ -318,6 +337,7 @@ function buildContracts(hostPlan = {}) {
     provider_events_block_realtime: false,
     transcript_blocks_realtime: false,
     per_meeting_annotation_isolation_required: true,
+    adapter_blueprint_required_before_host_wiring: true,
     speaker_track_required_for_realtime_timeline: true,
     participant_track_required_for_realtime_timeline: true,
     meeting_end_must_close_current_axis: true,
@@ -340,12 +360,14 @@ function buildSdkFacadeHandoff(platforms = [], inputs = {}) {
     adaptationRows = {},
     runtimeRows = {},
     routeRows = {},
+    blueprintRows = {},
     connectorHub = {},
   } = inputs;
   const platformRows = platforms.map((platform) => {
     const adaptation = adaptationRows[platform] ?? {};
     const runtime = runtimeRows[platform] ?? {};
     const route = routeRows[platform] ?? {};
+    const blueprint = blueprintRows[platform] ?? {};
     return compactObject({
       platform,
       display_name: adaptation.display_name ?? runtime.display_name,
@@ -355,12 +377,16 @@ function buildSdkFacadeHandoff(platforms = [], inputs = {}) {
       primary_surface: adaptation.primary_surface ?? runtime.primary_surface ?? route.primary_surface,
       surface_order: adaptation.surface_order ?? runtime.surface_order ?? route.surface_order,
       adapter_first_route: route.first_route ?? runtime.adapter_first_route,
+      adapter_blueprint_ready: blueprint.ready === true,
+      adapter_blueprint_primary_surface: blueprint.primary_surface,
+      adapter_blueprint_first_acceptance_gate: blueprint.first_acceptance_gate,
       runtime_bundle_ready: runtime.runtime_ready,
       lightweight_connector_ready: connectorHub.platforms?.includes(platform) && connectorHub.accepted === true,
       facade_methods: {
         adaptation_package: `sdk.platformAdaptationPackage('${platform}')`,
         runtime_bundle: `sdk.platformRuntimeBundle('${platform}')`,
         adapter_route: `sdk.platformAdapterRoute('${platform}')`,
+        adapter_blueprint: `sdk.platformAdapterBlueprint('${platform}')`,
         adaptation_strategy: `sdk.platformAdaptationStrategy('${platform}')`,
       },
     });
@@ -387,6 +413,8 @@ function buildSdkFacadeHandoff(platforms = [], inputs = {}) {
       'platformImplementationHandoffMatrix',
       'platformRuntimeBundle',
       'platformAdapterRoute',
+      'platformAdapterBlueprint',
+      'platformAdapterBlueprintMatrix',
       'platformAdaptationStrategy',
       'platformConnectorHub',
     ],
@@ -404,24 +432,30 @@ function buildSdkFacadeHandoff(platforms = [], inputs = {}) {
       },
       {
         step: 3,
+        method: 'sdk.platformAdapterBlueprint(platform)',
+        output: 'meeting_platform_adapter_blueprint',
+        purpose: 'choose_browser_native_provider_surfaces_and_acceptance_gates_for_this_meeting_app',
+      },
+      {
+        step: 4,
         method: 'sdk.observePlatformCandidates({ tabs/windows })',
         output: 'local_observer_axis_or_candidate_binding',
         purpose: 'create_or_bind_the_current_meeting_axis_before_marks',
       },
       {
-        step: 4,
+        step: 5,
         method: 'sdk.insertAnnotation(platform, { captured_at_ms, ...mark }, { remote: true })',
         output: 'timeline_annotation',
         purpose: 'insert_realtime_marks_by_device_capture_time',
       },
       {
-        step: 5,
+        step: 6,
         method: 'sdk.speakerTrack(platform, sample) / sdk.participantTrack(platform, sample)',
         output: 'speaker_or_participant_position_markers',
         purpose: 'draw_positions_without_realtime_transcript_text',
       },
       {
-        step: 6,
+        step: 7,
         method: 'sdk.ingestProvider(platform, providerEvent)',
         output: 'reconcile_or_backfill_signal',
         purpose: 'official_events_reconcile_lifecycle_without_blocking_marks',
@@ -473,12 +507,14 @@ function buildSurfaceCoverageMatrix(platforms = [], inputs = {}) {
     runtimeRows = {},
     routeRows = {},
     handoffRows = {},
+    blueprintRows = {},
   } = inputs;
   const rows = platforms.map((platform) => {
     const adaptation = adaptationRows[platform] ?? {};
     const runtime = runtimeRows[platform] ?? {};
     const route = routeRows[platform] ?? {};
     const handoff = handoffRows[platform] ?? {};
+    const blueprint = blueprintRows[platform] ?? {};
     const browserReady = (runtime.browser_match_count ?? adaptation.browser_match_count ?? 0) > 0
       && (runtime.candidate_observation_ready === true || adaptation.candidate_observation_ready === true);
     const webviewReady = browserReady && runtime.lightweight_connector_ready === true;
@@ -533,6 +569,14 @@ function buildSurfaceCoverageMatrix(platforms = [], inputs = {}) {
         ready: runtime.lightweight_connector_ready === true,
         install_function: runtime.lightweight_connector_install_function,
       },
+      adapter_blueprint: {
+        ready: blueprint.ready === true,
+        primary_surface: blueprint.primary_surface,
+        surface_order: blueprint.surface_order,
+        first_acceptance_gate: blueprint.first_acceptance_gate,
+        provider_blocks_realtime: blueprint.provider_blocks_realtime,
+        transcript_blocks_realtime: blueprint.transcript_blocks_realtime,
+      },
       speaker_track: {
         ready: handoff.speaker_track_ready === true || runtime.observer_scheduler_ready === true,
         min_stable_ms: handoff.speaker_min_stable_ms ?? runtime.speaker_min_stable_ms,
@@ -554,6 +598,7 @@ function buildSurfaceCoverageMatrix(platforms = [], inputs = {}) {
     provider_reconcile_ready_count: rows.filter((row) => row.provider_reconcile.ready).length,
     post_meeting_backfill_supported_count: rows.filter((row) => row.post_meeting_backfill.supported).length,
     lightweight_connector_ready_count: rows.filter((row) => row.lightweight_connector.ready).length,
+    adapter_blueprint_ready_count: rows.filter((row) => row.adapter_blueprint.ready).length,
     speaker_track_ready_count: rows.filter((row) => row.speaker_track.ready).length,
     participant_track_ready_count: rows.filter((row) => row.participant_track.ready).length,
     platforms,
@@ -713,6 +758,7 @@ function platformRow(platform, inputs = {}) {
     adaptationRows,
     handoffRows,
     trackRows,
+    blueprintRows,
     requireHandoffReady,
     requireProductionReady,
   } = inputs;
@@ -722,6 +768,7 @@ function platformRow(platform, inputs = {}) {
   const adaptation = adaptationRows[platform] ?? {};
   const handoff = handoffRows[platform] ?? {};
   const track = trackRows[platform] ?? {};
+  const blueprint = blueprintRows[platform] ?? {};
   const candidateReady = runtime.candidate_observation_ready === true
     || conformance.candidate_observation_ready === true
     || handoff.candidate_observation_ready === true;
@@ -740,6 +787,9 @@ function platformRow(platform, inputs = {}) {
     route.ready === true || route.adapter_route_ready === true || conformance.adapter_route_ready === true
       ? undefined
       : issue('error', 'adapter_route_not_ready', 'Adapter route must expose the local observer first path.', { platform }),
+    blueprint.ready === true
+      ? undefined
+      : issue('error', 'adapter_blueprint_not_ready', 'Adapter blueprint must be ready before external host wiring.', { platform }),
     candidateReady
       ? undefined
       : issue('error', 'candidate_observation_not_ready', 'Consumer host must be able to observe active meeting candidates before realtime marks.', { platform }),
@@ -782,6 +832,9 @@ function platformRow(platform, inputs = {}) {
     adapter_route_ready: route.ready === true || route.adapter_route_ready === true || conformance.adapter_route_ready === true,
     adapter_first_route: route.first_route ?? route.adapter_first_route ?? conformance.adapter_first_route,
     adapter_recommended_mode: route.recommended_mode ?? runtime.adapter_recommended_mode,
+    adapter_blueprint_ready: blueprint.ready === true,
+    adapter_blueprint_primary_surface: blueprint.primary_surface,
+    adapter_blueprint_first_acceptance_gate: blueprint.first_acceptance_gate,
     primary_surface: adaptation.primary_surface ?? runtime.primary_surface ?? route.primary_surface,
     surface_order: adaptation.surface_order ?? runtime.surface_order ?? route.surface_order,
     provider_reconcile_surface: adaptation.provider_reconcile_surface ?? runtime.provider_reconcile_surface ?? route.provider_reconcile_surface,
@@ -818,6 +871,7 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
   const connectorHub = buildMeetingPlatformConnectorHub(sharedOptions);
   const conformanceReport = buildMeetingPlatformConformanceReport(sharedOptions);
   const adaptationPackageMatrix = buildMeetingPlatformAdaptationPackageMatrix(sharedOptions);
+  const adapterBlueprintMatrix = buildMeetingPlatformAdapterBlueprintMatrix(sharedOptions);
   const handoffReadinessMatrix = firstNonEmpty(
     options.handoffReadinessMatrix,
     options.handoff_readiness_matrix,
@@ -826,6 +880,7 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
   const routeRows = byPlatform(hostPlan.adapter_route_matrix?.rows);
   const conformanceRows = byPlatform(conformanceReport.rows);
   const adaptationRows = byPlatform(adaptationPackageMatrix.rows);
+  const blueprintRows = byPlatform(adapterBlueprintMatrix.rows);
   const handoffRows = byPlatform(handoffReadinessMatrix.rows);
   const trackRows = byPlatform(hostPlan.meeting_track_contract?.rows);
   const requireHandoffReady = boolOption(options, 'requireHandoffReady', 'require_handoff_ready', false);
@@ -838,6 +893,7 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
     adaptationRows,
     handoffRows,
     trackRows,
+    blueprintRows,
     requireHandoffReady,
     requireProductionReady,
   }));
@@ -847,6 +903,7 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
     runtimeRows,
     routeRows,
     handoffRows,
+    blueprintRows,
   });
   const rowsByPlatform = byPlatform(rows);
   const adaptationRoadmap = buildAdaptationRoadmap(platforms, {
@@ -871,6 +928,12 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
       : issue('error', 'platform_conformance_report_not_accepted', 'Static platform conformance must pass for consumer handoff.', {
         blocking_count: conformanceReport.blocking_count,
       }),
+    adapterBlueprintMatrix.ready_count === adapterBlueprintMatrix.platform_count
+      ? undefined
+      : issue('error', 'adapter_blueprint_matrix_not_ready', 'Every selected platform must expose a ready adapter blueprint.', {
+        ready_count: adapterBlueprintMatrix.ready_count,
+        platform_count: adapterBlueprintMatrix.platform_count,
+      }),
     connectorHub.accepted === true
       ? undefined
       : issue('error', 'lightweight_connector_handoff_not_ready', 'Lightweight connector hub must be ready for browser/WebView consumer handoff.', {
@@ -893,6 +956,7 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
     runtime_ready_count: rows.filter((row) => row.runtime_ready === true).length,
     lightweight_connector_ready: connectorHub.accepted === true,
     lightweight_connector_platform_count: connectorHub.platform_count,
+    adapter_blueprint_ready_count: adapterBlueprintMatrix.ready_count,
     adapter_route_ready_count: rows.filter((row) => row.adapter_route_ready === true).length,
     candidate_observer_count: rows.filter((row) => row.candidate_observation_ready === true).length,
     speaker_track_ready_count: rows.filter((row) => row.speaker_track_ready === true).length,
@@ -914,6 +978,7 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
       adaptationRows,
       runtimeRows,
       routeRows,
+      blueprintRows,
       connectorHub,
     }),
     surface_coverage_matrix: surfaceCoverageMatrix,
@@ -938,6 +1003,10 @@ export function buildMeetingPlatformConsumerHandoff(options = {}) {
     handoff_readiness_matrix: {
       ...handoffReadinessMatrix,
       reports: undefined,
+    },
+    adapter_blueprint_matrix: includeDetails ? adapterBlueprintMatrix : {
+      ...adapterBlueprintMatrix,
+      blueprints: undefined,
     },
   };
 }

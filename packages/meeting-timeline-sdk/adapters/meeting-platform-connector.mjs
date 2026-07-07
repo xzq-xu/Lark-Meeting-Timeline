@@ -42,6 +42,7 @@ const DEFAULT_CONNECTOR_PLATFORMS = Object.freeze([
 const GLOBAL_RUNTIME_ACTIONS = new Set([
   'observe_platform_candidates',
   'adapter_routes',
+  'adapter_blueprints',
   'runtime_bundles',
   'registry',
   'manifest',
@@ -335,6 +336,25 @@ function connectorAcceptanceIssues(connector = {}, options = {}) {
       }));
     }
   }
+  for (const action of ['adapter_blueprint', 'adapter_blueprints']) {
+    if (!actions.has(action)) {
+      issues.push(issue('error', 'missing_blueprint_runtime_action', `Connector runtime event plan must include ${action}.`, {
+        platform: connector.platform,
+        action,
+      }));
+    }
+  }
+  if (connector.adapter_blueprint?.ready !== true) {
+    issues.push(issue('error', 'adapter_blueprint_not_ready', 'Connector must expose a ready adapter blueprint for external host wiring.', {
+      platform: connector.platform,
+      primary_surface: connector.adapter_blueprint?.primary_surface,
+    }));
+  }
+  if (!connector.adapter_blueprint?.endpoint) {
+    issues.push(issue('error', 'missing_adapter_blueprint_endpoint', 'Connector must include adapter blueprint endpoint.', {
+      platform: connector.platform,
+    }));
+  }
   if (connector.timeline_ingest?.timestamp_field !== 'captured_at_ms') {
     issues.push(issue('error', 'invalid_timestamp_field', 'Connector must use captured_at_ms for realtime annotation insertion.', {
       platform: connector.platform,
@@ -399,6 +419,7 @@ export function buildMeetingPlatformConnector(platformOrOptions = {}, options = 
   const registryAcceptance = buildMeetingPlatformRegistryAcceptanceReport(entry, inputOptions);
   const actions = entry.annotations?.runtime_event_plan?.supported_actions ?? [];
   const runtimeEndpoint = runtimeEventEndpoint(entry, inputOptions);
+  const adapterBlueprint = entry.adapter_blueprint ?? {};
 
   return compactObject({
     type: 'meeting_platform_connector',
@@ -449,6 +470,24 @@ export function buildMeetingPlatformConnector(platformOrOptions = {}, options = 
       supported_actions: actions,
       action_count: actions.length,
       realtime_contract: entry.annotations?.runtime_event_plan?.realtime_contract,
+    },
+    adapter_blueprint: {
+      schema: adapterBlueprint.schema,
+      ready: adapterBlueprint.ready === true,
+      endpoint: entry.host?.endpoints?.adapter_blueprints,
+      runtime_action: 'adapter_blueprint',
+      runtime_matrix_action: 'adapter_blueprints',
+      sdk_import: entry.sdk?.imports?.adapter_blueprint,
+      command: entry.commands?.print_adapter_blueprint,
+      recommended_mode: adapterBlueprint.recommended_mode,
+      primary_surface: adapterBlueprint.primary_surface,
+      surface_order: adapterBlueprint.surface_order,
+      browser_recommended: adapterBlueprint.browser_recommended,
+      native_recommended: adapterBlueprint.native_recommended,
+      provider_blocks_realtime: adapterBlueprint.provider_blocks_realtime,
+      transcript_blocks_realtime: adapterBlueprint.transcript_blocks_realtime,
+      realtime_axis_timestamp_field: adapterBlueprint.realtime_axis_timestamp_field,
+      first_acceptance_gate: adapterBlueprint.first_acceptance_gate,
     },
     timeline_ingest: {
       insert_endpoint: entry.annotations?.insert_endpoint,
@@ -555,6 +594,7 @@ export function buildMeetingPlatformConnectorMatrix(options = {}) {
     realtime_ready_count: connectors.filter((connector) => connector.readiness?.realtime_annotation_ready).length,
     provider_ready_count: connectors.filter((connector) => connector.provider?.ready).length,
     candidate_observer_count: connectors.filter((connector) => connector.browser_observer?.candidate_observation_ready).length,
+    adapter_blueprint_ready_count: connectors.filter((connector) => connector.adapter_blueprint?.ready).length,
     platforms: connectors.map((connector) => connector.platform),
     rows: connectors.map((connector) => ({
       platform: connector.platform,
@@ -568,6 +608,10 @@ export function buildMeetingPlatformConnectorMatrix(options = {}) {
       candidate_observation_ready: connector.browser_observer?.candidate_observation_ready === true,
       runtime_event_endpoint: connector.runtime_events?.endpoint,
       runtime_action_count: connector.runtime_events?.action_count ?? 0,
+      adapter_blueprint_ready: connector.adapter_blueprint?.ready === true,
+      adapter_blueprint_primary_surface: connector.adapter_blueprint?.primary_surface,
+      adapter_blueprint_endpoint: connector.adapter_blueprint?.endpoint,
+      adapter_blueprint_action: connector.adapter_blueprint?.runtime_action,
       insert_endpoint: connector.timeline_ingest?.insert_endpoint,
       adapter_route: connector.adapter_route?.recommended_mode,
       first_route: connector.adapter_route?.first_route,
@@ -603,6 +647,12 @@ function connectorHubIssues(hub = {}) {
       platform_count: hub.matrix?.platform_count,
     }));
   }
+  if (hub.matrix?.adapter_blueprint_ready_count !== hub.matrix?.platform_count) {
+    issues.push(issue('error', 'adapter_blueprint_not_ready', 'Every selected platform connector must expose a ready adapter blueprint.', {
+      adapter_blueprint_ready_count: hub.matrix?.adapter_blueprint_ready_count,
+      platform_count: hub.matrix?.platform_count,
+    }));
+  }
   return issues;
 }
 
@@ -618,6 +668,7 @@ export function buildMeetingPlatformConnectorHub(options = {}) {
     accepted_count: matrix.accepted_count,
     realtime_ready_count: matrix.realtime_ready_count,
     candidate_observer_count: matrix.candidate_observer_count,
+    adapter_blueprint_ready_count: matrix.adapter_blueprint_ready_count,
     platforms: matrix.platforms,
     default_platform: maybeNormalizePlatform(defaultPlatform) ?? matrix.platforms[0],
     runtime_event_endpoint: firstNonEmpty(
@@ -654,6 +705,7 @@ export function buildMeetingPlatformConnectorHub(options = {}) {
       accepted: matrix.accepted_count === matrix.platform_count,
       realtime_annotation_ready: matrix.realtime_ready_count === matrix.platform_count,
       candidate_observation_ready: matrix.candidate_observer_count === matrix.platform_count,
+      adapter_blueprint_ready: matrix.adapter_blueprint_ready_count === matrix.platform_count,
       provider_required_for_realtime: false,
       transcript_blocks_realtime: false,
     },
@@ -814,6 +866,14 @@ export function createMeetingPlatformConnectorRuntime(platformOrConnector, optio
       assertSupported('adapter_routes');
       return runtimeEventClient.adapterRoutes({ platforms: [connector.platform], ...routeOptions });
     },
+    adapterBlueprint(blueprintOptions = {}) {
+      assertSupported('adapter_blueprint');
+      return runtimeEventClient.adapterBlueprint(connector.platform, blueprintOptions);
+    },
+    adapterBlueprints(blueprintOptions = {}) {
+      assertSupported('adapter_blueprints');
+      return runtimeEventClient.adapterBlueprints({ platforms: [connector.platform], ...blueprintOptions });
+    },
     runtimeBundles(bundleOptions = {}) {
       assertSupported('runtime_bundles');
       return runtimeEventClient.runtimeBundles({ platforms: [connector.platform], ...bundleOptions });
@@ -973,6 +1033,15 @@ export function createMeetingPlatformConnectorHub(options = {}) {
     },
     adapterRoutes(routeOptions = {}) {
       return defaultRuntime(routeOptions).adapterRoutes(routeOptions);
+    },
+    adapterBlueprint(input = {}, blueprintOptions = {}) {
+      const hasRouteInput = input != null
+        && !(isPlainObject(input) && Object.keys(input).length === 0);
+      return (hasRouteInput ? runtimeFor(input, blueprintOptions) : defaultRuntime(blueprintOptions))
+        .adapterBlueprint(blueprintOptions);
+    },
+    adapterBlueprints(blueprintOptions = {}) {
+      return defaultRuntime(blueprintOptions).adapterBlueprints(blueprintOptions);
     },
     runtimeBundles(bundleOptions = {}) {
       return defaultRuntime(bundleOptions).runtimeBundles(bundleOptions);

@@ -48,6 +48,7 @@ export interface MeetingPlatformConnector {
   event_adapter: Record<string, unknown>;
   provider: Record<string, unknown>;
   browser_observer: Record<string, unknown>;
+  adapter_blueprint: Record<string, unknown>;
   runtime_events: {
     endpoint?: string;
     event_schema?: string;
@@ -88,6 +89,7 @@ export interface MeetingPlatformConnectorMatrix {
   realtime_ready_count: number;
   provider_ready_count: number;
   candidate_observer_count: number;
+  adapter_blueprint_ready_count: number;
   platforms: string[];
   rows: Array<Record<string, unknown>>;
   connectors: MeetingPlatformConnector[];
@@ -123,6 +125,7 @@ export interface MeetingPlatformConnectorHub {
   accepted_count: number;
   realtime_ready_count: number;
   candidate_observer_count: number;
+  adapter_blueprint_ready_count: number;
   platforms: string[];
   default_platform: string;
   runtime_event_endpoint?: string;
@@ -158,6 +161,8 @@ export interface MeetingPlatformConnectorRuntime {
   timelineView(input?: Record<string, unknown>, viewOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   adapterRoute(routeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   adapterRoutes(routeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  adapterBlueprint(blueprintOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  adapterBlueprints(blueprintOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   runtimeBundles(bundleOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   registry(registryOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   manifest(manifestOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
@@ -194,6 +199,8 @@ export interface MeetingPlatformConnectorHubRuntime {
   timelineView(input?: Record<string, unknown>, view?: Record<string, unknown>, viewOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   adapterRoute(input?: unknown, routeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   adapterRoutes(routeOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  adapterBlueprint(input?: unknown, blueprintOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
+  adapterBlueprints(blueprintOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   runtimeBundles(bundleOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   registry(registryOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;
   manifest(manifestOptions?: MeetingPlatformRuntimeEventSendOptions): Promise<unknown>;

@@ -69,6 +69,13 @@ export interface MeetingAppTimelineConnectorHandoff {
   platform_count: number;
   surface_count: number;
   runtime_event_endpoint?: string;
+  adapter_blueprints?: {
+    ready_count?: number;
+    platform_count?: number;
+    sdk_method?: string;
+    command?: string;
+    rows?: Array<Record<string, unknown>>;
+  };
   timestamp_field?: string;
   provider_events_block_realtime?: boolean;
   transcript_blocks_realtime?: boolean;
@@ -110,6 +117,8 @@ export interface MeetingAppTimelineConnectorRuntimeClient {
   timelineView(platform: string, input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
   adapterRoute(platform: string, options?: Record<string, unknown>): Promise<unknown>;
   adapterRoutes(options?: Record<string, unknown>): Promise<unknown>;
+  adapterBlueprint(platform: string, options?: Record<string, unknown>): Promise<unknown>;
+  adapterBlueprints(options?: Record<string, unknown>): Promise<unknown>;
   runManifest(options?: Record<string, unknown>): Promise<unknown>;
   runHandoffReadiness(options?: Record<string, unknown>): Promise<unknown>;
 }
