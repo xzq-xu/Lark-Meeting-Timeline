@@ -62,6 +62,14 @@ function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
 }
 
+function firstOption(options = {}, keys = []) {
+  for (const key of keys) {
+    const value = options?.[key];
+    if (value != null && value !== '') return value;
+  }
+  return undefined;
+}
+
 function asArray(value) {
   if (Array.isArray(value)) return value;
   if (value && typeof value !== 'string' && typeof value[Symbol.iterator] === 'function') return Array.from(value);
@@ -1406,11 +1414,24 @@ export function buildMeetingAppTimelineConnectorAdoptionIndex(checklistOrPackage
   const checklist = checklistOrPackage?.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA
     ? checklistOrPackage
     : buildMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage, options);
-  const fieldIntakeIndex = buildMeetingAppTimelineConnectorFieldIntakeIndex(checklist, options);
-  const bridgeHandoff = buildMeetingAppTimelineConnectorBridgeHandoff(checklist, options);
-  const bridgeAcceptance = buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(bridgeHandoff, options);
-  const smokePlan = buildMeetingAppTimelineConnectorSmokePlan(checklist, options);
-  const smokeAcceptance = buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan, options);
+  const fieldIntakeIndex = firstOption(options, ['fieldIntakeIndex', 'field_intake_index'])
+    ?? buildMeetingAppTimelineConnectorFieldIntakeIndex(checklist, options);
+  const bridgeHandoff = firstOption(options, ['bridgeHandoff', 'bridge_handoff'])
+    ?? buildMeetingAppTimelineConnectorBridgeHandoff(checklist, options);
+  const bridgeAcceptance = firstOption(options, [
+    'bridgeHandoffAcceptance',
+    'bridge_handoff_acceptance',
+    'bridgeHandoffAcceptanceReport',
+    'bridge_handoff_acceptance_report',
+  ]) ?? buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(bridgeHandoff, options);
+  const smokePlan = firstOption(options, ['smokePlan', 'smoke_plan'])
+    ?? buildMeetingAppTimelineConnectorSmokePlan(checklist, options);
+  const smokeAcceptance = firstOption(options, [
+    'smokePlanAcceptance',
+    'smoke_plan_acceptance',
+    'smokePlanAcceptanceReport',
+    'smoke_plan_acceptance_report',
+  ]) ?? buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan, options);
   const fieldIntakeByPlatform = new Map((fieldIntakeIndex.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
   const bridgeByPlatform = new Map((bridgeHandoff.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
   const smokeByPlatform = new Map((smokePlan.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
@@ -1603,7 +1624,8 @@ export function buildMeetingAppTimelineConnectorBridgeHandoff(pkgOrChecklist = {
     : buildMeetingAppTimelineConnectorHostInstallChecklist(pkgOrChecklist, options);
   const platforms = unique((checklist.rows ?? []).map((row) => normalizeKey(row.platform))).filter(Boolean);
   const baseUrl = firstNonEmpty(options.baseUrl, options.base_url, checklist.base_url, pkgOrChecklist.base_url);
-  const consumerHandoff = buildMeetingPlatformConsumerHandoff({
+  const consumerHandoff = firstOption(options, ['consumerHandoff', 'consumer_handoff'])
+    ?? buildMeetingPlatformConsumerHandoff({
     ...options,
     baseUrl,
     platforms,
@@ -2401,85 +2423,74 @@ function releaseGateFieldIntakeReady(fieldRow = {}) {
 
 export function buildMeetingAppTimelineConnectorReleaseGate(checklistOrPackage = {}, options = {}) {
   const target = releaseGateTarget(options);
-  const packageAcceptance = firstNonEmpty(
-    options.packageAcceptance,
-    options.package_acceptance,
-    options.packageAcceptanceReport,
-    options.package_acceptance_report,
+  const suppliedPackageAcceptance = firstNonEmpty(
+    firstOption(options, [
+      'packageAcceptance',
+      'package_acceptance',
+      'packageAcceptanceReport',
+      'package_acceptance_report',
+    ]),
     checklistOrPackage.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA ? checklistOrPackage.acceptance : undefined,
     checklistOrPackage.acceptance,
-    checklistOrPackage.schema === MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA
+  );
+  const packageAcceptance = suppliedPackageAcceptance
+    ?? (checklistOrPackage.schema === MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA
       ? buildMeetingAppTimelineConnectorPackageAcceptanceReport(checklistOrPackage, {
         ...options,
         target: target === 'production' ? 'production' : 'realtime',
       })
-      : undefined,
-  );
+      : undefined);
   const hostInstallChecklist = checklistOrPackage.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA
     ? checklistOrPackage
     : buildMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage, {
       ...options,
       target: target === 'production' ? 'production' : 'realtime',
     });
-  const hostInstallChecklistAcceptance = firstNonEmpty(
-    options.hostInstallChecklistAcceptance,
-    options.host_install_checklist_acceptance,
-    options.hostInstallChecklistAcceptanceReport,
-    options.host_install_checklist_acceptance_report,
-    buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(hostInstallChecklist, options),
-  );
-  const fieldIntakeIndex = firstNonEmpty(
-    options.fieldIntakeIndex,
-    options.field_intake_index,
-    buildMeetingAppTimelineConnectorFieldIntakeIndex(hostInstallChecklist, options),
-  );
-  const adoptionIndex = firstNonEmpty(
-    options.adoptionIndex,
-    options.adoption_index,
-    buildMeetingAppTimelineConnectorAdoptionIndex(hostInstallChecklist, options),
-  );
-  const bridgeHandoff = firstNonEmpty(
-    options.bridgeHandoff,
-    options.bridge_handoff,
-    buildMeetingAppTimelineConnectorBridgeHandoff(hostInstallChecklist, options),
-  );
-  const bridgeHandoffAcceptance = firstNonEmpty(
-    options.bridgeHandoffAcceptance,
-    options.bridge_handoff_acceptance,
-    options.bridgeHandoffAcceptanceReport,
-    options.bridge_handoff_acceptance_report,
-    buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(bridgeHandoff, options),
-  );
-  const bridgeSmokeReport = firstNonEmpty(
-    options.bridgeSmokeReport,
-    options.bridge_smoke_report,
-  );
-  const smokePlan = firstNonEmpty(
-    options.smokePlan,
-    options.smoke_plan,
-    buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist, options),
-  );
-  const smokePlanAcceptance = firstNonEmpty(
-    options.smokePlanAcceptance,
-    options.smoke_plan_acceptance,
-    options.smokePlanAcceptanceReport,
-    options.smoke_plan_acceptance_report,
-    buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan, options),
-  );
-  const smokeRunReport = firstNonEmpty(
-    options.smokeRunReport,
-    options.smoke_run_report,
-  );
-  const hostAdapterBootstrapPlanMatrixAcceptance = firstNonEmpty(
-    options.hostAdapterBootstrapPlanMatrixAcceptance,
-    options.host_adapter_bootstrap_plan_matrix_acceptance,
-    options.hostAdapterBootstrapPlanMatrixAcceptanceReport,
-    options.host_adapter_bootstrap_plan_matrix_acceptance_report,
-    options.hostBootstrapPlanMatrixAcceptance,
-    options.host_bootstrap_plan_matrix_acceptance,
-    options.hostBootstrapAcceptanceReport,
-    options.host_bootstrap_acceptance_report,
-  );
+  const hostInstallChecklistAcceptance = firstOption(options, [
+    'hostInstallChecklistAcceptance',
+    'host_install_checklist_acceptance',
+    'hostInstallChecklistAcceptanceReport',
+    'host_install_checklist_acceptance_report',
+  ]) ?? buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(hostInstallChecklist, options);
+  const fieldIntakeIndex = firstOption(options, ['fieldIntakeIndex', 'field_intake_index'])
+    ?? buildMeetingAppTimelineConnectorFieldIntakeIndex(hostInstallChecklist, options);
+  const bridgeHandoff = firstOption(options, ['bridgeHandoff', 'bridge_handoff'])
+    ?? buildMeetingAppTimelineConnectorBridgeHandoff(hostInstallChecklist, options);
+  const bridgeHandoffAcceptance = firstOption(options, [
+    'bridgeHandoffAcceptance',
+    'bridge_handoff_acceptance',
+    'bridgeHandoffAcceptanceReport',
+    'bridge_handoff_acceptance_report',
+  ]) ?? buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(bridgeHandoff, options);
+  const smokePlan = firstOption(options, ['smokePlan', 'smoke_plan'])
+    ?? buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist, options);
+  const smokePlanAcceptance = firstOption(options, [
+    'smokePlanAcceptance',
+    'smoke_plan_acceptance',
+    'smokePlanAcceptanceReport',
+    'smoke_plan_acceptance_report',
+  ]) ?? buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan, options);
+  const adoptionIndex = firstOption(options, ['adoptionIndex', 'adoption_index'])
+    ?? buildMeetingAppTimelineConnectorAdoptionIndex(hostInstallChecklist, {
+      ...options,
+      fieldIntakeIndex,
+      bridgeHandoff,
+      bridgeHandoffAcceptance,
+      smokePlan,
+      smokePlanAcceptance,
+    });
+  const bridgeSmokeReport = firstOption(options, ['bridgeSmokeReport', 'bridge_smoke_report']);
+  const smokeRunReport = firstOption(options, ['smokeRunReport', 'smoke_run_report']);
+  const hostAdapterBootstrapPlanMatrixAcceptance = firstOption(options, [
+    'hostAdapterBootstrapPlanMatrixAcceptance',
+    'host_adapter_bootstrap_plan_matrix_acceptance',
+    'hostAdapterBootstrapPlanMatrixAcceptanceReport',
+    'host_adapter_bootstrap_plan_matrix_acceptance_report',
+    'hostBootstrapPlanMatrixAcceptance',
+    'host_bootstrap_plan_matrix_acceptance',
+    'hostBootstrapAcceptanceReport',
+    'host_bootstrap_acceptance_report',
+  ]);
   const requireSmokeReports = options.requireSmokeReports === true
     || options.require_smoke_reports === true
     || target === 'production';
@@ -2689,9 +2700,9 @@ export function buildMeetingAppTimelineConnectorPlatformRoadmap(checklistOrPacka
   const hostInstallChecklist = checklistOrPackage.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA
     ? checklistOrPackage
     : buildMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage, options);
-  const releaseGate = firstNonEmpty(options.releaseGate, options.release_gate)
+  const releaseGate = firstOption(options, ['releaseGate', 'release_gate'])
     ?? buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, options);
-  const consumerHandoff = firstNonEmpty(options.consumerHandoff, options.consumer_handoff)
+  const consumerHandoff = firstOption(options, ['consumerHandoff', 'consumer_handoff'])
     ?? buildMeetingPlatformConsumerHandoff({
       ...options,
       baseUrl: firstNonEmpty(options.baseUrl, options.base_url, hostInstallChecklist.base_url),
@@ -2940,19 +2951,58 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
   const hostInstallChecklist = checklistOrPackage.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_INSTALL_CHECKLIST_SCHEMA
     ? checklistOrPackage
     : buildMeetingAppTimelineConnectorHostInstallChecklist(checklistOrPackage, options);
-  const releaseGate = firstNonEmpty(options.releaseGate, options.release_gate)
-    ?? buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, options);
-  const roadmap = firstNonEmpty(options.platformRoadmap, options.platform_roadmap)
+  const consumerHandoff = firstOption(options, ['consumerHandoff', 'consumer_handoff'])
+    ?? buildMeetingPlatformConsumerHandoff({
+      ...options,
+      baseUrl: firstNonEmpty(options.baseUrl, options.base_url, hostInstallChecklist.base_url),
+      platforms: (hostInstallChecklist.rows ?? []).map((row) => normalizeKey(row.platform)),
+    });
+  const fieldIntakeIndex = firstOption(options, ['fieldIntakeIndex', 'field_intake_index'])
+    ?? buildMeetingAppTimelineConnectorFieldIntakeIndex(hostInstallChecklist, options);
+  const bridgeHandoff = firstOption(options, ['bridgeHandoff', 'bridge_handoff'])
+    ?? buildMeetingAppTimelineConnectorBridgeHandoff(hostInstallChecklist, {
+      ...options,
+      consumerHandoff,
+    });
+  const bridgeHandoffAcceptance = firstOption(options, [
+    'bridgeHandoffAcceptance',
+    'bridge_handoff_acceptance',
+    'bridgeHandoffAcceptanceReport',
+    'bridge_handoff_acceptance_report',
+  ]) ?? buildMeetingAppTimelineConnectorBridgeHandoffAcceptanceReport(bridgeHandoff, options);
+  const smokePlan = firstOption(options, ['smokePlan', 'smoke_plan'])
+    ?? buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist, options);
+  const smokePlanAcceptance = firstOption(options, [
+    'smokePlanAcceptance',
+    'smoke_plan_acceptance',
+    'smokePlanAcceptanceReport',
+    'smoke_plan_acceptance_report',
+  ]) ?? buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport(smokePlan, options);
+  const adoptionIndex = firstOption(options, ['adoptionIndex', 'adoption_index'])
+    ?? buildMeetingAppTimelineConnectorAdoptionIndex(hostInstallChecklist, {
+      ...options,
+      fieldIntakeIndex,
+      bridgeHandoff,
+      bridgeHandoffAcceptance,
+      smokePlan,
+      smokePlanAcceptance,
+    });
+  const releaseGate = firstOption(options, ['releaseGate', 'release_gate'])
+    ?? buildMeetingAppTimelineConnectorReleaseGate(hostInstallChecklist, {
+      ...options,
+      fieldIntakeIndex,
+      bridgeHandoff,
+      bridgeHandoffAcceptance,
+      smokePlan,
+      smokePlanAcceptance,
+      adoptionIndex,
+    });
+  const roadmap = firstOption(options, ['platformRoadmap', 'platform_roadmap'])
     ?? buildMeetingAppTimelineConnectorPlatformRoadmap(hostInstallChecklist, {
       ...options,
       releaseGate,
+      consumerHandoff,
     });
-  const fieldIntakeIndex = firstNonEmpty(options.fieldIntakeIndex, options.field_intake_index)
-    ?? buildMeetingAppTimelineConnectorFieldIntakeIndex(hostInstallChecklist, options);
-  const bridgeHandoff = firstNonEmpty(options.bridgeHandoff, options.bridge_handoff)
-    ?? buildMeetingAppTimelineConnectorBridgeHandoff(hostInstallChecklist, options);
-  const smokePlan = firstNonEmpty(options.smokePlan, options.smoke_plan)
-    ?? buildMeetingAppTimelineConnectorSmokePlan(hostInstallChecklist, options);
   const releaseByPlatform = new Map((releaseGate.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
   const roadmapByPlatform = new Map((roadmap.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
   const fieldByPlatform = new Map((fieldIntakeIndex.rows ?? []).map((row) => [normalizeKey(row.platform), row]));
