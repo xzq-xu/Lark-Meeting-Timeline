@@ -22,6 +22,7 @@ export interface MeetingPlatformAdapterPortfolioItem {
   launch_requirements?: Record<string, unknown>;
   evidence_thresholds?: Record<string, unknown>;
   fallback_policy?: Record<string, unknown>;
+  adapter_strategy: Record<string, unknown>;
   p0_realtime_axis: Record<string, unknown>;
   p1_provider_reconcile: Record<string, unknown>;
   p2_post_meeting_backfill: Record<string, unknown>;
@@ -40,7 +41,13 @@ export interface MeetingPlatformAdapterPortfolio {
   built_in_count: number;
   external_authoring_count: number;
   browser_surface_ready_count: number;
+  browser_first_count: number;
+  native_first_count: number;
+  local_axis_first_count: number;
   provider_reconcile_count: number;
+  provider_required_for_realtime_count: number;
+  post_meeting_transcript_count: number;
+  transcript_blocking_count: number;
   implementation_ready_count: number;
   pilot_ready_count: number;
   production_ready_count: number;

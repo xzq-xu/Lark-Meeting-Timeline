@@ -125,8 +125,103 @@ function postMeetingBackfill(providerConnection = {}, handoff = {}) {
   });
 }
 
+function surfaceFamily(surface) {
+  const normalized = normalizeSurface(surface);
+  if (normalized === 'browser_extension' || normalized === 'webview_preload') return 'browser_observer';
+  if (normalized === 'native_detector' || normalized === 'host_sdk') return 'host_native_observer';
+  if (normalized === 'provider_reconcile') return 'provider_reconcile';
+  if (normalized?.includes('browser')) return 'browser_observer';
+  if (normalized?.includes('native') || normalized?.includes('desktop')) return 'host_native_observer';
+  return normalized ?? 'unknown';
+}
+
+function speakerStrategy(providerConnection = {}) {
+  const speakerEvents = (providerConnection.event_mapping ?? [])
+    .filter((event) => String(event.timeline_role ?? '').includes('speaker'));
+  return {
+    realtime_source: 'local_observer_or_host_detector',
+    official_provider_realtime_supported: speakerEvents.length > 0,
+    provider_event_count: speakerEvents.length,
+    fallback: 'post_meeting_transcript_segments',
+    blocks_realtime: false,
+  };
+}
+
+function participantStrategy(providerConnection = {}) {
+  const participantEvents = (providerConnection.event_mapping ?? [])
+    .filter((event) => String(event.timeline_role ?? '').includes('participant'));
+  return {
+    realtime_source: participantEvents.length > 0 ? 'provider_or_local_observer_best_effort' : 'local_observer_best_effort',
+    provider_event_count: participantEvents.length,
+    required_for_realtime_annotation: false,
+    blocks_realtime: false,
+  };
+}
+
+function adapterStrategy(plan = {}, providerConnection = {}, handoff = {}, runtimeProfile = {}, firstSurface, backfill = {}) {
+  const timestampField = plan.required_contracts?.timestamp_field ?? 'captured_at_ms';
+  return compactObject({
+    priority_tier: handoff.priority_tier,
+    rank_hint: handoff.rank_hint,
+    recommended_first_surface: firstSurface,
+    first_surface_family: surfaceFamily(firstSurface),
+    launch_context: runtimeProfile.adapter_surfaces?.launch_context,
+    realtime_axis: {
+      owner: 'local_observer',
+      source: firstSurface,
+      timestamp_field: timestampField,
+      candidate_observation_required: true,
+      may_start_before_provider_event: true,
+      provider_events_block_realtime: false,
+      transcript_blocks_realtime: false,
+    },
+    provider_reconcile: compactObject({
+      owner: 'official_provider_webhook_or_event_subscription',
+      path: plan.provider_reconcile?.path,
+      transport: plan.provider_reconcile?.transport,
+      role: plan.provider_reconcile?.role ?? 'reconcile_or_backfill_after_local_axis_exists',
+      required_for_realtime: false,
+      required_for_production: Boolean(plan.provider_reconcile?.path),
+      event_mapping_count: providerConnection.event_mapping?.length ?? 0,
+      security_verifier: providerConnection.security?.verifier,
+      blocks_realtime: false,
+    }),
+    speaker_positions: speakerStrategy(providerConnection),
+    participant_positions: participantStrategy(providerConnection),
+    post_meeting_artifacts: compactObject({
+      transcript_supported: backfill.supported === true,
+      transcript_strategy: backfill.strategy,
+      transcript_source: backfill.source,
+      transcript_blocks_realtime: false,
+      recording_or_artifact_supported: Boolean(providerConnection.integration?.recording?.source),
+      required_for_realtime: false,
+    }),
+    pilot_gate: {
+      required: [
+        'candidate_observation',
+        'annotation_with_captured_at_ms',
+        'manual_or_observed_meeting_end',
+      ],
+      provider_records_required: false,
+      transcript_required: false,
+    },
+    production_gate: {
+      required: [
+        'meeting_app_evidence',
+        'provider_replay_or_webhook_evidence',
+        'nonblocking_transcript_import',
+      ],
+      provider_records_required: true,
+      transcript_required: false,
+      current_next_phase: handoff.next_phase,
+    },
+  });
+}
+
 function implementationState(handoff = {}) {
   return compactObject({
+    priority_tier: handoff.priority_tier,
+    rank_hint: handoff.rank_hint,
     implementation_ready: handoff.implementation_ready,
     pilot_ready: handoff.pilot_ready,
     production_ready: handoff.production_ready,
@@ -153,6 +248,8 @@ export function buildMeetingPlatformAdapterPortfolioItem(platform, options = {})
   const firstSurface = recommendedFirstSurface(runtimeProfile, plan.recommended_first_surface);
   const browserMatches = plan.browser_surface?.matches ?? [];
   const providerDocs = docs(providerConnection);
+  const backfill = postMeetingBackfill(providerConnection, handoff);
+  const strategy = adapterStrategy(plan, providerConnection, handoff, runtimeProfile, firstSurface, backfill);
   return compactObject({
     type: 'meeting_platform_adapter_portfolio_item',
     schema: MEETING_PLATFORM_ADAPTER_PORTFOLIO_ITEM_SCHEMA,
@@ -166,6 +263,7 @@ export function buildMeetingPlatformAdapterPortfolioItem(platform, options = {})
     launch_requirements: runtimeProfile?.launch_requirements,
     evidence_thresholds: runtimeProfile?.evidence_thresholds,
     fallback_policy: runtimeProfile?.fallback_policy,
+    adapter_strategy: strategy,
     p0_realtime_axis: {
       source: firstSurface,
       local_axis_first: true,
@@ -192,7 +290,7 @@ export function buildMeetingPlatformAdapterPortfolioItem(platform, options = {})
       security: providerConnection?.security,
       readiness: providerConnection?.readiness,
     }),
-    p2_post_meeting_backfill: postMeetingBackfill(providerConnection, handoff),
+    p2_post_meeting_backfill: backfill,
     implementation: handoff ? implementationState(handoff) : undefined,
     evidence_requirements: plan.production_evidence,
     commands: compactObject({
@@ -227,12 +325,20 @@ export function buildMeetingPlatformAdapterPortfolio(options = {}) {
     primary_surface: item.adapter_surfaces?.primary,
     surface_order: item.adapter_surfaces?.recommended_order,
     recommended_first_surface: item.recommended_first_surface,
+    first_surface_family: item.adapter_strategy?.first_surface_family,
+    priority_tier: item.adapter_strategy?.priority_tier,
+    rank_hint: item.adapter_strategy?.rank_hint,
     browser_match_count: item.p0_realtime_axis?.browser_match_count ?? 0,
     provider_path: item.p1_provider_reconcile?.path,
     provider_transport: item.p1_provider_reconcile?.transport,
     official_doc_count: item.p1_provider_reconcile?.official_doc_count ?? 0,
+    provider_required_for_realtime: item.adapter_strategy?.provider_reconcile?.required_for_realtime === true,
     pilot_provider_records_required: item.evidence_thresholds?.pilot?.provider_records_required,
     production_provider_records_required: item.evidence_thresholds?.production?.provider_records_required,
+    transcript_supported: item.adapter_strategy?.post_meeting_artifacts?.transcript_supported === true,
+    transcript_blocks_realtime: item.adapter_strategy?.post_meeting_artifacts?.transcript_blocks_realtime === true,
+    speaker_realtime_source: item.adapter_strategy?.speaker_positions?.realtime_source,
+    speaker_provider_realtime_supported: item.adapter_strategy?.speaker_positions?.official_provider_realtime_supported === true,
     implementation_ready: item.implementation?.implementation_ready === true,
     pilot_ready: item.implementation?.pilot_ready === true,
     production_ready: item.implementation?.production_ready === true,
@@ -248,7 +354,13 @@ export function buildMeetingPlatformAdapterPortfolio(options = {}) {
     built_in_count: items.filter((item) => item.built_in).length,
     external_authoring_count: items.filter((item) => !item.built_in).length,
     browser_surface_ready_count: items.filter((item) => (item.p0_realtime_axis?.browser_match_count ?? 0) > 0).length,
+    browser_first_count: items.filter((item) => item.adapter_strategy?.first_surface_family === 'browser_observer').length,
+    native_first_count: items.filter((item) => item.adapter_strategy?.first_surface_family === 'host_native_observer').length,
+    local_axis_first_count: items.filter((item) => item.adapter_strategy?.realtime_axis?.owner === 'local_observer').length,
     provider_reconcile_count: items.filter((item) => item.p1_provider_reconcile?.path).length,
+    provider_required_for_realtime_count: items.filter((item) => item.adapter_strategy?.provider_reconcile?.required_for_realtime === true).length,
+    post_meeting_transcript_count: items.filter((item) => item.adapter_strategy?.post_meeting_artifacts?.transcript_supported === true).length,
+    transcript_blocking_count: items.filter((item) => item.adapter_strategy?.post_meeting_artifacts?.transcript_blocks_realtime === true).length,
     implementation_ready_count: items.filter((item) => item.implementation?.implementation_ready === true).length,
     pilot_ready_count: items.filter((item) => item.implementation?.pilot_ready === true).length,
     production_ready_count: items.filter((item) => item.implementation?.production_ready === true).length,

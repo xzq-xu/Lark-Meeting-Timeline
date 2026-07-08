@@ -109,7 +109,13 @@ export async function buildMeetingPlatformAdapterPortfolioCliReport(options = {}
     built_in_count: portfolio.built_in_count,
     external_authoring_count: portfolio.external_authoring_count,
     browser_surface_ready_count: portfolio.browser_surface_ready_count,
+    browser_first_count: portfolio.browser_first_count,
+    native_first_count: portfolio.native_first_count,
+    local_axis_first_count: portfolio.local_axis_first_count,
     provider_reconcile_count: portfolio.provider_reconcile_count,
+    provider_required_for_realtime_count: portfolio.provider_required_for_realtime_count,
+    post_meeting_transcript_count: portfolio.post_meeting_transcript_count,
+    transcript_blocking_count: portfolio.transcript_blocking_count,
     implementation_ready_count: portfolio.implementation_ready_count,
     pilot_ready_count: portfolio.pilot_ready_count,
     production_ready_count: portfolio.production_ready_count,
@@ -128,10 +134,10 @@ export async function buildMeetingPlatformAdapterPortfolioCliReport(options = {}
 
 export function formatMeetingPlatformAdapterPortfolioCliReport(report = {}) {
   const lines = [
-    `meeting_platform_adapter_portfolio_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | builtin=${report.built_in_count} | external=${report.external_authoring_count} | browser_ready=${report.browser_surface_ready_count} | provider=${report.provider_reconcile_count} | pilot=${report.pilot_ready_count} | written=${report.written_files?.length ?? 0}`,
+    `meeting_platform_adapter_portfolio_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | builtin=${report.built_in_count} | external=${report.external_authoring_count} | browser_first=${report.browser_first_count} | native_first=${report.native_first_count} | local_axis=${report.local_axis_first_count} | provider=${report.provider_reconcile_count} | transcript=${report.post_meeting_transcript_count} | pilot=${report.pilot_ready_count} | written=${report.written_files?.length ?? 0}`,
   ];
   for (const row of report.rows ?? []) {
-    lines.push(`${row.platform}: status=${row.adapter_status} surface=${row.recommended_first_surface} provider=${row.provider_path} docs=${row.official_doc_count} pilot=${boolLabel(row.pilot_ready)} next=${row.next_action} item=${row.item_file ?? 'n/a'}`);
+    lines.push(`${row.platform}: status=${row.adapter_status} surface=${row.recommended_first_surface} family=${row.first_surface_family} provider=${row.provider_path} transcript_blocking=${boolLabel(row.transcript_blocks_realtime)} speaker=${row.speaker_realtime_source} pilot=${boolLabel(row.pilot_ready)} next=${row.next_action} item=${row.item_file ?? 'n/a'}`);
   }
   if (report.next_actions?.length > 0) lines.push(`next_actions=${report.next_actions.join(',')}`);
   if (report.out_dir) lines.push(`out_dir=${basename(report.out_dir)}`);

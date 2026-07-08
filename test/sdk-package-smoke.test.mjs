@@ -365,8 +365,12 @@ assert.equal(adapterPortfolioBinReport.type, 'meeting_platform_adapter_portfolio
 assert.equal(adapterPortfolioBinReport.ok, true);
 assert.equal(adapterPortfolioBinReport.platform_count, 2);
 assert.equal(adapterPortfolioBinReport.built_in_count, 2);
+assert.equal(adapterPortfolioBinReport.browser_first_count, 1);
+assert.equal(adapterPortfolioBinReport.native_first_count, 1);
+assert.equal(adapterPortfolioBinReport.provider_required_for_realtime_count, 0);
 assert.equal(adapterPortfolioBinReport.rows.find((row) => row.platform === 'google_meet').recommended_first_surface, 'browser_extension');
 assert.equal(adapterPortfolioBinReport.rows.find((row) => row.platform === 'zoom').recommended_first_surface, 'native_detector');
+assert.equal(adapterPortfolioBinReport.rows.find((row) => row.platform === 'zoom').first_surface_family, 'host_native_observer');
 assert.equal(adapterPortfolioBinReport.written_files.length, 0);
 
 const { stdout: adapterStartupBinStdout } = await execFileAsync(
@@ -2830,10 +2834,17 @@ assert.equal(buildMeetingPlatformAdapterAuthoringPlanFromRoot('google-meet', {
 assert.equal(buildMeetingPlatformAdapterPortfolioItem('google-meet', {
   baseUrl: 'http://localhost:8787',
 }).p1_provider_reconcile.official_doc_count, 3);
+assert.equal(buildMeetingPlatformAdapterPortfolioItem('google-meet', {
+  baseUrl: 'http://localhost:8787',
+}).adapter_strategy.provider_reconcile.required_for_realtime, false);
 assert.equal(buildMeetingPlatformAdapterPortfolio({
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet', 'Acme Rooms'],
 }).external_authoring_count, 1);
+assert.equal(buildMeetingPlatformAdapterPortfolio({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet', 'zoom'],
+}).native_first_count, 1);
 assert.equal(buildMeetingPlatformAdapterPortfolioFromRoot({
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],
