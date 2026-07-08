@@ -21,6 +21,71 @@ import {
 export const MEETING_PLATFORM_ADAPTER_DECISION_SCHEMA = 'meeting_platform_adapter_decision';
 export const MEETING_PLATFORM_ADAPTER_DECISION_MATRIX_SCHEMA = 'meeting_platform_adapter_decision_matrix';
 export const MEETING_PLATFORM_ADAPTER_DECISION_SCHEMA_VERSION = 1;
+export const MEETING_PLATFORM_HOST_PROFILE_PRESETS = Object.freeze({
+  browser_extension: Object.freeze({
+    profile: 'browser_extension',
+    label: 'Browser extension',
+    available_surfaces: Object.freeze(['browser_extension']),
+    realtime_axis_surface: 'browser_extension',
+    notes: 'Use a content script or equivalent browser DOM observer as the realtime axis surface.',
+  }),
+  webview_preload: Object.freeze({
+    profile: 'webview_preload',
+    label: 'WebView preload',
+    available_surfaces: Object.freeze(['browser_extension']),
+    realtime_axis_surface: 'browser_extension',
+    notes: 'Use the browser-extension adapter contract through an Electron/WebView preload bridge.',
+  }),
+  native_detector: Object.freeze({
+    profile: 'native_detector',
+    label: 'Native detector',
+    available_surfaces: Object.freeze(['native_detector']),
+    realtime_axis_surface: 'native_detector',
+    notes: 'Use a native window, accessibility, audio, or desktop detector as the realtime axis surface.',
+  }),
+  hybrid_desktop: Object.freeze({
+    profile: 'hybrid_desktop',
+    label: 'Hybrid desktop',
+    available_surfaces: Object.freeze(['native_detector', 'browser_extension']),
+    realtime_axis_surface: 'native_detector_or_browser_extension',
+    notes: 'Prefer native detection where it is the platform default, but allow browser DOM observation fallback.',
+  }),
+  browser_or_native: Object.freeze({
+    profile: 'browser_or_native',
+    label: 'Browser or native',
+    available_surfaces: Object.freeze(['browser_extension', 'native_detector']),
+    realtime_axis_surface: 'browser_extension_or_native_detector',
+    notes: 'Allow either local observer family; provider events remain nonblocking reconcile only.',
+  }),
+  full_local: Object.freeze({
+    profile: 'full_local',
+    label: 'Full local observer',
+    available_surfaces: Object.freeze(['browser_extension', 'native_detector', 'host_detector']),
+    realtime_axis_surface: 'local_observer',
+    notes: 'All local realtime surfaces are available; provider events are still not required for realtime marks.',
+  }),
+  full: Object.freeze({
+    profile: 'full',
+    label: 'Full host integration',
+    available_surfaces: Object.freeze(['browser_extension', 'native_detector', 'host_detector', 'provider_reconcile']),
+    realtime_axis_surface: 'local_observer_with_provider_reconcile',
+    notes: 'Local realtime surfaces plus provider reconcile/backfill are available.',
+  }),
+  provider_reconcile_only: Object.freeze({
+    profile: 'provider_reconcile_only',
+    label: 'Provider reconcile only',
+    available_surfaces: Object.freeze(['provider_reconcile']),
+    realtime_axis_surface: 'none',
+    notes: 'Provider events can reconcile or backfill, but cannot prove a low-latency realtime annotation axis.',
+  }),
+  local_detector: Object.freeze({
+    profile: 'local_detector',
+    label: 'Local detector',
+    available_surfaces: Object.freeze(['host_detector']),
+    realtime_axis_surface: 'host_detector',
+    notes: 'Use an explicit trusted host detector or manual controller for the realtime axis.',
+  }),
+});
 
 const DEFAULT_DECISION_PLATFORMS = Object.freeze([
   'google_meet',
@@ -133,6 +198,29 @@ function normalizeSurface(value) {
     .replaceAll(' ', '_');
 }
 
+function normalizeHostProfile(value) {
+  return normalizeSurface(value);
+}
+
+function hostProfileInput(input = {}, options = {}) {
+  return firstNonEmpty(
+    options.hostProfile,
+    options.host_profile,
+    options.hostRuntimeProfile,
+    options.host_runtime_profile,
+    input.hostProfile,
+    input.host_profile,
+    input.hostRuntimeProfile,
+    input.host_runtime_profile,
+  );
+}
+
+function hostProfilePreset(input = {}, options = {}) {
+  const raw = hostProfileInput(input, options);
+  if (!raw) return undefined;
+  return MEETING_PLATFORM_HOST_PROFILE_PRESETS[normalizeHostProfile(raw)];
+}
+
 function capabilityEnabled(value) {
   if (value == null) return false;
   if (value === true) return true;
@@ -201,6 +289,7 @@ function surfaceAvailabilityInput(input = {}, options = {}) {
     input.surface_capabilities,
     input.hostSurfaces,
     input.host_surfaces,
+    hostProfilePreset(input, options)?.available_surfaces,
   );
 }
 
@@ -218,8 +307,10 @@ function hostCapabilitiesInput(input = {}, options = {}) {
 function configuredAvailableSurfaces(input = {}, options = {}) {
   const declared = surfaceAvailabilityInput(input, options);
   const caps = hostCapabilitiesInput(input, options);
+  const profile = hostProfilePreset(input, options);
   const values = [];
   let specified = false;
+  if (profile) specified = true;
   if (declared != null) {
     specified = true;
     if (Array.isArray(declared) || typeof declared === 'string' || typeof declared[Symbol.iterator] === 'function') {
@@ -445,12 +536,14 @@ function expandedSurface(value) {
 
 function hostSurfaceCompatibility(input = {}, options = {}, adapterBlueprint = {}, rawSurface = {}) {
   const configured = configuredAvailableSurfaces(input, options);
+  const profile = hostProfilePreset(input, options);
   const candidateSurfaces = surfaceOrderFromBlueprint(adapterBlueprint);
   const selectedFromRaw = expandedSurface(rawSurface.surface);
   const selectedCandidates = selectedFromRaw.length > 0 ? selectedFromRaw : candidateSurfaces;
   if (!configured) {
     return {
       specified: false,
+      host_profile: profile?.profile,
       available_surfaces: candidateSurfaces,
       candidate_surfaces: candidateSurfaces,
       selected_surface: rawSurface.surface,
@@ -468,6 +561,9 @@ function hostSurfaceCompatibility(input = {}, options = {}, adapterBlueprint = {
   const selectedAvailable = expandedSurface(selected).some((surface) => availableSet.has(surface));
   return {
     specified: true,
+    host_profile: profile?.profile,
+    host_profile_label: profile?.label,
+    host_profile_notes: profile?.notes,
     available_surfaces: configured,
     candidate_surfaces: candidateSurfaces,
     compatible_surfaces: selectable,
@@ -861,6 +957,7 @@ export function buildMeetingPlatformAdapterDecisionMatrix(input = {}, options = 
       status: decision.status,
       selected_surface: decision.selected_surface,
       surface_source: decision.surface_source,
+      host_profile: decision.host_surface_compatibility?.host_profile,
       host_surface_available: decision.host_surface_compatibility?.selected_surface_available !== false,
       host_available_surfaces: decision.host_surface_compatibility?.available_surfaces,
       host_compatible_surfaces: decision.host_surface_compatibility?.compatible_surfaces,

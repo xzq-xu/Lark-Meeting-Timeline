@@ -12,6 +12,13 @@ import type {
 export const MEETING_PLATFORM_ADAPTER_DECISION_SCHEMA: 'meeting_platform_adapter_decision';
 export const MEETING_PLATFORM_ADAPTER_DECISION_MATRIX_SCHEMA: 'meeting_platform_adapter_decision_matrix';
 export const MEETING_PLATFORM_ADAPTER_DECISION_SCHEMA_VERSION: 1;
+export const MEETING_PLATFORM_HOST_PROFILE_PRESETS: Readonly<Record<string, {
+  profile: string;
+  label: string;
+  available_surfaces: readonly string[];
+  realtime_axis_surface: string;
+  notes: string;
+}>>;
 
 export interface MeetingPlatformAdapterDecisionOptions {
   platform?: string;
@@ -25,6 +32,10 @@ export interface MeetingPlatformAdapterDecisionOptions {
   surface?: string;
   adapterSurface?: string;
   adapter_surface?: string;
+  hostProfile?: string;
+  host_profile?: string;
+  hostRuntimeProfile?: string;
+  host_runtime_profile?: string;
   availableSurfaces?: string[] | Record<string, unknown>;
   available_surfaces?: string[] | Record<string, unknown>;
   surfaceCapabilities?: Record<string, unknown>;
@@ -65,6 +76,10 @@ export interface MeetingPlatformAdapterDecisionInput {
   surface?: string;
   adapterSurface?: string;
   adapter_surface?: string;
+  hostProfile?: string;
+  host_profile?: string;
+  hostRuntimeProfile?: string;
+  host_runtime_profile?: string;
   availableSurfaces?: string[] | Record<string, unknown>;
   available_surfaces?: string[] | Record<string, unknown>;
   surfaceCapabilities?: Record<string, unknown>;
@@ -176,6 +191,7 @@ export interface MeetingPlatformAdapterDecisionMatrixRow {
   status?: string;
   selected_surface?: string;
   surface_source?: string;
+  host_profile?: string;
   host_surface_available?: boolean;
   host_available_surfaces?: string[];
   host_compatible_surfaces?: string[];
@@ -210,6 +226,9 @@ export interface MeetingPlatformAdapterDecision {
   surface_source?: string;
   host_surface_compatibility?: {
     specified?: boolean;
+    host_profile?: string;
+    host_profile_label?: string;
+    host_profile_notes?: string;
     available_surfaces?: string[];
     candidate_surfaces?: string[];
     compatible_surfaces?: string[];

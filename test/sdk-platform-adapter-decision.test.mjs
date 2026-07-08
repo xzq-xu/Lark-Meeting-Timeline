@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import {
+  MEETING_PLATFORM_HOST_PROFILE_PRESETS,
   assertMeetingPlatformAdapterDecision,
   assertMeetingPlatformAdapterDecisionMatrix,
   buildMeetingPlatformAdapterDecision,
@@ -126,6 +127,17 @@ assert.equal(browserOnlyMatrix.rows.find((row) => row.platform === 'zoom').selec
 assert.equal(browserOnlyMatrix.rows.find((row) => row.platform === 'zoom').surface_source, 'host_capabilities');
 assert.deepEqual(browserOnlyMatrix.rows.find((row) => row.platform === 'zoom').host_available_surfaces, ['browser_extension']);
 
+const browserProfileMatrix = buildMeetingPlatformAdapterDecisionMatrix({}, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom', 'teams'],
+  hostProfile: 'browser_extension',
+});
+assert.equal(MEETING_PLATFORM_HOST_PROFILE_PRESETS.browser_extension.available_surfaces[0], 'browser_extension');
+assert.equal(browserProfileMatrix.host_surface_constrained_count, 3);
+assert.equal(browserProfileMatrix.browser_surface_count, 3);
+assert.equal(browserProfileMatrix.rows.every((row) => row.host_profile === 'browser_extension'), true);
+assert.equal(browserProfileMatrix.rows.find((row) => row.platform === 'zoom').surface_source, 'host_capabilities');
+
 const nativeOnlyMatrix = buildMeetingPlatformAdapterDecisionMatrix({}, {
   baseUrl,
   platforms: ['google-meet', 'zoom', 'teams'],
@@ -139,6 +151,26 @@ assert.equal(nativeOnlyMatrix.native_surface_count, 3);
 assert.equal(nativeOnlyMatrix.rows.find((row) => row.platform === 'google_meet').selected_surface, 'native_detector');
 assert.equal(nativeOnlyMatrix.rows.find((row) => row.platform === 'google_meet').surface_source, 'host_capabilities');
 
+const nativeProfileMatrix = buildMeetingPlatformAdapterDecisionMatrix({}, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom', 'teams'],
+  hostProfile: 'native_detector',
+});
+assert.equal(nativeProfileMatrix.accepted_count, 3);
+assert.equal(nativeProfileMatrix.native_surface_count, 3);
+assert.equal(nativeProfileMatrix.rows.every((row) => row.host_profile === 'native_detector'), true);
+
+const webviewProfileDecision = buildMeetingPlatformAdapterDecision({
+  platform: 'google-meet',
+}, {
+  baseUrl,
+  hostProfile: 'webview_preload',
+});
+assert.equal(webviewProfileDecision.accepted, true);
+assert.equal(webviewProfileDecision.selected_surface, 'browser_extension');
+assert.equal(webviewProfileDecision.host_surface_compatibility.host_profile, 'webview_preload');
+assert.equal(webviewProfileDecision.adaptation_strategy.host_install_target, 'browser_extension_or_webview_preload');
+
 const providerOnlyMatrix = buildMeetingPlatformAdapterDecisionMatrix({}, {
   baseUrl,
   platforms: ['google-meet', 'zoom'],
@@ -149,6 +181,16 @@ assert.equal(providerOnlyMatrix.realtime_ready_count, 0);
 assert.equal(providerOnlyMatrix.provider_reconcile_surface_count, 2);
 assert.equal(providerOnlyMatrix.local_surface_selected_count, 0);
 assert.equal(providerOnlyMatrix.rows.every((row) => row.status === 'needs_local_surface_for_realtime_axis'), true);
+
+const providerProfileMatrix = buildMeetingPlatformAdapterDecisionMatrix({}, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom'],
+  hostProfile: 'provider_reconcile_only',
+});
+assert.equal(providerProfileMatrix.accepted_count, 0);
+assert.equal(providerProfileMatrix.realtime_ready_count, 0);
+assert.equal(providerProfileMatrix.rows.every((row) => row.host_profile === 'provider_reconcile_only'), true);
+assert.equal(providerProfileMatrix.rows.every((row) => row.status === 'needs_local_surface_for_realtime_axis'), true);
 
 const unavailableExplicitSurface = buildMeetingPlatformAdapterDecision({
   platform: 'google-meet',

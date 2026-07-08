@@ -570,6 +570,7 @@ import {
   buildMeetingPlatformAdapterCandidateLaunchPlan as buildMeetingPlatformAdapterCandidateLaunchPlanFromRoot,
   buildMeetingPlatformAdapterLaunchPlan as buildMeetingPlatformAdapterLaunchPlanFromRoot,
   buildMeetingPlatformAdapterPortfolio as buildMeetingPlatformAdapterPortfolioFromRoot,
+  MEETING_PLATFORM_HOST_PROFILE_PRESETS as MEETING_PLATFORM_HOST_PROFILE_PRESETS_FROM_ROOT,
   buildMeetingPlatformAdapterDecision as buildMeetingPlatformAdapterDecisionFromRoot,
   buildMeetingPlatformAdapterDecisionMatrix as buildMeetingPlatformAdapterDecisionMatrixFromRoot,
   buildMeetingPlatformAdapterStartupPlan as buildMeetingPlatformAdapterStartupPlanFromRoot,
@@ -1377,6 +1378,11 @@ assert.equal(rootMeetingAppSdk.platformAdapterDecisionMatrix({}, {
   platforms: ['google-meet', 'zoom'],
   availableSurfaces: ['browser_extension'],
 }).browser_surface_count, 2);
+assert.equal(MEETING_PLATFORM_HOST_PROFILE_PRESETS_FROM_ROOT.browser_extension.available_surfaces[0], 'browser_extension');
+assert.equal(rootMeetingAppSdk.platformAdapterDecisionMatrix({}, {
+  platforms: ['google-meet', 'zoom'],
+  hostProfile: 'browser_extension',
+}).rows.every((row) => row.host_profile === 'browser_extension'), true);
 assert.equal(rootMeetingAppSdk.platformAdapterDecisionMatrix({}, {
   platforms: ['google-meet', 'zoom'],
   availableSurfaces: ['provider_reconcile'],
