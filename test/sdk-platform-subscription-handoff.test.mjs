@@ -108,6 +108,10 @@ assert.equal(matrix.rows.find((row) => row.platform === 'lark').status, 'manual_
 assert.equal(matrix.rows.every((row) => row.adapter_selection_ready === true), true);
 assert.equal(matrix.rows.every((row) => row.annotation_timestamp_field === 'captured_at_ms'), true);
 assert.equal(matrix.rows.every((row) => row.provider_events_block_realtime === false), true);
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').realtime_axis_surface, 'browser_extension');
+assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').realtime_axis_surface, 'desktop_or_browser_observer');
+assert.equal(matrix.rows.find((row) => row.platform === 'zoom').realtime_axis_surface, 'native_detector');
+assert.equal(matrix.rows.find((row) => row.platform === 'lark').realtime_axis_surface, 'browser_extension_or_desktop_observer');
 for (const handoff of matrix.handoffs) {
   assertRuntimeHandoff(handoff);
 }

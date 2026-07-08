@@ -169,6 +169,57 @@ const SECURITY_STRATEGY = Object.freeze({
   }),
 });
 
+const ADAPTER_SELECTION_SNAPSHOT_DEFAULTS = Object.freeze({
+  local_detector: Object.freeze({
+    display_name: 'Local Meeting Detector',
+    recommended_mode: 'trusted_host_detector_only',
+    axis_surface: 'host_sdk',
+    axis_source_role: 'authoritative_realtime_axis',
+    speaker_track_source: 'provider_or_local_observer',
+    post_meeting_artifact_source: 'post_meeting_artifact_import',
+  }),
+  lark: Object.freeze({
+    display_name: 'Feishu / Lark',
+    recommended_mode: 'local_observer_first_provider_reconcile',
+    axis_surface: 'browser_extension_or_desktop_observer',
+    axis_source_role: 'primary_low_latency_axis',
+    speaker_track_source: 'local_observer_or_detector',
+    post_meeting_artifact_source: 'post_meeting_artifact_import',
+  }),
+  google_meet: Object.freeze({
+    display_name: 'Google Meet',
+    recommended_mode: 'local_observer_first_provider_reconcile',
+    axis_surface: 'browser_extension',
+    axis_source_role: 'primary_low_latency_axis',
+    speaker_track_source: 'local_observer_or_detector',
+    post_meeting_artifact_source: 'post_meeting_artifact_import',
+  }),
+  microsoft_teams: Object.freeze({
+    display_name: 'Microsoft Teams',
+    recommended_mode: 'local_observer_first_provider_reconcile',
+    axis_surface: 'desktop_or_browser_observer',
+    axis_source_role: 'primary_low_latency_axis',
+    speaker_track_source: 'local_observer_or_detector',
+    post_meeting_artifact_source: 'post_meeting_artifact_import',
+  }),
+  zoom: Object.freeze({
+    display_name: 'Zoom',
+    recommended_mode: 'local_observer_first_provider_reconcile',
+    axis_surface: 'native_detector',
+    axis_source_role: 'primary_low_latency_axis',
+    speaker_track_source: 'local_observer_or_detector',
+    post_meeting_artifact_source: 'post_meeting_artifact_import',
+  }),
+  webex: Object.freeze({
+    display_name: 'Webex',
+    recommended_mode: 'local_observer_first_provider_reconcile',
+    axis_surface: 'browser_extension_or_native_detector',
+    axis_source_role: 'primary_low_latency_axis',
+    speaker_track_source: 'local_observer_or_detector',
+    post_meeting_artifact_source: 'post_meeting_artifact_import',
+  }),
+});
+
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
 }
@@ -223,29 +274,23 @@ function adapterSelectionFor(platform, options = {}) {
   );
   if (selected) return selected;
   const localDetector = platform === 'local_detector';
+  const defaults = ADAPTER_SELECTION_SNAPSHOT_DEFAULTS[platform] ?? {};
   return {
     schema: 'meeting_platform_adapter_selection_snapshot',
     schema_version: 1,
     platform,
-    display_name: {
-      local_detector: 'Local Meeting Detector',
-      lark: 'Feishu / Lark',
-      google_meet: 'Google Meet',
-      microsoft_teams: 'Microsoft Teams',
-      zoom: 'Zoom',
-      webex: 'Webex',
-    }[platform],
-    recommended_mode: localDetector ? 'trusted_host_detector_only' : 'local_observer_first_provider_reconcile',
+    display_name: defaults.display_name,
+    recommended_mode: defaults.recommended_mode,
     selection: {
       axis_source: localDetector ? 'host_detector_axis' : 'local_observer_axis',
-      axis_surface: localDetector ? 'host_sdk' : 'browser_extension_or_native_detector',
-      axis_source_role: localDetector ? 'authoritative_realtime_axis' : 'primary_low_latency_axis',
+      axis_surface: defaults.axis_surface,
+      axis_source_role: defaults.axis_source_role,
       annotation_source: 'annotation_insert',
       timestamp_field: 'captured_at_ms',
       provider_reconcile_source: localDetector ? undefined : 'provider_reconcile',
       provider_reconcile_required_for_production: !localDetector,
-      speaker_track_source: localDetector ? 'trusted_host_detector' : 'local_detector_or_post_meeting_transcript',
-      post_meeting_artifact_source: localDetector ? undefined : 'post_meeting_artifact_import',
+      speaker_track_source: defaults.speaker_track_source,
+      post_meeting_artifact_source: defaults.post_meeting_artifact_source,
     },
     runtime_policy: {
       provider_events_block_realtime: false,
@@ -256,9 +301,9 @@ function adapterSelectionFor(platform, options = {}) {
         'validate_raw_signal',
         localDetector ? 'host_detector_axis' : 'local_observer_axis',
         'annotation_insert',
-        localDetector ? undefined : 'speaker_position_markers',
+        'speaker_position_markers',
         localDetector ? undefined : 'provider_reconcile_non_blocking',
-        localDetector ? undefined : 'post_meeting_artifact_import_non_blocking',
+        'post_meeting_artifact_import_non_blocking',
       ].filter(Boolean),
       runtime_actions: [
         'validate_raw_signal',
@@ -267,7 +312,7 @@ function adapterSelectionFor(platform, options = {}) {
         'insert_annotation',
         'append_speaker_position_marker_if_available',
         localDetector ? undefined : 'reconcile_provider_event_when_available',
-        localDetector ? undefined : 'import_post_meeting_artifact_when_available',
+        'import_post_meeting_artifact_when_available',
       ].filter(Boolean),
     },
     readiness: {

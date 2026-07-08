@@ -6,6 +6,7 @@ import {
   buildMeetingPlatformProviderConnectionMatrix,
   buildMeetingPlatformProviderConnectionPack,
 } from '../packages/meeting-timeline-sdk/adapters/platform-provider-connection.mjs';
+import { buildMeetingPlatformAdapterSelection } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-selection.mjs';
 import { createMeetingPlatformTimelineKit } from '../packages/meeting-timeline-sdk/adapters/platform-kit.mjs';
 
 const baseUrl = 'https://timeline.example.com';
@@ -23,6 +24,15 @@ function assertNonBlockingLocalAxis(pack) {
   assert.equal(pack.runtime_binding_contract.must_read_adapter_selection_before_session, true);
   assert.equal(pack.runtime_binding_contract.per_meeting_annotation_isolation_required, true);
   assert.equal(pack.realtime_annotation_policy.provider_events_block_realtime, false);
+}
+
+function assertMatchesCanonicalSelection(platform, pack) {
+  const selection = buildMeetingPlatformAdapterSelection(platform, {}, { baseUrl });
+  assert.equal(pack.adapter_selection.selection.axis_source, selection.selection.axis_source);
+  assert.equal(pack.adapter_selection.selection.axis_surface, selection.selection.axis_surface);
+  assert.equal(pack.adapter_selection.selection.speaker_track_source, selection.selection.speaker_track_source);
+  assert.equal(pack.adapter_selection.selection.post_meeting_artifact_source, selection.selection.post_meeting_artifact_source);
+  assert.equal(pack.runtime_binding_contract.realtime_axis_surface, selection.selection.axis_surface);
 }
 
 const googlePack = buildMeetingPlatformProviderConnectionPack('google-meet', {
@@ -46,8 +56,10 @@ assert.equal(googlePack.security.verifier, 'verifyGooglePubSubOidcJwt');
 assert.equal(googlePack.realtime_annotation_policy.provider_events_block_realtime, false);
 assert.equal(googlePack.realtime_annotation_policy.annotation_timestamp_field, 'captured_at_ms');
 assert.equal(googlePack.adapter_selection.selection.axis_source, 'local_observer_axis');
+assert.equal(googlePack.adapter_selection.selection.axis_surface, 'browser_extension');
 assert.equal(googlePack.runtime_binding_contract.provider_reconcile_source, 'provider_reconcile');
 assertNonBlockingLocalAxis(googlePack);
+assertMatchesCanonicalSelection('google-meet', googlePack);
 
 const teamsPack = buildMeetingPlatformProviderConnectionPack('teams', {
   baseUrl,
@@ -66,7 +78,9 @@ assert.equal(teamsPack.permissions.required_permissions.includes('OnlineMeetings
 assert.equal(teamsPack.event_mapping.some((item) => item.provider_event === 'meetingCallEvents.updated:rosterUpdated'), true);
 assert.equal(teamsPack.security.verifier, 'verifyMicrosoftGraphClientState');
 assert.equal(teamsPack.runtime_binding_contract.realtime_axis_source, 'local_observer_axis');
+assert.equal(teamsPack.runtime_binding_contract.realtime_axis_surface, 'desktop_or_browser_observer');
 assertNonBlockingLocalAxis(teamsPack);
+assertMatchesCanonicalSelection('teams', teamsPack);
 
 const zoomPack = buildMeetingPlatformProviderConnectionPack('zoom', {
   baseUrl,
@@ -82,7 +96,9 @@ assert.equal(zoomPack.next_actions.includes('configure_env:ZOOM_WEBHOOK_SECRET_T
 assert.equal(zoomPack.subscription.request.event_webhook_url, `${baseUrl}/api/platform-events/zoom`);
 assert.equal(zoomPack.event_mapping.some((item) => item.provider_event === 'recording.completed'), true);
 assert.equal(zoomPack.adapter_selection.selection.provider_reconcile_required_for_production, true);
+assert.equal(zoomPack.runtime_binding_contract.realtime_axis_surface, 'native_detector');
 assertNonBlockingLocalAxis(zoomPack);
+assertMatchesCanonicalSelection('zoom', zoomPack);
 
 const webexPack = buildMeetingPlatformProviderConnectionPack('webex', {
   baseUrl,
@@ -100,6 +116,7 @@ assert.equal(webexPack.permissions.admin_scopes.includes('meeting:admin_transcri
 assert.equal(webexPack.security.verifier, 'verifyWebexWebhookEvent');
 assert.equal(webexPack.runtime_binding_contract.realtime_axis_surface, 'browser_extension_or_native_detector');
 assertNonBlockingLocalAxis(webexPack);
+assertMatchesCanonicalSelection('webex', webexPack);
 
 const larkPack = buildMeetingPlatformProviderConnectionPack('lark', {
   baseUrl,
@@ -110,7 +127,9 @@ assert.equal(larkPack.readiness.ready, true);
 assert.equal(larkPack.transport, 'Feishu/Lark long connection or HTTP event callback');
 assert.equal(larkPack.event_mapping.some((item) => item.provider_event === 'vc.meeting.all_meeting_started_v1'), true);
 assert.equal(larkPack.runtime_binding_contract.provider_role, 'reconcile_and_backfill_after_local_axis');
+assert.equal(larkPack.runtime_binding_contract.realtime_axis_surface, 'browser_extension_or_desktop_observer');
 assertNonBlockingLocalAxis(larkPack);
+assertMatchesCanonicalSelection('lark', larkPack);
 
 const matrix = buildMeetingPlatformProviderConnectionMatrix({
   baseUrl,
@@ -128,6 +147,9 @@ assert.equal(matrix.blocked_count, 1);
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').missing_env.includes('ZOOM_WEBHOOK_SECRET_TOKEN'), true);
 assert.equal(matrix.rows.every((row) => row.adapter_selection_ready === true), true);
 assert.equal(matrix.rows.every((row) => row.provider_events_block_realtime === false), true);
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').realtime_axis_surface, 'browser_extension');
+assert.equal(matrix.rows.find((row) => row.platform === 'zoom').realtime_axis_surface, 'native_detector');
+assert.equal(matrix.rows.find((row) => row.platform === 'lark').realtime_axis_surface, 'browser_extension_or_desktop_observer');
 assert.equal(matrix.next_actions.includes('capture_real_provider_events'), true);
 
 const client = {
