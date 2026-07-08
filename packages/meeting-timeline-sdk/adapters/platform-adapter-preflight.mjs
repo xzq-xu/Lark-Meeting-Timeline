@@ -523,17 +523,46 @@ function currentWindowInput(objectInput = {}, capturedSnapshot = {}, options = {
 }
 
 function capturedSnapshotSummary(capturedSnapshot = {}) {
+  const semanticSignals = [
+    ...(capturedSnapshot.semanticSignals ?? []),
+    ...(capturedSnapshot.page?.semanticSignals ?? []),
+    ...(capturedSnapshot.dom?.semanticSignals ?? []),
+  ];
+  const semanticSignalTypes = unique(semanticSignals.map((signal) => signal?.type));
+  const interaction = firstNonEmpty(
+    capturedSnapshot.interaction,
+    capturedSnapshot.page?.interaction,
+    capturedSnapshot.dom?.interaction,
+  );
+  const activeSpeaker = firstNonEmpty(
+    capturedSnapshot.activeSpeaker,
+    capturedSnapshot.active_speaker,
+    interaction?.active_speaker_candidate,
+    capturedSnapshot.page?.activeSpeaker,
+    capturedSnapshot.dom?.activeSpeaker,
+  );
   return {
     source: capturedSnapshot.source,
     observed_at_ms: capturedSnapshot.observedAtMs ?? capturedSnapshot.observed_at_ms,
     url: capturedSnapshot.url,
     title: capturedSnapshot.title,
+    in_meeting: firstNonEmpty(capturedSnapshot.inMeeting, capturedSnapshot.in_meeting, capturedSnapshot.page?.inMeeting, capturedSnapshot.dom?.inMeeting),
     profile: capturedSnapshot.capture?.profile,
     profile_display_name: capturedSnapshot.capture?.profile_display_name,
     control_count: capturedSnapshot.capture?.control_count ?? capturedSnapshot.page?.controls?.length ?? 0,
     participant_count: capturedSnapshot.capture?.participant_count ?? capturedSnapshot.page?.participants?.length ?? 0,
     text_count: capturedSnapshot.capture?.text_count ?? capturedSnapshot.page?.texts?.length ?? 0,
     shadow_root_count: capturedSnapshot.capture?.shadow_root_count,
+    semantic_signal_count: firstNonEmpty(capturedSnapshot.capture?.semantic_signal_count, semanticSignalTypes.length || undefined),
+    semantic_signal_types: semanticSignalTypes.length ? semanticSignalTypes : undefined,
+    interaction,
+    active_speaker_candidate: activeSpeaker ? compactObject({
+      id: activeSpeaker.id,
+      name: activeSpeaker.name ?? activeSpeaker.display_name,
+      display_name: activeSpeaker.display_name ?? activeSpeaker.name,
+      speaking: activeSpeaker.speaking ?? true,
+      audioLevel: activeSpeaker.audioLevel ?? activeSpeaker.audio_level,
+    }) : undefined,
   };
 }
 
@@ -759,6 +788,20 @@ function candidateActivityScore(candidate = {}) {
   ].reduce((sum, value) => sum + value, 0);
 }
 
+function preflightInteractionScore(preflight = {}) {
+  const interaction = preflight.capture?.interaction ?? preflight.current_window?.interaction;
+  const semanticTypes = new Set(preflight.capture?.semantic_signal_types ?? preflight.current_window?.semantic_signal_types ?? []);
+  return [
+    interaction?.in_call === true ? 90 : 0,
+    interaction?.can_leave === true ? 70 : 0,
+    interaction?.active_speaker_candidate ? 55 : 0,
+    interaction?.participant_roster_observed === true ? 20 : 0,
+    semanticTypes.has('meeting_leave_available') ? 35 : 0,
+    semanticTypes.has('active_speaker_candidate') ? 35 : 0,
+    semanticTypes.has('meeting_join_available') && interaction?.in_call !== true ? -30 : 0,
+  ].reduce((sum, value) => sum + value, 0);
+}
+
 function candidatePreflightScore(candidate = {}, preflight = {}) {
   if (!preflight.platform) return -1_000 + candidateActivityScore(candidate);
   return [
@@ -769,6 +812,7 @@ function candidatePreflightScore(candidate = {}, preflight = {}) {
     preflight.current_window?.captured === true ? 120 : 0,
     preflight.readiness?.speaker_track_ready === true ? 70 : 0,
     preflight.readiness?.static_startup_ready === true ? 45 : 0,
+    preflightInteractionScore(preflight),
     20,
     candidateActivityScore(candidate),
   ].reduce((sum, value) => sum + value, 0);
@@ -827,6 +871,12 @@ function candidateRow(candidate = {}, preflight = {}, selected = false, selectio
     meeting_end_ready: preflight.readiness?.meeting_end_ready === true,
     speaker_track_ready: preflight.readiness?.speaker_track_ready === true,
     current_window_captured: preflight.current_window?.captured === true,
+    interaction_in_call: preflight.capture?.interaction?.in_call ?? preflight.current_window?.interaction?.in_call,
+    interaction_can_leave: preflight.capture?.interaction?.can_leave ?? preflight.current_window?.interaction?.can_leave,
+    interaction_pre_join: preflight.capture?.interaction?.pre_join ?? preflight.current_window?.interaction?.pre_join,
+    semantic_signal_types: preflight.capture?.semantic_signal_types ?? preflight.current_window?.semantic_signal_types,
+    active_speaker_candidate_id: preflight.capture?.active_speaker_candidate?.id ?? preflight.current_window?.active_speaker_candidate?.id,
+    active_speaker_candidate_name: preflight.capture?.active_speaker_candidate?.name ?? preflight.current_window?.active_speaker_candidate?.name,
     issue_codes: (preflight.issues ?? []).map((issue) => issue.code),
     first_next_action: preflight.next_actions?.[0],
   });
@@ -881,6 +931,7 @@ export function buildMeetingPlatformAdapterPreflight(input = {}, options = {}) {
 export function buildMeetingPlatformAdapterCurrentWindowPreflight(input = {}, options = {}) {
   const objectInput = normalizeInput(input);
   const capturedSnapshot = captureMeetingAppDomSnapshot(objectInput, currentWindowCaptureOptions(options));
+  const captureSummary = capturedSnapshotSummary(capturedSnapshot);
   const preflight = buildMeetingPlatformAdapterPreflight(
     currentWindowInput(objectInput, capturedSnapshot, options),
     withoutEvidenceOptions(options),
@@ -895,8 +946,19 @@ export function buildMeetingPlatformAdapterCurrentWindowPreflight(input = {}, op
       observed_at_ms: capturedSnapshot.observedAtMs ?? capturedSnapshot.observed_at_ms,
       url: capturedSnapshot.url,
       title: capturedSnapshot.title,
+      in_meeting: captureSummary.in_meeting,
+      interaction: captureSummary.interaction,
+      semantic_signal_types: captureSummary.semantic_signal_types,
+      active_speaker_candidate: captureSummary.active_speaker_candidate,
     },
-    capture: capturedSnapshotSummary(capturedSnapshot),
+    summary: {
+      ...(preflight.summary ?? {}),
+      current_window_in_meeting: captureSummary.in_meeting,
+      current_window_interaction: captureSummary.interaction,
+      current_window_semantic_signal_types: captureSummary.semantic_signal_types,
+      current_window_active_speaker_candidate: captureSummary.active_speaker_candidate,
+    },
+    capture: captureSummary,
     captured_snapshot: options.includeCapturedSnapshot === true || options.include_captured_snapshot === true
       ? capturedSnapshot
       : undefined,

@@ -10,6 +10,7 @@ import type {
 } from './meeting-app-profile.mjs';
 import type {
   MeetingAppDomCaptureInput,
+  MeetingAppDomInteractionState,
   MeetingAppDomCaptureSnapshot,
 } from './meeting-app-capture.mjs';
 
@@ -50,6 +51,49 @@ export interface MeetingPlatformAdapterPreflightReadiness {
   production_lifecycle_ready: boolean;
 }
 
+export interface MeetingPlatformAdapterPreflightActiveSpeakerCandidate {
+  id?: string;
+  name?: string;
+  display_name?: string;
+  speaking?: boolean;
+  audioLevel?: number;
+  [key: string]: unknown;
+}
+
+export interface MeetingPlatformAdapterCurrentWindowSummary {
+  captured?: boolean;
+  capture_schema?: string;
+  capture_source?: string;
+  capture_profile?: string;
+  observed_at_ms?: number;
+  url?: string;
+  title?: string;
+  in_meeting?: boolean;
+  interaction?: MeetingAppDomInteractionState;
+  semantic_signal_types?: string[];
+  active_speaker_candidate?: MeetingPlatformAdapterPreflightActiveSpeakerCandidate;
+  [key: string]: unknown;
+}
+
+export interface MeetingPlatformAdapterPreflightCaptureSummary {
+  source?: string;
+  observed_at_ms?: number;
+  url?: string;
+  title?: string;
+  in_meeting?: boolean;
+  profile?: string;
+  profile_display_name?: string;
+  control_count?: number;
+  participant_count?: number;
+  text_count?: number;
+  shadow_root_count?: number;
+  semantic_signal_count?: number;
+  semantic_signal_types?: string[];
+  interaction?: MeetingAppDomInteractionState;
+  active_speaker_candidate?: MeetingPlatformAdapterPreflightActiveSpeakerCandidate;
+  [key: string]: unknown;
+}
+
 export interface MeetingPlatformAdapterPreflight {
   type: 'meeting_platform_adapter_preflight';
   schema: 'meeting_platform_adapter_preflight';
@@ -65,8 +109,8 @@ export interface MeetingPlatformAdapterPreflight {
   native_diagnosis?: Record<string, unknown>;
   readiness: MeetingPlatformAdapterPreflightReadiness;
   summary?: Record<string, unknown>;
-  current_window?: Record<string, unknown>;
-  capture?: Record<string, unknown>;
+  current_window?: MeetingPlatformAdapterCurrentWindowSummary;
+  capture?: MeetingPlatformAdapterPreflightCaptureSummary;
   captured_snapshot?: MeetingAppDomCaptureSnapshot;
   issues?: Array<Record<string, unknown>>;
   next_actions: string[];

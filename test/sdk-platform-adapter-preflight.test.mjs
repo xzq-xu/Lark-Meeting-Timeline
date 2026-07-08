@@ -162,6 +162,12 @@ assert.equal(googleCurrentWindow.accepted, true);
 assert.equal(googleCurrentWindow.platform, 'google_meet');
 assert.equal(googleCurrentWindow.current_window.capture_profile, 'google_meet');
 assert.equal(googleCurrentWindow.capture.participant_count, 2);
+assert.equal(googleCurrentWindow.capture.interaction.in_call, true);
+assert.equal(googleCurrentWindow.capture.interaction.can_leave, true);
+assert.equal(googleCurrentWindow.capture.active_speaker_candidate.id, 'ada');
+assert.equal(googleCurrentWindow.summary.current_window_interaction.screen_share_active, true);
+assert.equal(googleCurrentWindow.current_window.semantic_signal_types.includes('meeting_leave_available'), true);
+assert.equal(googleCurrentWindow.current_window.semantic_signal_types.includes('active_speaker_candidate'), true);
 assert.equal(googleCurrentWindow.readiness.realtime_annotation_ready, true);
 assert.equal(googleCurrentWindow.captured_snapshot, undefined);
 assert.equal(assertMeetingPlatformAdapterCurrentWindowPreflight({
@@ -394,6 +400,10 @@ assert.equal(candidatePreflight.rows[0].status, 'needs_live_page_evidence');
 assert.equal(candidatePreflight.rows[0].tab_id, 7);
 assert.equal(candidatePreflight.rows[0].window_id, 'chrome-main');
 assert.equal(candidatePreflight.rows[2].current_window_captured, true);
+assert.equal(candidatePreflight.rows[2].interaction_in_call, true);
+assert.equal(candidatePreflight.rows[2].interaction_can_leave, true);
+assert.equal(candidatePreflight.rows[2].semantic_signal_types.includes('participants_control'), true);
+assert.equal(candidatePreflight.rows[2].active_speaker_candidate_name, 'Mira Patel');
 assert.equal(candidatePreflight.rows[2].selected, true);
 assert.equal(candidatePreflight.rows[2].selection_rank, 1);
 assert.equal(candidatePreflight.rows[2].selection_reason, 'accepted_current_window_live_candidate');
@@ -437,6 +447,8 @@ assert.equal(activeCandidatePreflight.selected_platform, 'microsoft_teams');
 assert.equal(activeCandidatePreflight.rows[1].selection_rank, 1);
 assert.equal(activeCandidatePreflight.rows[0].selection_rank, 2);
 assert.equal(activeCandidatePreflight.rows[1].selection_score > activeCandidatePreflight.rows[0].selection_score, true);
+assert.equal(activeCandidatePreflight.rows[1].interaction_can_leave, true);
+assert.equal(activeCandidatePreflight.rows[1].semantic_signal_types.includes('meeting_leave_available'), true);
 
 const nativeCandidatePreflight = buildMeetingPlatformAdapterCandidatePreflight({
   platform: 'zoom',

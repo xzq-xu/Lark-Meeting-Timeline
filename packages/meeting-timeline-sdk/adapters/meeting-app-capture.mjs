@@ -163,7 +163,7 @@ const PLATFORM_INTERACTION_HINTS = Object.freeze({
     screen_share: Object.freeze([/\bpresent now\b/i]),
   }),
   microsoft_teams: Object.freeze({
-    leave: Object.freeze([/\bhang up\b/i]),
+    leave: Object.freeze([/\bleave\b/i, /\bhang up\b/i]),
     screen_share: Object.freeze([/\bshare content\b/i]),
     chat: Object.freeze([/\bshow conversation\b/i]),
   }),
@@ -481,6 +481,19 @@ function labelHasSpeakingHint(value) {
   return undefined;
 }
 
+function cleanParticipantLabel(value) {
+  let text = normalizeText(value);
+  if (!text) return undefined;
+  text = text
+    .replace(/\b(is speaking|speaking|talking|active speaker|muted|microphone off|mic off|camera off|presenting)\b/ig, '')
+    .replace(/\b(you|me)\b/ig, '')
+    .replace(/(正在发言|正在讲话|正在说话|已静音|麦克风已关闭|摄像头已关闭|正在展示|我|本人)/g, '')
+    .replace(/[，,].*$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text || undefined;
+}
+
 function numberish(value) {
   if (value == null || value === '') return undefined;
   const numeric = Number(value);
@@ -698,7 +711,7 @@ function participantSummary(node) {
         'member-name',
         'avatar-tooltip',
       ),
-      label,
+      cleanParticipantLabel(label),
     ),
     ariaLabel: compactText(attr(node, 'aria-label')),
     label,
