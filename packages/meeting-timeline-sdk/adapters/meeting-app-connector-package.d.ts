@@ -32,6 +32,223 @@ export interface MeetingAppTimelineConnectorPackageIssue {
   [key: string]: unknown;
 }
 
+export interface MeetingAppTimelineConnectorAdapterPreflightContract {
+  required: boolean;
+  required_before?: string;
+  url_only_status?: string;
+  accepted_status?: string;
+  selected_surface?: string;
+  evidence_kind?: string;
+  candidate_mode_supported?: boolean;
+  current_window_mode_supported?: boolean;
+  sdk_methods?: string[];
+  bridge_messages?: string[];
+  required_live_inputs?: string[];
+  blocks_realtime_if_missing?: boolean;
+  output_fields?: string[];
+  [key: string]: unknown;
+}
+
+export interface MeetingAppTimelineLocalObserverInputContract {
+  kind?: 'browser_live_dom' | 'native_window_or_process' | 'host_surface_snapshot' | string;
+  required_inputs?: string[];
+  optional_inputs?: string[];
+  capture_profile?: string;
+  selector_groups?: {
+    controls?: string[];
+    participants?: string[];
+    texts?: string[];
+    [key: string]: unknown;
+  };
+  native_fields?: string[];
+  [key: string]: unknown;
+}
+
+export interface MeetingAppTimelineLocalObserverContract {
+  required: boolean;
+  platform?: string;
+  selected_surface?: string;
+  observer_mode?: 'browser_dom_observer' | 'native_window_observer' | 'host_surface_observer' | string;
+  axis?: {
+    start_create_on?: string;
+    end_create_on?: string;
+    end_fallbacks?: string[];
+    provider_reconcile_required_for_realtime?: boolean;
+    [key: string]: unknown;
+  };
+  sampling?: {
+    candidate_scan_interval_ms?: number;
+    active_snapshot_interval_ms?: number;
+    speaker_sample_interval_ms?: number;
+    participant_snapshot_interval_ms?: number;
+    max_snapshot_age_ms_before_insert?: number;
+    [key: string]: unknown;
+  };
+  filters?: {
+    speaker?: Record<string, unknown>;
+    participant?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+  input_contract?: MeetingAppTimelineLocalObserverInputContract;
+  output_events?: string[];
+  realtime_rules?: {
+    timestamp_field?: string;
+    provider_events_block_realtime?: boolean;
+    transcript_blocks_realtime?: boolean;
+    may_insert_before_provider_start_event?: boolean;
+    require_preflight_before_first_insert?: boolean;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+export interface MeetingAppTimelineLocalObserverRuntimeTriggerStep {
+  order?: number;
+  trigger?: string;
+  client_method?: string;
+  client_methods?: string[];
+  sdk_method?: string;
+  message_type?: string;
+  interval_ms?: number;
+  speaker_interval_ms?: number;
+  participant_interval_ms?: number;
+  required_before?: string;
+  required_field?: string;
+  must_precede?: string;
+  [key: string]: unknown;
+}
+
+export interface MeetingAppTimelineLocalObserverRuntimeWiring {
+  required: boolean;
+  platform?: string;
+  selected_surface?: string;
+  runtime_factory?: 'createMeetingAppBrowserRuntime' | 'createMeetingAppTrackRuntime' | string;
+  runtime_host_factory?: 'createMeetingPlatformRuntimeHost' | string;
+  sdk_modules?: string[];
+  client_methods?: {
+    observe_candidates?: string;
+    observe_meeting_app?: string;
+    insert_annotation?: string;
+    speaker_track?: string;
+    participant_track?: string;
+    [key: string]: unknown;
+  };
+  bridge_messages?: {
+    observe_candidates?: string;
+    observe_meeting_app?: string;
+    preflight_current_window?: string;
+    sample_tracks?: string;
+    insert_annotation?: string;
+    [key: string]: unknown;
+  };
+  trigger_order?: MeetingAppTimelineLocalObserverRuntimeTriggerStep[];
+  runtime_guards?: {
+    require_preflight_before_first_insert?: boolean;
+    max_snapshot_age_ms_before_insert?: number;
+    provider_events_block_realtime?: boolean;
+    transcript_blocks_realtime?: boolean;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+export interface MeetingAppTimelineConnectorEvidenceContract {
+  pilot_required?: string[];
+  production_required?: string[];
+  field_evidence_input?: string;
+  evidence_package?: string;
+  adapter_preflight?: MeetingAppTimelineConnectorAdapterPreflightContract;
+  local_observer?: MeetingAppTimelineLocalObserverContract;
+  local_observer_runtime_wiring?: MeetingAppTimelineLocalObserverRuntimeWiring;
+  [key: string]: unknown;
+}
+
+export interface MeetingAppTimelineConnectorHostInstallChecklistRow {
+  platform: string;
+  display_name?: string;
+  selected_surface?: string;
+  install_target?: string;
+  runtime_preset?: string;
+  realtime_startup_ready?: boolean;
+  adapter_blueprint_ready?: boolean;
+  adapter_blueprint_primary_surface?: string;
+  adapter_blueprint_first_acceptance_gate?: string;
+  first_action?: string;
+  observe_action?: string;
+  insert_action?: string;
+  provider_events_block_realtime?: boolean;
+  transcript_blocks_realtime?: boolean;
+  runtime_actions?: string[];
+  client_methods?: Record<string, string | undefined>;
+  required_host_steps?: string[];
+  optional_host_steps?: string[];
+  adapter_preflight?: MeetingAppTimelineConnectorAdapterPreflightContract;
+  local_observer_contract?: MeetingAppTimelineLocalObserverContract;
+  local_observer_runtime_wiring?: MeetingAppTimelineLocalObserverRuntimeWiring;
+  [key: string]: unknown;
+}
+
+export interface MeetingAppTimelineConnectorAdapterMatrixRow {
+  platform: string;
+  display_name?: string;
+  status: string;
+  selected_surface?: string;
+  adapter_mode?: string;
+  install_target?: string;
+  install_step?: string;
+  recommended_first_surface?: string;
+  surface_order?: string[];
+  can_start_axis_before_provider: boolean;
+  can_insert_annotation_on_current_axis: boolean;
+  provider_reconcile_blocks_realtime: boolean;
+  transcript_blocks_realtime: boolean;
+  provider_replay: Record<string, unknown> & {
+    accepted?: boolean;
+    record_count?: number;
+    runtime_event_count?: number;
+    signal_count?: number;
+    signal_types?: string[];
+    coverage?: Record<string, boolean>;
+    required_coverage?: string[];
+    provider_events_block_realtime?: boolean;
+    file?: string;
+    command?: string;
+    sdk_method?: string;
+  };
+  runtime_event_endpoint?: string;
+  timestamp_field?: string;
+  input_sources: Array<Record<string, unknown>>;
+  local_observer_contract?: MeetingAppTimelineLocalObserverContract;
+  local_observer_runtime_wiring?: MeetingAppTimelineLocalObserverRuntimeWiring;
+  runtime_sequence: Array<Record<string, unknown>>;
+  bridge_contract: Record<string, unknown>;
+  sdk_facade_methods: Record<string, string>;
+  evidence_contract: MeetingAppTimelineConnectorEvidenceContract;
+  validation_files: string[];
+  release_missing: string[];
+  missing: string[];
+  next_actions: string[];
+  [key: string]: unknown;
+}
+
+export interface MeetingAppTimelineHostAdapterConfigIndexRow {
+  platform: string;
+  status?: string;
+  selected_surface?: string;
+  adapter_mode?: string;
+  install_target?: string;
+  config_file?: string;
+  accepted: boolean;
+  issue_count: number;
+  provider_replay_accepted?: boolean;
+  can_start_axis_before_provider?: boolean;
+  timestamp_field?: string;
+  local_observer_mode?: string;
+  local_observer_sample_interval_ms?: number;
+  local_observer_runtime_factory?: string;
+  [key: string]: unknown;
+}
+
 export interface MeetingAppTimelineConnectorPackageSurfaceReport {
   surface: string;
   accepted: boolean;
@@ -153,7 +370,7 @@ export interface MeetingAppTimelineConnectorHostInstallChecklist {
   timestamp_field?: string;
   contracts: Record<string, unknown>;
   files_to_read_first: string[];
-  rows: Array<Record<string, unknown>>;
+  rows: MeetingAppTimelineConnectorHostInstallChecklistRow[];
   acceptance: MeetingAppTimelineConnectorPackageAcceptanceReport;
   next_actions: string[];
 }
@@ -173,7 +390,15 @@ export interface MeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport
   checklist_accepted: boolean;
   issue_count: number;
   issues: MeetingAppTimelineConnectorPackageIssue[];
-  rows: Array<Record<string, unknown>>;
+  rows: Array<Record<string, unknown> & {
+    platform: string;
+    accepted?: boolean;
+    adapter_preflight_required?: boolean;
+    adapter_preflight_url_only_status?: string;
+    local_observer_mode?: string;
+    local_observer_timestamp_field?: string;
+    local_observer_runtime_factory?: string;
+  }>;
   next_actions: string[];
 }
 
@@ -246,6 +471,9 @@ export interface MeetingAppTimelineConnectorAdoptionIndex {
     production_evidence_accepted: boolean;
     production_evidence_required: string[];
     runtime_actions: string[];
+    adapter_preflight?: MeetingAppTimelineConnectorAdapterPreflightContract;
+    local_observer_contract?: MeetingAppTimelineLocalObserverContract;
+    local_observer_runtime_wiring?: MeetingAppTimelineLocalObserverRuntimeWiring;
     missing: string[];
     next_actions: string[];
   }>;
@@ -549,45 +777,7 @@ export interface MeetingAppTimelineConnectorAdapterMatrix {
   source_schemas: Record<string, unknown>;
   files_to_read_first: string[];
   runtime_invariants: Record<string, unknown>;
-  rows: Array<Record<string, unknown> & {
-    platform: string;
-    display_name?: string;
-    status: string;
-    selected_surface?: string;
-    adapter_mode?: string;
-    install_target?: string;
-    install_step?: string;
-    recommended_first_surface?: string;
-    surface_order?: string[];
-    can_start_axis_before_provider: boolean;
-    can_insert_annotation_on_current_axis: boolean;
-    provider_reconcile_blocks_realtime: boolean;
-    transcript_blocks_realtime: boolean;
-    provider_replay: Record<string, unknown> & {
-      accepted?: boolean;
-      record_count?: number;
-      runtime_event_count?: number;
-      signal_count?: number;
-      signal_types?: string[];
-      coverage?: Record<string, boolean>;
-      required_coverage?: string[];
-      provider_events_block_realtime?: boolean;
-      file?: string;
-      command?: string;
-      sdk_method?: string;
-    };
-    runtime_event_endpoint?: string;
-    timestamp_field?: string;
-    input_sources: Array<Record<string, unknown>>;
-    runtime_sequence: Array<Record<string, unknown>>;
-    bridge_contract: Record<string, unknown>;
-    sdk_facade_methods: Record<string, string>;
-    evidence_contract: Record<string, unknown>;
-    validation_files: string[];
-    release_missing: string[];
-    missing: string[];
-    next_actions: string[];
-  }>;
+  rows: MeetingAppTimelineConnectorAdapterMatrixRow[];
   issue_count: number;
   issues: string[];
   next_actions: string[];
@@ -640,11 +830,13 @@ export interface MeetingAppTimelineHostAdapterConfig {
     can_insert_annotation_on_current_axis?: boolean;
   };
   input_sources: Array<Record<string, unknown>>;
+  local_observer_contract?: MeetingAppTimelineLocalObserverContract;
+  local_observer_runtime_wiring?: MeetingAppTimelineLocalObserverRuntimeWiring;
   runtime_sequence: Array<Record<string, unknown>>;
   bridge_contract: Record<string, unknown>;
   sdk_facade_methods: Record<string, string>;
   provider_replay: Record<string, unknown>;
-  evidence_contract: Record<string, unknown>;
+  evidence_contract: MeetingAppTimelineConnectorEvidenceContract;
   validation_files: string[];
   issue_count: number;
   issues: MeetingAppTimelineConnectorPackageIssue[];
@@ -663,19 +855,7 @@ export interface MeetingAppTimelineHostAdapterConfigIndex {
   timestamp_field?: string;
   source_matrix_schema?: string;
   files_to_read_first: string[];
-  rows: Array<Record<string, unknown> & {
-    platform: string;
-    status?: string;
-    selected_surface?: string;
-    adapter_mode?: string;
-    install_target?: string;
-    config_file?: string;
-    accepted: boolean;
-    issue_count: number;
-    provider_replay_accepted?: boolean;
-    can_start_axis_before_provider?: boolean;
-    timestamp_field?: string;
-  }>;
+  rows: MeetingAppTimelineHostAdapterConfigIndexRow[];
   configs: Record<string, MeetingAppTimelineHostAdapterConfig>;
   issue_count: number;
   issues: string[];

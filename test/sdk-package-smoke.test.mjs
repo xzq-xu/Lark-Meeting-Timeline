@@ -193,6 +193,18 @@ assert.equal(packedFiles.includes('README.md'), true);
 assert.equal(packedFiles.some((item) => item.startsWith('test/')), false);
 assert.equal(packedFiles.some((item) => item.startsWith('scripts/')), false);
 
+const connectorPackageDts = await readFile(
+  new URL('../packages/meeting-timeline-sdk/adapters/meeting-app-connector-package.d.ts', import.meta.url),
+  'utf8',
+);
+assert.match(connectorPackageDts, /interface MeetingAppTimelineConnectorAdapterPreflightContract/);
+assert.match(connectorPackageDts, /interface MeetingAppTimelineLocalObserverContract/);
+assert.match(connectorPackageDts, /interface MeetingAppTimelineLocalObserverRuntimeWiring/);
+assert.match(connectorPackageDts, /rows: MeetingAppTimelineConnectorHostInstallChecklistRow\[\]/);
+assert.match(connectorPackageDts, /rows: MeetingAppTimelineConnectorAdapterMatrixRow\[\]/);
+assert.match(connectorPackageDts, /local_observer_contract\?: MeetingAppTimelineLocalObserverContract/);
+assert.match(connectorPackageDts, /local_observer_runtime_wiring\?: MeetingAppTimelineLocalObserverRuntimeWiring/);
+
 await writeFile(join(consumerDir, 'package.json'), JSON.stringify({
   type: 'module',
   private: true,
