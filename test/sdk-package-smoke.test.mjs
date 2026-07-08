@@ -1070,8 +1070,10 @@ import {
   buildMeetingAppExtensionBackgroundSource,
   buildMeetingAppExtensionCandidateLaunchPlanMessage,
   buildMeetingAppExtensionCurrentWindowPreflightMessage,
+  buildMeetingAppExtensionOpenSessionMessage,
   buildMeetingAppExtensionOpenCandidateSessionMessage,
   buildMeetingAppExtensionPreflightCandidatesMessage,
+  buildMeetingAppExtensionRuntimeTargetMessage,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-extension';
 import {
   buildMeetingAppFixtureTrackReadinessReport,
@@ -1776,6 +1778,18 @@ assert.equal(buildMeetingAppExtensionCurrentWindowPreflightMessage({
 assert.equal(buildMeetingAppExtensionPreflightCandidatesMessage({
   capturedAtMs: 124,
 }).type, 'meeting_timeline.preflight_candidates');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.runtime_target, 'meeting_timeline.runtime_target');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.open_session, 'meeting_timeline.open_session');
+assert.equal(buildMeetingAppExtensionRuntimeTargetMessage({
+  platform: 'google-meet',
+  url: 'https://meet.google.com/abc-defg-hij',
+  capturedAtMs: 127,
+}).type, 'meeting_timeline.runtime_target');
+assert.equal(buildMeetingAppExtensionOpenSessionMessage({
+  platform: 'zoom',
+  url: 'https://zoom.us/j/987654321',
+  capturedAtMs: 128,
+}).type, 'meeting_timeline.open_session');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan, 'meeting_timeline.candidate_launch_plan');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session, 'meeting_timeline.open_candidate_session');
 assert.equal(buildMeetingAppExtensionCandidateLaunchPlanMessage({

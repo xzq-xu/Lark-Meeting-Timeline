@@ -17,6 +17,8 @@ export const MEETING_APP_EXTENSION_MESSAGE_TYPES = Object.freeze({
   observe_candidates: 'meeting_timeline.observe_candidates',
   preflight_current_window: 'meeting_timeline.preflight_current_window',
   preflight_candidates: 'meeting_timeline.preflight_candidates',
+  runtime_target: 'meeting_timeline.runtime_target',
+  open_session: 'meeting_timeline.open_session',
   candidate_launch_plan: 'meeting_timeline.candidate_launch_plan',
   open_candidate_session: 'meeting_timeline.open_candidate_session',
 });
@@ -84,6 +86,18 @@ const MESSAGE_TYPE_ALIASES = Object.freeze({
   preflight_platform_candidates: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates,
   preflightplatformcandidates: MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates,
   'preflight-platform-candidates': MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates,
+  runtime_target: MEETING_APP_EXTENSION_MESSAGE_TYPES.runtime_target,
+  runtimetarget: MEETING_APP_EXTENSION_MESSAGE_TYPES.runtime_target,
+  'runtime-target': MEETING_APP_EXTENSION_MESSAGE_TYPES.runtime_target,
+  adapter_runtime_target: MEETING_APP_EXTENSION_MESSAGE_TYPES.runtime_target,
+  adapterruntimetarget: MEETING_APP_EXTENSION_MESSAGE_TYPES.runtime_target,
+  'adapter-runtime-target': MEETING_APP_EXTENSION_MESSAGE_TYPES.runtime_target,
+  open_session: MEETING_APP_EXTENSION_MESSAGE_TYPES.open_session,
+  opensession: MEETING_APP_EXTENSION_MESSAGE_TYPES.open_session,
+  'open-session': MEETING_APP_EXTENSION_MESSAGE_TYPES.open_session,
+  open_adapter_session: MEETING_APP_EXTENSION_MESSAGE_TYPES.open_session,
+  openadaptersession: MEETING_APP_EXTENSION_MESSAGE_TYPES.open_session,
+  'open-adapter-session': MEETING_APP_EXTENSION_MESSAGE_TYPES.open_session,
   candidate_launch_plan: MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan,
   candidatelaunchplan: MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan,
   'candidate-launch-plan': MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan,
@@ -420,6 +434,48 @@ export function buildMeetingAppExtensionPreflightCandidatesMessage(input = {}, o
   });
 }
 
+function runtimeSessionOptions(merged = {}) {
+  const runtimeOptions = {
+    ...(plainObject(merged.options) ? merged.options : {}),
+    ...(plainObject(merged.runtimeOptions) ? merged.runtimeOptions : {}),
+    ...(plainObject(merged.runtime_options) ? merged.runtime_options : {}),
+  };
+  return Object.keys(runtimeOptions).length > 0 ? runtimeOptions : undefined;
+}
+
+function buildRuntimeSessionMessage(input = {}, options = {}, defaultType) {
+  const merged = plainObject(input) ? { ...input, ...options } : options;
+  return compactObject({
+    type: normalizeMeetingAppExtensionMessageType(firstNonEmpty(
+      merged.type,
+      merged.messageType,
+      merged.message_type,
+      defaultType,
+    )),
+    request_id: firstNonEmpty(merged.request_id, merged.requestId),
+    captured_at_ms: firstNonEmpty(merged.captured_at_ms, merged.capturedAtMs, Date.now()),
+    platform: optionalPlatform(firstNonEmpty(merged.platform, merged.platform_key, merged.platformKey)),
+    url: firstNonEmpty(merged.url, merged.href, merged.meeting_url, merged.meetingUrl),
+    title: merged.title,
+    active: merged.active,
+    in_meeting: firstNonEmpty(merged.in_meeting, merged.inMeeting),
+    query: firstNonEmpty(merged.query, merged.tabs_query, merged.tabsQuery),
+    tabs: firstNonEmpty(merged.tabs, merged.browser_tabs, merged.browserTabs),
+    windows: firstNonEmpty(merged.windows, merged.browser_windows, merged.browserWindows),
+    candidates: merged.candidates,
+    input: plainObject(merged.input) ? merged.input : undefined,
+    options: runtimeSessionOptions(merged),
+  });
+}
+
+export function buildMeetingAppExtensionRuntimeTargetMessage(input = {}, options = {}) {
+  return buildRuntimeSessionMessage(input, options, 'runtime_target');
+}
+
+export function buildMeetingAppExtensionOpenSessionMessage(input = {}, options = {}) {
+  return buildRuntimeSessionMessage(input, options, 'open_session');
+}
+
 function candidateLaunchOptions(merged = {}) {
   const launchOptions = {
     ...(plainObject(merged.options) ? merged.options : {}),
@@ -591,6 +647,8 @@ export function buildMeetingAppExtensionInstallPlan(options = {}) {
       message_types: { ...MEETING_APP_EXTENSION_MESSAGE_TYPES },
       local_content_script_messages: [
         MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+        MEETING_APP_EXTENSION_MESSAGE_TYPES.runtime_target,
+        MEETING_APP_EXTENSION_MESSAGE_TYPES.open_session,
         MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
         MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates,
         'meeting_timeline.insert_mark',

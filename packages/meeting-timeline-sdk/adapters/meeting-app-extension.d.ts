@@ -12,6 +12,8 @@ export type MeetingAppExtensionMessageType =
   | 'meeting_timeline.observe_candidates'
   | 'meeting_timeline.preflight_current_window'
   | 'meeting_timeline.preflight_candidates'
+  | 'meeting_timeline.runtime_target'
+  | 'meeting_timeline.open_session'
   | 'meeting_timeline.candidate_launch_plan'
   | 'meeting_timeline.open_candidate_session';
 
@@ -193,6 +195,8 @@ export const MEETING_APP_EXTENSION_MESSAGE_TYPES: Readonly<{
   observe_candidates: 'meeting_timeline.observe_candidates';
   preflight_current_window: 'meeting_timeline.preflight_current_window';
   preflight_candidates: 'meeting_timeline.preflight_candidates';
+  runtime_target: 'meeting_timeline.runtime_target';
+  open_session: 'meeting_timeline.open_session';
   candidate_launch_plan: 'meeting_timeline.candidate_launch_plan';
   open_candidate_session: 'meeting_timeline.open_candidate_session';
 }>;
@@ -240,6 +244,42 @@ export function buildMeetingAppExtensionPreflightCandidatesMessage(
     options?: Record<string, unknown>;
     preflightOptions?: Record<string, unknown>;
     preflight_options?: Record<string, unknown>;
+  },
+  options?: MeetingAppExtensionMessageOptions,
+): Record<string, unknown>;
+
+export function buildMeetingAppExtensionRuntimeTargetMessage(
+  input?: MeetingAppExtensionMessageOptions & {
+    query?: Record<string, unknown>;
+    tabs?: Record<string, unknown>[];
+    browser_tabs?: Record<string, unknown>[];
+    browserTabs?: Record<string, unknown>[];
+    windows?: Record<string, unknown>[];
+    browser_windows?: Record<string, unknown>[];
+    browserWindows?: Record<string, unknown>[];
+    candidates?: Record<string, unknown>[];
+    input?: Record<string, unknown>;
+    options?: Record<string, unknown>;
+    runtimeOptions?: Record<string, unknown>;
+    runtime_options?: Record<string, unknown>;
+  },
+  options?: MeetingAppExtensionMessageOptions,
+): Record<string, unknown>;
+
+export function buildMeetingAppExtensionOpenSessionMessage(
+  input?: MeetingAppExtensionMessageOptions & {
+    query?: Record<string, unknown>;
+    tabs?: Record<string, unknown>[];
+    browser_tabs?: Record<string, unknown>[];
+    browserTabs?: Record<string, unknown>[];
+    windows?: Record<string, unknown>[];
+    browser_windows?: Record<string, unknown>[];
+    browserWindows?: Record<string, unknown>[];
+    candidates?: Record<string, unknown>[];
+    input?: Record<string, unknown>;
+    options?: Record<string, unknown>;
+    runtimeOptions?: Record<string, unknown>;
+    runtime_options?: Record<string, unknown>;
   },
   options?: MeetingAppExtensionMessageOptions,
 ): Record<string, unknown>;

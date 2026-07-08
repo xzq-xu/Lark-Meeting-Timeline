@@ -19,9 +19,11 @@ import {
   buildMeetingAppExtensionCandidateLaunchPlanMessage,
   buildMeetingAppExtensionClientCallMessage,
   buildMeetingAppExtensionCurrentWindowPreflightMessage,
+  buildMeetingAppExtensionOpenSessionMessage,
   buildMeetingAppExtensionOpenCandidateSessionMessage,
   buildMeetingAppExtensionObserveCandidatesMessage,
   buildMeetingAppExtensionPreflightCandidatesMessage,
+  buildMeetingAppExtensionRuntimeTargetMessage,
   buildMeetingAppExtensionStatusMessage,
 } from './meeting-app-extension.mjs';
 import {
@@ -120,26 +122,20 @@ function messageExamples(platform, options = {}) {
         active: true,
       }],
     }),
-    runtime_target: {
-      type: MEETING_PLATFORM_RUNTIME_TARGET_MESSAGE_TYPE,
-      request_id: 'runtime-target-001',
-      payload: compactObject({
-        platform: extensionPlatform,
-        url,
-        title: meetingTitle,
-        captured_at_ms: capturedAtMs,
-      }),
-    },
-    open_session: {
-      type: MEETING_PLATFORM_OPEN_SESSION_MESSAGE_TYPE,
-      request_id: 'open-session-001',
-      payload: compactObject({
-        platform: extensionPlatform,
-        url,
-        title: meetingTitle,
-        captured_at_ms: capturedAtMs,
-      }),
-    },
+    runtime_target: buildMeetingAppExtensionRuntimeTargetMessage({
+      requestId: 'runtime-target-001',
+      platform: extensionPlatform,
+      capturedAtMs,
+      url,
+      title: meetingTitle,
+    }),
+    open_session: buildMeetingAppExtensionOpenSessionMessage({
+      requestId: 'open-session-001',
+      platform: extensionPlatform,
+      capturedAtMs,
+      url,
+      title: meetingTitle,
+    }),
     preflight_current_window: buildMeetingAppExtensionCurrentWindowPreflightMessage({
       requestId: 'preflight-001',
       platform: extensionPlatform,

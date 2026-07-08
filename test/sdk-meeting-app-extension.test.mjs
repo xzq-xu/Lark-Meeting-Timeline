@@ -19,9 +19,11 @@ import {
   buildMeetingAppExtensionLiveCaptureSource,
   buildMeetingAppExtensionMatchPatterns,
   buildMeetingAppExtensionObserveCandidatesMessage,
+  buildMeetingAppExtensionOpenSessionMessage,
   buildMeetingAppExtensionOpenCandidateSessionMessage,
   buildMeetingAppExtensionPackageJson,
   buildMeetingAppExtensionPreflightCandidatesMessage,
+  buildMeetingAppExtensionRuntimeTargetMessage,
   buildMeetingAppExtensionScaffold,
   buildMeetingAppExtensionScaffoldAcceptanceReport,
   buildMeetingAppExtensionStatusMessage,
@@ -349,6 +351,8 @@ assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status, 'meeting_time
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates, 'meeting_timeline.observe_candidates');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window, 'meeting_timeline.preflight_current_window');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates, 'meeting_timeline.preflight_candidates');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.runtime_target, 'meeting_timeline.runtime_target');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.open_session, 'meeting_timeline.open_session');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan, 'meeting_timeline.candidate_launch_plan');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session, 'meeting_timeline.open_candidate_session');
 assert.equal(MEETING_APP_EXTENSION_STATUS_STORAGE_KEY, 'meeting_timeline_extension_status');
@@ -359,6 +363,8 @@ assert.equal(normalizeMeetingAppExtensionMessageType('extension-status'), MEETIN
 assert.equal(normalizeMeetingAppExtensionMessageType('observe-platform-candidates'), MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates);
 assert.equal(normalizeMeetingAppExtensionMessageType('current-window-preflight'), MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window);
 assert.equal(normalizeMeetingAppExtensionMessageType('preflight-platform-candidates'), MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates);
+assert.equal(normalizeMeetingAppExtensionMessageType('adapter-runtime-target'), MEETING_APP_EXTENSION_MESSAGE_TYPES.runtime_target);
+assert.equal(normalizeMeetingAppExtensionMessageType('open-adapter-session'), MEETING_APP_EXTENSION_MESSAGE_TYPES.open_session);
 assert.equal(normalizeMeetingAppExtensionMessageType('candidate-launch-plan'), MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan);
 assert.equal(normalizeMeetingAppExtensionMessageType('open-candidates'), MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session);
 assert.equal(meetingAppExtensionTimelineEndpoint('insertMarks'), '/api/annotations/batch');
@@ -423,6 +429,40 @@ assert.deepEqual(preflightCandidatesMessage, {
   captured_at_ms: 126,
   query: { active: false },
   options: { requireSpeakerTrack: true },
+});
+
+const runtimeTargetMessage = buildMeetingAppExtensionRuntimeTargetMessage({
+  requestId: 'runtime-target-001',
+  capturedAtMs: 1265,
+  platform: 'google-meet',
+  href: 'https://meet.google.com/abc-defg-hij',
+  title: 'Google Meet',
+  runtimeOptions: { surface: 'browser-extension' },
+});
+assert.deepEqual(runtimeTargetMessage, {
+  type: MEETING_APP_EXTENSION_MESSAGE_TYPES.runtime_target,
+  request_id: 'runtime-target-001',
+  captured_at_ms: 1265,
+  platform: 'google_meet',
+  url: 'https://meet.google.com/abc-defg-hij',
+  title: 'Google Meet',
+  options: { surface: 'browser-extension' },
+});
+
+const openSessionMessage = buildMeetingAppExtensionOpenSessionMessage({
+  request_id: 'open-session-001',
+  captured_at_ms: 1266,
+  platform: 'zoom',
+  url: 'https://zoom.us/j/987654321',
+  inMeeting: true,
+});
+assert.deepEqual(openSessionMessage, {
+  type: MEETING_APP_EXTENSION_MESSAGE_TYPES.open_session,
+  request_id: 'open-session-001',
+  captured_at_ms: 1266,
+  platform: 'zoom',
+  url: 'https://zoom.us/j/987654321',
+  in_meeting: true,
 });
 
 const candidateLaunchPlanMessage = buildMeetingAppExtensionCandidateLaunchPlanMessage({
@@ -554,6 +594,14 @@ assert.equal(
 );
 assert.equal(
   plan.runtime_contract.local_content_script_messages.includes(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates),
+  true,
+);
+assert.equal(
+  plan.runtime_contract.local_content_script_messages.includes(MEETING_APP_EXTENSION_MESSAGE_TYPES.runtime_target),
+  true,
+);
+assert.equal(
+  plan.runtime_contract.local_content_script_messages.includes(MEETING_APP_EXTENSION_MESSAGE_TYPES.open_session),
   true,
 );
 assert.equal(plan.runtime_contract.status_storage_key, MEETING_APP_EXTENSION_STATUS_STORAGE_KEY);
