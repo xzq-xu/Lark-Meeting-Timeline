@@ -13,6 +13,9 @@ import {
   buildMeetingPlatformSpeakerTrackRuntimeEvent,
 } from './platform-runtime-event.mjs';
 import {
+  buildMeetingPlatformSpeakerTrack,
+} from './platform-speaker-track.mjs';
+import {
   MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
@@ -234,11 +237,11 @@ function inferRawSignalKind(input = {}, options = {}) {
   ));
   if (MEETING_PLATFORM_RAW_SIGNAL_KINDS.includes(explicit)) return explicit;
   if (hasAny(input, ['annotation', 'mark', 'label', 'ink', 'strokes', 'captured_at_ms', 'capturedAtMs'])) return 'annotation';
+  if (hasAny(input, ['snapshot', 'dom', 'url', 'href', 'tab.url', 'window.url', 'browser.url', 'in_meeting', 'inMeeting'])) return 'meeting_app_snapshot';
   if (hasAny(input, ['speaker', 'active_speaker', 'activeSpeaker', 'speaker_signal', 'speakerSignal'])) return 'speaker_track';
   if (hasAny(input, ['participant', 'participants', 'roster', 'participant_signal', 'participantSignal'])) return 'participant_track';
   if (hasAny(input, ['provider_event', 'providerEvent', 'webhook', 'event_type', 'eventType', 'event.event_type', 'payload.event_type'])) return 'provider_event';
   if (hasAny(input, ['windows', 'tabs', 'applications', 'apps', 'candidates', 'items'])) return 'platform_candidates';
-  if (hasAny(input, ['snapshot', 'dom', 'url', 'href', 'tab.url', 'window.url', 'browser.url', 'in_meeting', 'inMeeting'])) return 'meeting_app_snapshot';
   throw new MeetingTimelineSdkError('Cannot infer meeting platform raw signal kind', {
     supported_kinds: MEETING_PLATFORM_RAW_SIGNAL_KINDS,
     input_keys: Object.keys(input ?? {}),
@@ -502,9 +505,87 @@ function rawSignalInputs(input = {}) {
   return explicitBatch == null ? [input] : asArray(explicitBatch);
 }
 
+function shouldFilterActiveSpeakerSamples(options = {}) {
+  return boolOption(options, ['filterActiveSpeakerSamples', 'filter_active_speaker_samples'], false);
+}
+
+function hasActiveSpeakerSample(input = {}) {
+  return firstNonEmpty(
+    input.active_speaker,
+    input.activeSpeaker,
+    input.speaker,
+    input.snapshot?.active_speaker,
+    input.snapshot?.activeSpeaker,
+  ) != null;
+}
+
+function speakerSampleInput(input = {}) {
+  const snapshot = isPlainObject(input.snapshot) ? input.snapshot : {};
+  return compactObject({
+    ...snapshot,
+    ...input,
+    active_speaker: firstNonEmpty(input.active_speaker, input.activeSpeaker, snapshot.active_speaker, snapshot.activeSpeaker, input.speaker),
+    observed_at_ms: firstNonEmpty(input.observed_at_ms, input.observedAtMs, snapshot.observed_at_ms, snapshot.observedAtMs, input.occurred_at_ms, input.occurredAtMs),
+    meeting: firstNonEmpty(input.current_meeting, input.currentMeeting, input.meeting, snapshot.meeting),
+    url: firstNonEmpty(input.url, input.href, snapshot.url, snapshot.href, meetingUrl(input)),
+    title: firstNonEmpty(input.title, snapshot.title, meetingTitle(input)),
+    platform: firstNonEmpty(input.platform, snapshot.platform, platformFromInput(input)),
+  });
+}
+
+function groupSpeakerSamplesByPlatform(inputs = [], options = {}) {
+  const rows = new Map();
+  for (const input of inputs) {
+    const kind = inferRawSignalKind(input, options);
+    if (kind !== 'meeting_app_snapshot' && kind !== 'speaker_track') continue;
+    if (!hasActiveSpeakerSample(input)) continue;
+    const platform = platformFromInput(input, options);
+    if (!platform) continue;
+    const list = rows.get(platform) ?? [];
+    list.push(speakerSampleInput(input));
+    rows.set(platform, list);
+  }
+  return rows;
+}
+
+function filteredSpeakerRuntimeEvents(inputs = [], options = {}) {
+  const events = [];
+  for (const [platform, samples] of groupSpeakerSamplesByPlatform(inputs, options).entries()) {
+    const track = buildMeetingPlatformSpeakerTrack(platform, {
+      samples,
+    }, options);
+    if ((track.signals ?? []).length === 0) continue;
+    const meeting = firstNonEmpty(
+      track.signals.find((signal) => signal.meeting)?.meeting,
+      track.segments?.find?.((segment) => segment.meeting)?.meeting,
+    );
+    events.push(buildMeetingPlatformSpeakerTrackRuntimeEvent(platform, {
+      current_meeting: meeting,
+      signals: track.signals,
+      speaker_track: track,
+      filter_policy: track.filter_policy,
+      diagnostics: track.diagnostics,
+    }, {
+      ...options,
+      source: firstNonEmpty(options.source, options.detectorSource, options.detector_source, 'filtered_active_speaker_observer'),
+      sent_at_ms: track.signals[0]?.occurred_at_ms,
+    }));
+  }
+  return events;
+}
+
 export function buildMeetingPlatformRawSignalBatch(input = {}, options = {}) {
-  const signals = rawSignalInputs(input).map((signal) => buildMeetingPlatformRawSignal(signal, options));
-  const runtimeEvents = signals.flatMap((signal) => signal.runtime_events ?? []);
+  const inputs = rawSignalInputs(input);
+  const filterSpeakers = shouldFilterActiveSpeakerSamples(options);
+  const signalOptions = filterSpeakers
+    ? { ...options, deriveSpeakerTrack: false, derive_speaker_track: false }
+    : options;
+  const signals = inputs.map((signal) => buildMeetingPlatformRawSignal(signal, signalOptions));
+  const filteredSpeakerEvents = filterSpeakers ? filteredSpeakerRuntimeEvents(inputs, options) : [];
+  const runtimeEvents = [
+    ...signals.flatMap((signal) => signal.runtime_events ?? []),
+    ...filteredSpeakerEvents,
+  ];
   const rows = signals.map((signal) => ({
     kind: signal.kind,
     platform: signal.platform,
@@ -518,6 +599,7 @@ export function buildMeetingPlatformRawSignalBatch(input = {}, options = {}) {
     schema_version: MEETING_PLATFORM_RAW_SIGNAL_SCHEMA_VERSION,
     signal_count: signals.length,
     runtime_event_count: runtimeEvents.length,
+    filtered_speaker_event_count: filteredSpeakerEvents.length,
     platforms: unique(signals.map((signal) => signal.platform)),
     kinds: unique(signals.map((signal) => signal.kind)),
     rows,

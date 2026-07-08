@@ -34,6 +34,17 @@ assert.equal(googleSnapshot.runtime_events[0].snapshot.url, 'https://meet.google
 assert.equal(googleSnapshot.runtime_events[1].action, 'speaker_track');
 assert.equal(googleSnapshot.runtime_events[1].signals[0].speaker.display_name, 'Alex');
 
+const inferredSnapshot = buildMeetingPlatformRawSignal({
+  url: 'https://meet.google.com/abc-defg-hij',
+  observed_at_ms: baseMs,
+  active_speaker: {
+    id: 'alex',
+    display_name: 'Alex',
+  },
+});
+assert.equal(inferredSnapshot.kind, 'meeting_app_snapshot');
+assert.equal(inferredSnapshot.runtime_events[0].action, 'observe_meeting_app');
+
 const zoomCandidates = buildMeetingPlatformRawSignal({
   kind: 'platform_candidates',
   observed_at_ms: baseMs + 1_000,
@@ -106,6 +117,58 @@ assert.equal(batch.signal_count, 3);
 assert.equal(batch.runtime_event_count, 3);
 assert.deepEqual(batch.kinds, ['meeting_app_snapshot', 'speaker_track', 'annotation']);
 assert.equal(batch.runtime_events.map((event) => event.action).join(','), 'observe_meeting_app,speaker_track,insert_annotation');
+
+const filteredSpeakerBatch = buildMeetingPlatformRawSignalBatch([
+  {
+    kind: 'meeting_app_snapshot',
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Weekly sync',
+    observed_at_ms: baseMs,
+    active_speaker: { id: 'alex', display_name: 'Alex' },
+  },
+  {
+    kind: 'meeting_app_snapshot',
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Weekly sync',
+    observed_at_ms: baseMs + 200,
+    active_speaker: { id: 'alex', display_name: 'Alex' },
+  },
+  {
+    kind: 'meeting_app_snapshot',
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Weekly sync',
+    observed_at_ms: baseMs + 700,
+    active_speaker: { id: 'alex', display_name: 'Alex' },
+  },
+], {
+  filterActiveSpeakerSamples: true,
+  minStableMs: 500,
+});
+assert.equal(filteredSpeakerBatch.signal_count, 3);
+assert.equal(filteredSpeakerBatch.filtered_speaker_event_count, 1);
+assert.equal(filteredSpeakerBatch.runtime_event_count, 4);
+assert.equal(filteredSpeakerBatch.runtime_events.filter((event) => event.action === 'speaker_track').length, 1);
+assert.equal(filteredSpeakerBatch.runtime_events.find((event) => event.action === 'speaker_track').signals[0].speaker_name, 'Alex');
+
+const filteredFlickerBatch = buildMeetingPlatformRawSignalBatch([
+  {
+    kind: 'meeting_app_snapshot',
+    url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+    observed_at_ms: baseMs,
+    active_speaker: { id: 'alex', display_name: 'Alex' },
+  },
+  {
+    kind: 'meeting_app_snapshot',
+    url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+    observed_at_ms: baseMs + 100,
+    active_speaker: { id: 'morgan', display_name: 'Morgan' },
+  },
+], {
+  filterActiveSpeakerSamples: true,
+  minStableMs: 500,
+});
+assert.equal(filteredFlickerBatch.filtered_speaker_event_count, 0);
+assert.equal(filteredFlickerBatch.runtime_events.some((event) => event.action === 'speaker_track'), false);
 
 const examples = buildMeetingPlatformRawSignalExampleBatch({
   platforms: ['google-meet', 'teams', 'zoom'],

@@ -25,6 +25,14 @@ export interface MeetingPlatformRawSignalOptions extends MeetingPlatformRuntimeE
   source?: string;
   deriveSpeakerTrack?: boolean;
   derive_speaker_track?: boolean;
+  filterActiveSpeakerSamples?: boolean;
+  filter_active_speaker_samples?: boolean;
+  minStableMs?: number;
+  min_stable_ms?: number;
+  switchStableMs?: number;
+  switch_stable_ms?: number;
+  endIdleMs?: number;
+  end_idle_ms?: number;
   sample_at_ms?: number | string | Date;
   sampleAtMs?: number | string | Date;
   platforms?: string[];
@@ -96,6 +104,7 @@ export interface MeetingPlatformRawSignalBatch {
   schema_version: typeof MEETING_PLATFORM_RAW_SIGNAL_SCHEMA_VERSION;
   signal_count: number;
   runtime_event_count: number;
+  filtered_speaker_event_count?: number;
   platform_count?: number;
   platforms: string[];
   kinds: string[];
