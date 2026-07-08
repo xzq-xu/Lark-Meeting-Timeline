@@ -7,6 +7,8 @@ import type { MeetingPlatformRuntimeEventPlan } from './platform-runtime-event.m
 export const MEETING_PLATFORM_RUNTIME_BUNDLE_SCHEMA: 'meeting_platform_runtime_bundle';
 export const MEETING_PLATFORM_RUNTIME_BUNDLE_MATRIX_SCHEMA: 'meeting_platform_runtime_bundle_matrix';
 export const MEETING_PLATFORM_RUNTIME_BUNDLE_SCHEMA_VERSION: 1;
+export const MEETING_PLATFORM_RUNTIME_TARGET_MESSAGE_TYPE: 'meeting_timeline.runtime_target';
+export const MEETING_PLATFORM_OPEN_SESSION_MESSAGE_TYPE: 'meeting_timeline.open_session';
 
 export interface MeetingPlatformRuntimeBundleOptions extends MeetingPlatformAdaptationPackageOptions {
   bundleId?: string;
@@ -87,6 +89,7 @@ export interface MeetingPlatformRuntimeBundle {
     message_types: Record<string, string>;
     bridge_message_types?: string[];
     lightweight_connector_message_types?: string[];
+    background_message_types?: string[];
     accepted_methods: string[];
     runtime_event?: {
       schema: string;
@@ -95,6 +98,17 @@ export interface MeetingPlatformRuntimeBundle {
       client_factory: string;
       plan_schema?: string;
       plan?: MeetingPlatformRuntimeEventPlan;
+    };
+    runtime_bridge_bootstrap?: {
+      bridge_factory: string;
+      runner_factory: string;
+      runtime_manifest_source: string;
+      target_message_type: string;
+      open_session_message_type: string;
+      insert_message_type: string;
+      timestamp_field: string;
+      session_plan_kind: string;
+      target_fields: string[];
     };
     examples: Record<string, unknown>;
   };
@@ -137,6 +151,8 @@ export interface MeetingPlatformRuntimeBundleMatrix {
   provider_non_blocking_route_count?: number;
   transcript_non_blocking_route_count?: number;
   candidate_observer_count: number;
+  runtime_target_message_count?: number;
+  runtime_open_session_message_count?: number;
   provider_required_for_realtime_count: number;
   transcript_blocking_count: number;
   platforms: string[];

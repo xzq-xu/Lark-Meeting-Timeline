@@ -39,6 +39,8 @@ import {
 export const MEETING_PLATFORM_RUNTIME_BUNDLE_SCHEMA = 'meeting_platform_runtime_bundle';
 export const MEETING_PLATFORM_RUNTIME_BUNDLE_MATRIX_SCHEMA = 'meeting_platform_runtime_bundle_matrix';
 export const MEETING_PLATFORM_RUNTIME_BUNDLE_SCHEMA_VERSION = 1;
+export const MEETING_PLATFORM_RUNTIME_TARGET_MESSAGE_TYPE = 'meeting_timeline.runtime_target';
+export const MEETING_PLATFORM_OPEN_SESSION_MESSAGE_TYPE = 'meeting_timeline.open_session';
 
 const DEFAULT_RUNTIME_BUNDLE_PLATFORMS = Object.freeze([
   'lark',
@@ -96,6 +98,7 @@ function messageExamples(platform, options = {}) {
   const capturedAtMs = firstNonEmpty(options.capturedAtMs, options.captured_at_ms, 1_782_614_400_000);
   const url = firstNonEmpty(options.url, options.href, options.meeting_url, options.meetingUrl);
   const extensionPlatform = platform === 'local_detector' ? undefined : platform;
+  const meetingTitle = `${extensionPlatform ?? 'local'} meeting`;
   return {
     attached: buildMeetingAppExtensionAttachedMessage({
       platform: extensionPlatform,
@@ -113,10 +116,30 @@ function messageExamples(platform, options = {}) {
       capturedAtMs,
       tabs: [{
         url,
-        title: `${extensionPlatform ?? 'local'} meeting`,
+        title: meetingTitle,
         active: true,
       }],
     }),
+    runtime_target: {
+      type: MEETING_PLATFORM_RUNTIME_TARGET_MESSAGE_TYPE,
+      request_id: 'runtime-target-001',
+      payload: compactObject({
+        platform: extensionPlatform,
+        url,
+        title: meetingTitle,
+        captured_at_ms: capturedAtMs,
+      }),
+    },
+    open_session: {
+      type: MEETING_PLATFORM_OPEN_SESSION_MESSAGE_TYPE,
+      request_id: 'open-session-001',
+      payload: compactObject({
+        platform: extensionPlatform,
+        url,
+        title: meetingTitle,
+        captured_at_ms: capturedAtMs,
+      }),
+    },
     preflight_current_window: buildMeetingAppExtensionCurrentWindowPreflightMessage({
       requestId: 'preflight-001',
       platform: extensionPlatform,
@@ -139,7 +162,7 @@ function messageExamples(platform, options = {}) {
       capturedAtMs,
       tabs: [{
         url,
-        title: `${extensionPlatform ?? 'local'} meeting`,
+        title: meetingTitle,
         active: true,
       }],
       options: {
@@ -151,7 +174,7 @@ function messageExamples(platform, options = {}) {
       capturedAtMs,
       tabs: [{
         url,
-        title: `${extensionPlatform ?? 'local'} meeting`,
+        title: meetingTitle,
         active: true,
       }],
       options: {
@@ -398,6 +421,8 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
       bridge_message_types: [
         'meeting_timeline.sample',
         MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
+        MEETING_PLATFORM_RUNTIME_TARGET_MESSAGE_TYPE,
+        MEETING_PLATFORM_OPEN_SESSION_MESSAGE_TYPE,
         MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan,
         MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session,
         'meeting_timeline.insert_mark',
@@ -415,6 +440,8 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
       ],
       background_message_types: [
         MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates,
+        MEETING_PLATFORM_RUNTIME_TARGET_MESSAGE_TYPE,
+        MEETING_PLATFORM_OPEN_SESSION_MESSAGE_TYPE,
         MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window,
         MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates,
       ],
@@ -427,6 +454,17 @@ export function buildMeetingPlatformRuntimeBundle(platform, options = {}) {
         client_factory: 'createMeetingPlatformRuntimeEventClient',
         plan_schema: runtimeEventPlan.schema,
         plan: runtimeEventPlan,
+      },
+      runtime_bridge_bootstrap: {
+        bridge_factory: 'createMeetingPlatformAdapterMessageBridge',
+        runner_factory: 'createMeetingPlatformAdapterRunner',
+        runtime_manifest_source: 'sdk.platformAdapterRuntimeManifest({ platforms })',
+        target_message_type: MEETING_PLATFORM_RUNTIME_TARGET_MESSAGE_TYPE,
+        open_session_message_type: MEETING_PLATFORM_OPEN_SESSION_MESSAGE_TYPE,
+        insert_message_type: 'meeting_timeline.insert_mark',
+        timestamp_field: 'captured_at_ms',
+        session_plan_kind: 'runtime_target',
+        target_fields: ['platform', 'selected_surface', 'host_kind', 'bridge_kind', 'runtime_actions'],
       },
       examples: messages,
     },
@@ -484,6 +522,8 @@ export function buildMeetingPlatformRuntimeBundleMatrix(options = {}) {
     provider_non_blocking_route_count: bundles.filter((bundle) => bundle.adapter_route?.realtime_invariants?.provider_events_block_realtime === false).length,
     transcript_non_blocking_route_count: bundles.filter((bundle) => bundle.adapter_route?.realtime_invariants?.transcript_blocks_realtime === false).length,
     candidate_observer_count: bundles.filter((bundle) => bundle.messaging?.candidate_observation?.runtime_event_action === 'observe_platform_candidates').length,
+    runtime_target_message_count: bundles.filter((bundle) => bundle.messaging?.bridge_message_types?.includes(MEETING_PLATFORM_RUNTIME_TARGET_MESSAGE_TYPE)).length,
+    runtime_open_session_message_count: bundles.filter((bundle) => bundle.messaging?.bridge_message_types?.includes(MEETING_PLATFORM_OPEN_SESSION_MESSAGE_TYPE)).length,
     provider_required_for_realtime_count: bundles.filter((bundle) => bundle.readiness.provider_required_for_realtime).length,
     transcript_blocking_count: bundles.filter((bundle) => bundle.readiness.transcript_blocks_realtime).length,
     platforms: bundles.map((bundle) => bundle.platform),
@@ -499,6 +539,9 @@ export function buildMeetingPlatformRuntimeBundleMatrix(options = {}) {
       adapter_route_count: bundle.adapter_route?.route_count,
       candidate_observation_ready: bundle.messaging?.candidate_observation?.runtime_event_action === 'observe_platform_candidates',
       candidate_observer_message_type: bundle.messaging?.candidate_observation?.message_type,
+      runtime_target_message_type: bundle.messaging?.runtime_bridge_bootstrap?.target_message_type,
+      runtime_open_session_message_type: bundle.messaging?.runtime_bridge_bootstrap?.open_session_message_type,
+      runtime_bridge_factory: bundle.messaging?.runtime_bridge_bootstrap?.bridge_factory,
       candidate_observer_permission: bundle.messaging?.candidate_observation?.required_permission,
       observer_plan_ready: bundle.readiness.observer_plan_ready === true,
       observer_preflight_status: bundle.readiness.observer_preflight_status,

@@ -265,8 +265,10 @@ assert.equal(sdk.assertConsumerHandoff().accepted, true);
 const runtimeBundle = sdk.platformRuntimeBundle('google-meet');
 assert.equal(runtimeBundle.schema, 'meeting_platform_runtime_bundle');
 assert.equal(runtimeBundle.runtime.lightweight_connector_bridge.install_function, 'installMeetingPlatformConnectorContentScriptBridge');
+assert.equal(runtimeBundle.messaging.runtime_bridge_bootstrap.target_message_type, 'meeting_timeline.runtime_target');
 assert.equal(sdk.runtimeBundle('zoom').platform, 'zoom');
 assert.equal(sdk.platformRuntimeBundleMatrix().platform_count, 2);
+assert.equal(sdk.platformRuntimeBundleMatrix().runtime_target_message_count, 2);
 assert.equal(sdk.runtimeBundleMatrix().lightweight_connector_ready_count, 2);
 
 const adapterRoute = sdk.platformAdapterRoute('google-meet');

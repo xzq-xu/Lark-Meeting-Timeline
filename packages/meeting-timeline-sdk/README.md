@@ -1224,6 +1224,7 @@ const runtimeMatrix = buildMeetingPlatformRuntimeBundleMatrix({
   platforms: ['google-meet', 'teams', 'zoom', 'webex', 'lark'],
 });
 // runtimeMatrix.rows[*].candidate_observation_ready 可直接用于下游适配看板。
+// runtimeMatrix.runtime_target_message_count === runtimeMatrix.platform_count 时，说明每个平台的 bundle 都带 meeting_timeline.runtime_target / open_session 消息启动样例。
 ```
 
 `platform-kit` 同样暴露 `kit.platformRuntimeBundle('google-meet')` 和 `kit.platformRuntimeBundleMatrix()`。CLI 可批量导出每个平台的 runtime bundle：
