@@ -43,6 +43,7 @@ assert.equal(plan.endpoints.consumer_handoff, '/api/meeting-platform/consumer-ha
 assert.equal(plan.endpoints.observer_plans, '/api/meeting-platform/observer-plans');
 assert.equal(plan.endpoints.runtime_event_plans, '/api/meeting-platform/runtime-event-plans');
 assert.equal(plan.endpoints.adapter_routes, '/api/meeting-platform/adapter-routes');
+assert.equal(plan.endpoints.adapter_selections, '/api/meeting-platform/adapter-selections');
 assert.equal(plan.endpoints.adapter_blueprints, '/api/meeting-platform/adapter-blueprints');
 assert.equal(plan.endpoints.adapter_startup, '/api/meeting-platform/adapter-startup');
 assert.equal(plan.endpoints.adapter_preflight, '/api/meeting-platform/adapter-preflight');
@@ -60,11 +61,13 @@ assert.equal(plan.commands.validate_integration_runtime_manifest, 'npm run meeti
 assert.equal(plan.commands.validate_handoff_readiness, 'npm run meeting-platform:handoff-readiness');
 assert.equal(plan.commands.validate_platform_conformance, 'npm run meeting-platform:conformance');
 assert.equal(plan.commands.export_consumer_handoff, 'npm run meeting-platform:consumer-handoff');
+assert.equal(plan.commands.export_adapter_selections, 'npm run meeting-platform:adapter-selections');
 assert.equal(plan.commands.export_adapter_startup, 'npm run meeting-platform:adapter-startup');
 assert.equal(plan.commands.run_adapter_preflight, 'npm run meeting-platform:adapter-preflight');
 assert.equal(plan.sdk.runtime_event_module, '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event');
 assert.equal(plan.sdk.platform_conformance_module, '@ai-annotation/meeting-timeline-sdk/adapters/platform-conformance');
 assert.equal(plan.sdk.consumer_handoff_module, '@ai-annotation/meeting-timeline-sdk/adapters/platform-consumer-handoff');
+assert.equal(plan.sdk.adapter_selection_module, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-selection');
 assert.equal(plan.sdk.adapter_startup_module, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-startup');
 assert.equal(plan.sdk.adapter_preflight_module, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight');
 assert.equal(plan.handoff_bundle.platform_count, 3);
@@ -105,6 +108,11 @@ assert.equal(plan.runtime_event_plan_matrix.realtime_provider_dependency_count, 
 assert.equal(plan.runtime_event_plan_matrix.transcript_realtime_dependency_count, 0);
 assert.equal(plan.adapter_route_matrix.platform_count, 3);
 assert.equal(plan.adapter_route_matrix.rows.every((row) => row.first_route === 'local_observer_axis'), true);
+assert.equal(plan.adapter_selection_matrix.platform_count, 3);
+assert.equal(plan.adapter_selection_matrix.selection_ready_count, 3);
+assert.equal(plan.adapter_selection_matrix.pilot_evidence_ready_count, 0);
+assert.equal(plan.adapter_selection_matrix.rows.find((row) => row.platform === 'google_meet').axis_surface, 'browser_extension');
+assert.equal(plan.adapter_selection_matrix.rows.find((row) => row.platform === 'zoom').axis_surface, 'native_detector');
 assert.equal(plan.adapter_blueprint_matrix.platform_count, 3);
 assert.equal(plan.adapter_blueprint_matrix.ready_count, 3);
 assert.equal(plan.adapter_blueprint_matrix.rows.find((row) => row.platform === 'google_meet').primary_surface, 'browser_extension');
@@ -136,7 +144,9 @@ assert.equal(plan.next_actions.includes('export_meeting_platform_consumer_handof
 assert.equal(plan.next_actions.includes('wire_host_routes_to_handleMeetingPlatformRequest'), true);
 assert.equal(plan.next_actions.includes('wire_observer_plans_to_host_scheduler'), true);
 assert.equal(plan.next_actions.includes('publish_adapter_blueprints_endpoint_for_downstream_hosts'), true);
+assert.equal(plan.next_actions.includes('publish_adapter_selections_endpoint_for_downstream_hosts'), true);
 assert.equal(plan.next_actions.includes('publish_adapter_startup_plan_endpoint_for_downstream_hosts'), true);
+assert.equal(plan.next_actions.includes('select_adapter_path_before_runtime_surface_install'), true);
 assert.equal(plan.next_actions.includes('generate_adapter_startup_plan_before_runtime_surface_install'), true);
 assert.equal(plan.next_actions.includes('run_adapter_preflight_with_live_window_evidence_before_realtime_marks'), true);
 assert.equal(plan.next_actions.includes('wire_platform_adapter_runtime_entries_into_host_surface'), true);
@@ -150,7 +160,7 @@ const scaffold = buildMeetingPlatformHostIntegrationScaffold({
 });
 
 assert.equal(scaffold.schema, MEETING_PLATFORM_HOST_INTEGRATION_SCAFFOLD_SCHEMA);
-assert.equal(scaffold.files.length, 32);
+assert.equal(scaffold.files.length, 33);
 assert.equal(file(scaffold, 'package.json').mime, 'application/json');
 const manifest = JSON.parse(file(scaffold, 'package.json').content);
 assert.equal(manifest.name, 'timeline-host-consumer');
@@ -163,6 +173,7 @@ assert.equal(manifest.scripts['meeting-platform:runtime-bundles'], 'node ./scrip
 assert.equal(manifest.scripts['meeting-platform:observer-plans'], 'node ./scripts/print-observer-plans.mjs');
 assert.equal(manifest.scripts['meeting-platform:runtime-event-plans'], 'node ./scripts/print-runtime-event-plans.mjs');
 assert.equal(manifest.scripts['meeting-platform:adapter-routes'], 'node ./scripts/print-adapter-routes.mjs');
+assert.equal(manifest.scripts['meeting-platform:adapter-selections'], 'node ./scripts/print-adapter-selections.mjs');
 assert.equal(manifest.scripts['meeting-platform:adapter-blueprints'], 'node ./scripts/print-adapter-blueprints.mjs');
 assert.equal(manifest.scripts['meeting-platform:adapter-startup'], 'node ./scripts/print-adapter-startup.mjs');
 assert.equal(manifest.scripts['meeting-platform:adapter-preflight'], 'node ./scripts/print-adapter-preflight.mjs');
@@ -192,6 +203,8 @@ assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('m
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformRuntimeEventPlanMatrix'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformAdapterRouteMatrix'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('adapterRoutes'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformAdapterSelectionMatrix'), true);
+assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('adapterSelections'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformAdapterBlueprintMatrix'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('adapterBlueprints'), true);
 assert.equal(file(scaffold, 'src/meeting-platform-host.mjs').content.includes('platformAdapterStartupPlanMatrix'), true);
@@ -225,6 +238,7 @@ assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meetin
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/observer-plans'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/runtime-event-plans'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/adapter-routes'), true);
+assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/adapter-selections'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/adapter-blueprints'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/adapter-startup'), true);
 assert.equal(file(scaffold, 'src/http-routes.mjs').content.includes('/api/meeting-platform/adapter-preflight'), true);
@@ -247,6 +261,8 @@ assert.equal(file(scaffold, 'scripts/print-runtime-bundles.mjs').content.include
 assert.equal(file(scaffold, 'scripts/print-observer-plans.mjs').content.includes('host.observerPlans()'), true);
 assert.equal(file(scaffold, 'scripts/print-runtime-event-plans.mjs').content.includes('host.runtimeEventPlans()'), true);
 assert.equal(file(scaffold, 'scripts/print-adapter-routes.mjs').content.includes('host.adapterRoutes()'), true);
+assert.equal(file(scaffold, 'scripts/print-adapter-selections.mjs').content.includes('host.adapterSelections(input)'), true);
+assert.equal(file(scaffold, 'scripts/print-adapter-selections.mjs').content.includes('MEETING_PLATFORM_SELECTION_INPUT_JSON'), true);
 assert.equal(file(scaffold, 'scripts/print-adapter-blueprints.mjs').content.includes('host.adapterBlueprints()'), true);
 assert.equal(file(scaffold, 'scripts/print-adapter-startup.mjs').content.includes('host.adapterStartupPlans'), true);
 assert.equal(file(scaffold, 'scripts/print-adapter-startup.mjs').content.includes('MEETING_PLATFORM_STARTUP_INPUT_JSON'), true);
@@ -272,6 +288,8 @@ assert.equal(file(scaffold, 'README.md').content.includes('captured_at_ms'), tru
 assert.equal(file(scaffold, 'README.md').content.includes('adaptationStrategyMatrix'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('runtimeEventPlans'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('adapterRoutes'), true);
+assert.equal(file(scaffold, 'README.md').content.includes('adapterSelections'), true);
+assert.equal(file(scaffold, 'README.md').content.includes('Adapter selections'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('adapterBlueprints'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('Adapter blueprints'), true);
 assert.equal(file(scaffold, 'README.md').content.includes('adapterStartupPlans'), true);
@@ -305,6 +323,10 @@ assert.equal(acceptance.candidate_observation_ready, true);
 assert.equal(acceptance.adapter_blueprint_ready, true);
 assert.equal(acceptance.adapter_blueprint_ready_count, 3);
 assert.equal(acceptance.adapter_blueprint_matrix.rows.find((row) => row.platform === 'google_meet').primary_surface, 'browser_extension');
+assert.equal(acceptance.adapter_selection_ready, true);
+assert.equal(acceptance.adapter_selection_ready_count, 3);
+assert.equal(acceptance.adapter_selection_pilot_evidence_ready_count, 0);
+assert.equal(acceptance.adapter_selection_matrix.rows.find((row) => row.platform === 'zoom').axis_surface, 'native_detector');
 assert.equal(acceptance.adapter_startup_ready, true);
 assert.equal(acceptance.adapter_startup_ready_count, 3);
 assert.equal(acceptance.adapter_startup_plan_matrix.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
@@ -339,6 +361,7 @@ assert.equal(acceptance.required_files.includes('scripts/print-runtime-bundles.m
 assert.equal(acceptance.required_files.includes('scripts/print-observer-plans.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-runtime-event-plans.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-adapter-routes.mjs'), true);
+assert.equal(acceptance.required_files.includes('scripts/print-adapter-selections.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-adapter-startup.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-adapter-preflight.mjs'), true);
 assert.equal(acceptance.required_files.includes('scripts/print-platform-adapters.mjs'), true);

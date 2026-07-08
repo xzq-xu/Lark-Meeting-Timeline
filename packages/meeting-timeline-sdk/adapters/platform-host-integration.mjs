@@ -32,6 +32,9 @@ import {
   buildMeetingPlatformAdapterRouteMatrix,
 } from './platform-adapter-route.mjs';
 import {
+  buildMeetingPlatformAdapterSelectionMatrix,
+} from './platform-adapter-selection.mjs';
+import {
   buildMeetingPlatformAdapterBlueprintMatrix,
 } from './platform-adapter-blueprint.mjs';
 import {
@@ -281,6 +284,12 @@ export function createMeetingPlatformHost(options = {}) {
         platforms: routeOptions.platforms ?? routeOptions.platform_keys ?? platforms,
       });
     },
+    adapterSelections(input = {}, selectionOptions = {}) {
+      return kit.platformAdapterSelectionMatrix(input, {
+        ...selectionOptions,
+        platforms: selectionOptions.platforms ?? selectionOptions.platform_keys ?? input.platforms ?? input.platform_keys ?? platforms,
+      });
+    },
     adapterBlueprints(blueprintOptions = {}) {
       return kit.platformAdapterBlueprintMatrix({
         ...blueprintOptions,
@@ -470,6 +479,11 @@ function routesSource(options = {}) {
   if (url.pathname === '/api/meeting-platform/adapter-routes') {
     return Response.json(host.adapterRoutes(options));
   }
+  if (url.pathname === '/api/meeting-platform/adapter-selections') {
+    const payload = request.method === 'POST' ? await request.json() : Object.fromEntries(url.searchParams.entries());
+    const input = payload.input ?? payload;
+    return Response.json(host.adapterSelections(input, options));
+  }
   if (url.pathname === '/api/meeting-platform/adapter-blueprints') {
     return Response.json(host.adapterBlueprints(options));
   }
@@ -648,6 +662,7 @@ function readmeSource(plan = {}) {
   const candidateRows = plan.candidate_observation_contract?.rows ?? [];
   const trackRows = plan.meeting_track_contract?.rows ?? [];
   const adapterRows = plan.adapter_runtime_contract?.rows ?? [];
+  const selectionRows = plan.adapter_selection_matrix?.rows ?? [];
   const startupRows = plan.adapter_startup_plan_matrix?.rows ?? [];
   const preflightRows = plan.adapter_preflight_matrix?.rows ?? [];
   return `# Meeting Platform Timeline Host
@@ -664,6 +679,7 @@ Runtime rule:
 - Candidate observation is a required host-axis binding contract: browser extensions or native hosts send active meeting windows through meeting_timeline.observe_candidates or /api/meeting-platform/observe-candidates before realtime marks are inserted.
 - Observer plans standardize the local DOM/AX observation loop, throttling, speaker follow-up, and meeting-end grace windows for each meeting app surface.
 - Adapter routes describe each platform's implementation path: local observer realtime axis first, provider reconciliation second, transcript/artifact import last.
+- Adapter selections choose the concrete realtime axis, annotation insertion, speaker marker, provider reconcile, and artifact import path before host runtime surfaces are launched.
 - Adapter blueprints expose the concrete browser/native/provider/artifact surface contract each host must wire for Google Meet, Teams, Zoom, Webex, Lark, and local detector.
 - Adapter startup plans tell the host which browser/native/webview surface to launch first and which observe/insert actions to call before realtime marks are accepted.
 - Adapter preflight validates current live DOM/native evidence before the host lets realtime annotations bind to a meeting axis.
@@ -710,6 +726,16 @@ Adapter runtime entries:
 - timestamp field: captured_at_ms
 
 ${adapterRows.map((row) => `- ${row.platform}: ${row.ready ? 'ready' : 'missing'} via ${row.adapter_file} (${row.selected_surface ?? 'unknown_surface'})`).join('\n')}
+
+Adapter selections:
+
+- endpoint: ${plan.endpoints?.adapter_selections ?? '/api/meeting-platform/adapter-selections'}
+- script: npm run meeting-platform:adapter-selections
+- selection ready count: ${plan.adapter_selection_matrix?.selection_ready_count ?? 0}
+- pilot evidence ready count: ${plan.adapter_selection_matrix?.pilot_evidence_ready_count ?? 0}
+- production evidence ready count: ${plan.adapter_selection_matrix?.production_evidence_ready_count ?? 0}
+
+${selectionRows.map((row) => `- ${row.platform}: axis=${row.axis_source ?? 'unknown_axis'}, surface=${row.axis_surface ?? 'unknown_surface'}, annotation=${row.annotation_source ?? 'unknown_annotation'}, pilot=${row.pilot_evidence_ready ? 'ready' : 'pending'}`).join('\n')}
 
 Adapter startup plans:
 
@@ -777,6 +803,11 @@ const runtimeBundles = host.runtimeBundles();
 const observerPlans = host.observerPlans();
 const runtimeEventPlans = host.runtimeEventPlans();
 const adapterRoutes = host.adapterRoutes();
+const adapterSelections = host.adapterSelections({
+  meetingAppRecordSet: {
+    records: [{ platform: 'google_meet', url: 'https://meet.google.com/abc-defg-hij' }],
+  },
+});
 const adapterBlueprints = host.adapterBlueprints();
 const adapterStartupPlans = host.adapterStartupPlans();
 const adapterPreflight = host.adapterPreflight({
@@ -822,6 +853,7 @@ npm run meeting-platform:runtime-bundles
 npm run meeting-platform:observer-plans
 npm run meeting-platform:runtime-event-plans
 npm run meeting-platform:resolve
+npm run meeting-platform:adapter-selections
 npm run meeting-platform:adapter-blueprints
 npm run meeting-platform:adapter-startup
 npm run meeting-platform:adapter-preflight
@@ -990,6 +1022,12 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     baseUrl,
     basePath,
   });
+  const adapterSelectionMatrix = buildMeetingPlatformAdapterSelectionMatrix({}, {
+    ...options,
+    platforms,
+    baseUrl,
+    basePath,
+  });
   const adapterBlueprintMatrix = buildMeetingPlatformAdapterBlueprintMatrix({
     ...options,
     platforms,
@@ -1037,6 +1075,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       host_integration_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-host-integration',
       platform_conformance_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-conformance',
       consumer_handoff_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-consumer-handoff',
+      adapter_selection_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-selection',
       adapter_startup_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-startup',
       adapter_preflight_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight',
     },
@@ -1063,6 +1102,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       observer_plans: '/api/meeting-platform/observer-plans',
       runtime_event_plans: '/api/meeting-platform/runtime-event-plans',
       adapter_routes: '/api/meeting-platform/adapter-routes',
+      adapter_selections: '/api/meeting-platform/adapter-selections',
       adapter_blueprints: '/api/meeting-platform/adapter-blueprints',
       adapter_startup: '/api/meeting-platform/adapter-startup',
       adapter_preflight: '/api/meeting-platform/adapter-preflight',
@@ -1081,6 +1121,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       ...(handoff.commands ?? {}),
       validate_platform_conformance: 'npm run meeting-platform:conformance',
       export_consumer_handoff: 'npm run meeting-platform:consumer-handoff',
+      export_adapter_selections: 'npm run meeting-platform:adapter-selections',
       export_adapter_startup: 'npm run meeting-platform:adapter-startup',
       run_adapter_preflight: 'npm run meeting-platform:adapter-preflight',
       validate_integration_runtime_manifest: 'npm run meeting-platform:integration-runtime-run-manifest',
@@ -1093,6 +1134,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     ])),
     extension_install_plan: extensionInstallPlan,
     adapter_route_matrix: adapterRouteMatrix,
+    adapter_selection_matrix: adapterSelectionMatrix,
     adapter_blueprint_matrix: adapterBlueprintMatrix,
     adapter_startup_plan_matrix: adapterStartupPlanMatrix,
     adapter_preflight_matrix: adapterPreflightMatrix,
@@ -1118,7 +1160,9 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       'capture_real_meeting_app_snapshots_for_each_target_platform',
       'wire_observer_plans_to_host_scheduler',
       'publish_adapter_blueprints_endpoint_for_downstream_hosts',
+      'publish_adapter_selections_endpoint_for_downstream_hosts',
       'publish_adapter_startup_plan_endpoint_for_downstream_hosts',
+      'select_adapter_path_before_runtime_surface_install',
       'generate_adapter_startup_plan_before_runtime_surface_install',
       'run_adapter_preflight_with_live_window_evidence_before_realtime_marks',
       'wire_platform_adapter_runtime_entries_into_host_surface',
@@ -1150,6 +1194,7 @@ export function buildMeetingPlatformHostIntegrationScaffold(options = {}) {
       'meeting-platform:observer-plans': 'node ./scripts/print-observer-plans.mjs',
       'meeting-platform:runtime-event-plans': 'node ./scripts/print-runtime-event-plans.mjs',
       'meeting-platform:adapter-routes': 'node ./scripts/print-adapter-routes.mjs',
+      'meeting-platform:adapter-selections': 'node ./scripts/print-adapter-selections.mjs',
       'meeting-platform:adapter-blueprints': 'node ./scripts/print-adapter-blueprints.mjs',
       'meeting-platform:adapter-startup': 'node ./scripts/print-adapter-startup.mjs',
       'meeting-platform:adapter-preflight': 'node ./scripts/print-adapter-preflight.mjs',
@@ -1330,6 +1375,18 @@ const host = createMeetingPlatformHost({
 
 console.log(JSON.stringify(host.adapterRoutes(), null, 2));
 `;
+  const adapterSelectionsScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+const input = process.env.MEETING_PLATFORM_SELECTION_INPUT_JSON
+  ? JSON.parse(process.env.MEETING_PLATFORM_SELECTION_INPUT_JSON)
+  : {};
+
+console.log(JSON.stringify(host.adapterSelections(input), null, 2));
+`;
   const adapterBlueprintsScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
 
 const host = createMeetingPlatformHost({
@@ -1484,6 +1541,7 @@ if (
       sourceFile('scripts/print-observer-plans.mjs', observerPlansScript, 'observer_plan_script', 'text/javascript'),
       sourceFile('scripts/print-runtime-event-plans.mjs', runtimeEventPlansScript, 'runtime_event_plan_script', 'text/javascript'),
       sourceFile('scripts/print-adapter-routes.mjs', adapterRoutesScript, 'adapter_route_script', 'text/javascript'),
+      sourceFile('scripts/print-adapter-selections.mjs', adapterSelectionsScript, 'adapter_selection_script', 'text/javascript'),
       sourceFile('scripts/print-adapter-blueprints.mjs', adapterBlueprintsScript, 'adapter_blueprint_script', 'text/javascript'),
       sourceFile('scripts/print-adapter-startup.mjs', adapterStartupScript, 'adapter_startup_script', 'text/javascript'),
       sourceFile('scripts/print-adapter-preflight.mjs', adapterPreflightScript, 'adapter_preflight_script', 'text/javascript'),
@@ -1524,6 +1582,7 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     'scripts/print-observer-plans.mjs',
     'scripts/print-runtime-event-plans.mjs',
     'scripts/print-adapter-routes.mjs',
+    'scripts/print-adapter-selections.mjs',
     'scripts/print-adapter-blueprints.mjs',
     'scripts/print-adapter-startup.mjs',
     'scripts/print-adapter-preflight.mjs',
@@ -1588,6 +1647,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!host.includes('platformAdapterRouteMatrix')) {
     issues.push(issue('error', 'missing_adapter_route_matrix', 'Host source must expose the platform adapter route matrix.'));
+  }
+  if (!host.includes('platformAdapterSelectionMatrix')) {
+    issues.push(issue('error', 'missing_adapter_selection_matrix', 'Host source must expose the platform adapter selection matrix.'));
   }
   if (!host.includes('platformAdapterBlueprintMatrix')) {
     issues.push(issue('error', 'missing_adapter_blueprint_matrix', 'Host source must expose the platform adapter blueprint matrix.'));
@@ -1668,6 +1730,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!routes.includes('/api/meeting-platform/adapter-routes')) {
     issues.push(issue('error', 'missing_adapter_route_route', 'Route source must expose the platform adapter route matrix endpoint.'));
   }
+  if (!routes.includes('/api/meeting-platform/adapter-selections')) {
+    issues.push(issue('error', 'missing_adapter_selection_route', 'Route source must expose the platform adapter selection matrix endpoint.'));
+  }
   if (!routes.includes('/api/meeting-platform/adapter-blueprints')) {
     issues.push(issue('error', 'missing_adapter_blueprint_route', 'Route source must expose the platform adapter blueprint matrix endpoint.'));
   }
@@ -1718,6 +1783,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!readme.includes('Adapter blueprints')) {
     issues.push(issue('warning', 'readme_missing_adapter_blueprint_contract', 'README should state the adapter blueprint contract.'));
+  }
+  if (!readme.includes('Adapter selections')) {
+    issues.push(issue('warning', 'readme_missing_adapter_selection_contract', 'README should state the adapter selection contract.'));
   }
   if (!readme.includes('Adapter startup plans')) {
     issues.push(issue('warning', 'readme_missing_adapter_startup_plan', 'README should state the adapter startup plan contract.'));
@@ -1784,6 +1852,15 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     issues.push(issue('error', 'adapter_blueprint_matrix_not_ready', 'Every selected platform must expose a ready adapter blueprint before host handoff.', {
       platform_count: adapterBlueprintMatrix.platform_count,
       ready_count: adapterBlueprintMatrix.ready_count,
+    }));
+  }
+  const adapterSelectionMatrix = scaffold.plan?.adapter_selection_matrix;
+  if (!adapterSelectionMatrix) {
+    issues.push(issue('error', 'missing_adapter_selection_matrix', 'Scaffold plan must include the adapter selection matrix.'));
+  } else if (adapterSelectionMatrix.selection_ready_count !== adapterSelectionMatrix.platform_count) {
+    issues.push(issue('error', 'adapter_selection_matrix_not_ready', 'Every selected platform must expose a ready adapter selection before host handoff.', {
+      platform_count: adapterSelectionMatrix.platform_count,
+      selection_ready_count: adapterSelectionMatrix.selection_ready_count,
     }));
   }
   const adapterStartupPlanMatrix = scaffold.plan?.adapter_startup_plan_matrix;
@@ -1855,6 +1932,13 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
       : false,
     adapter_blueprint_ready_count: adapterBlueprintMatrix?.ready_count ?? 0,
     adapter_blueprint_matrix: adapterBlueprintMatrix,
+    adapter_selection_ready: adapterSelectionMatrix
+      ? adapterSelectionMatrix.selection_ready_count === adapterSelectionMatrix.platform_count
+      : false,
+    adapter_selection_ready_count: adapterSelectionMatrix?.selection_ready_count ?? 0,
+    adapter_selection_pilot_evidence_ready_count: adapterSelectionMatrix?.pilot_evidence_ready_count ?? 0,
+    adapter_selection_production_evidence_ready_count: adapterSelectionMatrix?.production_evidence_ready_count ?? 0,
+    adapter_selection_matrix: adapterSelectionMatrix,
     adapter_startup_ready: adapterStartupPlanMatrix
       ? adapterStartupPlanMatrix.realtime_startup_ready_count === adapterStartupPlanMatrix.platform_count
       : false,

@@ -1,5 +1,6 @@
 import type { MeetingPlatformAdapterBlueprintMatrix } from './platform-adapter-blueprint.mjs';
 import type { MeetingPlatformAdapterRouteMatrix } from './platform-adapter-route.mjs';
+import type { MeetingPlatformAdapterSelectionMatrix } from './platform-adapter-selection.mjs';
 import type { MeetingPlatformAdapterStartupPlanMatrix } from './platform-adapter-startup.mjs';
 import type { MeetingPlatformAdapterPreflightMatrix } from './platform-adapter-preflight.mjs';
 import type { MeetingPlatformConformanceReport } from './platform-conformance.mjs';
@@ -38,6 +39,7 @@ export interface MeetingPlatformHostIntegrationPlan {
   integration_plans: Record<string, Record<string, unknown>>;
   extension_install_plan: Record<string, unknown>;
   adapter_route_matrix: MeetingPlatformAdapterRouteMatrix;
+  adapter_selection_matrix: MeetingPlatformAdapterSelectionMatrix;
   adapter_blueprint_matrix: MeetingPlatformAdapterBlueprintMatrix;
   adapter_startup_plan_matrix: MeetingPlatformAdapterStartupPlanMatrix;
   adapter_preflight_matrix: MeetingPlatformAdapterPreflightMatrix;
@@ -95,6 +97,11 @@ export interface MeetingPlatformHostIntegrationScaffoldAcceptanceReport {
   adapter_blueprint_ready: boolean;
   adapter_blueprint_ready_count: number;
   adapter_blueprint_matrix?: MeetingPlatformAdapterBlueprintMatrix;
+  adapter_selection_ready: boolean;
+  adapter_selection_ready_count: number;
+  adapter_selection_pilot_evidence_ready_count: number;
+  adapter_selection_production_evidence_ready_count: number;
+  adapter_selection_matrix?: MeetingPlatformAdapterSelectionMatrix;
   adapter_startup_ready: boolean;
   adapter_startup_ready_count: number;
   adapter_startup_plan_matrix?: MeetingPlatformAdapterStartupPlanMatrix;
