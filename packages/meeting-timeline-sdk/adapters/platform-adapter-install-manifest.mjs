@@ -102,6 +102,7 @@ function sdkImports(plans = []) {
     adapter_import_plan: first.adapter_import_plan ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-import-plan',
     adapter_blueprint: first.adapter_blueprint ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint',
     adapter_preflight: first.adapter_preflight ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight',
+    raw_signal: first.raw_signal ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-raw-signal',
     adapter_install_manifest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-install-manifest',
     connector: first.connector ?? '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector',
     runtime_bundle: first.runtime_bundle ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
@@ -130,6 +131,10 @@ function platformRow(plan = {}) {
     adapter_blueprint_path: plan.adapter_blueprint?.path,
     adapter_blueprint_primary_surface: plan.adapter_blueprint?.primary_surface,
     adapter_blueprint_first_gate: plan.adapter_blueprint?.first_acceptance_gate,
+    raw_signal_validation_path: plan.raw_signal_validation?.path,
+    raw_signal_validation_status: plan.raw_signal_validation?.status,
+    raw_signal_validation_runtime_actions: plan.raw_signal_validation?.runtime_actions,
+    raw_signal_validation_runtime_event_count: plan.raw_signal_validation?.runtime_event_count,
     adapter_preflight_status: plan.adapter_preflight?.status,
     adapter_preflight_selected_surface: plan.adapter_preflight?.selected_surface,
     adapter_preflight_startup_ready: plan.adapter_preflight?.startup_ready === true,
@@ -216,6 +221,30 @@ function adapterBlueprintRegistry(plans = []) {
   };
 }
 
+function rawSignalValidationRegistry(plans = []) {
+  const rows = plans.map((plan) => compactObject({
+    platform: plan.platform,
+    display_name: plan.display_name,
+    available: plan.raw_signal_validation?.available === true,
+    schema: plan.raw_signal_validation?.schema,
+    path: plan.raw_signal_validation?.path,
+    command: plan.raw_signal_validation?.command,
+    status: plan.raw_signal_validation?.status,
+    runtime_actions: plan.raw_signal_validation?.runtime_actions,
+    runtime_action_count: plan.raw_signal_validation?.runtime_action_count,
+    signal_count: plan.raw_signal_validation?.signal_count,
+    runtime_event_count: plan.raw_signal_validation?.runtime_event_count,
+    filtered_speaker_event_count: plan.raw_signal_validation?.filtered_speaker_event_count,
+    filter_active_speaker_samples: plan.raw_signal_validation?.filter_active_speaker_samples,
+  }));
+  return {
+    enabled: rows.some((row) => row.available === true),
+    platform_count: rows.filter((row) => row.available === true).length,
+    ready_count: rows.filter((row) => row.available === true && (!row.status || row.status === 'ready')).length,
+    rows,
+  };
+}
+
 function adapterPreflightRegistry(plans = []) {
   const rows = plans.map((plan) => compactObject({
     platform: plan.platform,
@@ -261,6 +290,8 @@ function readiness(plans = [], input = {}, options = {}) {
   const localAxisIssues = plans.filter((plan) => plan.runtime_contract?.local_axis_first !== true);
   const providerBlocking = plans.filter((plan) => plan.runtime_contract?.provider_events_block_realtime === true);
   const transcriptBlocking = plans.filter((plan) => plan.runtime_contract?.transcript_blocks_realtime === true);
+  const rawSignalMissing = plans.filter((plan) => plan.runtime_contract?.raw_signal_validation_required_before_preflight !== true
+    || plan.raw_signal_validation?.available !== true);
   const preflightMissing = plans.filter((plan) => plan.runtime_contract?.adapter_preflight_required_before_realtime_insert !== true);
   const noPlans = plans.length === 0;
   const issues = [
@@ -282,6 +313,9 @@ function readiness(plans = [], input = {}, options = {}) {
     }) : undefined,
     transcriptBlocking.length > 0 ? issue('error', 'transcript_blocks_realtime', 'Transcript import must not block realtime annotations.', {
       platforms: transcriptBlocking.map((plan) => plan.platform),
+    }) : undefined,
+    rawSignalMissing.length > 0 ? issue('error', 'raw_signal_validation_required', 'Every installed adapter must validate raw signals before adapter preflight.', {
+      platforms: rawSignalMissing.map((plan) => plan.platform),
     }) : undefined,
     preflightMissing.length > 0 ? issue('error', 'adapter_preflight_gate_required', 'Every installed adapter must require live-evidence preflight before realtime annotation insertion.', {
       platforms: preflightMissing.map((plan) => plan.platform),
@@ -334,6 +368,14 @@ function installSequence(plans = []) {
     },
     {
       step: 5,
+      id: 'run_raw_signal_validation_before_preflight',
+      action: 'validate host-captured snapshots, marks, and speaker samples with platformRawSignalBatch before adapter preflight',
+      required: true,
+      sdk_method: 'platformRawSignalBatch',
+      platforms,
+    },
+    {
+      step: 6,
       id: 'run_adapter_preflight_before_realtime_session',
       action: 'run adapter preflight with live DOM/native-window evidence before opening a realtime annotation session',
       required: true,
@@ -346,7 +388,7 @@ function installSequence(plans = []) {
       platforms,
     },
     {
-      step: 6,
+      step: 7,
       id: 'bind_axis_before_marks',
       action: 'start local candidate observation and bind the current meeting axis',
       required: true,
@@ -354,7 +396,7 @@ function installSequence(plans = []) {
       timestamp_field: 'captured_at_ms',
     },
     {
-      step: 7,
+      step: 8,
       id: 'insert_marks_in_realtime',
       action: 'insert every annotation with captured_at_ms from the local device/app clock',
       required: true,
@@ -362,7 +404,7 @@ function installSequence(plans = []) {
       timestamp_field: 'captured_at_ms',
     },
     {
-      step: 8,
+      step: 9,
       id: 'reconcile_provider_events_later',
       action: 'connect provider events only for reconcile/backfill after the local axis exists',
       required: false,
@@ -375,6 +417,7 @@ function nextActions(manifest = {}, ready = {}) {
   return unique([
     ...(ready.issues ?? []).map((item) => item.code),
     manifest.accepted ? 'install_manifest_into_host_runtime' : 'fix_install_manifest_blockers',
+    manifest.accepted ? 'run_raw_signal_validation_before_adapter_preflight' : '',
     manifest.accepted ? 'run_adapter_preflight_with_live_window_evidence_before_first_insert' : '',
     manifest.accepted ? 'register_platform_surface_registry' : '',
     manifest.accepted ? 'start_local_axis_observers_before_marks' : '',
@@ -405,6 +448,7 @@ export function buildMeetingPlatformAdapterInstallManifest(plansOrInput = {}, in
       local_axis_first: true,
       provider_events_block_realtime: false,
       transcript_blocks_realtime: false,
+      raw_signal_validation_required_before_preflight: true,
       adapter_preflight_required_before_realtime_insert: true,
       adapter_preflight_url_only_status: 'needs_live_page_evidence',
     },
@@ -414,6 +458,7 @@ export function buildMeetingPlatformAdapterInstallManifest(plansOrInput = {}, in
     native_detector: surfaceRegistry(plans, 'native_detector'),
     native_host: surfaceRegistry(plans, 'native_host'),
     adapter_blueprints: adapterBlueprintRegistry(plans),
+    raw_signal_validation: rawSignalValidationRegistry(plans),
     adapter_preflight: adapterPreflightRegistry(plans),
     provider_reconcile: providerRegistry(plans),
     install_sequence: installSequence(plans),

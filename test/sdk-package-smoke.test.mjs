@@ -2811,7 +2811,10 @@ assert.equal(buildMeetingPlatformAdapterLaunchPlan(directInstallManifest, {
 }).accepted, true);
 assert.equal(buildMeetingPlatformAdapterLaunchPlanFromRoot(directInstallManifest, {
   platform: 'google-meet',
-}).runtime_actions[0].id, 'observe_platform_candidates');
+}).runtime_actions[0].id, 'validate_raw_signal');
+assert.equal(buildMeetingPlatformAdapterLaunchPlanFromRoot(directInstallManifest, {
+  platform: 'google-meet',
+}).runtime_actions[1].id, 'observe_platform_candidates');
 assert.equal(buildMeetingPlatformAdapterCandidateLaunchPlanFromRoot(directInstallManifest, {
   candidates: [{
     url: 'https://meet.google.com/abc-defg-hij',

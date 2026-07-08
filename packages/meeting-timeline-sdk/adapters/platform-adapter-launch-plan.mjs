@@ -161,6 +161,10 @@ function adapterBlueprintRow(manifest = {}, platform) {
   return asArray(manifest.adapter_blueprints?.rows).find((row) => row.platform === platform);
 }
 
+function rawSignalValidationRow(manifest = {}, platform) {
+  return asArray(manifest.raw_signal_validation?.rows).find((row) => row.platform === platform);
+}
+
 function resolvePlatform(manifest = {}, input = {}, options = {}) {
   const url = rawUrl(input, options);
   const explicit = explicitPlatform(input, options);
@@ -247,6 +251,15 @@ function runtimeActions(row = {}, surface = '') {
   const localSurface = surface !== 'provider_reconcile';
   return [
     localSurface ? {
+      id: 'validate_raw_signal',
+      phase: 'adapter_validation',
+      required: true,
+      sdk_method: 'platformRawSignalBatch',
+      artifact_path: row.raw_signal_validation_path,
+      expected_runtime_actions: row.raw_signal_validation_runtime_actions,
+      timestamp_field: 'captured_at_ms',
+    } : undefined,
+    localSurface ? {
       id: 'observe_platform_candidates',
       phase: 'local_axis',
       required: true,
@@ -297,6 +310,9 @@ function readiness(manifest = {}, row = null, surface = '', entrypoint = {}, res
     row?.ready === true ? undefined : issue('error', 'platform_not_ready', 'Installed platform row is not ready.', {
       platform: resolved.platform,
     }),
+    row?.raw_signal_validation_path ? undefined : issue('error', 'raw_signal_validation_not_registered', 'Launch plan requires raw signal validation before realtime adapter preflight.', {
+      platform: resolved.platform,
+    }),
     surface ? undefined : issue('error', 'surface_not_selected', 'No runtime surface is selected for launch.', {
       platform: resolved.platform,
     }),
@@ -326,6 +342,7 @@ function nextActions(plan = {}, ready = {}) {
   ]);
   return unique([
     'start_selected_surface_runtime',
+    'validate_raw_signal_samples_before_adapter_preflight',
     'observe_platform_candidates_before_first_mark',
     'insert_realtime_marks_with_captured_at_ms',
     'reconcile_provider_events_after_local_axis',
@@ -399,6 +416,7 @@ export function buildMeetingPlatformAdapterLaunchPlan(manifestOrInput = {}, inpu
   const resolved = resolvePlatform(manifest, input, options);
   const row = platformRow(manifest, resolved.platform);
   const blueprint = adapterBlueprintRow(manifest, resolved.platform);
+  const rawSignalValidation = rawSignalValidationRow(manifest, resolved.platform);
   const surface = selectedSurface(row, input, options);
   const entrypoint = row ? surfaceEntrypoint(manifest, row, surface, resolved.url) : {};
   const ready = readiness(manifest, row, surface, entrypoint, resolved);
@@ -416,10 +434,12 @@ export function buildMeetingPlatformAdapterLaunchPlan(manifestOrInput = {}, inpu
     current_url: resolved.url,
     platform_row: row,
     adapter_blueprint: blueprint,
+    raw_signal_validation: rawSignalValidation,
     surface_entrypoint: entrypoint,
     axis_contract: {
       timestamp_field: 'captured_at_ms',
       local_axis_first: true,
+      raw_signal_validation_required_before_preflight: true,
       provider_events_block_realtime: false,
       transcript_blocks_realtime: false,
     },
@@ -466,6 +486,7 @@ export function buildMeetingPlatformAdapterCandidateLaunchPlan(manifestOrInput =
     launch_plan: launchPlan,
     axis_contract: launchPlan.axis_contract,
     adapter_blueprint: launchPlan.adapter_blueprint,
+    raw_signal_validation: launchPlan.raw_signal_validation,
     runtime_actions: launchPlan.runtime_actions,
     mark_template: launchPlan.mark_template,
     readiness: ready,

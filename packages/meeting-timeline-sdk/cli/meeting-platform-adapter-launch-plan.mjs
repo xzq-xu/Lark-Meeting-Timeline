@@ -86,6 +86,9 @@ export async function buildMeetingPlatformAdapterLaunchPlanCliReport(options = {
     adapter_blueprint_available: plan.adapter_blueprint?.available === true,
     adapter_blueprint_primary_surface: plan.adapter_blueprint?.primary_surface,
     adapter_blueprint_first_gate: plan.adapter_blueprint?.first_acceptance_gate,
+    raw_signal_validation_available: plan.raw_signal_validation?.available === true,
+    raw_signal_validation_status: plan.raw_signal_validation?.status,
+    raw_signal_validation_runtime_action_count: plan.raw_signal_validation?.runtime_action_count,
     accepted: plan.accepted,
     manifest_read_error: manifestReadError,
     issue_count: plan.readiness?.issue_count ?? 0,
@@ -102,7 +105,7 @@ export async function buildMeetingPlatformAdapterLaunchPlanCliReport(options = {
 
 export function formatMeetingPlatformAdapterLaunchPlanCliReport(report = {}) {
   const lines = [
-    `meeting_platform_adapter_launch_plan_report | ok=${boolLabel(report.ok)} | platform=${report.platform ?? 'n/a'} | surface=${report.selected_surface ?? 'n/a'} | blueprint_surface=${report.adapter_blueprint_primary_surface ?? 'n/a'} | reason=${report.detection_reason ?? 'n/a'} | accepted=${boolLabel(report.accepted)} | actions=${report.runtime_action_count} | issues=${report.issue_count}`,
+    `meeting_platform_adapter_launch_plan_report | ok=${boolLabel(report.ok)} | platform=${report.platform ?? 'n/a'} | surface=${report.selected_surface ?? 'n/a'} | blueprint_surface=${report.adapter_blueprint_primary_surface ?? 'n/a'} | raw_signal=${report.raw_signal_validation_status ?? 'n/a'} | reason=${report.detection_reason ?? 'n/a'} | accepted=${boolLabel(report.accepted)} | actions=${report.runtime_action_count} | issues=${report.issue_count}`,
   ];
   if (report.adapter_blueprint_first_gate) lines.push(`adapter_blueprint_first_gate=${report.adapter_blueprint_first_gate}`);
   if (report.first_runtime_action) lines.push(`first_runtime_action=${report.first_runtime_action}`);

@@ -54,8 +54,13 @@ assert.equal(googlePlan.detection_reason, 'meeting_url');
 assert.equal(googlePlan.selected_surface, 'browser_extension');
 assert.equal(googlePlan.adapter_blueprint.primary_surface, 'browser_extension');
 assert.equal(googlePlan.adapter_blueprint.first_acceptance_gate, 'local_candidate_preflight_accepts_active_meeting');
+assert.equal(googlePlan.raw_signal_validation.status, 'ready');
+assert.equal(googlePlan.axis_contract.raw_signal_validation_required_before_preflight, true);
 assert.equal(googlePlan.detected_meeting.meeting_id, 'abc-defg-hij');
 assert.equal(googlePlan.surface_entrypoint.content_script.matches.includes('https://meet.google.com/*'), true);
+assert.equal(googlePlan.runtime_actions[0].id, 'validate_raw_signal');
+assert.equal(googlePlan.runtime_actions[0].sdk_method, 'platformRawSignalBatch');
+assert.equal(googlePlan.runtime_actions[0].artifact_path, 'google_meet/raw-signal-validation.json');
 assert.equal(googlePlan.runtime_actions.find((action) => action.id === 'observe_platform_candidates').sdk_method, 'observePlatformCandidates');
 assert.equal(googlePlan.runtime_actions.find((action) => action.id === 'insert_realtime_annotation').sdk_method, 'insertAnnotation');
 assert.equal(googlePlan.mark_template.platform, 'google_meet');
@@ -97,7 +102,9 @@ assert.equal(candidateLaunchPlan.candidate_preflight.accepted_count, 1);
 assert.equal(candidateLaunchPlan.launch_plan.accepted, true);
 assert.equal(candidateLaunchPlan.launch_plan.platform, 'google_meet');
 assert.equal(candidateLaunchPlan.adapter_blueprint.primary_surface, 'browser_extension');
-assert.equal(candidateLaunchPlan.runtime_actions[0].id, 'observe_platform_candidates');
+assert.equal(candidateLaunchPlan.raw_signal_validation.status, 'ready');
+assert.equal(candidateLaunchPlan.runtime_actions[0].id, 'validate_raw_signal');
+assert.equal(candidateLaunchPlan.runtime_actions[1].id, 'observe_platform_candidates');
 assert.equal(assertMeetingPlatformAdapterCandidateLaunchPlan(candidateLaunchPlan), candidateLaunchPlan);
 
 const urlOnlyCandidateLaunchPlan = buildMeetingPlatformAdapterCandidateLaunchPlan(manifest, {
