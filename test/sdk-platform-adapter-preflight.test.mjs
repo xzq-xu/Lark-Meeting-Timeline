@@ -194,16 +194,26 @@ assert.equal(googleLifecycle.status, 'ready_for_realtime_annotations_and_lifecyc
 assert.equal(googleLifecycle.readiness.meeting_end_ready, true);
 assert.equal(googleLifecycle.readiness.production_lifecycle_ready, true);
 
-const teamsActive = buildMeetingAppFixtureSnapshot('teams', {
-  state: 'active',
-  observedAtMs: 1_783_356_010_000,
-});
 const matrix = buildMeetingPlatformAdapterPreflightMatrix({}, {
   baseUrl,
   platforms: ['google-meet', 'teams', 'zoom'],
   snapshots: {
     'google-meet': [googleActive],
-    teams: [teamsActive],
+  },
+  inputByPlatform: {
+    teams: {
+      platform: 'teams',
+      window: {
+        id: 'teams-native-main',
+        title: 'Microsoft Teams Meeting',
+        active: true,
+        visible: true,
+        inMeeting: true,
+        meeting_id: 'teams-123',
+      },
+      process: { name: 'Microsoft Teams' },
+      audio: { call_active: true },
+    },
   },
 });
 assert.equal(matrix.schema, 'meeting_platform_adapter_preflight_matrix');

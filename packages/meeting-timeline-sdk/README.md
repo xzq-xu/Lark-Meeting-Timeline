@@ -912,6 +912,18 @@ npx meeting-platform-adapter-startup \
 
 `adapter-startup-report.json` 的关键字段是 `realtime_startup_ready_count`、`rows[*].selected_surface`、`install_target`、`observe_action`、`insert_action` 和 `provider_events_block_realtime=false`。默认报告只保留轻量摘要，完整 per-platform startup plan 写到 `--out-dir`；如果 CI 或调试需要在报告里带压缩版 plan summary，再显式加 `--include-plans=true`。这份计划用于启动本地实时轴；如果 `selected_surface=provider_reconcile`，报告会明确它不能作为实时标注的 primary surface。
 
+startup plan 只能说明“应该启动哪个 surface”；真正打开会议窗口后，还需要用 `platformAdapterPreflight()` 或 SDK CLI 验证 live DOM/native evidence 是否足够建实时轴。Google Meet 这类 browser surface 可以传 DOM snapshot；Teams/Zoom 这类 native-first surface 可以传窗口、进程、Accessibility 或音频通话状态。URL-only preflight 会返回 `needs_live_page_evidence`，不会误报 realtime ready：
+
+```sh
+npx meeting-platform-adapter-preflight \
+  --mode=candidates \
+  --input-file=current-meeting-candidates.json \
+  --base-url=https://timeline.example.com \
+  --report-file=meeting-platform-adapter-preflight-report.json
+```
+
+`adapter-preflight-report.json` 的关键字段是 `mode`、`status`、`accepted_count`、`realtime_ready_count`、`live_evidence_ready_count`、`rows[*].selected_surface` 和 `rows[*].issue_codes`。`mode=matrix` 适合 CI 一次检查 Google Meet / Teams / Zoom / Webex / Lark 的 evidence 覆盖，`mode=candidates` 适合扩展 background 或 native detector 把当前窗口列表交给 SDK 选择可建轴的候选。
+
 运行时打开某个会议窗口后，用 `platformAdapterLaunchPlan()` 或 CLI 把当前 URL / 显式 platform 映射到具体启动动作。它会消费 `adapter-install-manifest.json` 和其中的 `adapter_blueprints` 索引，自动识别 Google Meet / Zoom / Teams / Webex / Lark URL，选择已安装的 surface，并输出 `adapter_blueprint` 摘要与 `runtime_actions`。如果只选择 `provider-reconcile`，launch plan 会拒绝作为实时启动面，因为 provider 只能会后对齐，不能替代本地轴。
 
 ```sh
