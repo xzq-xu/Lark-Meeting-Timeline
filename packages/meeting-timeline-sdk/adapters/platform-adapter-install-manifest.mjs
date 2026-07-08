@@ -101,6 +101,7 @@ function sdkImports(plans = []) {
     platform_kit: first.platform_kit ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
     adapter_import_plan: first.adapter_import_plan ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-import-plan',
     adapter_blueprint: first.adapter_blueprint ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint',
+    adapter_preflight: first.adapter_preflight ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight',
     adapter_install_manifest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-install-manifest',
     connector: first.connector ?? '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector',
     runtime_bundle: first.runtime_bundle ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
@@ -129,6 +130,12 @@ function platformRow(plan = {}) {
     adapter_blueprint_path: plan.adapter_blueprint?.path,
     adapter_blueprint_primary_surface: plan.adapter_blueprint?.primary_surface,
     adapter_blueprint_first_gate: plan.adapter_blueprint?.first_acceptance_gate,
+    adapter_preflight_status: plan.adapter_preflight?.status,
+    adapter_preflight_selected_surface: plan.adapter_preflight?.selected_surface,
+    adapter_preflight_startup_ready: plan.adapter_preflight?.startup_ready === true,
+    adapter_preflight_realtime_ready: plan.adapter_preflight?.realtime_annotation_ready === true,
+    adapter_preflight_required_before: plan.adapter_preflight?.required_before,
+    adapter_preflight_url_only_status: plan.adapter_preflight?.url_only_status,
     source_package: plan.source_package,
     first_issue: plan.readiness?.issues?.[0]?.code,
   });
@@ -209,6 +216,31 @@ function adapterBlueprintRegistry(plans = []) {
   };
 }
 
+function adapterPreflightRegistry(plans = []) {
+  const rows = plans.map((plan) => compactObject({
+    platform: plan.platform,
+    display_name: plan.display_name,
+    selected_surface: plan.adapter_preflight?.selected_surface ?? plan.selected_surface,
+    status: plan.adapter_preflight?.status,
+    accepted: plan.adapter_preflight?.accepted === true,
+    startup_ready: plan.adapter_preflight?.startup_ready === true,
+    live_evidence_ready: plan.adapter_preflight?.live_evidence_ready === true,
+    realtime_annotation_ready: plan.adapter_preflight?.realtime_annotation_ready === true,
+    required_before: plan.adapter_preflight?.required_before,
+    live_evidence_required: plan.adapter_preflight?.live_evidence_required === true,
+    url_only_status: plan.adapter_preflight?.url_only_status,
+    command: plan.adapter_preflight?.command,
+    bridge_messages: plan.adapter_preflight?.bridge_messages,
+  }));
+  return {
+    enabled: rows.some((row) => row.live_evidence_required === true),
+    platform_count: rows.length,
+    startup_ready_count: rows.filter((row) => row.startup_ready === true).length,
+    realtime_ready_count: rows.filter((row) => row.realtime_annotation_ready === true).length,
+    rows,
+  };
+}
+
 function duplicatePlatforms(plans = []) {
   const counts = new Map();
   for (const plan of plans) counts.set(plan.platform, (counts.get(plan.platform) ?? 0) + 1);
@@ -229,6 +261,7 @@ function readiness(plans = [], input = {}, options = {}) {
   const localAxisIssues = plans.filter((plan) => plan.runtime_contract?.local_axis_first !== true);
   const providerBlocking = plans.filter((plan) => plan.runtime_contract?.provider_events_block_realtime === true);
   const transcriptBlocking = plans.filter((plan) => plan.runtime_contract?.transcript_blocks_realtime === true);
+  const preflightMissing = plans.filter((plan) => plan.runtime_contract?.adapter_preflight_required_before_realtime_insert !== true);
   const noPlans = plans.length === 0;
   const issues = [
     noPlans ? issue('error', 'missing_import_plans', 'Install manifest requires at least one adapter import plan.') : undefined,
@@ -249,6 +282,9 @@ function readiness(plans = [], input = {}, options = {}) {
     }) : undefined,
     transcriptBlocking.length > 0 ? issue('error', 'transcript_blocks_realtime', 'Transcript import must not block realtime annotations.', {
       platforms: transcriptBlocking.map((plan) => plan.platform),
+    }) : undefined,
+    preflightMissing.length > 0 ? issue('error', 'adapter_preflight_gate_required', 'Every installed adapter must require live-evidence preflight before realtime annotation insertion.', {
+      platforms: preflightMissing.map((plan) => plan.platform),
     }) : undefined,
   ].filter(Boolean);
   const readyPlans = plans.filter((plan) => plan.accepted === true);
@@ -298,6 +334,19 @@ function installSequence(plans = []) {
     },
     {
       step: 5,
+      id: 'run_adapter_preflight_before_realtime_session',
+      action: 'run adapter preflight with live DOM/native-window evidence before opening a realtime annotation session',
+      required: true,
+      sdk_method: 'platformAdapterPreflight',
+      message_types: [
+        'meeting_timeline.preflight_current_window',
+        'meeting_timeline.preflight_candidates',
+      ],
+      url_only_status: 'needs_live_page_evidence',
+      platforms,
+    },
+    {
+      step: 6,
       id: 'bind_axis_before_marks',
       action: 'start local candidate observation and bind the current meeting axis',
       required: true,
@@ -305,7 +354,7 @@ function installSequence(plans = []) {
       timestamp_field: 'captured_at_ms',
     },
     {
-      step: 6,
+      step: 7,
       id: 'insert_marks_in_realtime',
       action: 'insert every annotation with captured_at_ms from the local device/app clock',
       required: true,
@@ -313,7 +362,7 @@ function installSequence(plans = []) {
       timestamp_field: 'captured_at_ms',
     },
     {
-      step: 7,
+      step: 8,
       id: 'reconcile_provider_events_later',
       action: 'connect provider events only for reconcile/backfill after the local axis exists',
       required: false,
@@ -326,6 +375,7 @@ function nextActions(manifest = {}, ready = {}) {
   return unique([
     ...(ready.issues ?? []).map((item) => item.code),
     manifest.accepted ? 'install_manifest_into_host_runtime' : 'fix_install_manifest_blockers',
+    manifest.accepted ? 'run_adapter_preflight_with_live_window_evidence_before_first_insert' : '',
     manifest.accepted ? 'register_platform_surface_registry' : '',
     manifest.accepted ? 'start_local_axis_observers_before_marks' : '',
   ]);
@@ -355,6 +405,8 @@ export function buildMeetingPlatformAdapterInstallManifest(plansOrInput = {}, in
       local_axis_first: true,
       provider_events_block_realtime: false,
       transcript_blocks_realtime: false,
+      adapter_preflight_required_before_realtime_insert: true,
+      adapter_preflight_url_only_status: 'needs_live_page_evidence',
     },
     platform_registry: rows,
     browser_extension: browserRegistry(plans, input, options),
@@ -362,6 +414,7 @@ export function buildMeetingPlatformAdapterInstallManifest(plansOrInput = {}, in
     native_detector: surfaceRegistry(plans, 'native_detector'),
     native_host: surfaceRegistry(plans, 'native_host'),
     adapter_blueprints: adapterBlueprintRegistry(plans),
+    adapter_preflight: adapterPreflightRegistry(plans),
     provider_reconcile: providerRegistry(plans),
     install_sequence: installSequence(plans),
     readiness: ready,

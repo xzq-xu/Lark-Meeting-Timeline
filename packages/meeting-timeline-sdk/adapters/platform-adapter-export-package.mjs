@@ -193,6 +193,7 @@ function importPaths() {
     adapter_authoring: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-authoring',
     adapter_portfolio: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-portfolio',
     adapter_blueprint: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint',
+    adapter_preflight: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight',
     adapter_acceptance_checklist: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-acceptance-checklist',
     implementation_handoff: '@ai-annotation/meeting-timeline-sdk/adapters/platform-implementation-handoff',
     runtime_bundle: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
@@ -211,6 +212,7 @@ function commandSet(platform, target, options = {}) {
     adapter_authoring: commandWithBase('meeting-platform:adapter-authoring', options, `--platforms=${platform}`),
     adapter_portfolio: commandWithBase('meeting-platform:adapter-portfolio', options, `--platforms=${platform}`),
     adapter_blueprint: commandWithBase('meeting-platform:adapter-blueprint', options, `--platforms=${platform}`),
+    adapter_preflight: commandWithBase('meeting-platform:adapter-preflight', options, `--platforms=${platform}`),
     acceptance_checklist: commandWithBase('meeting-platform:adapter-acceptance-checklist', options, `--platforms=${platform} --target=${target}`),
     implementation_handoff: commandWithBase('meeting-platform:implementation-handoff', options, `--platforms=${platform}`),
     runtime_bundle: commandWithBase('meeting-platform:runtime-bundle', options, `--platforms=${platform}`),
@@ -232,6 +234,11 @@ function browserSurface(runtimeBundle = {}, portfolioItem = {}) {
     host_permissions: browser.host_permissions ?? [],
     content_script_manifest_source: 'runtime-bundle.json#/browser/manifest',
     first_message_type: p0.candidate_observation_message_type ?? 'meeting_timeline.observe_candidates',
+    preflight_required_before_insert: true,
+    preflight_message_types: [
+      'meeting_timeline.preflight_current_window',
+      'meeting_timeline.preflight_candidates',
+    ],
     first_sdk_method: 'observePlatformCandidates',
     mark_insert_method: 'insertAnnotation',
     timestamp_field: p0.timestamp_field ?? 'captured_at_ms',
@@ -247,6 +254,11 @@ function webviewSurface(runtimeBundle = {}, portfolioItem = {}) {
     install_function: bridge.install_function,
     options_source: 'runtime-bundle.json#/runtime/lightweight_connector_bridge/options',
     window_messaging_supported: true,
+    preflight_required_before_insert: true,
+    preflight_message_types: [
+      'meeting_timeline.preflight_current_window',
+      'meeting_timeline.preflight_candidates',
+    ],
     first_sdk_method: 'observeMeetingApp_or_observePlatformCandidates',
     timestamp_field: 'captured_at_ms',
   });
@@ -258,6 +270,8 @@ function nativeSurface(portfolioItem = {}, implementation = {}) {
     role: 'host_controlled_detector_or_desktop_observer_when_browser_extension_is_not_available',
     recommended_first_surface: portfolioItem.recommended_first_surface,
     first_sdk_method: 'observePlatformCandidates',
+    preflight_required_before_insert: true,
+    preflight_sdk_method: 'platformAdapterPreflight',
     mark_insert_method: 'insertAnnotation',
     speaker_track_method: 'speakerTrack',
     participant_track_method: 'participantTrack',
@@ -329,6 +343,35 @@ function lightweightPortfolioItem(plan = {}) {
       sdk_test: plan.commands?.sdk_test,
     }),
     next_actions: plan.next_actions ?? [],
+  });
+}
+
+function adapterPreflightExport(implementation = {}, portfolioItem = {}) {
+  const preflight = implementation.adapter_preflight ?? {};
+  return compactObject({
+    status: preflight.status ?? 'needs_live_page_evidence',
+    accepted: preflight.accepted === true,
+    selected_surface: preflight.selected_surface ?? portfolioItem.recommended_first_surface,
+    startup_ready: preflight.startup_ready === true || portfolioItem.implementation?.implementation_ready === true,
+    live_evidence_ready: preflight.live_evidence_ready === true,
+    realtime_annotation_ready: preflight.realtime_annotation_ready === true,
+    required_before: 'bind_current_axis_or_insert_realtime_annotation',
+    live_evidence_required: true,
+    url_only_status: 'needs_live_page_evidence',
+    source: implementation.schema === 'meeting_platform_implementation_handoff'
+      ? 'implementation_handoff'
+      : 'export_package_default_gate',
+    sdk_methods: preflight.sdk_methods ?? [
+      'platformAdapterPreflight',
+      'platformAdapterCurrentWindowPreflight',
+      'platformAdapterCandidatePreflight',
+    ],
+    bridge_messages: preflight.bridge_messages ?? [
+      'meeting_timeline.preflight_current_window',
+      'meeting_timeline.preflight_candidates',
+    ],
+    command: implementation.acceptance?.commands?.adapter_preflight,
+    first_next_action: preflight.first_next_action ?? 'collect_live_dom_or_native_window_evidence_for_adapter_preflight',
   });
 }
 
@@ -407,6 +450,15 @@ function lightweightAcceptanceChecklist(plan = {}, portfolioItem = {}, target = 
       expected: 'meeting_timeline.observe_candidates',
       actual: p0.candidate_observation_message_type,
       next_action: 'wire_observe_platform_candidates',
+    }),
+    lightweightChecklistItem(target, {
+      id: 'adapter_preflight_gate_declared',
+      group: 'p0_realtime_axis',
+      label: 'Adapter preflight gate is declared before realtime mark insertion',
+      passed: true,
+      expected: 'needs_live_page_evidence_until_live_dom_or_native_window_sample',
+      actual: 'needs_live_page_evidence_until_live_dom_or_native_window_sample',
+      next_action: 'run_adapter_preflight_with_live_window_evidence_before_first_insert',
     }),
     lightweightChecklistItem(target, {
       id: 'provider_reconcile_path_declared',
@@ -546,27 +598,35 @@ function setupOrder(platform, builtIn, target) {
     },
     {
       step: 4,
+      id: 'run_adapter_preflight',
+      action: 'run adapter preflight with live DOM/native-window evidence before opening a realtime annotation session',
+      required: true,
+      output: 'adapter_preflight.realtime_annotation_ready',
+      url_only_status: 'needs_live_page_evidence',
+    },
+    {
+      step: 5,
       id: 'insert_realtime_marks',
       action: `call insertAnnotation('${platform}', { captured_at_ms, ...mark })`,
       required: true,
       output: 'timeline marks aligned to device capture time',
     },
     {
-      step: 5,
+      step: 6,
       id: 'emit_speaker_positions',
       action: 'call speakerTrack/participantTrack when local evidence is available',
       required: false,
       output: 'speaker and participant position markers without transcript text',
     },
     {
-      step: 6,
+      step: 7,
       id: 'connect_provider_reconcile',
       action: 'ingest official provider events only after local realtime axis is available',
       required: target === 'production',
       output: 'start/end/participant/artifact reconcile and backfill',
     },
     {
-      step: 7,
+      step: 8,
       id: 'run_acceptance',
       action: `run adapter acceptance checklist target=${target}`,
       required: true,
@@ -582,6 +642,7 @@ function nextActionsFor(packageObject = {}) {
     ...(checklist.next_actions ?? []),
     ...(portfolio.next_actions ?? []),
     packageObject.built_in ? 'wire_export_package_into_host_project' : 'author_missing_platform_adapter_before_runtime_install',
+    'run_adapter_preflight_with_live_window_evidence_before_first_insert',
     'bind_current_meeting_axis_before_first_annotation',
     'keep_provider_events_nonblocking_for_realtime_marks',
   ]);
@@ -619,6 +680,9 @@ export function buildMeetingPlatformAdapterExportPackage(platform, input = {}, o
     adapter_contract: buildArtifacts ? safeArtifact(builtIn, buildMeetingPlatformAdapterContract, key, merged) : undefined,
     adaptation_package: buildArtifacts ? safeArtifact(builtIn, buildMeetingPlatformAdaptationPackage, key, merged) : undefined,
   });
+  const implementationForGate = artifacts.implementation_handoff
+    ?? safeArtifact(builtIn, buildMeetingPlatformImplementationHandoff, key, merged);
+  const adapterPreflight = adapterPreflightExport(implementationForGate, portfolioItem);
   const hostFiles = buildHostFiles(authoringPlan.platform, artifacts, builtIn);
   const refs = builtIn
     ? builtInArtifactRefs(authoringPlan.platform, hostFiles, artifactRefs(artifacts, hostFiles))
@@ -639,6 +703,7 @@ export function buildMeetingPlatformAdapterExportPackage(platform, input = {}, o
     timestamp_field: 'captured_at_ms',
     provider_events_block_realtime: false,
     transcript_blocks_realtime: false,
+    adapter_preflight: adapterPreflight,
     import_paths: importPaths(),
     artifact_refs: refs,
     host_files: hostFiles,
@@ -660,6 +725,8 @@ export function buildMeetingPlatformAdapterExportPackage(platform, input = {}, o
       target_blocking_count: checklist.summary?.blocking_count,
       failed_required_ids: checklist.summary?.failed_required_ids ?? [],
       implementation_ready: portfolioItem.implementation?.implementation_ready === true,
+      adapter_preflight_startup_ready: adapterPreflight.startup_ready === true,
+      adapter_preflight_realtime_ready: adapterPreflight.realtime_annotation_ready === true,
       pilot_ready: portfolioItem.implementation?.pilot_ready === true,
       production_ready: portfolioItem.implementation?.production_ready === true,
     }),
@@ -747,6 +814,8 @@ export function buildMeetingPlatformAdapterExportPackageMatrix(input = {}, optio
     custom_authoring_count: packages.filter((item) => item.built_in !== true).length,
     browser_extension_ready_count: packages.filter((item) => item.surface_entrypoints?.browser_extension?.ready === true).length,
     provider_reconcile_count: packages.filter((item) => item.surface_entrypoints?.provider_reconcile?.ready === true).length,
+    adapter_preflight_startup_ready_count: packages.filter((item) => item.adapter_preflight?.startup_ready === true).length,
+    adapter_preflight_realtime_ready_count: packages.filter((item) => item.adapter_preflight?.realtime_annotation_ready === true).length,
     platforms: packages.map((item) => item.platform),
     rows: packages.map((item) => ({
       platform: item.platform,
@@ -759,6 +828,10 @@ export function buildMeetingPlatformAdapterExportPackageMatrix(input = {}, optio
       recommended_first_surface: item.recommended_first_surface,
       browser_extension_ready: item.surface_entrypoints?.browser_extension?.ready === true,
       provider_reconcile_ready: item.surface_entrypoints?.provider_reconcile?.ready === true,
+      adapter_preflight_status: item.adapter_preflight?.status,
+      adapter_preflight_selected_surface: item.adapter_preflight?.selected_surface,
+      adapter_preflight_startup_ready: item.adapter_preflight?.startup_ready === true,
+      adapter_preflight_realtime_ready: item.adapter_preflight?.realtime_annotation_ready === true,
       host_file_count: item.host_files.length,
       failed_required_ids: item.readiness.failed_required_ids,
       first_next_action: item.next_actions?.[0],

@@ -30,11 +30,22 @@ assert.equal(google.transcript_blocks_realtime, false);
 assert.equal(google.import_paths.platform_kit, '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit');
 assert.equal(google.import_paths.adapter_export_package, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-export-package');
 assert.equal(google.import_paths.adapter_blueprint, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint');
+assert.equal(google.import_paths.adapter_preflight, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight');
+assert.equal(google.commands.adapter_preflight.includes('meeting-platform:adapter-preflight'), true);
+assert.equal(google.adapter_preflight.status, 'needs_live_page_evidence');
+assert.equal(google.adapter_preflight.selected_surface, 'browser_extension');
+assert.equal(google.adapter_preflight.startup_ready, true);
+assert.equal(google.adapter_preflight.live_evidence_required, true);
+assert.equal(google.adapter_preflight.realtime_annotation_ready, false);
+assert.equal(google.adapter_preflight.bridge_messages.includes('meeting_timeline.preflight_current_window'), true);
 assert.equal(google.surface_entrypoints.browser_extension.ready, true);
 assert.equal(google.surface_entrypoints.browser_extension.first_message_type, 'meeting_timeline.observe_candidates');
+assert.equal(google.surface_entrypoints.browser_extension.preflight_required_before_insert, true);
+assert.equal(google.surface_entrypoints.browser_extension.preflight_message_types.includes('meeting_timeline.preflight_candidates'), true);
 assert.equal(google.surface_entrypoints.browser_extension.mark_insert_method, 'insertAnnotation');
 assert.equal(google.surface_entrypoints.provider_reconcile.ready, true);
 assert.equal(google.surface_entrypoints.provider_reconcile.required_for_realtime, false);
+assert.equal(google.setup_order.find((step) => step.id === 'run_adapter_preflight').url_only_status, 'needs_live_page_evidence');
 assert.equal(google.setup_order.find((step) => step.id === 'insert_realtime_marks').action.includes("insertAnnotation('google_meet'"), true);
 assert.equal(google.host_files.find((file) => file.source === 'runtime_bundle').path, 'google_meet/runtime-bundle.json');
 assert.equal(google.host_files.find((file) => file.source === 'adapter_blueprint').path, 'google_meet/adapter-blueprint.json');
@@ -48,6 +59,8 @@ assert.equal(google.artifacts.provider_connection.event_mapping.length > 0, true
 assert.equal(google.commands.export_package.includes('meeting-platform:adapter-export-package'), true);
 assert.equal(google.commands.adapter_blueprint.includes('meeting-platform:adapter-blueprint'), true);
 assert.equal(google.readiness.static_accepted, true);
+assert.equal(google.readiness.adapter_preflight_startup_ready, true);
+assert.equal(google.readiness.adapter_preflight_realtime_ready, false);
 assert.deepEqual(google.readiness.failed_required_ids, []);
 
 const custom = buildMeetingPlatformAdapterExportPackage('Acme Rooms', {}, {
@@ -79,7 +92,13 @@ assert.equal(matrix.built_in_count, 2);
 assert.equal(matrix.custom_authoring_count, 1);
 assert.equal(matrix.browser_extension_ready_count, 2);
 assert.equal(matrix.provider_reconcile_count, 3);
+assert.equal(matrix.adapter_preflight_startup_ready_count, 2);
+assert.equal(matrix.adapter_preflight_realtime_ready_count, 0);
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').host_file_count >= 8, true);
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').adapter_preflight_status, 'needs_live_page_evidence');
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').adapter_preflight_selected_surface, 'browser_extension');
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').adapter_preflight_startup_ready, true);
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').adapter_preflight_realtime_ready, false);
 assert.equal(matrix.rows.find((row) => row.platform === 'acme_rooms').accepted, false);
 assert.equal(matrix.acceptance_checklist_matrix.accepted_count, 2);
 

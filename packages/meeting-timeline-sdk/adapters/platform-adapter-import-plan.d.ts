@@ -33,6 +33,7 @@ export interface MeetingPlatformAdapterImportPlan {
   export_package_accepted: boolean;
   runtime_contract: Record<string, unknown>;
   adapter_blueprint: Record<string, unknown>;
+  adapter_preflight: Record<string, unknown>;
   sdk_imports: Record<string, string>;
   host_file_coverage: Record<string, unknown>;
   surface_entrypoints?: Record<string, Record<string, unknown>>;
@@ -54,6 +55,8 @@ export interface MeetingPlatformAdapterImportPlanMatrix {
   blocked_count: number;
   file_coverage_checked_count: number;
   missing_file_count: number;
+  adapter_preflight_startup_ready_count: number;
+  adapter_preflight_realtime_ready_count: number;
   platforms: string[];
   rows: Array<Record<string, unknown>>;
   plans: MeetingPlatformAdapterImportPlan[];

@@ -146,10 +146,13 @@ function readiness(pkg = {}, surface = '', coverage = {}, input = {}, options = 
     && pkg.local_axis_first === true
     && pkg.provider_events_block_realtime === false
     && pkg.transcript_blocks_realtime === false;
+  const preflightContractReady = pkg.adapter_preflight?.live_evidence_required === true
+    && pkg.adapter_preflight?.url_only_status === 'needs_live_page_evidence'
+    && Boolean(pkg.adapter_preflight?.required_before);
   const surfaceReady = selected.ready === true || (surface === 'provider_reconcile' && selected.required_for_realtime === false);
   const packageAccepted = pkg.accepted === true || (allowCustomAuthoring && pkg.built_in !== true);
   const fileCoverageReady = coverage.checked !== true || coverage.missing.length === 0;
-  const importReady = schemaValid && hardContractReady && surfaceReady && packageAccepted && fileCoverageReady;
+  const importReady = schemaValid && hardContractReady && preflightContractReady && surfaceReady && packageAccepted && fileCoverageReady;
   const issues = [
     schemaValid ? undefined : issue('error', 'invalid_export_package_schema', 'Adapter export package schema is invalid.', {
       actual: pkg.schema,
@@ -160,6 +163,7 @@ function readiness(pkg = {}, surface = '', coverage = {}, input = {}, options = 
     pkg.local_axis_first === true ? undefined : issue('error', 'local_axis_first_required', 'Realtime annotations must bind a local axis before provider reconcile.'),
     pkg.provider_events_block_realtime === false ? undefined : issue('error', 'provider_events_must_be_nonblocking', 'Provider events must not block realtime mark insertion.'),
     pkg.transcript_blocks_realtime === false ? undefined : issue('error', 'transcript_must_be_nonblocking', 'Transcript artifacts must remain post-meeting backfill.'),
+    preflightContractReady ? undefined : issue('error', 'adapter_preflight_gate_required', 'Adapter import must declare a live-evidence preflight gate before realtime annotation insertion.'),
     surfaceReady ? undefined : issue('error', 'selected_surface_not_ready', 'Selected import surface is not ready in the export package.', {
       surface,
     }),
@@ -175,6 +179,7 @@ function readiness(pkg = {}, surface = '', coverage = {}, input = {}, options = 
   return {
     schema_valid: schemaValid,
     hard_contract_ready: hardContractReady,
+    adapter_preflight_contract_ready: preflightContractReady,
     selected_surface_ready: surfaceReady,
     export_package_accepted: pkg.accepted === true,
     package_accepted_for_import: packageAccepted,
@@ -192,11 +197,31 @@ function sdkImports(pkg = {}) {
     platform_kit: imports.platform_kit ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
     adapter_export_package: imports.adapter_export_package ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-export-package',
     adapter_blueprint: imports.adapter_blueprint ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint',
+    adapter_preflight: imports.adapter_preflight ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight',
     adapter_import_plan: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-import-plan',
     connector: imports.connector ?? '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector',
     runtime_bundle: imports.runtime_bundle ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
     provider_connection: imports.provider_connection ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection',
   };
+}
+
+function adapterPreflightSummary(pkg = {}) {
+  const preflight = pkg.adapter_preflight ?? {};
+  return compactObject({
+    status: preflight.status,
+    accepted: preflight.accepted === true,
+    selected_surface: preflight.selected_surface,
+    startup_ready: preflight.startup_ready === true,
+    live_evidence_ready: preflight.live_evidence_ready === true,
+    realtime_annotation_ready: preflight.realtime_annotation_ready === true,
+    required_before: preflight.required_before,
+    live_evidence_required: preflight.live_evidence_required === true,
+    url_only_status: preflight.url_only_status,
+    sdk_methods: preflight.sdk_methods,
+    bridge_messages: preflight.bridge_messages,
+    command: preflight.command ?? pkg.commands?.adapter_preflight,
+    first_next_action: preflight.first_next_action,
+  });
 }
 
 function adapterBlueprintSummary(pkg = {}, input = {}, options = {}) {
@@ -264,6 +289,19 @@ function installSteps(pkg = {}, surface = '', coverage = {}) {
     },
     {
       step: 5,
+      id: 'run_adapter_preflight',
+      action: 'run adapter preflight with live DOM/native-window evidence before opening a realtime annotation session',
+      required: true,
+      sdk_method: 'platformAdapterPreflight',
+      message_types: [
+        'meeting_timeline.preflight_current_window',
+        'meeting_timeline.preflight_candidates',
+      ],
+      url_only_status: 'needs_live_page_evidence',
+      timestamp_field: 'captured_at_ms',
+    },
+    {
+      step: 6,
       id: 'bind_current_axis',
       action: 'call observePlatformCandidates before first realtime mark',
       required: true,
@@ -271,7 +309,7 @@ function installSteps(pkg = {}, surface = '', coverage = {}) {
       timestamp_field: 'captured_at_ms',
     },
     {
-      step: 6,
+      step: 7,
       id: 'insert_realtime_marks',
       action: `call insertAnnotation('${pkg.platform}', { captured_at_ms, ...mark })`,
       required: true,
@@ -279,14 +317,14 @@ function installSteps(pkg = {}, surface = '', coverage = {}) {
       timestamp_field: 'captured_at_ms',
     },
     {
-      step: 7,
+      step: 8,
       id: 'emit_speaker_participant_positions',
       action: 'call speakerTrack/participantTrack when local samples are available',
       required: false,
       sdk_methods: ['speakerTrack', 'participantTrack'],
     },
     {
-      step: 8,
+      step: 9,
       id: 'connect_provider_reconcile',
       action: 'connect provider events only as reconcile/backfill after local axis exists',
       required: false,
@@ -301,6 +339,7 @@ function nextActions(pkg = {}, ready = {}, coverage = {}) {
     ...(ready.issues ?? []).map((item) => item.code),
     ...(coverage.missing ?? []).map((file) => `provide_host_file:${file.path}`),
     ...(pkg.next_actions ?? []),
+    ready.import_ready ? 'run_adapter_preflight_with_live_window_evidence_before_first_insert' : undefined,
     ready.import_ready ? 'wire_selected_surface_into_host_runtime' : 'fix_adapter_import_plan_blockers',
   ]);
 }
@@ -311,6 +350,7 @@ export function buildMeetingPlatformAdapterImportPlan(exportPackage = {}, input 
   const coverage = hostFileCoverage(exportPackage, input, { ...options, target });
   const ready = readiness(exportPackage, surface, coverage, input, { ...options, target });
   const blueprint = adapterBlueprintSummary(exportPackage, input, options);
+  const preflight = adapterPreflightSummary(exportPackage);
   return {
     type: 'meeting_platform_adapter_import_plan',
     schema: MEETING_PLATFORM_ADAPTER_IMPORT_PLAN_SCHEMA,
@@ -330,8 +370,11 @@ export function buildMeetingPlatformAdapterImportPlan(exportPackage = {}, input 
       local_axis_first: exportPackage.local_axis_first === true,
       provider_events_block_realtime: exportPackage.provider_events_block_realtime === true,
       transcript_blocks_realtime: exportPackage.transcript_blocks_realtime === true,
+      adapter_preflight_required_before_realtime_insert: preflight.live_evidence_required === true,
+      adapter_preflight_url_only_status: preflight.url_only_status,
     },
     adapter_blueprint: blueprint,
+    adapter_preflight: preflight,
     sdk_imports: sdkImports(exportPackage),
     host_file_coverage: coverage,
     surface_entrypoints: exportPackage.surface_entrypoints,
@@ -387,6 +430,8 @@ export function buildMeetingPlatformAdapterImportPlanMatrix(packagesOrInput = {}
     blocked_count: plans.filter((plan) => plan.accepted !== true).length,
     file_coverage_checked_count: plans.filter((plan) => plan.host_file_coverage.checked === true).length,
     missing_file_count: plans.reduce((count, plan) => count + (plan.host_file_coverage.missing?.length ?? 0), 0),
+    adapter_preflight_startup_ready_count: plans.filter((plan) => plan.adapter_preflight?.startup_ready === true).length,
+    adapter_preflight_realtime_ready_count: plans.filter((plan) => plan.adapter_preflight?.realtime_annotation_ready === true).length,
     platforms: plans.map((plan) => plan.platform),
     rows: plans.map((plan) => ({
       platform: plan.platform,
@@ -400,6 +445,10 @@ export function buildMeetingPlatformAdapterImportPlanMatrix(packagesOrInput = {}
       file_coverage_ready: plan.readiness.file_coverage_ready,
       adapter_blueprint_available: plan.adapter_blueprint?.available === true,
       adapter_blueprint_primary_surface: plan.adapter_blueprint?.primary_surface,
+      adapter_preflight_status: plan.adapter_preflight?.status,
+      adapter_preflight_selected_surface: plan.adapter_preflight?.selected_surface,
+      adapter_preflight_startup_ready: plan.adapter_preflight?.startup_ready === true,
+      adapter_preflight_realtime_ready: plan.adapter_preflight?.realtime_annotation_ready === true,
       missing_file_count: plan.host_file_coverage.missing?.length ?? 0,
       first_issue: plan.readiness.issues?.[0]?.code,
       first_next_action: plan.next_actions?.[0],

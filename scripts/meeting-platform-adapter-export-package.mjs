@@ -109,6 +109,8 @@ async function buildReport() {
     custom_authoring_count: matrix.custom_authoring_count,
     browser_extension_ready_count: matrix.browser_extension_ready_count,
     provider_reconcile_count: matrix.provider_reconcile_count,
+    adapter_preflight_startup_ready_count: matrix.adapter_preflight_startup_ready_count,
+    adapter_preflight_realtime_ready_count: matrix.adapter_preflight_realtime_ready_count,
     required_platforms: requiredPlatforms,
     written_files: writtenFiles,
     rows,
@@ -128,9 +130,9 @@ try {
   if (jsonOutput) {
     console.log(JSON.stringify(report, null, 2));
   } else {
-    console.log(`meeting_platform_adapter_export_package_report | ok=${boolLabel(report.ok)} | target=${report.target} | platforms=${report.platform_count} | accepted=${report.accepted_count} | export_ready=${report.export_ready_count} | browser_ready=${report.browser_extension_ready_count} | providers=${report.provider_reconcile_count} | written=${report.written_files.length}`);
+    console.log(`meeting_platform_adapter_export_package_report | ok=${boolLabel(report.ok)} | target=${report.target} | platforms=${report.platform_count} | accepted=${report.accepted_count} | export_ready=${report.export_ready_count} | browser_ready=${report.browser_extension_ready_count} | providers=${report.provider_reconcile_count} | preflight=${report.adapter_preflight_realtime_ready_count}/${report.platform_count} | written=${report.written_files.length}`);
     for (const row of report.rows) {
-      console.log(`${row.platform}: accepted=${boolLabel(row.accepted)} export_ready=${boolLabel(row.export_ready)} built_in=${boolLabel(row.built_in)} surface=${row.recommended_first_surface ?? 'none'} browser=${boolLabel(row.browser_extension_ready)} provider=${boolLabel(row.provider_reconcile_ready)} files=${row.host_file_count} next=${row.first_next_action ?? 'none'} package=${row.package_file}`);
+      console.log(`${row.platform}: accepted=${boolLabel(row.accepted)} export_ready=${boolLabel(row.export_ready)} built_in=${boolLabel(row.built_in)} surface=${row.recommended_first_surface ?? 'none'} browser=${boolLabel(row.browser_extension_ready)} provider=${boolLabel(row.provider_reconcile_ready)} preflight=${row.adapter_preflight_status ?? 'n/a'} realtime=${boolLabel(row.adapter_preflight_realtime_ready)} files=${row.host_file_count} next=${row.first_next_action ?? 'none'} package=${row.package_file}`);
     }
     if (report.next_actions.length > 0) console.log(`next_actions=${report.next_actions.join(',')}`);
   }

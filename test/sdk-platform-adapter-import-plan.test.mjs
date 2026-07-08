@@ -35,16 +35,28 @@ assert.equal(googlePlan.runtime_contract.timestamp_field, 'captured_at_ms');
 assert.equal(googlePlan.runtime_contract.local_axis_first, true);
 assert.equal(googlePlan.runtime_contract.provider_events_block_realtime, false);
 assert.equal(googlePlan.runtime_contract.transcript_blocks_realtime, false);
+assert.equal(googlePlan.runtime_contract.adapter_preflight_required_before_realtime_insert, true);
+assert.equal(googlePlan.runtime_contract.adapter_preflight_url_only_status, 'needs_live_page_evidence');
 assert.equal(googlePlan.adapter_blueprint.available, true);
 assert.equal(googlePlan.adapter_blueprint.path, 'google_meet/adapter-blueprint.json');
 assert.equal(googlePlan.adapter_blueprint.schema, 'meeting_platform_adapter_blueprint');
 assert.equal(googlePlan.adapter_blueprint.command.includes('meeting-platform:adapter-blueprint'), true);
+assert.equal(googlePlan.adapter_preflight.status, 'needs_live_page_evidence');
+assert.equal(googlePlan.adapter_preflight.selected_surface, 'browser_extension');
+assert.equal(googlePlan.adapter_preflight.startup_ready, true);
+assert.equal(googlePlan.adapter_preflight.live_evidence_required, true);
+assert.equal(googlePlan.adapter_preflight.realtime_annotation_ready, false);
+assert.equal(googlePlan.adapter_preflight.command.includes('meeting-platform:adapter-preflight'), true);
+assert.equal(googlePlan.adapter_preflight.bridge_messages.includes('meeting_timeline.preflight_candidates'), true);
 assert.equal(googlePlan.host_file_coverage.status, 'complete');
 assert.equal(googlePlan.readiness.hard_contract_ready, true);
+assert.equal(googlePlan.readiness.adapter_preflight_contract_ready, true);
 assert.equal(googlePlan.readiness.selected_surface_ready, true);
+assert.equal(googlePlan.install_steps.find((step) => step.id === 'run_adapter_preflight').url_only_status, 'needs_live_page_evidence');
 assert.equal(googlePlan.install_steps.find((step) => step.id === 'bind_current_axis').sdk_method, 'observePlatformCandidates');
 assert.equal(googlePlan.install_steps.find((step) => step.id === 'insert_realtime_marks').action.includes("insertAnnotation('google_meet'"), true);
 assert.equal(googlePlan.sdk_imports.adapter_blueprint, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint');
+assert.equal(googlePlan.sdk_imports.adapter_preflight, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight');
 assert.equal(googlePlan.sdk_imports.adapter_import_plan, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-import-plan');
 assert.equal(assertMeetingPlatformAdapterImportPlan(googlePlan), googlePlan);
 
@@ -112,6 +124,11 @@ assert.equal(matrix.accepted_count, 2);
 assert.equal(matrix.missing_file_count, 0);
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
 assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').adapter_blueprint_available, true);
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').adapter_preflight_status, 'needs_live_page_evidence');
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').adapter_preflight_selected_surface, 'browser_extension');
+assert.equal(matrix.rows.find((row) => row.platform === 'zoom').adapter_preflight_selected_surface, 'native_detector');
+assert.equal(matrix.rows.find((row) => row.platform === 'zoom').adapter_preflight_startup_ready, true);
+assert.equal(matrix.rows.find((row) => row.platform === 'zoom').adapter_preflight_realtime_ready, false);
 
 const client = {
   async startMeeting(input) {

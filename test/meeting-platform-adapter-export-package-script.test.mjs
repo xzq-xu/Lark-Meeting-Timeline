@@ -31,12 +31,18 @@ assert.equal(report.target, 'static');
 assert.equal(report.platform_count, 1);
 assert.equal(report.accepted_count, 1);
 assert.equal(report.export_ready_count, 1);
+assert.equal(report.adapter_preflight_startup_ready_count, 1);
+assert.equal(report.adapter_preflight_realtime_ready_count, 0);
 assert.equal(report.written_files.includes(join(outDir, 'google_meet', 'adapter-export-package.json')), true);
 assert.equal(report.written_files.includes(join(outDir, 'google_meet', 'adapter-blueprint.json')), true);
 assert.equal(report.written_files.includes(join(outDir, 'google_meet', 'runtime-bundle.json')), true);
 assert.equal(report.written_files.includes(join(outDir, 'google_meet', 'provider-connection.json')), true);
 assert.equal(report.rows[0].package_file, join(outDir, 'google_meet', 'adapter-export-package.json'));
 assert.equal(report.rows[0].host_file_count >= 8, true);
+assert.equal(report.rows[0].adapter_preflight_status, 'needs_live_page_evidence');
+assert.equal(report.rows[0].adapter_preflight_selected_surface, 'browser_extension');
+assert.equal(report.rows[0].adapter_preflight_startup_ready, true);
+assert.equal(report.rows[0].adapter_preflight_realtime_ready, false);
 assert.equal(report.matrix.packages, undefined);
 
 const writtenReport = JSON.parse(await readFile(reportFile, 'utf8'));
@@ -49,6 +55,8 @@ assert.equal(exportPackage.accepted, true);
 assert.equal(exportPackage.artifacts, undefined);
 assert.equal(exportPackage.host_files.find((file) => file.source === 'adapter_blueprint').path, 'google_meet/adapter-blueprint.json');
 assert.equal(exportPackage.host_files.find((file) => file.source === 'adapter_contract').path, 'google_meet/adapter-contract.json');
+assert.equal(exportPackage.adapter_preflight.status, 'needs_live_page_evidence');
+assert.equal(exportPackage.adapter_preflight.realtime_annotation_ready, false);
 assert.equal(exportPackage.surface_entrypoints.provider_reconcile.blocks_realtime_annotation, false);
 
 const adapterBlueprint = JSON.parse(await readFile(join(outDir, 'google_meet', 'adapter-blueprint.json'), 'utf8'));
@@ -75,5 +83,7 @@ const { stdout: textStdout } = await execFileAsync(process.execPath, [
 assert.match(textStdout, /meeting_platform_adapter_export_package_report/);
 assert.match(textStdout, /webex: accepted=yes/);
 assert.match(textStdout, /export_ready=yes/);
+assert.match(textStdout, /preflight=needs_live_page_evidence/);
+assert.match(textStdout, /realtime=no/);
 
 console.log('ok meeting platform adapter export package script');

@@ -54,6 +54,7 @@ export interface MeetingPlatformAdapterExportPackage {
   timestamp_field: 'captured_at_ms';
   provider_events_block_realtime: false;
   transcript_blocks_realtime: false;
+  adapter_preflight: Record<string, unknown>;
   import_paths: Record<string, string>;
   artifact_refs: Record<string, Record<string, unknown>>;
   host_files: MeetingPlatformAdapterExportHostFile[];
@@ -80,6 +81,8 @@ export interface MeetingPlatformAdapterExportPackageMatrix {
   custom_authoring_count: number;
   browser_extension_ready_count: number;
   provider_reconcile_count: number;
+  adapter_preflight_startup_ready_count: number;
+  adapter_preflight_realtime_ready_count: number;
   platforms: string[];
   rows: Array<Record<string, unknown>>;
   packages: MeetingPlatformAdapterExportPackage[];

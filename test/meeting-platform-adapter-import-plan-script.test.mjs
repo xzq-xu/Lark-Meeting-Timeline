@@ -43,12 +43,18 @@ assert.equal(report.target, 'static');
 assert.equal(report.package_count, 1);
 assert.equal(report.accepted_count, 1);
 assert.equal(report.blocked_count, 0);
+assert.equal(report.adapter_preflight_startup_ready_count, 1);
+assert.equal(report.adapter_preflight_realtime_ready_count, 0);
 assert.equal(report.available_file_count >= 8, true);
 assert.equal(report.rows[0].platform, 'google_meet');
 assert.equal(report.rows[0].selected_surface, 'browser_extension');
 assert.equal(report.rows[0].file_coverage_ready, true);
 assert.equal(report.rows[0].adapter_blueprint_available, true);
 assert.equal(report.rows[0].adapter_blueprint_primary_surface, 'browser_extension');
+assert.equal(report.rows[0].adapter_preflight_status, 'needs_live_page_evidence');
+assert.equal(report.rows[0].adapter_preflight_selected_surface, 'browser_extension');
+assert.equal(report.rows[0].adapter_preflight_startup_ready, true);
+assert.equal(report.rows[0].adapter_preflight_realtime_ready, false);
 assert.equal(report.rows[0].plan_file, join(importDir, 'google_meet', 'adapter-import-plan.json'));
 
 const writtenReport = JSON.parse(await readFile(reportFile, 'utf8'));
@@ -59,7 +65,11 @@ assert.equal(importPlan.schema, 'meeting_platform_adapter_import_plan');
 assert.equal(importPlan.accepted, true);
 assert.equal(importPlan.adapter_blueprint.primary_surface, 'browser_extension');
 assert.equal(importPlan.adapter_blueprint.provider_blocks_realtime, false);
+assert.equal(importPlan.runtime_contract.adapter_preflight_required_before_realtime_insert, true);
+assert.equal(importPlan.adapter_preflight.status, 'needs_live_page_evidence');
+assert.equal(importPlan.adapter_preflight.realtime_annotation_ready, false);
 assert.equal(importPlan.host_file_coverage.status, 'complete');
+assert.equal(importPlan.install_steps.find((step) => step.id === 'run_adapter_preflight').sdk_method, 'platformAdapterPreflight');
 assert.equal(importPlan.install_steps.find((step) => step.id === 'insert_realtime_marks').sdk_method, 'insertAnnotation');
 
 const { stdout: missingStdout } = await execFileAsync(process.execPath, [
@@ -90,5 +100,7 @@ const { stdout: textStdout } = await execFileAsync(process.execPath, [
 });
 assert.match(textStdout, /meeting_platform_adapter_import_plan_report/);
 assert.match(textStdout, /google_meet: accepted=yes/);
+assert.match(textStdout, /preflight=needs_live_page_evidence/);
+assert.match(textStdout, /realtime=no/);
 
 console.log('ok meeting platform adapter import plan script');

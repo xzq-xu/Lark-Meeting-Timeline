@@ -155,6 +155,9 @@ export async function buildMeetingPlatformAdapterInstallManifestCliReport(option
     selected_surfaces: manifest.selected_surfaces,
     browser_content_script_count: manifest.browser_extension?.content_scripts?.length ?? 0,
     provider_reconcile_count: manifest.provider_reconcile?.platform_count ?? 0,
+    adapter_preflight_platform_count: manifest.adapter_preflight?.platform_count ?? 0,
+    adapter_preflight_startup_ready_count: manifest.adapter_preflight?.startup_ready_count ?? 0,
+    adapter_preflight_realtime_ready_count: manifest.adapter_preflight?.realtime_ready_count ?? 0,
     missing_plan_files: missing,
     missing_plan_file_count: missing.length,
     rows: manifest.platform_registry,
@@ -167,10 +170,10 @@ export async function buildMeetingPlatformAdapterInstallManifestCliReport(option
 
 export function formatMeetingPlatformAdapterInstallManifestCliReport(report = {}) {
   const lines = [
-    `meeting_platform_adapter_install_manifest_report | ok=${boolLabel(report.ok)} | target=${report.target} | plans=${report.plan_count} | platforms=${report.platform_count} | ready=${report.ready_platform_count} | blocked=${report.blocked_platform_count} | browser_content_scripts=${report.browser_content_script_count} | missing_plans=${report.missing_plan_file_count}`,
+    `meeting_platform_adapter_install_manifest_report | ok=${boolLabel(report.ok)} | target=${report.target} | plans=${report.plan_count} | platforms=${report.platform_count} | ready=${report.ready_platform_count} | blocked=${report.blocked_platform_count} | preflight=${report.adapter_preflight_realtime_ready_count}/${report.adapter_preflight_platform_count} | browser_content_scripts=${report.browser_content_script_count} | missing_plans=${report.missing_plan_file_count}`,
   ];
   for (const row of report.rows ?? []) {
-    lines.push(`${row.platform}: ready=${boolLabel(row.ready)} surface=${row.selected_surface} timestamp=${row.timestamp_field ?? 'n/a'} first_sdk=${row.first_sdk_method ?? 'n/a'} mark_sdk=${row.mark_insert_method ?? 'n/a'} issue=${row.first_issue ?? 'none'}`);
+    lines.push(`${row.platform}: ready=${boolLabel(row.ready)} surface=${row.selected_surface} timestamp=${row.timestamp_field ?? 'n/a'} preflight=${row.adapter_preflight_status ?? 'n/a'} realtime=${boolLabel(row.adapter_preflight_realtime_ready)} first_sdk=${row.first_sdk_method ?? 'n/a'} mark_sdk=${row.mark_insert_method ?? 'n/a'} issue=${row.first_issue ?? 'none'}`);
   }
   if (report.missing_plan_files?.length > 0) lines.push(`missing_plan_files=${report.missing_plan_files.join(',')}`);
   if (report.next_actions?.length > 0) lines.push(`next_actions=${report.next_actions.join(',')}`);

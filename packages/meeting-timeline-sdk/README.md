@@ -859,7 +859,7 @@ npm run meeting-platform:adapter-export-package -- \
   --report-file=data/meeting-platform-adapter-export-package-report.json
 ```
 
-这个 export package 和独立 SDK 的关系是：当前仍在同一个仓库内交付，但输出结构已经按下游项目消费设计。其他项目只需要读 `adapter-export-package.json`，按 `host_files` 取对应 artifact，并优先实现 `setup_order` 的 P0 本地轴流程：先 `observePlatformCandidates()` 绑定当前会议，再用 `insertAnnotation(platform, { captured_at_ms, ...mark })` 写实时标注；provider 事件、转写和录制产物只作为 reconcile/backfill。
+这个 export package 和独立 SDK 的关系是：当前仍在同一个仓库内交付，但输出结构已经按下游项目消费设计。其他项目只需要读 `adapter-export-package.json`，按 `host_files` 取对应 artifact，并优先实现 `setup_order` 的 P0 本地轴流程：安装本地 surface 后，先跑 `adapter_preflight`，用 live DOM snapshot、candidate tabs/windows 或进程/Accessibility/音频状态把 `adapter_preflight.realtime_annotation_ready` 验到 `true`；再 `observePlatformCandidates()` 绑定当前会议，最后用 `insertAnnotation(platform, { captured_at_ms, ...mark })` 写实时标注。URL-only 会保持 `needs_live_page_evidence`，不会误报可写入；provider 事件、转写和录制产物只作为 reconcile/backfill。
 
 安装 SDK 包后也可以直接运行同名 bin：
 
@@ -871,7 +871,7 @@ npx meeting-platform-adapter-export-package \
   --out-dir=meeting-platform-adapter-export-packages
 ```
 
-下游项目拿到这份目录后，用 `platformAdapterImportPlan()` 或 CLI 做导入校验。它会确认 `adapter-export-package.json` 的硬约束、所选 surface 是否可用、`host_files` 是否齐全，并自动读取同目录里的 `adapter-blueprint.json`，把 primary surface、surface order、第一条验收 gate 和 provider/transcript 非阻塞约束压进 import plan：
+下游项目拿到这份目录后，用 `platformAdapterImportPlan()` 或 CLI 做导入校验。它会确认 `adapter-export-package.json` 的硬约束、adapter preflight gate、所选 surface 是否可用、`host_files` 是否齐全，并自动读取同目录里的 `adapter-blueprint.json`，把 primary surface、surface order、第一条验收 gate 和 provider/transcript 非阻塞约束压进 import plan：
 
 ```sh
 npx meeting-platform-adapter-import-plan \
@@ -881,9 +881,9 @@ npx meeting-platform-adapter-import-plan \
   --out-dir=meeting-platform-adapter-import-plans
 ```
 
-`adapter-import-plan.json` 的关键字段是 `selected_surface`、`adapter_blueprint`、`host_file_coverage`、`readiness.issues` 和 `install_steps`。对于 Google Meet / Teams / Zoom / Webex / Lark，默认 surface 会优先选择本地可观测路径：Google Meet 通常是 `browser_extension`，Zoom/桌面优先场景会落到 `native_detector`；如果接入方明确要 Electron WebView 或 native detector，可以传 `--surface=webview-preload` 或 `--surface=native-detector`，旧的 `--surface=native-host` 仍作为兼容别名。如果是尚未内置的新会议软件，默认不会把它当成可运行适配器；只有显式 `allowCustomAuthoring` 时，import plan 才会把它视为“可继续作者接入”的计划。
+`adapter-import-plan.json` 的关键字段是 `selected_surface`、`adapter_blueprint`、`adapter_preflight`、`host_file_coverage`、`readiness.issues` 和 `install_steps`。对于 Google Meet / Teams / Zoom / Webex / Lark，默认 surface 会优先选择本地可观测路径：Google Meet 通常是 `browser_extension`，Zoom/桌面优先场景会落到 `native_detector`；如果接入方明确要 Electron WebView 或 native detector，可以传 `--surface=webview-preload` 或 `--surface=native-detector`，旧的 `--surface=native-host` 仍作为兼容别名。如果是尚未内置的新会议软件，默认不会把它当成可运行适配器；只有显式 `allowCustomAuthoring` 时，import plan 才会把它视为“可继续作者接入”的计划。
 
-多个平台的 import plan 验收通过后，再用 `platformAdapterInstallManifest()` 或 CLI 生成宿主统一安装清单。它不会替代真实会议软件的运行时代码，而是把下游项目需要注册的 surfaces 合并成一份 manifest：browser extension 的 `content_scripts`/`host_permissions`、WebView/native detector 的 platform registry、`adapter_blueprints` 索引、provider reconcile 的非阻塞约束、以及 `observePlatformCandidates()` -> `insertAnnotation()` 的顺序约束。
+多个平台的 import plan 验收通过后，再用 `platformAdapterInstallManifest()` 或 CLI 生成宿主统一安装清单。它不会替代真实会议软件的运行时代码，而是把下游项目需要注册的 surfaces 合并成一份 manifest：browser extension 的 `content_scripts`/`host_permissions`、WebView/native detector 的 platform registry、`adapter_blueprints` 索引、`adapter_preflight` registry、provider reconcile 的非阻塞约束、以及 `run_adapter_preflight_before_realtime_session -> observePlatformCandidates() -> insertAnnotation()` 的顺序约束。
 
 ```sh
 npx meeting-platform-adapter-install-manifest \

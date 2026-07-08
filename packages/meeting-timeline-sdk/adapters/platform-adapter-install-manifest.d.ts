@@ -36,6 +36,7 @@ export interface MeetingPlatformAdapterInstallManifest {
   native_detector: Record<string, unknown>;
   native_host: Record<string, unknown>;
   adapter_blueprints: Record<string, unknown>;
+  adapter_preflight: Record<string, unknown>;
   provider_reconcile: Record<string, unknown>;
   install_sequence: Array<Record<string, unknown>>;
   readiness: Record<string, unknown>;
