@@ -65,6 +65,8 @@ async function buildReport() {
     implementation_ready_count: matrix.implementation_ready_count,
     pilot_ready_count: matrix.pilot_ready_count,
     production_ready_count: matrix.production_ready_count,
+    adapter_preflight_startup_ready_count: matrix.adapter_preflight_startup_ready_count,
+    adapter_preflight_realtime_ready_count: matrix.adapter_preflight_realtime_ready_count,
     recommended_first_platform: matrix.recommended_first_platform,
     recommended_first_surface: matrix.recommended_first_surface,
     required_platforms: requiredPlatforms,
@@ -84,9 +86,9 @@ try {
   if (jsonOutput) {
     console.log(JSON.stringify(report, null, 2));
   } else {
-    console.log(`meeting_platform_implementation_handoff_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | implementation_ready=${report.implementation_ready_count} | pilot=${report.pilot_ready_count} | production=${report.production_ready_count} | first=${report.recommended_first_platform ?? 'n/a'} | surface=${report.recommended_first_surface ?? 'n/a'} | written=${report.written_files.length}`);
+    console.log(`meeting_platform_implementation_handoff_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | implementation_ready=${report.implementation_ready_count} | pilot=${report.pilot_ready_count} | production=${report.production_ready_count} | preflight=${report.adapter_preflight_realtime_ready_count}/${report.platform_count} | first=${report.recommended_first_platform ?? 'n/a'} | surface=${report.recommended_first_surface ?? 'n/a'} | written=${report.written_files.length}`);
     for (const row of report.rows) {
-      console.log(`${row.platform}: ready=${boolLabel(row.implementation_ready)} surface=${row.recommended_first_surface} matches=${row.browser_match_count} provider=${row.provider_path ?? 'none'} gaps=${row.production_gap_count} handoff=${row.handoff_file}`);
+      console.log(`${row.platform}: ready=${boolLabel(row.implementation_ready)} surface=${row.recommended_first_surface} preflight=${row.adapter_preflight_status ?? 'n/a'} realtime=${boolLabel(row.adapter_preflight_realtime_ready)} matches=${row.browser_match_count} provider=${row.provider_path ?? 'none'} gaps=${row.production_gap_count} handoff=${row.handoff_file}`);
     }
     if (report.next_actions.length > 0) console.log(`next_actions=${report.next_actions.join(',')}`);
   }

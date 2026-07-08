@@ -30,12 +30,19 @@ assert.equal(report.platform_count, 3);
 assert.equal(report.implementation_ready_count, 3);
 assert.equal(report.pilot_ready_count, 3);
 assert.equal(report.production_ready_count, 0);
+assert.equal(report.adapter_preflight_startup_ready_count, 3);
+assert.equal(report.adapter_preflight_realtime_ready_count, 0);
 assert.equal(report.recommended_first_platform, 'google_meet');
 assert.equal(report.recommended_first_surface, 'browser_extension');
 assert.equal(report.written_files.length, 3);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').handoff_file, join(outDir, 'google_meet.json'));
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').runtime_event_endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_preflight_status, 'needs_live_page_evidence');
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_preflight_selected_surface, 'browser_extension');
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_preflight_startup_ready, true);
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_preflight_realtime_ready, false);
 assert.equal(report.rows.find((row) => row.platform === 'microsoft_teams').provider_permission_risk, 'tenant_admin_consent_and_subscription_renewal');
+assert.equal(report.rows.find((row) => row.platform === 'microsoft_teams').adapter_preflight_selected_surface, 'native_detector');
 assert.equal(report.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 assert.equal(report.matrix.handoffs, undefined);
 
@@ -49,7 +56,12 @@ assert.equal(googleHandoff.platform, 'google_meet');
 assert.equal(googleHandoff.install_surface.browser_matches.includes('https://meet.google.com/*'), true);
 assert.equal(googleHandoff.runtime_events.message_types.includes('meeting_timeline.sample_tracks'), true);
 assert.equal(googleHandoff.provider_reconcile.path, 'google_workspace_events_pubsub');
+assert.equal(googleHandoff.adapter_preflight.status, 'needs_live_page_evidence');
+assert.equal(googleHandoff.adapter_preflight.selected_surface, 'browser_extension');
+assert.equal(googleHandoff.adapter_preflight.realtime_annotation_ready, false);
+assert.equal(googleHandoff.contracts.adapter_preflight_required_before_realtime_insert, true);
 assert.equal(googleHandoff.contracts.timestamp_field, 'captured_at_ms');
+assert.equal(googleHandoff.acceptance.commands.adapter_preflight.includes('meeting-platform:adapter-preflight'), true);
 assert.equal(googleHandoff.acceptance.commands.runtime_bundle.includes('meeting-platform:runtime-bundle'), true);
 
 const { stdout: textStdout } = await execFileAsync(process.execPath, [
@@ -61,6 +73,8 @@ const { stdout: textStdout } = await execFileAsync(process.execPath, [
 });
 assert.match(textStdout, /meeting_platform_implementation_handoff_report/);
 assert.match(textStdout, /implementation_ready=1/);
+assert.match(textStdout, /preflight=0\/1/);
 assert.match(textStdout, /webex: ready=yes/);
+assert.match(textStdout, /preflight=needs_live_page_evidence/);
 
 console.log('ok meeting platform implementation handoff script');
