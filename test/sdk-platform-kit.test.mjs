@@ -106,6 +106,8 @@ assert.equal(googleKitReport.platform_provider_replay_matrix.accepted_count, 1);
 assert.equal(googleKitReport.platform_host_profile_compatibility_matrix.platform_count, 1);
 assert.equal(googleKitReport.platform_host_profile_compatibility_matrix.host_profile_count, 9);
 assert.equal(googleKitReport.platform_host_profile_compatibility_matrix.full_realtime_profile_count >= 1, true);
+assert.equal(googleKitReport.platform_adapter_matrix.platform_count, 1);
+assert.equal(googleKitReport.platform_adapter_matrix.rows[0].adapter_kind, 'browser_first');
 assert.equal(kit.platformHostProfileCompatibilityMatrix({}, {
   platforms: ['google-meet', 'zoom'],
   hostProfiles: ['browser_extension', 'native_detector'],

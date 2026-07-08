@@ -127,6 +127,8 @@ assert.equal(packedFiles.includes('adapters/platform-adapter-blueprint.mjs'), tr
 assert.equal(packedFiles.includes('adapters/platform-adapter-blueprint.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-decision.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-decision.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-matrix.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-matrix.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-startup.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-startup.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-runtime-recipe.mjs'), true);
@@ -638,6 +640,8 @@ import {
   buildMeetingPlatformAdapterDecision as buildMeetingPlatformAdapterDecisionFromRoot,
   buildMeetingPlatformAdapterDecisionMatrix as buildMeetingPlatformAdapterDecisionMatrixFromRoot,
   buildMeetingPlatformHostProfileCompatibilityMatrix as buildMeetingPlatformHostProfileCompatibilityMatrixFromRoot,
+  buildMeetingPlatformAdapterMatrix as buildMeetingPlatformAdapterMatrixFromRoot,
+  buildMeetingPlatformAdapterMatrixRow as buildMeetingPlatformAdapterMatrixRowFromRoot,
   buildMeetingPlatformAdapterStartupPlan as buildMeetingPlatformAdapterStartupPlanFromRoot,
   buildMeetingPlatformAdapterStartupPlanMatrix as buildMeetingPlatformAdapterStartupPlanMatrixFromRoot,
   buildMeetingPlatformAdapterRuntimeManifest as buildMeetingPlatformAdapterRuntimeManifestFromRoot,
@@ -753,6 +757,10 @@ import {
   buildMeetingPlatformAdapterDecisionMatrix,
   buildMeetingPlatformHostProfileCompatibilityMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-decision';
+import {
+  buildMeetingPlatformAdapterMatrix,
+  buildMeetingPlatformAdapterMatrixRow,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-matrix';
 import {
   buildMeetingPlatformAdapterStartupPlan,
   buildMeetingPlatformAdapterStartupPlanMatrix,
@@ -1475,6 +1483,10 @@ assert.equal(rootMeetingAppSdk.hostProfileCompatibilityMatrix({}, {
   platforms: ['google-meet'],
   hostProfiles: ['provider_reconcile_only'],
 }).full_realtime_profile_count, 0);
+assert.equal(rootMeetingAppSdk.platformAdapterMatrix({ platforms: ['google-meet', 'zoom'] }).platform_count, 2);
+assert.equal(rootMeetingAppSdk.adapterMatrix({ platforms: ['google-meet'] }).rows[0].primary_surface, 'browser_extension');
+assert.equal(rootMeetingAppSdk.platformAdapterMatrixRow('zoom').primary_surface, 'native_detector');
+assert.equal(rootMeetingAppSdk.adapterMatrixRow('google-meet').realtime_axis.timestamp_field, 'captured_at_ms');
 assert.equal(rootMeetingAppSdk.platformAdapterAcceptanceChecklist('google-meet', {}, { target: 'static' }).accepted, true);
 assert.equal(rootMeetingAppSdk.adapterAcceptanceChecklistMatrix({ platforms: ['google-meet'] }, { target: 'static' }).accepted_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterExportPackage('google-meet', {}, { target: 'static' }).export_ready, true);
@@ -1699,6 +1711,14 @@ assert.equal(buildMeetingPlatformHostProfileCompatibilityMatrixFromRoot({}, {
   platforms: ['google-meet'],
   hostProfiles: ['browser_extension'],
 }).recommended_host_profile, 'browser_extension');
+assert.equal(buildMeetingPlatformAdapterMatrixFromRoot({
+  platforms: ['google-meet', 'zoom'],
+}, {
+  baseUrl: 'http://localhost:8787',
+}).platform_count, 2);
+assert.equal(buildMeetingPlatformAdapterMatrixRowFromRoot('google-meet', {}, {
+  baseUrl: 'http://localhost:8787',
+}).primary_surface, 'browser_extension');
 assert.equal(buildMeetingPlatformAdapterStartupPlanFromRoot({
   url: 'https://meet.google.com/abc-defg-hij',
 }, {
@@ -3339,6 +3359,14 @@ assert.equal(buildMeetingPlatformHostProfileCompatibilityMatrix({}, {
   platforms: ['google-meet', 'zoom'],
   hostProfiles: ['native_detector'],
 }).rows[0].native_surface_count, 2);
+assert.equal(buildMeetingPlatformAdapterMatrix({
+  platforms: ['google-meet', 'teams', 'zoom'],
+}, {
+  baseUrl: 'http://localhost:8787',
+}).rows[0].primary_surface, 'browser_extension');
+assert.equal(buildMeetingPlatformAdapterMatrixRow('zoom', {}, {
+  baseUrl: 'http://localhost:8787',
+}).adapter_kind, 'native_first');
 assert.equal(buildMeetingPlatformAdapterStartupPlan({
   url: 'https://meet.google.com/abc-defg-hij',
 }, {
@@ -3418,6 +3446,8 @@ assert.equal(kit.platformHostProfileCompatibilityMatrix({}, {
   platforms: ['webex'],
   hostProfiles: ['browser_extension'],
 }).cell_count, 1);
+assert.equal(kit.platformAdapterMatrix({ platforms: ['google-meet', 'zoom'] }).provider_reconcile_required_count, 2);
+assert.equal(kit.platformAdapterMatrixRow('google-meet').realtime_axis.provider_events_block_realtime, false);
 assert.equal(kit.platformAdapterStartupPlan({
   url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
 }).platform, 'microsoft_teams');

@@ -632,6 +632,17 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionOptions,
   ): import('./adapters/platform-adapter-decision.mjs').MeetingPlatformHostProfileCompatibilityMatrix;
   hostProfileCompatibilityMatrix: MeetingAppTimelineSdk['platformHostProfileCompatibilityMatrix'];
+  platformAdapterMatrix(
+    input?: Record<string, unknown>,
+    options?: import('./adapters/platform-adapter-matrix.mjs').MeetingPlatformAdapterMatrixOptions,
+  ): import('./adapters/platform-adapter-matrix.mjs').MeetingPlatformAdapterMatrix;
+  adapterMatrix: MeetingAppTimelineSdk['platformAdapterMatrix'];
+  platformAdapterMatrixRow(
+    platformOrOptions?: string | Record<string, unknown>,
+    input?: Record<string, unknown>,
+    options?: import('./adapters/platform-adapter-matrix.mjs').MeetingPlatformAdapterMatrixOptions,
+  ): import('./adapters/platform-adapter-matrix.mjs').MeetingPlatformAdapterMatrixRow;
+  adapterMatrixRow: MeetingAppTimelineSdk['platformAdapterMatrixRow'];
   assertPlatformAdapterDecision(
     input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
     options?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionOptions,
@@ -866,6 +877,7 @@ export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-adapter-selection.mjs';
 export * from './adapters/platform-adapter-blueprint.mjs';
 export * from './adapters/platform-adapter-decision.mjs';
+export * from './adapters/platform-adapter-matrix.mjs';
 export * from './adapters/platform-adapter-startup.mjs';
 export * from './adapters/platform-adapter-runtime-recipe.mjs';
 export * from './adapters/platform-adapter-preflight.mjs';

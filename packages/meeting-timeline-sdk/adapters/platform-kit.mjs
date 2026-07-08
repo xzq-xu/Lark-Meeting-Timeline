@@ -200,6 +200,10 @@ import {
   buildMeetingPlatformHostProfileCompatibilityMatrix,
 } from './platform-adapter-decision.mjs';
 import {
+  buildMeetingPlatformAdapterMatrix,
+  buildMeetingPlatformAdapterMatrixRow,
+} from './platform-adapter-matrix.mjs';
+import {
   assertMeetingPlatformAdapterStartupPlan,
   assertMeetingPlatformAdapterStartupPlanMatrix,
   buildMeetingPlatformAdapterStartupPlan,
@@ -710,6 +714,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_adapter_selection_matrix: buildMeetingPlatformAdapterSelectionMatrix(options),
     platform_adapter_blueprint_matrix: buildMeetingPlatformAdapterBlueprintMatrix(options),
     platform_adapter_decision_matrix: buildMeetingPlatformAdapterDecisionMatrix(options),
+    platform_adapter_matrix: buildMeetingPlatformAdapterMatrix(options, options),
     platform_adapter_startup_plan_matrix: buildMeetingPlatformAdapterStartupPlanMatrix(options),
     platform_adapter_runtime_recipe_matrix: platformAdapterRuntimeRecipeMatrix,
     platform_adapter_runtime_manifest: platformAdapterRuntimeManifest,
@@ -900,6 +905,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformHostProfileCompatibilityMatrix(input = {}, decisionOptions = {}) {
       return buildMeetingPlatformHostProfileCompatibilityMatrix(input, withDefaults(defaults, decisionOptions));
+    },
+    platformAdapterMatrix(input = {}, matrixOptions = {}) {
+      return buildMeetingPlatformAdapterMatrix(input, withDefaults(defaults, matrixOptions));
+    },
+    platformAdapterMatrixRow(platform, input = {}, matrixOptions = {}) {
+      return buildMeetingPlatformAdapterMatrixRow(platform, input, withDefaults(defaults, matrixOptions));
     },
     assertPlatformAdapterDecision(input = {}, decisionOptions = {}) {
       return assertMeetingPlatformAdapterDecision(input, withDefaults(defaults, decisionOptions));

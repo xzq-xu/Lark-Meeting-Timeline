@@ -88,6 +88,11 @@ import type {
   MeetingPlatformHostProfileCompatibilityMatrix,
 } from './platform-adapter-decision.mjs';
 import type {
+  MeetingPlatformAdapterMatrix,
+  MeetingPlatformAdapterMatrixOptions,
+  MeetingPlatformAdapterMatrixRow,
+} from './platform-adapter-matrix.mjs';
+import type {
   MeetingPlatformAdapterStartupPlan,
   MeetingPlatformAdapterStartupPlanMatrix,
   MeetingPlatformAdapterStartupPlanOptions,
@@ -525,6 +530,8 @@ export interface MeetingPlatformTimelineKit {
   platformAdapterDecision(input?: string | URL | MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecision;
   platformAdapterDecisionMatrix(input?: MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecisionMatrix;
   platformHostProfileCompatibilityMatrix(input?: MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformHostProfileCompatibilityMatrix;
+  platformAdapterMatrix(input?: Record<string, unknown>, matrixOptions?: MeetingPlatformAdapterMatrixOptions): MeetingPlatformAdapterMatrix;
+  platformAdapterMatrixRow(platform: string, input?: Record<string, unknown>, matrixOptions?: MeetingPlatformAdapterMatrixOptions): MeetingPlatformAdapterMatrixRow;
   assertPlatformAdapterDecision(input?: string | URL | MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecision;
   assertPlatformAdapterDecisionMatrix(input?: MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecisionMatrix;
   platformAdapterStartupPlan(input?: string | URL | MeetingPlatformAdapterDecisionInput, startupOptions?: MeetingPlatformAdapterStartupPlanOptions): MeetingPlatformAdapterStartupPlan;

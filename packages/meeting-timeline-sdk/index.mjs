@@ -1639,6 +1639,19 @@ export function createMeetingAppTimelineSdk(options = {}) {
     hostProfileCompatibilityMatrix(input = {}, decisionOptions = {}) {
       return sdk.platformHostProfileCompatibilityMatrix(input, decisionOptions);
     },
+    platformAdapterMatrix(input = {}, matrixOptions = {}) {
+      return runtime.kit.platformAdapterMatrix(input, sdkPlatformOptions(runtime, matrixOptions));
+    },
+    adapterMatrix(input = {}, matrixOptions = {}) {
+      return sdk.platformAdapterMatrix(input, matrixOptions);
+    },
+    platformAdapterMatrixRow(platformOrOptions = {}, input = {}, matrixOptions = {}) {
+      const resolved = singlePlatformInput(runtime, platformOrOptions, matrixOptions);
+      return runtime.kit.platformAdapterMatrixRow(resolved.platform, input, sdkPlatformOptions(runtime, resolved.options));
+    },
+    adapterMatrixRow(platformOrOptions = {}, input = {}, matrixOptions = {}) {
+      return sdk.platformAdapterMatrixRow(platformOrOptions, input, matrixOptions);
+    },
     assertPlatformAdapterDecision(input = {}, decisionOptions = {}) {
       return runtime.kit.assertPlatformAdapterDecision(input, sdkPlatformOptions(runtime, decisionOptions));
     },
@@ -1979,6 +1992,7 @@ export * from './adapters/platform-adapter-route.mjs';
 export * from './adapters/platform-adapter-selection.mjs';
 export * from './adapters/platform-adapter-blueprint.mjs';
 export * from './adapters/platform-adapter-decision.mjs';
+export * from './adapters/platform-adapter-matrix.mjs';
 export * from './adapters/platform-adapter-startup.mjs';
 export * from './adapters/platform-adapter-runtime-recipe.mjs';
 export * from './adapters/platform-adapter-preflight.mjs';
