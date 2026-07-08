@@ -5,6 +5,8 @@ export const MEETING_PLATFORM_ADAPTER_SESSION_EVENT_SCHEMA: 'meeting_platform_ad
 export const MEETING_PLATFORM_ADAPTER_SESSION_SCHEMA_VERSION: 1;
 
 export interface MeetingPlatformAdapterSessionClient {
+  platformAdapterSelection?(platformOrPayload: string | Record<string, unknown>, payloadOrOptions?: Record<string, unknown>, options?: Record<string, unknown>): unknown | Promise<unknown>;
+  adapterSelection?(platformOrPayload: string | Record<string, unknown>, payloadOrOptions?: Record<string, unknown>, options?: Record<string, unknown>): unknown | Promise<unknown>;
   platformRawSignalBatch?(payload: Record<string, unknown>, options?: Record<string, unknown>): unknown | Promise<unknown>;
   rawSignalBatch?(payload: Record<string, unknown>, options?: Record<string, unknown>): unknown | Promise<unknown>;
   validateRawSignal?(payload: Record<string, unknown>, options?: Record<string, unknown>): unknown | Promise<unknown>;
@@ -34,6 +36,10 @@ export interface MeetingPlatformAdapterSessionOptions {
   platform_argument?: boolean;
   allowUnobservedAxis?: boolean;
   allow_unobserved_axis?: boolean;
+  readAdapterSelection?: boolean;
+  read_adapter_selection?: boolean;
+  allowUnreadAdapterSelection?: boolean;
+  allow_unread_adapter_selection?: boolean;
   validateRawSignal?: boolean;
   validate_raw_signal?: boolean;
   allowUnvalidatedRawSignal?: boolean;
@@ -61,10 +67,12 @@ export interface MeetingPlatformAdapterSession {
   id: string;
   platform?: string;
   selected_surface?: string;
+  adapter_selection?: Record<string, unknown>;
   launch_plan: MeetingPlatformAdapterLaunchPlan;
   axis_contract: Record<string, unknown>;
   runtime_actions: Array<Record<string, unknown>>;
   getState(): Record<string, unknown>;
+  readAdapterSelection(input?: Record<string, unknown>, options?: MeetingPlatformAdapterSessionOptions): Promise<MeetingPlatformAdapterSessionEvent>;
   validateRawSignal(input?: Record<string, unknown>, options?: MeetingPlatformAdapterSessionOptions): Promise<MeetingPlatformAdapterSessionEvent>;
   observeAxis(input?: Record<string, unknown>, options?: MeetingPlatformAdapterSessionOptions): Promise<MeetingPlatformAdapterSessionEvent>;
   insertAnnotation(input?: Record<string, unknown>, options?: MeetingPlatformAdapterSessionOptions): Promise<MeetingPlatformAdapterSessionEvent>;

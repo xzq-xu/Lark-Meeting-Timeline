@@ -314,6 +314,13 @@ function event(action, bridge, message = {}, payload = {}, result, handled = tru
     result?.payload?.launch_plan?.adapter_blueprint,
     state?.current_launch_plan?.adapter_blueprint,
   );
+  const adapterSelection = firstNonEmpty(
+    result?.adapter_selection,
+    result?.launch_plan?.adapter_selection,
+    result?.payload?.launch_plan?.adapter_selection,
+    result?.payload?.adapter_selection_event?.payload?.adapter_selection,
+    state?.current_launch_plan?.adapter_selection,
+  );
   const rawSignalValidation = firstNonEmpty(
     result?.raw_signal_validation,
     result?.launch_plan?.raw_signal_validation,
@@ -332,6 +339,10 @@ function event(action, bridge, message = {}, payload = {}, result, handled = tru
     request_id: requestId(message, payload),
     platform: result?.platform ?? result?.payload?.platform ?? state?.current_launch_plan?.platform,
     selected_surface: result?.selected_surface ?? result?.payload?.selected_surface ?? state?.current_launch_plan?.selected_surface,
+    adapter_selection: adapterSelection,
+    adapter_selection_axis_source: adapterSelection?.axis_source,
+    adapter_selection_axis_surface: adapterSelection?.axis_surface,
+    adapter_selection_timestamp_field: adapterSelection?.timestamp_field,
     adapter_blueprint: adapterBlueprint,
     adapter_blueprint_primary_surface: adapterBlueprint?.primary_surface,
     adapter_blueprint_first_gate: adapterBlueprint?.first_acceptance_gate,
@@ -466,6 +477,7 @@ export function buildMeetingPlatformAdapterMessageBridgeHandoff(manifestOrInput 
       'background_or_native_host_sends_observe_candidates',
       'optional_candidate_launch_plan_checks_live_evidence',
       'bridge_opens_adapter_runner_session',
+      'runner_reads_adapter_selection_before_runtime_wiring',
       'runner_validates_raw_signal_before_axis_observation',
       'content_or_device_sends_insert_mark_with_captured_at_ms',
       'bridge_routes_mark_to_current_runner_session',

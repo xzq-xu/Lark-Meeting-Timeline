@@ -34,6 +34,10 @@ export interface MeetingPlatformAdapterMessageBridgeEvent {
   request_id?: string;
   platform?: string;
   selected_surface?: string;
+  adapter_selection?: Record<string, unknown>;
+  adapter_selection_axis_source?: string;
+  adapter_selection_axis_surface?: string;
+  adapter_selection_timestamp_field?: string;
   adapter_blueprint?: Record<string, unknown>;
   adapter_blueprint_primary_surface?: string;
   adapter_blueprint_first_gate?: string;

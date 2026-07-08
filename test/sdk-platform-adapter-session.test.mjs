@@ -79,6 +79,8 @@ const session = createMeetingPlatformAdapterSession(googlePlan, adapterClient, {
 assert.equal(session.schema, 'meeting_platform_adapter_session');
 assert.equal(session.platform, 'google_meet');
 assert.equal(session.selected_surface, 'browser_extension');
+assert.equal(session.adapter_selection.axis_surface, 'browser_extension');
+assert.equal(session.getState().adapter_selection_read, false);
 assert.equal(session.getState().axis_observed, false);
 await assert.rejects(
   () => session.insertAnnotation({ label: 'why?' }),
@@ -90,6 +92,9 @@ const validated = await session.validateRawSignal({
 });
 assert.equal(validated.action, 'validate_raw_signal');
 assert.equal(validated.payload.raw_signals[0].platform, 'google_meet');
+assert.equal(session.getState().adapter_selection_read, true);
+assert.equal(session.getState().last_adapter_selection_event.action, 'read_adapter_selection');
+assert.equal(session.getState().last_adapter_selection_event.payload.axis_surface, 'browser_extension');
 assert.equal(session.getState().raw_signal_validated, true);
 assert.equal(calls[0][0], 'platformRawSignalBatch');
 
@@ -127,6 +132,8 @@ const handoff = buildMeetingPlatformAdapterSessionHandoff(googlePlan);
 assert.equal(handoff.schema, 'meeting_platform_adapter_session_handoff');
 assert.equal(handoff.session_factory, 'createMeetingPlatformAdapterSession');
 assert.equal(handoff.required_client_methods.includes('observePlatformCandidates'), true);
+assert.equal(handoff.optional_client_methods.includes('platformAdapterSelection'), true);
+assert.equal(handoff.next_actions.includes('call_session_readAdapterSelection_before_runtime_wiring'), true);
 assert.equal(handoff.next_actions.includes('call_session_insertAnnotation_for_realtime_marks'), true);
 
 const bridgeCalls = [];

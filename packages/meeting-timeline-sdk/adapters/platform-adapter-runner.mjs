@@ -108,6 +108,13 @@ function shouldValidateRawSignal(options = {}) {
     && options.auto_validate_raw_signal !== false;
 }
 
+function shouldReadAdapterSelection(options = {}) {
+  return options.readAdapterSelection !== false
+    && options.read_adapter_selection !== false
+    && options.autoReadAdapterSelection !== false
+    && options.auto_read_adapter_selection !== false;
+}
+
 function launchPlanFromCandidate(plan) {
   return assertMeetingPlatformAdapterCandidateLaunchPlan(plan).launch_plan;
 }
@@ -135,7 +142,10 @@ function event(action, runner, payload = {}, result) {
     selected_surface: payload.launch_plan?.selected_surface,
     payload,
     result,
-    captured_at_ms: payload.observe_event?.captured_at_ms ?? payload.launch_plan?.mark_template?.captured_at_ms,
+    captured_at_ms: payload.observe_event?.captured_at_ms
+      ?? payload.raw_signal_event?.captured_at_ms
+      ?? payload.adapter_selection_event?.captured_at_ms
+      ?? payload.launch_plan?.mark_template?.captured_at_ms,
   });
 }
 
@@ -225,6 +235,9 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
         : assertMeetingPlatformAdapterLaunchPlan(runner.launchPlan(input, mergedOptions));
       const session = createMeetingPlatformAdapterSession(launchPlan, client, mergedOptions);
       const validationInput = observeInputFor(input);
+      const adapterSelectionEvent = shouldReadAdapterSelection(mergedOptions)
+        ? await session.readAdapterSelection(validationInput, mergedOptions)
+        : undefined;
       const rawSignalEvent = shouldValidateRawSignal(mergedOptions)
         ? await session.validateRawSignal(validationInput, mergedOptions)
         : undefined;
@@ -244,6 +257,7 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
           platform: session.platform,
           selected_surface: session.selected_surface,
         },
+        adapter_selection_event: adapterSelectionEvent,
         raw_signal_event: rawSignalEvent,
         observe_event: observeEvent,
       }, observeEvent?.result);
@@ -271,6 +285,11 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
     async validateRawSignal(input = {}, validationOptions = {}) {
       const session = requireCurrentSession(state);
       state.last_session_event = await session.validateRawSignal(input, validationOptions);
+      return state.last_session_event;
+    },
+    async readAdapterSelection(input = {}, selectionOptions = {}) {
+      const session = requireCurrentSession(state);
+      state.last_session_event = await session.readAdapterSelection(input, selectionOptions);
       return state.last_session_event;
     },
     async insertAnnotation(input = {}, markOptions = {}) {
@@ -329,10 +348,11 @@ export function buildMeetingPlatformAdapterRunnerHandoff(manifestOrInput = {}, o
     convenience_method: 'openMeetingPlatformAdapterSession',
     install_manifest_schema: installManifest?.schema,
     required_client_methods: ['observePlatformCandidates', 'insertAnnotation'],
-    optional_client_methods: ['platformRawSignalBatch', 'rawSignalBatch', 'speakerTrack', 'participantTrack', 'ingestProvider'],
+    optional_client_methods: ['platformAdapterSelection', 'adapterSelection', 'platformRawSignalBatch', 'rawSignalBatch', 'speakerTrack', 'participantTrack', 'ingestProvider'],
     runtime_sequence: [
       'build_launch_plan_from_current_url_or_platform',
       'create_session_from_launch_plan',
+      'read_adapter_selection_before_runtime_wiring',
       'validate_raw_signal_before_adapter_preflight',
       'observe_axis_before_first_mark',
       'insert_realtime_annotations_with_captured_at_ms',

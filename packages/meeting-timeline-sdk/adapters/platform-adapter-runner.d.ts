@@ -32,6 +32,10 @@ export interface MeetingPlatformAdapterRunnerOptions extends MeetingPlatformAdap
   validate_raw_signal?: boolean;
   autoValidateRawSignal?: boolean;
   auto_validate_raw_signal?: boolean;
+  readAdapterSelection?: boolean;
+  read_adapter_selection?: boolean;
+  autoReadAdapterSelection?: boolean;
+  auto_read_adapter_selection?: boolean;
   [key: string]: unknown;
 }
 
@@ -51,6 +55,7 @@ export interface MeetingPlatformAdapterOpenSessionEvent {
       platform?: string;
       selected_surface?: string;
     };
+    adapter_selection_event?: MeetingPlatformAdapterSessionEvent;
     raw_signal_event?: MeetingPlatformAdapterSessionEvent;
     observe_event?: MeetingPlatformAdapterSessionEvent;
   };
@@ -71,6 +76,7 @@ export interface MeetingPlatformAdapterRunner {
   openCandidate(input?: MeetingPlatformAdapterLaunchPlanOptions | MeetingPlatformAdapterCandidateLaunchPlan | string | Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterOpenSessionEvent>;
   ensureOpen(input?: MeetingPlatformAdapterLaunchPlanOptions | MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterCandidateLaunchPlan | string | Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterOpenSessionEvent | undefined>;
   currentSession(): MeetingPlatformAdapterSession;
+  readAdapterSelection(input?: Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterSessionEvent>;
   validateRawSignal(input?: Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterSessionEvent>;
   observeAxis(input?: Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterSessionEvent>;
   insertAnnotation(input?: Record<string, unknown>, options?: MeetingPlatformAdapterRunnerOptions): Promise<MeetingPlatformAdapterSessionEvent>;

@@ -103,6 +103,9 @@ assert.equal(candidatePlan.request_id, 'candidate-plan-1');
 assert.equal(candidatePlan.result.accepted, true);
 assert.equal(candidatePlan.result.status, 'ready_for_realtime_launch');
 assert.equal(candidatePlan.result.launch_plan.platform, 'google_meet');
+assert.equal(candidatePlan.adapter_selection_axis_source, 'local_observer_axis');
+assert.equal(candidatePlan.adapter_selection_axis_surface, 'browser_extension');
+assert.equal(candidatePlan.adapter_selection_timestamp_field, 'captured_at_ms');
 assert.equal(candidatePlan.adapter_blueprint_primary_surface, 'browser_extension');
 assert.equal(candidatePlan.raw_signal_validation_status, 'ready');
 assert.equal(candidatePlan.result.selected_candidate.tab_id, 7);
@@ -150,8 +153,10 @@ const strictOpened = await strictBridge.handleMessage({
 assert.equal(strictOpened.action, 'open_candidate_session');
 assert.equal(strictOpened.platform, 'google_meet');
 assert.equal(strictOpened.result.payload.launch_plan.platform, 'google_meet');
+assert.equal(strictOpened.adapter_selection_axis_surface, 'browser_extension');
 assert.equal(strictOpened.adapter_blueprint_primary_surface, 'browser_extension');
 assert.equal(strictOpened.raw_signal_validation_status, 'ready');
+assert.equal(strictOpened.result.payload.adapter_selection_event.action, 'read_adapter_selection');
 assert.equal(strictOpened.result.payload.raw_signal_event.action, 'validate_raw_signal');
 assert.equal(strictCalls[0][0], 'observePlatformCandidates');
 assert.equal(strictCalls[0][1].candidates[0].tab_id, 9);
@@ -170,6 +175,8 @@ assert.equal(opened.handled, true);
 assert.equal(opened.action, 'open_session');
 assert.equal(opened.request_id, 'observe-1');
 assert.equal(opened.platform, 'google_meet');
+assert.equal(opened.adapter_selection_axis_source, 'local_observer_axis');
+assert.equal(opened.adapter_selection_axis_surface, 'browser_extension');
 assert.equal(opened.adapter_blueprint_primary_surface, 'browser_extension');
 assert.equal(opened.adapter_blueprint_first_gate, 'local_candidate_preflight_accepts_active_meeting');
 assert.equal(opened.raw_signal_validation_status, 'ready');
@@ -243,6 +250,7 @@ assert.equal(handoff.message_types.includes('meeting_timeline.insert_mark'), tru
 assert.equal(handoff.message_types.includes('meeting_timeline.candidate_launch_plan'), true);
 assert.equal(handoff.message_types.includes('meeting_timeline.open_candidate_session'), true);
 assert.equal(handoff.supported_surfaces.includes('electron_webview_preload'), true);
+assert.equal(handoff.runtime_sequence.includes('runner_reads_adapter_selection_before_runtime_wiring'), true);
 
 const timelineCalls = [];
 const timelineClient = {

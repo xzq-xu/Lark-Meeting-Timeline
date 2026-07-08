@@ -91,6 +91,8 @@ const launchPlanRunner = createMeetingPlatformAdapterRunner(launchPlan, adapterC
   clock: () => 321,
 });
 assert.equal((await launchPlanRunner.open()).payload.observe_event.captured_at_ms, 321);
+assert.equal(launchPlanRunner.getState().last_open_event.payload.adapter_selection_event.action, 'read_adapter_selection');
+assert.equal(launchPlanRunner.getState().last_open_event.payload.adapter_selection_event.payload.axis_surface, 'browser_extension');
 assert.equal(launchPlanRunner.getState().last_open_event.payload.raw_signal_event.action, 'validate_raw_signal');
 
 const opened = await runner.open({
@@ -101,7 +103,10 @@ assert.equal(opened.schema, 'meeting_platform_adapter_open_session_event');
 assert.equal(opened.action, 'open_session');
 assert.equal(opened.platform, 'google_meet');
 assert.equal(opened.payload.launch_plan.platform, 'google_meet');
+assert.equal(opened.payload.launch_plan.adapter_selection.axis_surface, 'browser_extension');
 assert.equal(opened.payload.launch_plan.adapter_blueprint.primary_surface, 'browser_extension');
+assert.equal(opened.payload.adapter_selection_event.action, 'read_adapter_selection');
+assert.equal(opened.payload.adapter_selection_event.payload.axis_source, 'local_observer_axis');
 assert.equal(opened.payload.raw_signal_event.action, 'validate_raw_signal');
 assert.equal(opened.payload.observe_event.action, 'observe_axis');
 assert.equal(opened.payload.observe_event.captured_at_ms, 1_782_700_000_123);
@@ -153,6 +158,8 @@ assert.equal(directOpened.payload.observe_event.captured_at_ms, 123);
 const handoff = buildMeetingPlatformAdapterRunnerHandoff(manifest);
 assert.equal(handoff.schema, 'meeting_platform_adapter_runner_handoff');
 assert.equal(handoff.runner_factory, 'createMeetingPlatformAdapterRunner');
+assert.equal(handoff.optional_client_methods.includes('platformAdapterSelection'), true);
+assert.equal(handoff.runtime_sequence.includes('read_adapter_selection_before_runtime_wiring'), true);
 assert.equal(handoff.runtime_sequence.includes('build_launch_plan_from_current_url_or_platform'), true);
 
 const timelineCalls = [];

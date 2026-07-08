@@ -94,6 +94,23 @@ function rawSignalValidationPayload(plan = {}, input = {}, options = {}) {
   });
 }
 
+function adapterSelectionPayload(plan = {}, input = {}, options = {}) {
+  const capturedAtMs = firstNonEmpty(input.captured_at_ms, input.capturedAtMs, options.captured_at_ms, options.capturedAtMs, nowMs(options));
+  const runtimeAction = asArray(plan.runtime_actions).find((action) => action.id === 'read_adapter_selection');
+  return compactObject({
+    platform: plan.platform,
+    source: firstNonEmpty(input.source, options.source, 'meeting_platform_adapter_session'),
+    captured_at_ms: capturedAtMs,
+    selected_surface: plan.selected_surface,
+    adapter_selection: plan.adapter_selection,
+    adapter_selection_path: plan.adapter_selection?.path ?? runtimeAction?.artifact_path,
+    axis_source: plan.adapter_selection?.axis_source ?? plan.axis_contract?.adapter_selection_axis_source,
+    axis_surface: plan.adapter_selection?.axis_surface ?? plan.axis_contract?.adapter_selection_axis_surface,
+    timestamp_field: plan.adapter_selection?.timestamp_field ?? plan.axis_contract?.timestamp_field,
+    runtime_action: runtimeAction,
+  });
+}
+
 function markPayload(plan = {}, input = {}, options = {}) {
   return {
     ...input,
@@ -148,6 +165,27 @@ async function callValidateRawSignal(client = {}, payload = {}, options = {}) {
   };
 }
 
+async function callAdapterSelection(client = {}, platform, payload = {}, options = {}) {
+  if (typeof client.platformAdapterSelection === 'function') {
+    if (options.platformArgument === false || options.platform_argument === false || client.platformAdapterSelection.length < 2) {
+      return client.platformAdapterSelection(payload, options);
+    }
+    return client.platformAdapterSelection(platform, payload, options);
+  }
+  if (typeof client.adapterSelection === 'function') {
+    if (options.platformArgument === false || options.platform_argument === false || client.adapterSelection.length < 2) {
+      return client.adapterSelection(payload, options);
+    }
+    return client.adapterSelection(platform, payload, options);
+  }
+  return {
+    ok: true,
+    mode: 'launch_plan_contract',
+    status: payload.adapter_selection?.ready === true ? 'ready' : 'not_available',
+    adapter_selection: payload.adapter_selection,
+  };
+}
+
 async function callTrack(client = {}, method, platform, payload = {}, options = {}) {
   if (typeof client[method] !== 'function') {
     throw new MeetingTimelineSdkError(`Adapter session client cannot call ${method}`, {
@@ -183,8 +221,10 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
   };
   const plan = launchPlanFrom(launchPlanOrInput, defaults);
   const state = {
+    adapter_selection_read: false,
     raw_signal_validated: false,
     axis_observed: false,
+    last_adapter_selection_event: undefined,
     last_raw_signal_event: undefined,
     last_observe_event: undefined,
     last_annotation_event: undefined,
@@ -196,6 +236,7 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
     id: sessionId(plan, defaults),
     platform: plan.platform,
     selected_surface: plan.selected_surface,
+    adapter_selection: plan.adapter_selection,
     launch_plan: plan,
     axis_contract: plan.axis_contract,
     runtime_actions: plan.runtime_actions,
@@ -205,10 +246,22 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
         session_id: session.id,
         platform: session.platform,
         selected_surface: session.selected_surface,
+        adapter_selection: session.adapter_selection,
       };
+    },
+    async readAdapterSelection(input = {}, selectionOptions = {}) {
+      const mergedOptions = { ...defaults, ...selectionOptions };
+      const payload = adapterSelectionPayload(plan, input, mergedOptions);
+      const result = await callAdapterSelection(client, plan.platform, payload, mergedOptions);
+      state.adapter_selection_read = true;
+      state.last_adapter_selection_event = event('read_adapter_selection', session, payload, result);
+      return state.last_adapter_selection_event;
     },
     async validateRawSignal(input = {}, validationOptions = {}) {
       const mergedOptions = { ...defaults, ...validationOptions };
+      if (state.adapter_selection_read !== true && mergedOptions.readAdapterSelection !== false && mergedOptions.read_adapter_selection !== false) {
+        await session.readAdapterSelection(input, mergedOptions);
+      }
       const payload = rawSignalValidationPayload(plan, input, mergedOptions);
       const result = await callValidateRawSignal(client, payload, mergedOptions);
       state.raw_signal_validated = true;
@@ -217,6 +270,9 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
     },
     async observeAxis(input = {}, observeOptions = {}) {
       const mergedOptions = { ...defaults, ...observeOptions };
+      if (state.adapter_selection_read !== true && mergedOptions.readAdapterSelection !== false && mergedOptions.read_adapter_selection !== false) {
+        await session.readAdapterSelection(input, mergedOptions);
+      }
       if (state.raw_signal_validated !== true && mergedOptions.validateRawSignal !== false && mergedOptions.validate_raw_signal !== false) {
         await session.validateRawSignal(input, mergedOptions);
       }
@@ -238,6 +294,13 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
       if (state.axis_observed !== true && mergedOptions.allowUnobservedAxis !== true && mergedOptions.allow_unobserved_axis !== true) {
         throw new MeetingTimelineSdkError('Adapter session must observe local axis before inserting realtime annotation', {
           code: 'adapter_session_axis_not_observed',
+          session_id: session.id,
+          platform: session.platform,
+        });
+      }
+      if (state.adapter_selection_read !== true && mergedOptions.allowUnreadAdapterSelection !== true && mergedOptions.allow_unread_adapter_selection !== true) {
+        throw new MeetingTimelineSdkError('Adapter session must read adapter selection before inserting realtime annotation', {
+          code: 'adapter_session_adapter_selection_not_read',
           session_id: session.id,
           platform: session.platform,
         });
@@ -289,12 +352,13 @@ export function buildMeetingPlatformAdapterSessionHandoff(launchPlanOrInput = {}
     selected_surface: plan.selected_surface,
     session_factory: 'createMeetingPlatformAdapterSession',
     required_client_methods: ['observePlatformCandidates', 'insertAnnotation'],
-    optional_client_methods: ['platformRawSignalBatch', 'rawSignalBatch', 'speakerTrack', 'participantTrack', 'ingestProvider'],
+    optional_client_methods: ['platformAdapterSelection', 'adapterSelection', 'platformRawSignalBatch', 'rawSignalBatch', 'speakerTrack', 'participantTrack', 'ingestProvider'],
     launch_plan_schema: plan.schema,
     runtime_actions: plan.runtime_actions,
     axis_contract: plan.axis_contract,
     next_actions: [
       'create_session_from_launch_plan',
+      'call_session_readAdapterSelection_before_runtime_wiring',
       'call_session_validateRawSignal_before_adapter_preflight',
       'call_session_observeAxis_before_first_mark',
       'call_session_insertAnnotation_for_realtime_marks',
