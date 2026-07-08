@@ -662,6 +662,26 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-startup.mjs').MeetingPlatformAdapterStartupPlanOptions,
   ): import('./adapters/platform-adapter-startup.mjs').MeetingPlatformAdapterStartupPlanMatrix;
   assertAdapterStartupPlanMatrix: MeetingAppTimelineSdk['assertPlatformAdapterStartupPlanMatrix'];
+  platformAdapterRuntimeRecipe(
+    input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeOptions,
+  ): import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipe;
+  adapterRuntimeRecipe: MeetingAppTimelineSdk['platformAdapterRuntimeRecipe'];
+  platformAdapterRuntimeRecipeMatrix(
+    input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeOptions,
+  ): import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeMatrix;
+  adapterRuntimeRecipeMatrix: MeetingAppTimelineSdk['platformAdapterRuntimeRecipeMatrix'];
+  assertPlatformAdapterRuntimeRecipe(
+    input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeOptions,
+  ): import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipe;
+  assertAdapterRuntimeRecipe: MeetingAppTimelineSdk['assertPlatformAdapterRuntimeRecipe'];
+  assertPlatformAdapterRuntimeRecipeMatrix(
+    input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeOptions,
+  ): import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeMatrix;
+  assertAdapterRuntimeRecipeMatrix: MeetingAppTimelineSdk['assertPlatformAdapterRuntimeRecipeMatrix'];
   platformAdapterPreflight(
     input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
     options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
@@ -825,6 +845,7 @@ export * from './adapters/platform-adapter-selection.mjs';
 export * from './adapters/platform-adapter-blueprint.mjs';
 export * from './adapters/platform-adapter-decision.mjs';
 export * from './adapters/platform-adapter-startup.mjs';
+export * from './adapters/platform-adapter-runtime-recipe.mjs';
 export * from './adapters/platform-adapter-preflight.mjs';
 export * from './adapters/platform-realtime-axis-readiness.mjs';
 export * from './adapters/platform-strategy.mjs';

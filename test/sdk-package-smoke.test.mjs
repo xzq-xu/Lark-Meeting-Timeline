@@ -123,6 +123,8 @@ assert.equal(packedFiles.includes('adapters/platform-adapter-decision.mjs'), tru
 assert.equal(packedFiles.includes('adapters/platform-adapter-decision.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-startup.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-startup.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-runtime-recipe.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-adapter-runtime-recipe.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-preflight.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-adapter-preflight.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-evidence-correlation.mjs'), true);
@@ -576,6 +578,8 @@ import {
   buildMeetingPlatformHostProfileCompatibilityMatrix as buildMeetingPlatformHostProfileCompatibilityMatrixFromRoot,
   buildMeetingPlatformAdapterStartupPlan as buildMeetingPlatformAdapterStartupPlanFromRoot,
   buildMeetingPlatformAdapterStartupPlanMatrix as buildMeetingPlatformAdapterStartupPlanMatrixFromRoot,
+  buildMeetingPlatformAdapterRuntimeRecipe as buildMeetingPlatformAdapterRuntimeRecipeFromRoot,
+  buildMeetingPlatformAdapterRuntimeRecipeMatrix as buildMeetingPlatformAdapterRuntimeRecipeMatrixFromRoot,
   buildMeetingPlatformAdapterCandidatePreflight as buildMeetingPlatformAdapterCandidatePreflightFromRoot,
   buildMeetingPlatformAdapterCurrentWindowPreflight as buildMeetingPlatformAdapterCurrentWindowPreflightFromRoot,
   buildMeetingPlatformAdapterPreflight as buildMeetingPlatformAdapterPreflightFromRoot,
@@ -688,6 +692,10 @@ import {
   buildMeetingPlatformAdapterStartupPlan,
   buildMeetingPlatformAdapterStartupPlanMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-startup';
+import {
+  buildMeetingPlatformAdapterRuntimeRecipe,
+  buildMeetingPlatformAdapterRuntimeRecipeMatrix,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-runtime-recipe';
 import {
   buildMeetingPlatformAdapterCandidatePreflight,
   buildMeetingPlatformAdapterCurrentWindowPreflight,
@@ -1512,6 +1520,20 @@ assert.equal(rootMeetingAppSdk.adapterStartupPlan({
 assert.equal(rootMeetingAppSdk.platformAdapterStartupPlanMatrix({}, {
   platforms: ['google-meet'],
 }).realtime_startup_ready_count, 1);
+assert.equal(rootMeetingAppSdk.platformAdapterRuntimeRecipe({
+  url: 'https://meet.google.com/abc-defg-hij',
+}).host_wiring.bridge_kind, 'browser_content_script');
+assert.equal(rootMeetingAppSdk.adapterRuntimeRecipe({
+  platform: 'zoom',
+  window: { title: 'Zoom Meeting' },
+  process: { name: 'Zoom Workplace' },
+}).selected_surface, 'native_detector');
+assert.equal(rootMeetingAppSdk.platformAdapterRuntimeRecipeMatrix({}, {
+  platforms: ['google-meet', 'zoom'],
+}).runtime_ready_count, 2);
+assert.equal(rootMeetingAppSdk.assertAdapterRuntimeRecipe({
+  url: 'https://meet.google.com/abc-defg-hij',
+}).accepted, true);
 assert.equal(rootMeetingAppSdk.platformAdapterPreflight({
   url: 'https://meet.google.com/abc-defg-hij',
   snapshots: [rootGoogleActiveSnapshot],
@@ -1600,6 +1622,15 @@ assert.equal(buildMeetingPlatformAdapterStartupPlanMatrixFromRoot({}, {
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],
 }).realtime_startup_ready_count, 1);
+assert.equal(buildMeetingPlatformAdapterRuntimeRecipeFromRoot({
+  url: 'https://meet.google.com/abc-defg-hij',
+}, {
+  baseUrl: 'http://localhost:8787',
+}).host_wiring.bridge_kind, 'browser_content_script');
+assert.equal(buildMeetingPlatformAdapterRuntimeRecipeMatrixFromRoot({}, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet', 'zoom'],
+}).runtime_ready_count, 2);
 assert.equal(buildMeetingPlatformAdapterPreflightFromRoot({
   url: 'https://meet.google.com/abc-defg-hij',
   snapshots: [rootGoogleActiveSnapshot],
@@ -3134,6 +3165,15 @@ assert.equal(buildMeetingPlatformAdapterStartupPlanMatrix({}, {
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).rows[0].insert_action, 'insertAnnotation');
+assert.equal(buildMeetingPlatformAdapterRuntimeRecipe({
+  url: 'https://meet.google.com/abc-defg-hij',
+}, {
+  baseUrl: 'http://localhost:8787',
+}).raw_signal_examples.filtered_speaker_event_count, 1);
+assert.equal(buildMeetingPlatformAdapterRuntimeRecipeMatrix({}, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['zoom'],
+}).rows[0].bridge_kind, 'native_detector_runtime_event_client');
 assert.equal(buildMeetingPlatformAdapterPreflight({
   url: 'https://meet.google.com/abc-defg-hij',
   snapshots: [rootGoogleActiveSnapshot],
@@ -3190,6 +3230,12 @@ assert.equal(kit.platformAdapterStartupPlan({
 assert.equal(kit.platformAdapterStartupPlanMatrix({}, {
   platforms: ['webex'],
 }).realtime_startup_ready_count, 1);
+assert.equal(kit.platformAdapterRuntimeRecipe({
+  url: 'https://meet.google.com/abc-defg-hij',
+}).runtime_ready, true);
+assert.equal(kit.platformAdapterRuntimeRecipeMatrix({}, {
+  platforms: ['webex'],
+}).runtime_ready_count, 1);
 assert.equal(kit.platformAdapterPreflight({
   platform: 'google-meet',
   snapshots: [rootGoogleActiveSnapshot],

@@ -1675,6 +1675,30 @@ export function createMeetingAppTimelineSdk(options = {}) {
     assertAdapterStartupPlanMatrix(input = {}, startupOptions = {}) {
       return sdk.assertPlatformAdapterStartupPlanMatrix(input, startupOptions);
     },
+    platformAdapterRuntimeRecipe(input = {}, recipeOptions = {}) {
+      return runtime.kit.platformAdapterRuntimeRecipe(input, sdkPlatformOptions(runtime, recipeOptions));
+    },
+    adapterRuntimeRecipe(input = {}, recipeOptions = {}) {
+      return sdk.platformAdapterRuntimeRecipe(input, recipeOptions);
+    },
+    platformAdapterRuntimeRecipeMatrix(input = {}, recipeOptions = {}) {
+      return runtime.kit.platformAdapterRuntimeRecipeMatrix(input, sdkPlatformOptions(runtime, recipeOptions));
+    },
+    adapterRuntimeRecipeMatrix(input = {}, recipeOptions = {}) {
+      return sdk.platformAdapterRuntimeRecipeMatrix(input, recipeOptions);
+    },
+    assertPlatformAdapterRuntimeRecipe(input = {}, recipeOptions = {}) {
+      return runtime.kit.assertPlatformAdapterRuntimeRecipe(input, sdkPlatformOptions(runtime, recipeOptions));
+    },
+    assertAdapterRuntimeRecipe(input = {}, recipeOptions = {}) {
+      return sdk.assertPlatformAdapterRuntimeRecipe(input, recipeOptions);
+    },
+    assertPlatformAdapterRuntimeRecipeMatrix(input = {}, recipeOptions = {}) {
+      return runtime.kit.assertPlatformAdapterRuntimeRecipeMatrix(input, sdkPlatformOptions(runtime, recipeOptions));
+    },
+    assertAdapterRuntimeRecipeMatrix(input = {}, recipeOptions = {}) {
+      return sdk.assertPlatformAdapterRuntimeRecipeMatrix(input, recipeOptions);
+    },
     platformAdapterPreflight(input = {}, preflightOptions = {}) {
       return runtime.kit.platformAdapterPreflight(input, sdkPlatformOptions(runtime, preflightOptions));
     },
@@ -1932,6 +1956,7 @@ export * from './adapters/platform-adapter-selection.mjs';
 export * from './adapters/platform-adapter-blueprint.mjs';
 export * from './adapters/platform-adapter-decision.mjs';
 export * from './adapters/platform-adapter-startup.mjs';
+export * from './adapters/platform-adapter-runtime-recipe.mjs';
 export * from './adapters/platform-adapter-preflight.mjs';
 export * from './adapters/platform-realtime-axis-readiness.mjs';
 export * from './adapters/platform-strategy.mjs';

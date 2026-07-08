@@ -93,6 +93,11 @@ import type {
   MeetingPlatformAdapterStartupPlanOptions,
 } from './platform-adapter-startup.mjs';
 import type {
+  MeetingPlatformAdapterRuntimeRecipe,
+  MeetingPlatformAdapterRuntimeRecipeMatrix,
+  MeetingPlatformAdapterRuntimeRecipeOptions,
+} from './platform-adapter-runtime-recipe.mjs';
+import type {
   MeetingPlatformAdapterCandidatePreflight,
   MeetingPlatformAdapterPreflight,
   MeetingPlatformAdapterPreflightMatrix,
@@ -524,6 +529,10 @@ export interface MeetingPlatformTimelineKit {
   platformAdapterStartupPlanMatrix(input?: MeetingPlatformAdapterDecisionInput, startupOptions?: MeetingPlatformAdapterStartupPlanOptions): MeetingPlatformAdapterStartupPlanMatrix;
   assertPlatformAdapterStartupPlan(input?: string | URL | MeetingPlatformAdapterDecisionInput, startupOptions?: MeetingPlatformAdapterStartupPlanOptions): MeetingPlatformAdapterStartupPlan;
   assertPlatformAdapterStartupPlanMatrix(input?: MeetingPlatformAdapterDecisionInput, startupOptions?: MeetingPlatformAdapterStartupPlanOptions): MeetingPlatformAdapterStartupPlanMatrix;
+  platformAdapterRuntimeRecipe(input?: string | URL | MeetingPlatformAdapterDecisionInput, recipeOptions?: MeetingPlatformAdapterRuntimeRecipeOptions): MeetingPlatformAdapterRuntimeRecipe;
+  platformAdapterRuntimeRecipeMatrix(input?: MeetingPlatformAdapterDecisionInput, recipeOptions?: MeetingPlatformAdapterRuntimeRecipeOptions): MeetingPlatformAdapterRuntimeRecipeMatrix;
+  assertPlatformAdapterRuntimeRecipe(input?: string | URL | MeetingPlatformAdapterDecisionInput, recipeOptions?: MeetingPlatformAdapterRuntimeRecipeOptions): MeetingPlatformAdapterRuntimeRecipe;
+  assertPlatformAdapterRuntimeRecipeMatrix(input?: MeetingPlatformAdapterDecisionInput, recipeOptions?: MeetingPlatformAdapterRuntimeRecipeOptions): MeetingPlatformAdapterRuntimeRecipeMatrix;
   platformAdapterPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
   platformAdapterCurrentWindowPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
   platformAdapterPreflightMatrix(input?: MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflightMatrix;

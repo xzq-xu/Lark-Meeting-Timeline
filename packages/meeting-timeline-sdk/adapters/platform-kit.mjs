@@ -206,6 +206,12 @@ import {
   buildMeetingPlatformAdapterStartupPlanMatrix,
 } from './platform-adapter-startup.mjs';
 import {
+  assertMeetingPlatformAdapterRuntimeRecipe,
+  assertMeetingPlatformAdapterRuntimeRecipeMatrix,
+  buildMeetingPlatformAdapterRuntimeRecipe,
+  buildMeetingPlatformAdapterRuntimeRecipeMatrix,
+} from './platform-adapter-runtime-recipe.mjs';
+import {
   assertMeetingPlatformAdapterCandidatePreflight,
   assertMeetingPlatformAdapterCurrentWindowPreflight,
   assertMeetingPlatformAdapterPreflight,
@@ -633,6 +639,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
   const platformProviderReplayMatrix = buildMeetingPlatformProviderReplayMatrix(providerReplayKitOptions(options));
   const platformRealtimeAxisReadinessMatrix = buildMeetingPlatformRealtimeAxisReadinessMatrix(options, options);
   const platformHostProfileCompatibilityMatrix = buildMeetingPlatformHostProfileCompatibilityMatrix(options, options);
+  const platformAdapterRuntimeRecipeMatrix = buildMeetingPlatformAdapterRuntimeRecipeMatrix(options, options);
   const platformAdapterExportPackageMatrix = buildMeetingPlatformAdapterExportPackageMatrix(options);
   const platformAdapterImportPlanMatrix = buildMeetingPlatformAdapterImportPlanMatrix({
     packages: platformAdapterExportPackageMatrix.packages,
@@ -699,6 +706,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_adapter_blueprint_matrix: buildMeetingPlatformAdapterBlueprintMatrix(options),
     platform_adapter_decision_matrix: buildMeetingPlatformAdapterDecisionMatrix(options),
     platform_adapter_startup_plan_matrix: buildMeetingPlatformAdapterStartupPlanMatrix(options),
+    platform_adapter_runtime_recipe_matrix: platformAdapterRuntimeRecipeMatrix,
     platform_live_adapter_matrix: buildMeetingPlatformLiveAdapterMatrix(options),
     platform_live_adapter_readiness_matrix: buildMeetingPlatformLiveAdapterReadinessMatrix(options),
     platform_live_adapter_handoff_bundle: buildMeetingPlatformLiveAdapterHandoffBundle(options),
@@ -904,6 +912,18 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertPlatformAdapterStartupPlanMatrix(input = {}, startupOptions = {}) {
       return assertMeetingPlatformAdapterStartupPlanMatrix(input, withDefaults(defaults, startupOptions));
+    },
+    platformAdapterRuntimeRecipe(input = {}, recipeOptions = {}) {
+      return buildMeetingPlatformAdapterRuntimeRecipe(input, withDefaults(defaults, recipeOptions));
+    },
+    platformAdapterRuntimeRecipeMatrix(input = {}, recipeOptions = {}) {
+      return buildMeetingPlatformAdapterRuntimeRecipeMatrix(input, withDefaults(defaults, recipeOptions));
+    },
+    assertPlatformAdapterRuntimeRecipe(input = {}, recipeOptions = {}) {
+      return assertMeetingPlatformAdapterRuntimeRecipe(input, withDefaults(defaults, recipeOptions));
+    },
+    assertPlatformAdapterRuntimeRecipeMatrix(input = {}, recipeOptions = {}) {
+      return assertMeetingPlatformAdapterRuntimeRecipeMatrix(input, withDefaults(defaults, recipeOptions));
     },
     platformAdapterPreflight(input = {}, preflightOptions = {}) {
       return buildMeetingPlatformAdapterPreflight(input, withDefaults(defaults, preflightOptions));
