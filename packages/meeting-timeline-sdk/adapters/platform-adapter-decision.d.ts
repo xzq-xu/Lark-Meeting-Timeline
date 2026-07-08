@@ -25,6 +25,14 @@ export interface MeetingPlatformAdapterDecisionOptions {
   surface?: string;
   adapterSurface?: string;
   adapter_surface?: string;
+  availableSurfaces?: string[] | Record<string, unknown>;
+  available_surfaces?: string[] | Record<string, unknown>;
+  surfaceCapabilities?: Record<string, unknown>;
+  surface_capabilities?: Record<string, unknown>;
+  hostSurfaces?: string[] | Record<string, unknown>;
+  host_surfaces?: string[] | Record<string, unknown>;
+  hostCapabilities?: Record<string, unknown>;
+  host_capabilities?: Record<string, unknown>;
   providerOnly?: boolean;
   provider_only?: boolean;
   platforms?: string[];
@@ -57,6 +65,14 @@ export interface MeetingPlatformAdapterDecisionInput {
   surface?: string;
   adapterSurface?: string;
   adapter_surface?: string;
+  availableSurfaces?: string[] | Record<string, unknown>;
+  available_surfaces?: string[] | Record<string, unknown>;
+  surfaceCapabilities?: Record<string, unknown>;
+  surface_capabilities?: Record<string, unknown>;
+  hostSurfaces?: string[] | Record<string, unknown>;
+  host_surfaces?: string[] | Record<string, unknown>;
+  hostCapabilities?: Record<string, unknown>;
+  host_capabilities?: Record<string, unknown>;
   tabs?: Array<Record<string, unknown>>;
   window?: Record<string, unknown>;
   browser?: Record<string, unknown>;
@@ -159,6 +175,10 @@ export interface MeetingPlatformAdapterDecisionMatrixRow {
   realtime_ready?: boolean;
   status?: string;
   selected_surface?: string;
+  surface_source?: string;
+  host_surface_available?: boolean;
+  host_available_surfaces?: string[];
+  host_compatible_surfaces?: string[];
   selected_route?: string;
   recommended_mode?: string;
   adapter_blueprint_ready?: boolean;
@@ -188,6 +208,17 @@ export interface MeetingPlatformAdapterDecision {
   platform_source?: string;
   selected_surface?: string;
   surface_source?: string;
+  host_surface_compatibility?: {
+    specified?: boolean;
+    available_surfaces?: string[];
+    candidate_surfaces?: string[];
+    compatible_surfaces?: string[];
+    selected_surface?: string;
+    selected_surface_available?: boolean;
+    source?: string;
+    missing_surfaces?: string[];
+    [key: string]: unknown;
+  };
   selected_route?: string;
   recommended_mode?: string;
   adaptation_strategy?: MeetingPlatformAdapterAdaptationStrategy;
@@ -217,6 +248,9 @@ export interface MeetingPlatformAdapterDecisionMatrix {
   accepted_count: number;
   realtime_ready_count: number;
   adapter_blueprint_ready_count: number;
+  host_surface_constrained_count: number;
+  host_surface_compatible_count: number;
+  local_surface_selected_count: number;
   browser_surface_count: number;
   native_surface_count: number;
   provider_reconcile_surface_count: number;

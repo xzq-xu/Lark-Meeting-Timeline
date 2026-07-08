@@ -74,9 +74,9 @@ const larkProvider = buildMeetingPlatformAdapterStartupPlan({
   providerOnly: true,
 });
 assert.equal(larkProvider.selected_surface, 'provider_reconcile');
-assert.equal(larkProvider.accepted, true);
+assert.equal(larkProvider.accepted, false);
 assert.equal(larkProvider.realtime_startup_ready, false);
-assert.equal(larkProvider.issues[0].code, 'provider_reconcile_not_realtime_surface');
+assert.equal(larkProvider.issues[0].code, 'decision_not_accepted');
 assert.equal(larkProvider.message_contract.realtime_axis_source, 'not_allowed_as_primary_realtime_axis');
 assert.equal(larkProvider.next_actions.includes('add_local_surface_for_realtime_annotations'), true);
 

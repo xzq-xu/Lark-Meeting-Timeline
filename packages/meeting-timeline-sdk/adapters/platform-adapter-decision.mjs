@@ -133,6 +133,120 @@ function normalizeSurface(value) {
     .replaceAll(' ', '_');
 }
 
+function capabilityEnabled(value) {
+  if (value == null) return false;
+  if (value === true) return true;
+  if (value === false) return false;
+  const text = String(value).trim().toLowerCase();
+  return ['1', 'true', 'yes', 'on', 'available', 'supported', 'enabled', 'ready'].includes(text);
+}
+
+function capabilitySurfaceAliases(key) {
+  const normalized = normalizeSurface(key);
+  if (!normalized) return [];
+  if ([
+    'browser',
+    'browser_observer',
+    'browser_dom_observer',
+    'browser_extension',
+    'extension',
+    'content_script',
+  ].includes(normalized)) return ['browser_extension'];
+  if ([
+    'webview',
+    'webview_preload',
+    'electron_preload',
+  ].includes(normalized)) return ['webview_preload'];
+  if ([
+    'native',
+    'native_detector',
+    'native_window_observer',
+    'desktop',
+    'desktop_observer',
+    'desktop_detector',
+    'accessibility',
+    'accessibility_agent',
+  ].includes(normalized)) return ['native_detector'];
+  if ([
+    'provider',
+    'provider_events',
+    'provider_event',
+    'provider_webhook',
+    'provider_reconcile',
+    'webhook',
+    'long_connection',
+  ].includes(normalized)) return ['provider_reconcile'];
+  if ([
+    'host',
+    'host_sdk',
+    'host_detector',
+    'local_detector',
+    'manual',
+    'manual_controller',
+  ].includes(normalized)) return ['host_detector'];
+  return [normalized];
+}
+
+function surfaceAvailabilityInput(input = {}, options = {}) {
+  return firstNonEmpty(
+    options.availableSurfaces,
+    options.available_surfaces,
+    options.surfaceCapabilities,
+    options.surface_capabilities,
+    options.hostSurfaces,
+    options.host_surfaces,
+    input.availableSurfaces,
+    input.available_surfaces,
+    input.surfaceCapabilities,
+    input.surface_capabilities,
+    input.hostSurfaces,
+    input.host_surfaces,
+  );
+}
+
+function hostCapabilitiesInput(input = {}, options = {}) {
+  return firstNonEmpty(
+    options.hostCapabilities,
+    options.host_capabilities,
+    options.capabilities,
+    input.hostCapabilities,
+    input.host_capabilities,
+    input.capabilities,
+  );
+}
+
+function configuredAvailableSurfaces(input = {}, options = {}) {
+  const declared = surfaceAvailabilityInput(input, options);
+  const caps = hostCapabilitiesInput(input, options);
+  const values = [];
+  let specified = false;
+  if (declared != null) {
+    specified = true;
+    if (Array.isArray(declared) || typeof declared === 'string' || typeof declared[Symbol.iterator] === 'function') {
+      values.push(...asArray(declared));
+    } else if (isPlainObject(declared)) {
+      for (const [key, value] of Object.entries(declared)) {
+        if (capabilityEnabled(value)) values.push(key);
+      }
+    }
+  }
+  if (isPlainObject(caps)) {
+    specified = true;
+    const capabilityPairs = {
+      browser_extension: firstNonEmpty(caps.browserExtension, caps.browser_extension, caps.browser, caps.browserObserver, caps.browser_observer),
+      webview_preload: firstNonEmpty(caps.webviewPreload, caps.webview_preload, caps.webview, caps.electronPreload, caps.electron_preload),
+      native_detector: firstNonEmpty(caps.nativeDetector, caps.native_detector, caps.native, caps.desktopObserver, caps.desktop_observer, caps.accessibilityAgent, caps.accessibility_agent),
+      provider_reconcile: firstNonEmpty(caps.providerEvents, caps.provider_events, caps.providerWebhook, caps.provider_webhook, caps.providerReconcile, caps.provider_reconcile, caps.webhook),
+      host_detector: firstNonEmpty(caps.hostDetector, caps.host_detector, caps.localDetector, caps.local_detector, caps.hostSdk, caps.host_sdk),
+    };
+    for (const [surface, enabled] of Object.entries(capabilityPairs)) {
+      if (capabilityEnabled(enabled)) values.push(surface);
+    }
+  }
+  if (!specified) return undefined;
+  return unique(values.flatMap((value) => capabilitySurfaceAliases(value)));
+}
+
 function surfaceFromInput(input = {}, options = {}) {
   const explicit = normalizeSurface(firstNonEmpty(
     options.surface,
@@ -329,6 +443,45 @@ function expandedSurface(value) {
   return [surface];
 }
 
+function hostSurfaceCompatibility(input = {}, options = {}, adapterBlueprint = {}, rawSurface = {}) {
+  const configured = configuredAvailableSurfaces(input, options);
+  const candidateSurfaces = surfaceOrderFromBlueprint(adapterBlueprint);
+  const selectedFromRaw = expandedSurface(rawSurface.surface);
+  const selectedCandidates = selectedFromRaw.length > 0 ? selectedFromRaw : candidateSurfaces;
+  if (!configured) {
+    return {
+      specified: false,
+      available_surfaces: candidateSurfaces,
+      candidate_surfaces: candidateSurfaces,
+      selected_surface: rawSurface.surface,
+      selected_surface_available: true,
+      source: rawSurface.source,
+      missing_surfaces: [],
+    };
+  }
+  const availableSet = new Set(configured);
+  const selectable = candidateSurfaces.filter((surface) => availableSet.has(surface));
+  const rawAvailable = selectedCandidates.find((surface) => availableSet.has(surface));
+  const selected = rawSurface.source === 'explicit'
+    ? rawSurface.surface
+    : firstNonEmpty(rawAvailable, selectable[0], rawSurface.surface);
+  const selectedAvailable = expandedSurface(selected).some((surface) => availableSet.has(surface));
+  return {
+    specified: true,
+    available_surfaces: configured,
+    candidate_surfaces: candidateSurfaces,
+    compatible_surfaces: selectable,
+    selected_surface: selected,
+    selected_surface_available: selectedAvailable,
+    source: rawSurface.source === 'explicit'
+      ? 'explicit'
+      : selected !== rawSurface.surface
+        ? 'host_capabilities'
+        : rawSurface.source,
+    missing_surfaces: candidateSurfaces.filter((surface) => !availableSet.has(surface)),
+  };
+}
+
 function surfaceOrderFromBlueprint(blueprint = {}) {
   return unique([
     ...asArray(blueprint.surface_order).flatMap((surface) => expandedSurface(surface)),
@@ -510,6 +663,34 @@ function adaptationStrategy(platform, selectedSurface, adapterBlueprint = {}, ro
   });
 }
 
+function decisionIssues(surface = {}, routeReadiness = {}, adapterBlueprintReady = false) {
+  return [
+    ...(routeReadiness.issues ?? []),
+    surface.selected_surface_available === false ? {
+      code: 'selected_surface_unavailable',
+      message: 'Selected adapter surface is not available in the host capability set.',
+      selected_surface: surface.selected_surface,
+      available_surfaces: surface.available_surfaces,
+    } : undefined,
+    surface.selected_surface === 'provider_reconcile' ? {
+      code: 'provider_reconcile_not_realtime_surface',
+      message: 'Provider reconcile can backfill or verify the axis, but it cannot be the primary low-latency annotation surface.',
+      selected_surface: surface.selected_surface,
+    } : undefined,
+    adapterBlueprintReady ? undefined : {
+      code: 'adapter_blueprint_not_ready',
+      message: 'Adapter blueprint must be ready before host wiring.',
+    },
+  ].filter(Boolean);
+}
+
+function decisionStatus(accepted, surface = {}) {
+  if (accepted) return 'ready_for_realtime_annotation';
+  if (surface.selected_surface_available === false) return 'host_surface_unavailable';
+  if (surface.selected_surface === 'provider_reconcile') return 'needs_local_surface_for_realtime_axis';
+  return 'needs_adapter_setup';
+}
+
 export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
   const objectInput = typeof input === 'string' || input instanceof URL
     ? { url: String(input) }
@@ -542,12 +723,18 @@ export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
   const adapterBlueprint = buildMeetingPlatformAdapterBlueprint(platform, platformOptions);
   const adapterBlueprintReady = adapterBlueprint.readiness?.ready === true;
   const rawSurface = surfaceFromInput(objectInput, platformOptions);
-  const surface = rawSurface.source === 'default'
+  const defaultSurface = rawSurface.source === 'default'
     ? {
       surface: startupSurfaceFromBlueprint(adapterBlueprint) ?? rawSurface.surface,
       source: 'adapter_blueprint',
     }
     : rawSurface;
+  const hostCompatibility = hostSurfaceCompatibility(objectInput, platformOptions, adapterBlueprint, defaultSurface);
+  const surface = {
+    surface: hostCompatibility.selected_surface,
+    source: hostCompatibility.source,
+    host_compatibility: hostCompatibility,
+  };
   const capability = buildMeetingAppAdapterCapabilityReport(platform, {
     ...platformOptions,
     input: inputForCapability(objectInput, platformOptions),
@@ -560,20 +747,26 @@ export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
     && routeReadiness.ready === true
     && adapterBlueprintReady
     && route.realtime_invariants?.provider_events_block_realtime === false;
-  const realtimeReady = routeReadiness.ready === true && (executionPlan.realtime_ready === true || hostDetectorReady);
+  const localSurfaceSelected = surface.surface !== 'provider_reconcile';
+  const hostSurfaceAvailable = hostCompatibility.selected_surface_available !== false;
+  const realtimeReady = routeReadiness.ready === true
+    && localSurfaceSelected
+    && hostSurfaceAvailable
+    && (executionPlan.realtime_ready === true || hostDetectorReady);
   const decision = {
     realtime_ready: realtimeReady,
   };
   const accepted = realtimeReady
     && adapterBlueprintReady
     && route.realtime_invariants?.provider_events_block_realtime === false;
+  const issues = decisionIssues(hostCompatibility, routeReadiness, adapterBlueprintReady);
   return compactObject({
     type: 'meeting_platform_adapter_decision',
     schema: MEETING_PLATFORM_ADAPTER_DECISION_SCHEMA,
     schema_version: MEETING_PLATFORM_ADAPTER_DECISION_SCHEMA_VERSION,
     accepted,
     realtime_ready: realtimeReady,
-    status: accepted ? 'ready_for_realtime_annotation' : 'needs_adapter_setup',
+    status: decisionStatus(accepted, hostCompatibility),
     platform,
     display_name: route.display_name ?? capability.display_name,
     detected: platformResolution.detected,
@@ -584,6 +777,7 @@ export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
     }),
     selected_surface: surface.surface,
     surface_source: surface.source,
+    host_surface_compatibility: hostCompatibility,
     selected_route: firstRoute?.route,
     recommended_mode: route.recommended_mode,
     adaptation_strategy: adaptationStrategy(platform, surface.surface, adapterBlueprint, route),
@@ -623,8 +817,9 @@ export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
       capability,
       execution_plan: executionPlan,
     } : undefined,
+    issues,
     next_actions: unique([
-      ...(routeReadiness.issues ?? []).map((item) => `adapter_route:${item.code}`),
+      ...issues.map((item) => item.code ? `adapter_decision:${item.code}` : undefined),
       ...(capability.next_actions ?? []),
       ...(executionPlan.next_actions ?? []),
       accepted ? 'wire_runtime_actions_into_host_surface' : 'fix_adapter_decision_before_realtime_rollout',
@@ -651,6 +846,9 @@ export function buildMeetingPlatformAdapterDecisionMatrix(input = {}, options = 
     accepted_count: decisions.filter((decision) => decision.accepted).length,
     realtime_ready_count: decisions.filter((decision) => decision.realtime_ready).length,
     adapter_blueprint_ready_count: decisions.filter((decision) => decision.adapter_blueprint?.ready).length,
+    host_surface_constrained_count: decisions.filter((decision) => decision.host_surface_compatibility?.specified === true).length,
+    host_surface_compatible_count: decisions.filter((decision) => decision.host_surface_compatibility?.selected_surface_available !== false).length,
+    local_surface_selected_count: decisions.filter((decision) => decision.selected_surface !== 'provider_reconcile').length,
     browser_surface_count: decisions.filter((decision) => decision.selected_surface === 'browser_extension').length,
     native_surface_count: decisions.filter((decision) => decision.selected_surface === 'native_detector').length,
     provider_reconcile_surface_count: decisions.filter((decision) => decision.selected_surface === 'provider_reconcile').length,
@@ -662,6 +860,10 @@ export function buildMeetingPlatformAdapterDecisionMatrix(input = {}, options = 
       realtime_ready: decision.realtime_ready,
       status: decision.status,
       selected_surface: decision.selected_surface,
+      surface_source: decision.surface_source,
+      host_surface_available: decision.host_surface_compatibility?.selected_surface_available !== false,
+      host_available_surfaces: decision.host_surface_compatibility?.available_surfaces,
+      host_compatible_surfaces: decision.host_surface_compatibility?.compatible_surfaces,
       selected_route: decision.selected_route,
       recommended_mode: decision.recommended_mode,
       adapter_blueprint_ready: decision.adapter_blueprint?.ready === true,

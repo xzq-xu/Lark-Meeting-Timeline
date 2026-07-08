@@ -1373,6 +1373,14 @@ assert.equal(rootMeetingAppSdk.adapterAuthoringMatrix({ platforms: ['google-meet
 assert.equal(rootMeetingAppSdk.platformAdapterPortfolioItem('google-meet').p1_provider_reconcile.path, 'google_workspace_events_pubsub');
 assert.equal(rootMeetingAppSdk.adapterPortfolioItem('zoom').recommended_first_surface, 'native_detector');
 assert.equal(rootMeetingAppSdk.adapterPortfolio({ platforms: ['google-meet', 'Acme Rooms'] }).external_authoring_count, 1);
+assert.equal(rootMeetingAppSdk.platformAdapterDecisionMatrix({}, {
+  platforms: ['google-meet', 'zoom'],
+  availableSurfaces: ['browser_extension'],
+}).browser_surface_count, 2);
+assert.equal(rootMeetingAppSdk.platformAdapterDecisionMatrix({}, {
+  platforms: ['google-meet', 'zoom'],
+  availableSurfaces: ['provider_reconcile'],
+}).accepted_count, 0);
 assert.equal(rootMeetingAppSdk.platformAdapterAcceptanceChecklist('google-meet', {}, { target: 'static' }).accepted, true);
 assert.equal(rootMeetingAppSdk.adapterAcceptanceChecklistMatrix({ platforms: ['google-meet'] }, { target: 'static' }).accepted_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterExportPackage('google-meet', {}, { target: 'static' }).export_ready, true);

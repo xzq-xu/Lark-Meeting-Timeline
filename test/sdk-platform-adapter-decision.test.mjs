@@ -97,6 +97,9 @@ const larkProvider = buildMeetingPlatformAdapterDecision({
   baseUrl,
   providerOnly: true,
 });
+assert.equal(larkProvider.accepted, false);
+assert.equal(larkProvider.realtime_ready, false);
+assert.equal(larkProvider.status, 'needs_local_surface_for_realtime_axis');
 assert.equal(larkProvider.selected_surface, 'provider_reconcile');
 assert.equal(larkProvider.adaptation_strategy.selected_observer_mode, 'provider_reconcile_only');
 assert.equal(larkProvider.adaptation_strategy.realtime_dependencies.local_observer_required, true);
@@ -107,6 +110,57 @@ assert.equal(larkProvider.adaptation_strategy.host_integration_checklist.steps.f
 assert.equal(larkProvider.adaptation_strategy.risk_tags.includes('provider_only_surface_cannot_prove_low_latency_axis_without_local_observer'), true);
 assert.equal(larkProvider.runtime_actions.some((action) => action.action === 'provider_event'), true);
 assert.equal(larkProvider.contracts.provider_events_block_realtime, false);
+assert.equal(larkProvider.issues.some((issue) => issue.code === 'provider_reconcile_not_realtime_surface'), true);
+
+const browserOnlyMatrix = buildMeetingPlatformAdapterDecisionMatrix({}, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom', 'teams'],
+  availableSurfaces: ['browser_extension'],
+});
+assert.equal(browserOnlyMatrix.accepted_count, 3);
+assert.equal(browserOnlyMatrix.host_surface_constrained_count, 3);
+assert.equal(browserOnlyMatrix.local_surface_selected_count, 3);
+assert.equal(browserOnlyMatrix.browser_surface_count, 3);
+assert.equal(browserOnlyMatrix.native_surface_count, 0);
+assert.equal(browserOnlyMatrix.rows.find((row) => row.platform === 'zoom').selected_surface, 'browser_extension');
+assert.equal(browserOnlyMatrix.rows.find((row) => row.platform === 'zoom').surface_source, 'host_capabilities');
+assert.deepEqual(browserOnlyMatrix.rows.find((row) => row.platform === 'zoom').host_available_surfaces, ['browser_extension']);
+
+const nativeOnlyMatrix = buildMeetingPlatformAdapterDecisionMatrix({}, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom', 'teams'],
+  hostCapabilities: {
+    nativeDetector: true,
+  },
+});
+assert.equal(nativeOnlyMatrix.accepted_count, 3);
+assert.equal(nativeOnlyMatrix.browser_surface_count, 0);
+assert.equal(nativeOnlyMatrix.native_surface_count, 3);
+assert.equal(nativeOnlyMatrix.rows.find((row) => row.platform === 'google_meet').selected_surface, 'native_detector');
+assert.equal(nativeOnlyMatrix.rows.find((row) => row.platform === 'google_meet').surface_source, 'host_capabilities');
+
+const providerOnlyMatrix = buildMeetingPlatformAdapterDecisionMatrix({}, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom'],
+  availableSurfaces: ['provider_reconcile'],
+});
+assert.equal(providerOnlyMatrix.accepted_count, 0);
+assert.equal(providerOnlyMatrix.realtime_ready_count, 0);
+assert.equal(providerOnlyMatrix.provider_reconcile_surface_count, 2);
+assert.equal(providerOnlyMatrix.local_surface_selected_count, 0);
+assert.equal(providerOnlyMatrix.rows.every((row) => row.status === 'needs_local_surface_for_realtime_axis'), true);
+
+const unavailableExplicitSurface = buildMeetingPlatformAdapterDecision({
+  platform: 'google-meet',
+  surface: 'browser_extension',
+}, {
+  baseUrl,
+  availableSurfaces: ['native_detector'],
+});
+assert.equal(unavailableExplicitSurface.accepted, false);
+assert.equal(unavailableExplicitSurface.status, 'host_surface_unavailable');
+assert.equal(unavailableExplicitSurface.host_surface_compatibility.selected_surface_available, false);
+assert.equal(unavailableExplicitSurface.issues.some((issue) => issue.code === 'selected_surface_unavailable'), true);
 
 const missing = buildMeetingPlatformAdapterDecision({});
 assert.equal(missing.accepted, false);
