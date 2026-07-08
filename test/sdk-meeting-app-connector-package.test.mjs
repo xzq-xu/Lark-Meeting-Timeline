@@ -90,6 +90,11 @@ assert.equal(connectorPackage.provider_replay.accepted, true);
 assert.equal(connectorPackage.provider_replay.matrix.schema, 'meeting_platform_provider_replay_matrix');
 assert.equal(connectorPackage.provider_replay.accepted_count, 2);
 assert.equal(connectorPackage.provider_replay.matrix.rows.every((row) => row.provider_events_block_realtime === false), true);
+assert.equal(connectorPackage.platform_onboarding.accepted, true);
+assert.equal(connectorPackage.platform_onboarding.target, 'static');
+assert.equal(connectorPackage.platform_onboarding.matrix.schema, 'meeting_platform_adapter_acceptance_checklist_matrix');
+assert.equal(connectorPackage.platform_onboarding.matrix.rows.find((row) => row.platform === 'google_meet').local_observer_install_step, 'install_browser_extension_or_webview_preload');
+assert.equal(connectorPackage.platform_onboarding.matrix.rows.find((row) => row.platform === 'zoom').local_observer_install_step, 'wire_native_window_or_accessibility_detector');
 
 assert.equal(buildAcceptanceReportFromSubpath(connectorPackage).accepted, true);
 assert.equal(assertMeetingAppTimelineConnectorPackage(connectorPackage), connectorPackage);
@@ -126,6 +131,8 @@ assert.equal(hostInstallChecklist.ready_count, 2);
 assert.equal(hostInstallChecklist.timestamp_field, 'captured_at_ms');
 assert.equal(hostInstallChecklist.provider_replay.accepted, true);
 assert.equal(hostInstallChecklist.provider_replay.rows.find((row) => row.platform === 'google_meet').accepted, true);
+assert.equal(hostInstallChecklist.platform_onboarding.accepted, true);
+assert.equal(hostInstallChecklist.files_to_read_first.includes('platform-onboarding-checklist-matrix.json'), true);
 assert.equal(hostInstallChecklist.files_to_read_first.includes('provider-replay-matrix.json'), true);
 assert.equal(hostInstallChecklist.files_to_read_first.includes('startup-plan-matrix.json'), true);
 assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
@@ -151,6 +158,10 @@ assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'zoom').lo
 assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'zoom').local_observer_contract.input_contract.required_inputs.includes('candidate_windows'), true);
 assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'zoom').local_observer_runtime_wiring.runtime_factory, 'createMeetingAppTrackRuntime');
 assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'google_meet').required_host_steps.includes('insert_annotation_with_captured_at_ms'), true);
+assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'google_meet').onboarding_contract.install_step, 'install_browser_extension_or_webview_preload');
+assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'google_meet').onboarding_contract.runtime_event_contract.observe_before_insert_required, true);
+assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'google_meet').onboarding_contract.runtime_event_contract.speaker_position_markers.transcript_text_required, false);
+assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'zoom').onboarding_contract.install_step, 'wire_native_window_or_accessibility_detector');
 const hostInstallChecklistAcceptance = buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(hostInstallChecklist);
 assert.equal(hostInstallChecklistAcceptance.schema, 'meeting_app_timeline_connector_host_install_checklist_acceptance_report');
 assert.equal(hostInstallChecklistAcceptance.accepted, true);
@@ -161,6 +172,8 @@ assert.equal(hostInstallChecklistAcceptance.rows.find((row) => row.platform === 
 assert.equal(hostInstallChecklistAcceptance.rows.find((row) => row.platform === 'google_meet').local_observer_mode, 'browser_dom_observer');
 assert.equal(hostInstallChecklistAcceptance.rows.find((row) => row.platform === 'google_meet').local_observer_timestamp_field, 'captured_at_ms');
 assert.equal(hostInstallChecklistAcceptance.rows.find((row) => row.platform === 'google_meet').local_observer_runtime_factory, 'createMeetingAppBrowserRuntime');
+assert.equal(hostInstallChecklistAcceptance.rows.find((row) => row.platform === 'google_meet').onboarding_timestamp_field, 'captured_at_ms');
+assert.equal(hostInstallChecklistAcceptance.rows.find((row) => row.platform === 'zoom').onboarding_install_step, 'wire_native_window_or_accessibility_detector');
 assert.equal(assertMeetingAppTimelineConnectorHostInstallChecklist(hostInstallChecklist), hostInstallChecklist);
 assert.equal(buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceReport(connectorPackage).accepted, true);
 
@@ -367,6 +380,7 @@ assert.equal(adapterMatrix.runtime_invariants.first_runtime_action, 'observe_pla
 assert.equal(adapterMatrix.runtime_invariants.mark_timestamp_field, 'captured_at_ms');
 assert.equal(adapterMatrix.runtime_invariants.provider_replay_blocks_realtime, false);
 assert.equal(adapterMatrix.files_to_read_first.includes('provider-replay-matrix.json'), true);
+assert.equal(adapterMatrix.files_to_read_first.includes('platform-onboarding-checklist-matrix.json'), true);
 const googleAdapterRow = adapterMatrix.rows.find((row) => row.platform === 'google_meet');
 const zoomAdapterRow = adapterMatrix.rows.find((row) => row.platform === 'zoom');
 assert.equal(googleAdapterRow.selected_surface, 'browser_extension');
@@ -375,6 +389,8 @@ assert.equal(googleAdapterRow.install_step, 'install_manifest_v3_content_script_
 assert.equal(googleAdapterRow.runtime_sequence[0].action, 'observe_platform_candidates');
 assert.equal(googleAdapterRow.runtime_sequence[1].action, 'insert_annotation');
 assert.equal(googleAdapterRow.runtime_sequence[1].required_field, 'captured_at_ms');
+assert.equal(googleAdapterRow.onboarding_contract.install_step, 'install_browser_extension_or_webview_preload');
+assert.equal(googleAdapterRow.onboarding_contract.runtime_event_contract.timestamp_field, 'captured_at_ms');
 assert.equal(googleAdapterRow.can_start_axis_before_provider, true);
 assert.equal(googleAdapterRow.provider_reconcile_blocks_realtime, false);
 assert.equal(googleAdapterRow.provider_replay.accepted, true);
@@ -390,7 +406,9 @@ assert.equal(googleAdapterRow.evidence_contract.local_observer.sampling.speaker_
 assert.equal(googleAdapterRow.local_observer_runtime_wiring.client_methods.observe_meeting_app, 'observeMeetingApp');
 assert.equal(googleAdapterRow.evidence_contract.local_observer_runtime_wiring.client_methods.insert_annotation, 'insertAnnotation');
 assert.equal(googleAdapterRow.evidence_contract.pilot_required.includes('candidate_observation'), true);
+assert.equal(googleAdapterRow.evidence_contract.platform_onboarding.install_step, 'install_browser_extension_or_webview_preload');
 assert.equal(googleAdapterRow.validation_files.includes('connector-smoke-run-report.json'), true);
+assert.equal(googleAdapterRow.validation_files.includes('platform-onboarding-checklist-matrix.json'), true);
 assert.equal(zoomAdapterRow.selected_surface, 'native_detector');
 assert.equal(zoomAdapterRow.adapter_mode, 'native_or_desktop_observer');
 assert.equal(zoomAdapterRow.install_step, 'install_native_desktop_observer_or_accessibility_detector');
@@ -402,6 +420,7 @@ const adapterMatrixAcceptance = buildMeetingAppTimelineConnectorAdapterMatrixAcc
 assert.equal(adapterMatrixAcceptance.schema, 'meeting_app_timeline_connector_adapter_matrix_acceptance_report');
 assert.equal(adapterMatrixAcceptance.accepted, true);
 assert.equal(adapterMatrixAcceptance.issue_count, 0);
+assert.equal(adapterMatrixAcceptance.rows.find((row) => row.platform === 'google_meet').onboarding_timestamp_field, 'captured_at_ms');
 assert.equal(assertMeetingAppTimelineConnectorAdapterMatrix(hostInstallChecklist, {
   releaseGate,
   platformRoadmap,
@@ -428,6 +447,7 @@ assert.equal(assertMeetingAppTimelineHostAdapterConfigIndex(adapterMatrix).accep
 const googleHostAdapterConfig = buildMeetingAppTimelineHostAdapterConfig(adapterMatrix, 'google-meet');
 assert.equal(googleHostAdapterConfig.schema, MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA);
 assert.equal(googleHostAdapterConfig.accepted, true);
+assert.equal(googleHostAdapterConfig.onboarding_contract.install_step, 'install_browser_extension_or_webview_preload');
 assert.equal(googleHostAdapterConfig.platform, 'google_meet');
 assert.equal(googleHostAdapterConfig.selected_surface, 'browser_extension');
 assert.equal(googleHostAdapterConfig.config_file, 'host-adapter-configs/google_meet.json');

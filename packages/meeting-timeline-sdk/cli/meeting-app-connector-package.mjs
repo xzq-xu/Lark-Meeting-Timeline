@@ -48,9 +48,23 @@ function stripFileContents(files = []) {
   return files.map(({ content, ...file }) => file);
 }
 
+function stripPlatformOnboarding(onboarding = {}) {
+  if (!onboarding || typeof onboarding !== 'object') return onboarding;
+  return {
+    ...onboarding,
+    matrix: onboarding.matrix
+      ? {
+        ...onboarding.matrix,
+        checklists: undefined,
+      }
+      : undefined,
+  };
+}
+
 function stripConnectorPackage(pkg = {}) {
   return {
     ...pkg,
+    platform_onboarding: stripPlatformOnboarding(pkg.platform_onboarding),
     extension: pkg.extension
       ? {
         ...pkg.extension,
@@ -89,6 +103,14 @@ function markdownTable(rows = [], columns = []) {
 function connectorQuickstartMarkdown(pkg = {}) {
   const startupRows = pkg.startup_plans?.matrix?.rows ?? [];
   const actionRows = pkg.runtime_events?.plan_matrix?.rows ?? [];
+  const onboardingRows = pkg.platform_onboarding?.matrix?.rows ?? [];
+  const onboardingTable = markdownTable(onboardingRows, [
+    { label: 'Platform', value: (row) => row.platform },
+    { label: 'Target', value: (row) => row.target },
+    { label: 'Surface step', value: (row) => row.local_observer_install_step },
+    { label: 'Timestamp', value: (row) => row.runtime_contract_timestamp_field },
+    { label: 'Provider nonblocking', value: (row) => boolLabel(row.provider_reconcile_nonblocking === true) },
+  ]);
   const startupTable = markdownTable(startupRows, [
     { label: 'Platform', value: (row) => row.platform },
     { label: 'Surface', value: (row) => row.selected_surface },
@@ -118,6 +140,7 @@ function connectorQuickstartMarkdown(pkg = {}) {
     '- `connector-release-gate.json`: aggregated pilot/production gate for package acceptance, host checklist, bridge, field intake, smoke execution, and host bootstrap acceptance.',
     '- `connector-adapter-matrix.json`: per-platform runtime wiring plan: selected surface, install step, input sources, event order, SDK methods, and evidence contract.',
     '- `connector-adapter-matrix-acceptance.json`: standalone gate for the adapter matrix runtime invariants.',
+    '- `platform-onboarding-checklist-matrix.json`: per-platform onboarding contract with implementation sequence, runtime event contract, SDK entrypoints, and evidence plan.',
     '- `host-adapter-config-index.json` and `host-adapter-configs/{platform}.json`: compact per-platform configs a host project can load directly.',
     '- `host-adapter-bootstrap-plan-matrix.json`: per-platform host startup plan after URL/window resolution: load config, install adapter, observe candidates, insert annotation.',
     '- `host-adapter-bootstrap-plan-matrix-acceptance.json`: standalone gate for host startup order, runtime endpoint, captured_at_ms, and required observe/insert actions.',
@@ -142,8 +165,13 @@ function connectorQuickstartMarkdown(pkg = {}) {
     '- Realtime annotations must carry `captured_at_ms` from the device or ink end time.',
     '- Provider events and transcript/artifact import must not block realtime annotation insertion.',
     '- Use `startup-plan-matrix.json` to choose the host runtime surface before installing bridges.',
+    '- Use `platform-onboarding-checklist-matrix.json` to confirm the selected surface, implementation order, observe-before-insert invariant, and evidence target before host wiring.',
     '- Use `host-adapter-bootstrap-plan-matrix.json` as the final host-side CI gate before wiring Google Meet, Teams, Zoom, Webex, or Lark windows.',
     '- Use `connector-handoff.json` for CI and handoff dashboards instead of parsing every raw file.',
+    '',
+    '## Platform Onboarding Matrix',
+    '',
+    onboardingTable,
     '',
     '## Startup Matrix',
     '',
@@ -226,6 +254,7 @@ async function writeConnectorPackageFiles(outDir, pkg = {}) {
   await write('handoff-acceptance.json', pkg.handoff_acceptance);
   await write('runtime-event-plan-matrix.json', pkg.runtime_events?.plan_matrix);
   await write('provider-replay-matrix.json', pkg.provider_replay?.matrix);
+  await write('platform-onboarding-checklist-matrix.json', pkg.platform_onboarding?.matrix);
   await write('adapter-blueprint-matrix.json', pkg.adapter_blueprints?.matrix);
   await write('startup-plan-matrix.json', pkg.startup_plans?.matrix);
   await write('connector-handoff.json', buildMeetingAppTimelineConnectorHandoff(pkg));
@@ -421,6 +450,8 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     provider_replay_accepted: pkg.provider_replay?.accepted === true,
     provider_replay_accepted_count: pkg.provider_replay?.accepted_count ?? 0,
     provider_replay_runtime_event_count: pkg.provider_replay?.runtime_event_count ?? 0,
+    platform_onboarding_accepted: pkg.platform_onboarding?.accepted === true,
+    platform_onboarding_target: pkg.platform_onboarding?.target,
     adapter_blueprint_ready_count: pkg.adapter_blueprints?.ready_count ?? 0,
     startup_plan_ready_count: pkg.startup_plans?.realtime_startup_ready_count ?? 0,
     observer_surface_count: Object.keys(pkg.observer_plan_by_surface ?? {}).length,
@@ -440,6 +471,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
     adoption_index: connectorAdoptionIndex,
     field_intake_index: connectorFieldIntakeIndex,
     provider_replay: pkg.provider_replay,
+    platform_onboarding: stripPlatformOnboarding(pkg.platform_onboarding),
     release_gate: connectorReleaseGate,
     adapter_matrix: connectorAdapterMatrix,
     adapter_matrix_acceptance: connectorAdapterMatrixAcceptance,
@@ -465,7 +497,7 @@ export async function buildMeetingAppConnectorPackageCliReport(options = {}) {
 
 export function formatMeetingAppConnectorPackageCliReport(report = {}) {
   const lines = [
-    `meeting_app_timeline_connector_package_report | ok=${boolLabel(report.ok)} | release_gate=${boolLabel(report.release_gate_accepted)} | adapter_matrix=${boolLabel(report.adapter_matrix_accepted)} | host_configs=${boolLabel(report.host_adapter_config_accepted)} | host_bootstrap=${boolLabel(report.host_adapter_bootstrap_accepted)} | provider_replay=${boolLabel(report.provider_replay_accepted)} | target=${report.release_gate_target ?? 'pilot'} | platforms=${report.platform_count} | surfaces=${report.surface_count} | handoffs=${report.handoff_count} | ready=${report.ready_count} | blueprint_ready=${report.adapter_blueprint_ready_count} | startup_ready=${report.startup_plan_ready_count} | extension=${boolLabel(report.extension_scaffold)} | extension_accepted=${boolLabel(report.extension_accepted)} | runtime_actions=${report.runtime_event_action_count} | provider_runtime_events=${report.provider_replay_runtime_event_count} | written=${report.written_files?.length ?? 0}`,
+    `meeting_app_timeline_connector_package_report | ok=${boolLabel(report.ok)} | release_gate=${boolLabel(report.release_gate_accepted)} | adapter_matrix=${boolLabel(report.adapter_matrix_accepted)} | host_configs=${boolLabel(report.host_adapter_config_accepted)} | host_bootstrap=${boolLabel(report.host_adapter_bootstrap_accepted)} | provider_replay=${boolLabel(report.provider_replay_accepted)} | onboarding=${boolLabel(report.platform_onboarding_accepted)} | target=${report.release_gate_target ?? 'pilot'} | platforms=${report.platform_count} | surfaces=${report.surface_count} | handoffs=${report.handoff_count} | ready=${report.ready_count} | blueprint_ready=${report.adapter_blueprint_ready_count} | startup_ready=${report.startup_plan_ready_count} | extension=${boolLabel(report.extension_scaffold)} | extension_accepted=${boolLabel(report.extension_accepted)} | runtime_actions=${report.runtime_event_action_count} | provider_runtime_events=${report.provider_replay_runtime_event_count} | written=${report.written_files?.length ?? 0}`,
   ];
   for (const row of report.rows ?? []) {
     lines.push(`${row.platform}/${row.surface}: ready=${boolLabel(row.ready_to_start)} realtime=${boolLabel(row.realtime_annotation_ready)} speaker=${boolLabel(row.speaker_track_ready)} participant=${boolLabel(row.participant_track_ready)} install=${row.install_target ?? 'n/a'} start=${row.start_mode ?? 'n/a'}`);

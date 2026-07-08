@@ -395,6 +395,49 @@ function localObserverRuntimeWiring(row = {}) {
   });
 }
 
+function platformOnboardingByPlatform(pkg = {}) {
+  const checklists = pkg.platform_onboarding?.matrix?.checklists
+    ?? pkg.platform_onboarding?.checklists
+    ?? [];
+  return new Map(asArray(checklists).map((checklist) => [normalizeKey(checklist.platform), checklist]));
+}
+
+function summarizePlatformOnboardingContract(checklist = {}) {
+  if (!checklist || typeof checklist !== 'object' || !checklist.schema) return undefined;
+  const installStep = asArray(checklist.implementation_sequence)
+    .find((step) => step.group === 'local_observer_install');
+  return compactObject({
+    schema: checklist.schema,
+    target: checklist.target,
+    accepted: checklist.accepted === true,
+    adapter_status: checklist.adapter_status,
+    recommended_first_surface: checklist.recommended_first_surface,
+    install_step: installStep?.id,
+    runtime_event_contract: checklist.runtime_event_contract,
+    implementation_sequence: checklist.implementation_sequence,
+    sdk_entrypoints: checklist.sdk_entrypoints,
+    evidence_collection_plan: checklist.evidence_collection_plan,
+    summary: checklist.summary,
+    next_actions: checklist.next_actions,
+  });
+}
+
+function summarizePlatformOnboarding(pkg = {}) {
+  const matrix = pkg.platform_onboarding?.matrix;
+  if (!matrix) return undefined;
+  return compactObject({
+    schema: matrix.schema,
+    target: matrix.target,
+    accepted: pkg.platform_onboarding?.accepted === true || matrix.blocked_count === 0,
+    accepted_count: matrix.accepted_count,
+    blocked_count: matrix.blocked_count,
+    platform_count: matrix.platform_count,
+    command: pkg.platform_onboarding?.command,
+    sdk_method: pkg.platform_onboarding?.sdk_method,
+    rows: matrix.rows,
+  });
+}
+
 function sampleUrlForPlatform(platform) {
   return {
     google_meet: 'https://meet.google.com/abc-defg-hij',
@@ -806,6 +849,18 @@ export function buildMeetingAppTimelineConnectorPackageAcceptanceReport(pkg = {}
   if (pkg.contracts?.transcript_blocks_realtime !== false) {
     addIssue(issues, 'transcript_blocks_realtime', 'Transcript import must not block realtime annotation insertion');
   }
+  if (pkg.platform_onboarding && pkg.platform_onboarding.accepted !== true) {
+    addIssue(issues, 'platform_onboarding_not_accepted', 'Platform onboarding checklist matrix must be accepted for connector handoff', {
+      target: pkg.platform_onboarding.target,
+      blocked_count: pkg.platform_onboarding.blocked_count,
+    });
+  }
+  if (pkg.platform_onboarding?.matrix && (pkg.platform_onboarding.matrix.platform_count ?? 0) < platforms.length) {
+    addIssue(issues, 'platform_onboarding_coverage_incomplete', 'Platform onboarding matrix must cover every selected platform', {
+      platform_onboarding_platform_count: pkg.platform_onboarding.matrix.platform_count ?? 0,
+      platform_count: platforms.length,
+    });
+  }
   if (!pkg.runtime_events?.endpoint) addIssue(issues, 'missing_runtime_event_endpoint', 'Runtime event endpoint is required');
   if ((pkg.runtime_events?.action_count ?? 0) <= 0) addIssue(issues, 'missing_runtime_event_actions', 'Runtime event plan has no actions');
   if (!pkg.provider_replay?.matrix) {
@@ -1001,9 +1056,11 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, o
   const blueprintRows = pkg.adapter_blueprints?.matrix?.rows ?? [];
   const startupByPlatform = new Map(startupRows.map((row) => [normalizeKey(row.platform), row]));
   const blueprintByPlatform = new Map(blueprintRows.map((row) => [normalizeKey(row.platform), row]));
+  const onboardingByPlatform = platformOnboardingByPlatform(pkg);
   const rows = acceptance.platforms.map((platform) => {
     const startup = startupByPlatform.get(platform) ?? {};
     const blueprint = blueprintByPlatform.get(platform) ?? {};
+    const onboarding = summarizePlatformOnboardingContract(onboardingByPlatform.get(platform));
     const actions = runtimeActionRowsForPlatform(pkg, platform);
     const observeCandidates = runtimeActionByName(actions, 'observe_platform_candidates');
     const observeMeetingApp = runtimeActionByName(actions, 'observe_meeting_app');
@@ -1046,6 +1103,7 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, o
         speakerTrack ? 'emit_speaker_track_markers' : undefined,
         participantTrack ? 'emit_participant_track_markers' : undefined,
       ].filter(Boolean),
+      onboarding_contract: onboarding,
     });
     const observerContract = localObserverContract(row);
     return compactObject({
@@ -1079,6 +1137,7 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, o
       rows: pkg.provider_replay.matrix?.rows,
       provider_events_block_realtime: pkg.provider_replay.realtime_policy?.provider_events_block_realtime,
     } : undefined,
+    platform_onboarding: summarizePlatformOnboarding(pkg),
     platform_count: acceptance.platform_count,
     surface_count: acceptance.surface_count,
     ready_count: readyCount,
@@ -1096,6 +1155,7 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, o
     files_to_read_first: [
       'connector-handoff.json',
       'provider-replay-matrix.json',
+      'platform-onboarding-checklist-matrix.json',
       'startup-plan-matrix.json',
       'adapter-blueprint-matrix.json',
       'runtime-event-plan-matrix.json',
@@ -1147,6 +1207,12 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceRe
   }
   if (checklist.contracts?.local_observer_runtime_wiring_required_for_host !== true) {
     addIssue(issues, 'local_observer_runtime_wiring_not_required', 'Local observer runtime wiring must be required for host integration');
+  }
+  if (checklist.platform_onboarding && checklist.platform_onboarding.accepted !== true) {
+    addIssue(issues, 'platform_onboarding_not_accepted', 'Platform onboarding summary must be accepted', {
+      target: checklist.platform_onboarding.target,
+      blocked_count: checklist.platform_onboarding.blocked_count,
+    });
   }
   if ((checklist.platform_count ?? 0) <= 0) addIssue(issues, 'missing_platforms', 'Host install checklist must include at least one platform');
   if (rows.length !== checklist.platform_count) {
@@ -1216,6 +1282,25 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceRe
     if (row.local_observer_runtime_wiring?.client_methods?.insert_annotation !== 'insertAnnotation') {
       addIssue(issues, 'row_runtime_wiring_missing_insert_method', 'Local observer runtime wiring must expose insertAnnotation', { platform });
     }
+    if (row.onboarding_contract?.schema !== 'meeting_platform_adapter_acceptance_checklist') {
+      addIssue(issues, 'row_missing_onboarding_contract', 'Checklist row must include platform onboarding contract', { platform });
+    }
+    if (row.onboarding_contract?.runtime_event_contract?.timestamp_field !== 'captured_at_ms') {
+      addIssue(issues, 'row_onboarding_missing_captured_at_ms', 'Platform onboarding contract must preserve captured_at_ms', { platform });
+    }
+    if (row.onboarding_contract?.runtime_event_contract?.observe_before_insert_required !== true) {
+      addIssue(issues, 'row_onboarding_missing_observe_before_insert', 'Platform onboarding contract must require observe before insert', { platform });
+    }
+    if (row.onboarding_contract?.runtime_event_contract?.speaker_position_markers?.transcript_text_required !== false) {
+      addIssue(issues, 'row_onboarding_requires_transcript_for_speaker_positions', 'Speaker position markers must not require transcript text', { platform });
+    }
+    const onboardingSteps = asArray(row.onboarding_contract?.implementation_sequence).map((step) => step.id);
+    if (!onboardingSteps.includes('observe_platform_candidates_before_insert')) {
+      addIssue(issues, 'row_onboarding_missing_observe_step', 'Platform onboarding sequence must include observe_platform_candidates_before_insert', { platform });
+    }
+    if (!onboardingSteps.includes('insert_annotation_with_captured_at_ms')) {
+      addIssue(issues, 'row_onboarding_missing_insert_step', 'Platform onboarding sequence must include insert_annotation_with_captured_at_ms', { platform });
+    }
     if (row.provider_events_block_realtime !== false) {
       addIssue(issues, 'row_provider_events_block_realtime', 'Provider events must not block realtime annotations for row', { platform });
     }
@@ -1251,6 +1336,9 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceRe
       local_observer_mode: row.local_observer_contract?.observer_mode,
       local_observer_timestamp_field: row.local_observer_contract?.realtime_rules?.timestamp_field,
       local_observer_runtime_factory: row.local_observer_runtime_wiring?.runtime_factory,
+      onboarding_target: row.onboarding_contract?.target,
+      onboarding_install_step: row.onboarding_contract?.install_step,
+      onboarding_timestamp_field: row.onboarding_contract?.runtime_event_contract?.timestamp_field,
     })),
     next_actions: issues.length > 0
       ? unique([
@@ -3063,6 +3151,7 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
       runtime_event_endpoint: hostInstallChecklist.runtime_event_endpoint,
       timestamp_field: hostInstallChecklist.timestamp_field,
       input_sources: adapterMatrixPrimaryInputs(row, fieldRow),
+      onboarding_contract: row.onboarding_contract,
       local_observer_contract: row.local_observer_contract,
       local_observer_runtime_wiring: row.local_observer_runtime_wiring,
       runtime_sequence: runtimeSequence,
@@ -3097,6 +3186,7 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
         field_evidence_input: fieldRow.field_evidence_input,
         evidence_package: fieldRow.evidence_package,
         adapter_preflight: row.adapter_preflight,
+        platform_onboarding: row.onboarding_contract,
         local_observer: row.local_observer_contract,
         local_observer_runtime_wiring: row.local_observer_runtime_wiring,
       },
@@ -3107,6 +3197,7 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
         'connector-smoke-run-report.json',
         'connector-release-gate.json',
         'connector-field-intake-index.json',
+        'platform-onboarding-checklist-matrix.json',
       ],
       release_missing: releaseRow.missing ?? [],
       missing,
@@ -3154,10 +3245,12 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
       connector_bridge_handoff: bridgeHandoff.schema,
       connector_smoke_plan: smokePlan.schema,
       provider_replay: hostInstallChecklist.provider_replay ? 'meeting_platform_provider_replay_matrix' : undefined,
+      platform_onboarding: hostInstallChecklist.platform_onboarding?.schema,
     },
     files_to_read_first: [
       'connector-adapter-matrix.json',
       'provider-replay-matrix.json',
+      'platform-onboarding-checklist-matrix.json',
       'connector-platform-roadmap.json',
       'connector-release-gate.json',
       'connector-smoke-plan.json',
@@ -3249,6 +3342,15 @@ export function buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(ma
     if (row.local_observer_runtime_wiring?.client_methods?.insert_annotation !== 'insertAnnotation') {
       addIssue(issues, 'row_runtime_wiring_missing_insert_method', 'Local observer runtime wiring must expose insertAnnotation', { platform });
     }
+    if (row.onboarding_contract?.schema !== 'meeting_platform_adapter_acceptance_checklist') {
+      addIssue(issues, 'row_missing_onboarding_contract', 'Adapter matrix row must include platform onboarding contract', { platform });
+    }
+    if (row.onboarding_contract?.runtime_event_contract?.timestamp_field !== 'captured_at_ms') {
+      addIssue(issues, 'row_onboarding_missing_captured_at_ms', 'Platform onboarding contract must preserve captured_at_ms', { platform });
+    }
+    if (row.onboarding_contract?.runtime_event_contract?.observe_before_insert_required !== true) {
+      addIssue(issues, 'row_onboarding_missing_observe_before_insert', 'Platform onboarding contract must require observe before insert', { platform });
+    }
     if (sequence[0]?.action !== 'observe_platform_candidates') {
       addIssue(issues, 'row_first_action_not_observe_candidates', 'First runtime action must observe platform candidates', { platform });
     }
@@ -3288,6 +3390,8 @@ export function buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(ma
       local_observer_mode: row.local_observer_contract?.observer_mode,
       local_observer_sample_interval_ms: row.local_observer_contract?.sampling?.active_snapshot_interval_ms,
       local_observer_runtime_factory: row.local_observer_runtime_wiring?.runtime_factory,
+      onboarding_install_step: row.onboarding_contract?.install_step,
+      onboarding_timestamp_field: row.onboarding_contract?.runtime_event_contract?.timestamp_field,
     })),
     next_actions: issues.length > 0
       ? unique([
@@ -3374,6 +3478,15 @@ function hostAdapterConfigIssues(config = {}) {
       url_only_status: config.evidence_contract?.adapter_preflight?.url_only_status,
     });
   }
+  if (config.onboarding_contract?.schema !== 'meeting_platform_adapter_acceptance_checklist') {
+    addIssue(issues, 'missing_onboarding_contract', 'Host adapter config must include platform onboarding contract', { platform: config.platform });
+  }
+  if (config.onboarding_contract?.runtime_event_contract?.timestamp_field !== 'captured_at_ms') {
+    addIssue(issues, 'onboarding_missing_captured_at_ms', 'Host adapter onboarding contract must preserve captured_at_ms', { platform: config.platform });
+  }
+  if (config.onboarding_contract?.runtime_event_contract?.observe_before_insert_required !== true) {
+    addIssue(issues, 'onboarding_missing_observe_before_insert', 'Host adapter onboarding contract must require observe before insert', { platform: config.platform });
+  }
   if (config.local_observer_contract?.required !== true) {
     addIssue(issues, 'missing_local_observer_contract', 'Host adapter config must include local observer contract', { platform: config.platform });
   }
@@ -3429,6 +3542,7 @@ function hostAdapterConfigFromMatrixRow(row = {}, matrix = {}) {
       can_insert_annotation_on_current_axis: row.can_insert_annotation_on_current_axis,
     },
     input_sources: row.input_sources,
+    onboarding_contract: row.onboarding_contract,
     local_observer_contract: row.local_observer_contract,
     local_observer_runtime_wiring: row.local_observer_runtime_wiring,
     runtime_sequence: row.runtime_sequence,

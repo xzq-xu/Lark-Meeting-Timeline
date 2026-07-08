@@ -182,6 +182,7 @@ export interface MeetingAppTimelineConnectorHostInstallChecklistRow {
   client_methods?: Record<string, string | undefined>;
   required_host_steps?: string[];
   optional_host_steps?: string[];
+  onboarding_contract?: Record<string, unknown>;
   adapter_preflight?: MeetingAppTimelineConnectorAdapterPreflightContract;
   local_observer_contract?: MeetingAppTimelineLocalObserverContract;
   local_observer_runtime_wiring?: MeetingAppTimelineLocalObserverRuntimeWiring;
@@ -218,6 +219,7 @@ export interface MeetingAppTimelineConnectorAdapterMatrixRow {
   runtime_event_endpoint?: string;
   timestamp_field?: string;
   input_sources: Array<Record<string, unknown>>;
+  onboarding_contract?: Record<string, unknown>;
   local_observer_contract?: MeetingAppTimelineLocalObserverContract;
   local_observer_runtime_wiring?: MeetingAppTimelineLocalObserverRuntimeWiring;
   runtime_sequence: Array<Record<string, unknown>>;
@@ -368,6 +370,7 @@ export interface MeetingAppTimelineConnectorHostInstallChecklist {
   surface_count: number;
   ready_count: number;
   timestamp_field?: string;
+  platform_onboarding?: Record<string, unknown>;
   contracts: Record<string, unknown>;
   files_to_read_first: string[];
   rows: MeetingAppTimelineConnectorHostInstallChecklistRow[];

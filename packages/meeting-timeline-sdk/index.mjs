@@ -874,10 +874,21 @@ export function createMeetingAppTimelineSdk(options = {}) {
         {},
       );
       const startupPlanMatrix = runtime.kit.platformAdapterStartupPlanMatrix(startupPlanInput, merged);
+      const platformOnboardingMatrix = runtime.kit.platformAdapterAcceptanceChecklistMatrix({
+        platforms: hostPackage.platforms,
+      }, {
+        ...merged,
+        target: firstNonEmpty(
+          connectorOptions.onboardingTarget,
+          connectorOptions.onboarding_target,
+          'static',
+        ),
+      });
       const accepted = hostPackage.accepted === true
         && handoffAcceptance.accepted === true
         && adapterBlueprintMatrix.ready_count === adapterBlueprintMatrix.platform_count
         && startupPlanMatrix.realtime_startup_ready_count === startupPlanMatrix.platform_count
+        && platformOnboardingMatrix.blocked_count === 0
         && (extensionAcceptance ? extensionAcceptance.accepted === true : true);
       return compactObject({
         type: 'meeting_app_timeline_connector_package',
@@ -927,6 +938,16 @@ export function createMeetingAppTimelineSdk(options = {}) {
             provider_events_block_realtime: false,
             local_observer_remains_primary_realtime_axis: true,
           },
+        },
+        platform_onboarding: {
+          matrix: platformOnboardingMatrix,
+          accepted: platformOnboardingMatrix.blocked_count === 0,
+          target: platformOnboardingMatrix.target,
+          accepted_count: platformOnboardingMatrix.accepted_count,
+          blocked_count: platformOnboardingMatrix.blocked_count,
+          platform_count: platformOnboardingMatrix.platform_count,
+          command: 'npm run meeting-platform:adapter-acceptance-checklist',
+          sdk_method: 'sdk.platformAdapterAcceptanceChecklistMatrix({ platforms }, { target })',
         },
         adapter_blueprints: {
           matrix: {
