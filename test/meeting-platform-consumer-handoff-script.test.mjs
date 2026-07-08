@@ -78,6 +78,22 @@ const jsonReport = JSON.parse(jsonStdout);
 assert.equal(jsonReport.rows[0].platform, 'webex');
 assert.equal(jsonReport.rows[0].consumer_ready, true);
 
+const { stdout: binStdout } = await execFileAsync(process.execPath, [
+  'packages/meeting-timeline-sdk/bin/meeting-platform-consumer-handoff.mjs',
+  '--platforms=google-meet,zoom',
+  '--json=true',
+], {
+  cwd: repoRoot,
+});
+const binReport = JSON.parse(binStdout);
+assert.equal(binReport.schema, 'meeting_platform_consumer_handoff');
+assert.equal(binReport.accepted, true);
+assert.equal(binReport.platform_count, 2);
+assert.equal(binReport.adapter_startup_ready_count, 2);
+assert.equal(binReport.rows.find((row) => row.platform === 'google_meet').adapter_startup_selected_surface, 'browser_extension');
+assert.equal(binReport.rows.find((row) => row.platform === 'zoom').adapter_startup_selected_surface, 'native_detector');
+assert.equal(binReport.entrypoints.commands.adapter_startup.includes('meeting-platform:adapter-startup'), true);
+
 let strictStdout = '';
 let strictCode = 0;
 try {

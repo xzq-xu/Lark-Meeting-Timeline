@@ -29,6 +29,7 @@ assert.equal(packedFiles.includes('index.mjs'), true);
 assert.equal(packedFiles.includes('index.d.ts'), true);
 assert.equal(packedFiles.includes('bin/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-app-connector-package.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-platform-consumer-handoff.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-blueprint.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-export-package.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-import-plan.mjs'), true);
@@ -41,6 +42,7 @@ assert.equal(packedFiles.includes('bin/meeting-platform-host-integration.mjs'), 
 assert.equal(packedFiles.includes('bin/meeting-platform-provider-replay.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-connector-package.mjs'), true);
+assert.equal(packedFiles.includes('cli/meeting-platform-consumer-handoff.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-blueprint.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-export-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-import-plan.mjs'), true);
@@ -239,6 +241,25 @@ assert.equal(connectorBinReport.platform_count, 1);
 assert.deepEqual(connectorBinReport.surfaces, ['browser_extension']);
 assert.equal(connectorBinReport.package.schema, 'meeting_app_timeline_connector_package');
 assert.equal(connectorBinReport.package.provider_replay.accepted, true);
+
+const { stdout: consumerHandoffBinStdout } = await execFileAsync(
+  join(consumerDir, 'node_modules', '.bin', 'meeting-platform-consumer-handoff'),
+  [
+    '--platforms=google-meet,zoom',
+    '--json=true',
+  ],
+  {
+    cwd: consumerDir,
+  },
+);
+const consumerHandoffBinReport = JSON.parse(consumerHandoffBinStdout);
+assert.equal(consumerHandoffBinReport.schema, 'meeting_platform_consumer_handoff');
+assert.equal(consumerHandoffBinReport.accepted, true);
+assert.equal(consumerHandoffBinReport.platform_count, 2);
+assert.equal(consumerHandoffBinReport.adapter_startup_ready_count, 2);
+assert.equal(consumerHandoffBinReport.rows.find((row) => row.platform === 'google_meet').adapter_startup_selected_surface, 'browser_extension');
+assert.equal(consumerHandoffBinReport.rows.find((row) => row.platform === 'zoom').adapter_startup_selected_surface, 'native_detector');
+assert.equal(consumerHandoffBinReport.entrypoints.commands.adapter_startup.includes('meeting-platform:adapter-startup'), true);
 
 const { stdout: adapterExportBinStdout } = await execFileAsync(
   join(consumerDir, 'node_modules', '.bin', 'meeting-platform-adapter-export-package'),

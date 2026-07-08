@@ -2457,6 +2457,15 @@ npm run meeting-platform:consumer-handoff -- \
   --report-file=data/meeting-platform-consumer-handoff-report.json
 ```
 
+如果下游项目是直接安装 SDK 包，也可以不依赖本仓库的 npm script，直接运行包内 CLI：
+
+```sh
+npx meeting-platform-consumer-handoff \
+  --base-url=https://timeline.example.com \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --report-file=data/meeting-platform-consumer-handoff-report.json
+```
+
 `consumer-handoff` 会把 `meeting-platform:adapter-startup` 也列入 `entrypoints.commands` 和 `boot_order`。因此下游项目不需要自己在 `platform-adapter-blueprint`、`platform-adapter-startup`、`platform-host-integration` 之间猜调用顺序：先读 blueprint 确认可接入面，再读 startup plan 启动本地实时 surface，最后按 `observePlatformCandidates` → `insertAnnotation` 的顺序写入 `captured_at_ms` 标注。provider webhook 和转写仍然只做 reconcile/backfill，不作为实时标注前置条件。
 
 如果外部项目只想“收到平台 webhook 后直接落到会议轴”，可以用更高层的 `platform-ingest`：
