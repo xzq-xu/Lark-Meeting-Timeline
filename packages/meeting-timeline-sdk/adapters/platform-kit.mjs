@@ -174,6 +174,10 @@ import {
   buildMeetingPlatformAdapterRouteMatrix,
 } from './platform-adapter-route.mjs';
 import {
+  buildMeetingPlatformAdapterSelection,
+  buildMeetingPlatformAdapterSelectionMatrix,
+} from './platform-adapter-selection.mjs';
+import {
   assertMeetingPlatformAdapterBlueprint,
   assertMeetingPlatformAdapterBlueprintMatrix,
   buildMeetingPlatformAdapterBlueprint,
@@ -644,6 +648,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_adaptation_runbook: buildMeetingPlatformAdaptationRunbookSummary(options),
     platform_adaptation_strategy: buildMeetingPlatformAdaptationStrategyMatrix(options),
     platform_adapter_route_matrix: buildMeetingPlatformAdapterRouteMatrix(options),
+    platform_adapter_selection_matrix: buildMeetingPlatformAdapterSelectionMatrix(options),
     platform_adapter_blueprint_matrix: buildMeetingPlatformAdapterBlueprintMatrix(options),
     platform_adapter_decision_matrix: buildMeetingPlatformAdapterDecisionMatrix(options),
     platform_adapter_startup_plan_matrix: buildMeetingPlatformAdapterStartupPlanMatrix(options),
@@ -804,6 +809,12 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdapterRouteMatrix(routeOptions = {}) {
       return buildMeetingPlatformAdapterRouteMatrix(withDefaults(defaults, routeOptions));
+    },
+    platformAdapterSelection(platform, input = {}, selectionOptions = {}) {
+      return buildMeetingPlatformAdapterSelection(platform, input, withDefaults(defaults, selectionOptions));
+    },
+    platformAdapterSelectionMatrix(input = {}, selectionOptions = {}) {
+      return buildMeetingPlatformAdapterSelectionMatrix(input, withDefaults(defaults, selectionOptions));
     },
     platformAdapterBlueprint(platform, blueprintOptions = {}) {
       return buildMeetingPlatformAdapterBlueprint(platform, withDefaults(defaults, blueprintOptions));

@@ -71,6 +71,10 @@ import type {
   MeetingPlatformAdapterRouteOptions,
 } from './platform-adapter-route.mjs';
 import type {
+  MeetingPlatformAdapterSelection,
+  MeetingPlatformAdapterSelectionMatrix,
+} from './platform-adapter-selection.mjs';
+import type {
   MeetingPlatformAdapterBlueprint,
   MeetingPlatformAdapterBlueprintMatrix,
   MeetingPlatformAdapterBlueprintOptions,
@@ -474,6 +478,15 @@ export interface MeetingPlatformTimelineKit {
   platformAdaptationStrategyMatrix(strategyOptions?: MeetingPlatformRolloutOptions): MeetingPlatformAdaptationStrategyMatrix;
   platformAdapterRoute(platform: string, routeOptions?: MeetingPlatformAdapterRouteOptions): MeetingPlatformAdapterRoute;
   platformAdapterRouteMatrix(routeOptions?: MeetingPlatformAdapterRouteOptions): MeetingPlatformAdapterRouteMatrix;
+  platformAdapterSelection(
+    platform: string,
+    input?: Record<string, unknown>,
+    selectionOptions?: Record<string, unknown>,
+  ): MeetingPlatformAdapterSelection;
+  platformAdapterSelectionMatrix(
+    input?: Record<string, unknown>,
+    selectionOptions?: Record<string, unknown>,
+  ): MeetingPlatformAdapterSelectionMatrix;
   platformAdapterBlueprint(platform: string, blueprintOptions?: MeetingPlatformAdapterBlueprintOptions): MeetingPlatformAdapterBlueprint;
   platformAdapterBlueprintMatrix(blueprintOptions?: MeetingPlatformAdapterBlueprintOptions): MeetingPlatformAdapterBlueprintMatrix;
   verifyPlatformAdapterBlueprint(
