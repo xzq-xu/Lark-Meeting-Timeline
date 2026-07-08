@@ -31,6 +31,7 @@ assert.equal(packedFiles.includes('bin/meeting-app-adapter-integration-package.m
 assert.equal(packedFiles.includes('bin/meeting-app-connector-package.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-consumer-handoff.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-blueprint.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-platform-adapter-decision.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-export-package.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-import-plan.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-install-manifest.mjs'), true);
@@ -45,6 +46,7 @@ assert.equal(packedFiles.includes('cli/meeting-app-adapter-integration-package.m
 assert.equal(packedFiles.includes('cli/meeting-app-connector-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-consumer-handoff.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-blueprint.mjs'), true);
+assert.equal(packedFiles.includes('cli/meeting-platform-adapter-decision.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-export-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-import-plan.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-install-manifest.mjs'), true);
@@ -374,6 +376,26 @@ assert.equal(adapterStartupBinReport.realtime_startup_ready_count, 2);
 assert.equal(adapterStartupBinReport.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
 assert.equal(adapterStartupBinReport.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
 assert.equal(adapterStartupBinReport.written_files.length, 0);
+
+const { stdout: adapterDecisionBinStdout } = await execFileAsync(
+  join(consumerDir, 'node_modules', '.bin', 'meeting-platform-adapter-decision'),
+  [
+    '--platforms=google-meet,zoom',
+    '--json=true',
+    '--write-decisions=false',
+  ],
+  {
+    cwd: consumerDir,
+  },
+);
+const adapterDecisionBinReport = JSON.parse(adapterDecisionBinStdout);
+assert.equal(adapterDecisionBinReport.type, 'meeting_platform_adapter_decision_report');
+assert.equal(adapterDecisionBinReport.ok, true);
+assert.equal(adapterDecisionBinReport.platform_count, 2);
+assert.equal(adapterDecisionBinReport.host_checklist_ready_count, 2);
+assert.equal(adapterDecisionBinReport.rows.find((row) => row.platform === 'google_meet').selected_observer_mode, 'browser_dom_observer');
+assert.equal(adapterDecisionBinReport.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
+assert.equal(adapterDecisionBinReport.written_files.length, 0);
 
 const { stdout: adapterPreflightBinStdout } = await execFileAsync(
   join(consumerDir, 'node_modules', '.bin', 'meeting-platform-adapter-preflight'),
