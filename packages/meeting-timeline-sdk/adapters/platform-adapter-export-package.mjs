@@ -28,9 +28,14 @@ import {
 import {
   buildMeetingPlatformAdaptationPackage,
 } from './platform-adaptation-package.mjs';
+import {
+  MEETING_PLATFORM_RAW_SIGNAL_KINDS,
+  buildMeetingPlatformRawSignalExampleBatch,
+} from './platform-raw-signal.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_EXPORT_PACKAGE_SCHEMA = 'meeting_platform_adapter_export_package';
 export const MEETING_PLATFORM_ADAPTER_EXPORT_PACKAGE_MATRIX_SCHEMA = 'meeting_platform_adapter_export_package_matrix';
+export const MEETING_PLATFORM_ADAPTER_RAW_SIGNAL_VALIDATION_SCHEMA = 'meeting_platform_adapter_raw_signal_validation';
 export const MEETING_PLATFORM_ADAPTER_EXPORT_PACKAGE_SCHEMA_VERSION = 1;
 
 const DEFAULT_EXPORT_PLATFORMS = Object.freeze([
@@ -182,6 +187,14 @@ function buildHostFiles(platform, artifacts = {}, builtIn = false) {
       purpose: 'portable strategy package for realtime axis plus provider reconcile/backfill',
     });
   }
+  if (builtIn || artifacts.raw_signal_validation) {
+    files.push({
+      path: packagePath(platform, 'raw-signal-validation.json'),
+      source: 'raw_signal_validation',
+      required_from: 'static',
+      purpose: 'sample validation proving adapter-collected snapshots, marks, and speaker signals normalize into timeline runtime events',
+    });
+  }
   return files;
 }
 
@@ -200,6 +213,7 @@ function importPaths() {
     adapter_contract: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract',
     provider_connection: '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection',
     adaptation_package: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adaptation-package',
+    raw_signal: '@ai-annotation/meeting-timeline-sdk/adapters/platform-raw-signal',
     integration_runtime: '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime',
     runtime_host: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-runtime-host',
     connector: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector',
@@ -217,10 +231,61 @@ function commandSet(platform, target, options = {}) {
     implementation_handoff: commandWithBase('meeting-platform:implementation-handoff', options, `--platforms=${platform}`),
     runtime_bundle: commandWithBase('meeting-platform:runtime-bundle', options, `--platforms=${platform}`),
     provider_connection: commandWithBase('meeting-platform:provider-connection', options, `--platforms=${platform}`),
+    raw_signal_validation: commandWithBase('meeting-platform:raw-signal', options, `--examples=true --platforms=${platform} --filter-active-speaker-samples=true`),
     handoff_readiness: commandWithBase('meeting-platform:handoff-readiness', options, `--platforms=${platform}`),
     runtime_host_verify: commandWithBase('meeting-platform:runtime-host-verify', options, `--platforms=${platform}`),
     sdk_test: 'npm run sdk:test',
   };
+}
+
+function actionCounts(events = []) {
+  const counts = {};
+  for (const event of events) counts[event.action] = (counts[event.action] ?? 0) + 1;
+  return counts;
+}
+
+function buildRawSignalValidation(platform, options = {}) {
+  const batch = buildMeetingPlatformRawSignalExampleBatch({
+    ...options,
+    platforms: [platform],
+    filterActiveSpeakerSamples: true,
+  });
+  const runtimeEvents = batch.runtime_events ?? [];
+  return compactObject({
+    type: MEETING_PLATFORM_ADAPTER_RAW_SIGNAL_VALIDATION_SCHEMA,
+    schema: MEETING_PLATFORM_ADAPTER_RAW_SIGNAL_VALIDATION_SCHEMA,
+    schema_version: MEETING_PLATFORM_ADAPTER_EXPORT_PACKAGE_SCHEMA_VERSION,
+    platform: batch.platforms?.[0] ?? platform,
+    status: batch.signal_count > 0 && batch.runtime_event_count > 0 ? 'ready' : 'no_runtime_events',
+    purpose: 'validate host-collected meeting platform raw signals before wiring realtime annotations to the timeline',
+    command: commandWithBase('meeting-platform:raw-signal', options, `--examples=true --platforms=${platform} --filter-active-speaker-samples=true`),
+    input_contract: MEETING_PLATFORM_RAW_SIGNAL_KINDS,
+    output_contract: {
+      schema: 'meeting_platform_runtime_event',
+      timestamp_field: 'captured_at_ms',
+      runtime_actions: unique(runtimeEvents.map((event) => event.action)),
+    },
+    filter_policy: {
+      filter_active_speaker_samples: true,
+      min_stable_ms: firstNonEmpty(options.minStableMs, options.min_stable_ms, 500),
+      role: 'suppress noisy active-speaker flicker before drawing speaker positions',
+    },
+    sample_summary: {
+      signal_count: batch.signal_count,
+      runtime_event_count: batch.runtime_event_count,
+      filtered_speaker_event_count: batch.filtered_speaker_event_count,
+      platform_count: batch.platform_count,
+      platforms: batch.platforms,
+      kinds: batch.kinds,
+      runtime_action_counts: actionCounts(runtimeEvents),
+      rows: batch.rows,
+    },
+    next_actions: [
+      'replace_examples_with_host_captured_snapshots_marks_and_speaker_samples',
+      'require_runtime_event_count_above_zero_before_realtime_mark_wiring',
+      'keep_active_speaker_filtering_enabled_for_speaker_position_markers',
+    ],
+  });
 }
 
 function browserSurface(runtimeBundle = {}, portfolioItem = {}) {
@@ -521,6 +586,7 @@ function artifactRefs(artifacts = {}, files = []) {
     adapter_contract: artifactRef('adapter_contract', artifacts.adapter_contract, bySource.adapter_contract, 'static'),
     provider_connection: artifactRef('provider_connection', artifacts.provider_connection, bySource.provider_connection, 'production'),
     adaptation_package: artifactRef('adaptation_package', artifacts.adaptation_package, bySource.adaptation_package, 'static'),
+    raw_signal_validation: artifactRef('raw_signal_validation', artifacts.raw_signal_validation, bySource.raw_signal_validation, 'static'),
   });
 }
 
@@ -570,6 +636,13 @@ function builtInArtifactRefs(platform, files = [], refs = {}) {
       required_from: 'static',
       platform,
     },
+    raw_signal_validation: refs.raw_signal_validation ?? {
+      name: 'raw_signal_validation',
+      schema: MEETING_PLATFORM_ADAPTER_RAW_SIGNAL_VALIDATION_SCHEMA,
+      path: bySource.raw_signal_validation,
+      required_from: 'static',
+      platform,
+    },
   });
 }
 
@@ -598,6 +671,13 @@ function setupOrder(platform, builtIn, target) {
     },
     {
       step: 4,
+      id: 'validate_raw_signals',
+      action: `run meeting-platform:raw-signal examples for ${platform}, then replay host-captured raw signals before first live wiring`,
+      required: true,
+      output: 'runtime events generated from meeting_app_snapshot/annotation/speaker_track raw signals',
+    },
+    {
+      step: 5,
       id: 'run_adapter_preflight',
       action: 'run adapter preflight with live DOM/native-window evidence before opening a realtime annotation session',
       required: true,
@@ -605,28 +685,28 @@ function setupOrder(platform, builtIn, target) {
       url_only_status: 'needs_live_page_evidence',
     },
     {
-      step: 5,
+      step: 6,
       id: 'insert_realtime_marks',
       action: `call insertAnnotation('${platform}', { captured_at_ms, ...mark })`,
       required: true,
       output: 'timeline marks aligned to device capture time',
     },
     {
-      step: 6,
+      step: 7,
       id: 'emit_speaker_positions',
       action: 'call speakerTrack/participantTrack when local evidence is available',
       required: false,
       output: 'speaker and participant position markers without transcript text',
     },
     {
-      step: 7,
+      step: 8,
       id: 'connect_provider_reconcile',
       action: 'ingest official provider events only after local realtime axis is available',
       required: target === 'production',
       output: 'start/end/participant/artifact reconcile and backfill',
     },
     {
-      step: 8,
+      step: 9,
       id: 'run_acceptance',
       action: `run adapter acceptance checklist target=${target}`,
       required: true,
@@ -642,6 +722,7 @@ function nextActionsFor(packageObject = {}) {
     ...(checklist.next_actions ?? []),
     ...(portfolio.next_actions ?? []),
     packageObject.built_in ? 'wire_export_package_into_host_project' : 'author_missing_platform_adapter_before_runtime_install',
+    'run_raw_signal_validation_before_adapter_preflight',
     'run_adapter_preflight_with_live_window_evidence_before_first_insert',
     'bind_current_meeting_axis_before_first_annotation',
     'keep_provider_events_nonblocking_for_realtime_marks',
@@ -679,6 +760,7 @@ export function buildMeetingPlatformAdapterExportPackage(platform, input = {}, o
     provider_connection: buildArtifacts ? safeArtifact(builtIn, buildMeetingPlatformProviderConnectionPack, key, merged) : undefined,
     adapter_contract: buildArtifacts ? safeArtifact(builtIn, buildMeetingPlatformAdapterContract, key, merged) : undefined,
     adaptation_package: buildArtifacts ? safeArtifact(builtIn, buildMeetingPlatformAdaptationPackage, key, merged) : undefined,
+    raw_signal_validation: buildArtifacts ? safeArtifact(builtIn, buildRawSignalValidation, key, merged) : undefined,
   });
   const implementationForGate = artifacts.implementation_handoff
     ?? safeArtifact(builtIn, buildMeetingPlatformImplementationHandoff, key, merged);
@@ -816,6 +898,7 @@ export function buildMeetingPlatformAdapterExportPackageMatrix(input = {}, optio
     provider_reconcile_count: packages.filter((item) => item.surface_entrypoints?.provider_reconcile?.ready === true).length,
     adapter_preflight_startup_ready_count: packages.filter((item) => item.adapter_preflight?.startup_ready === true).length,
     adapter_preflight_realtime_ready_count: packages.filter((item) => item.adapter_preflight?.realtime_annotation_ready === true).length,
+    raw_signal_validation_ready_count: packages.filter((item) => item.artifact_refs?.raw_signal_validation?.path).length,
     platforms: packages.map((item) => item.platform),
     rows: packages.map((item) => ({
       platform: item.platform,
@@ -832,6 +915,7 @@ export function buildMeetingPlatformAdapterExportPackageMatrix(input = {}, optio
       adapter_preflight_selected_surface: item.adapter_preflight?.selected_surface,
       adapter_preflight_startup_ready: item.adapter_preflight?.startup_ready === true,
       adapter_preflight_realtime_ready: item.adapter_preflight?.realtime_annotation_ready === true,
+      raw_signal_validation_ready: Boolean(item.artifact_refs?.raw_signal_validation?.path),
       host_file_count: item.host_files.length,
       failed_required_ids: item.readiness.failed_required_ids,
       first_next_action: item.next_actions?.[0],

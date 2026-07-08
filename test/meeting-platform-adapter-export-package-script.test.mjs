@@ -37,8 +37,10 @@ assert.equal(report.written_files.includes(join(outDir, 'google_meet', 'adapter-
 assert.equal(report.written_files.includes(join(outDir, 'google_meet', 'adapter-blueprint.json')), true);
 assert.equal(report.written_files.includes(join(outDir, 'google_meet', 'runtime-bundle.json')), true);
 assert.equal(report.written_files.includes(join(outDir, 'google_meet', 'provider-connection.json')), true);
+assert.equal(report.written_files.includes(join(outDir, 'google_meet', 'raw-signal-validation.json')), true);
 assert.equal(report.rows[0].package_file, join(outDir, 'google_meet', 'adapter-export-package.json'));
 assert.equal(report.rows[0].host_file_count >= 8, true);
+assert.equal(report.rows[0].raw_signal_validation_ready, true);
 assert.equal(report.rows[0].adapter_preflight_status, 'needs_live_page_evidence');
 assert.equal(report.rows[0].adapter_preflight_selected_surface, 'browser_extension');
 assert.equal(report.rows[0].adapter_preflight_startup_ready, true);
@@ -55,6 +57,7 @@ assert.equal(exportPackage.accepted, true);
 assert.equal(exportPackage.artifacts, undefined);
 assert.equal(exportPackage.host_files.find((file) => file.source === 'adapter_blueprint').path, 'google_meet/adapter-blueprint.json');
 assert.equal(exportPackage.host_files.find((file) => file.source === 'adapter_contract').path, 'google_meet/adapter-contract.json');
+assert.equal(exportPackage.host_files.find((file) => file.source === 'raw_signal_validation').path, 'google_meet/raw-signal-validation.json');
 assert.equal(exportPackage.adapter_preflight.status, 'needs_live_page_evidence');
 assert.equal(exportPackage.adapter_preflight.realtime_annotation_ready, false);
 assert.equal(exportPackage.surface_entrypoints.provider_reconcile.blocks_realtime_annotation, false);
@@ -71,6 +74,14 @@ assert.equal(runtimeBundle.platform, 'google_meet');
 const providerConnection = JSON.parse(await readFile(join(outDir, 'google_meet', 'provider-connection.json'), 'utf8'));
 assert.equal(providerConnection.schema, 'meeting_platform_provider_connection_pack');
 assert.equal(providerConnection.platform, 'google_meet');
+
+const rawSignalValidation = JSON.parse(await readFile(join(outDir, 'google_meet', 'raw-signal-validation.json'), 'utf8'));
+assert.equal(rawSignalValidation.schema, 'meeting_platform_adapter_raw_signal_validation');
+assert.equal(rawSignalValidation.platform, 'google_meet');
+assert.equal(rawSignalValidation.status, 'ready');
+assert.equal(rawSignalValidation.sample_summary.signal_count, 3);
+assert.equal(rawSignalValidation.output_contract.runtime_actions.includes('observe_meeting_app'), true);
+assert.equal(rawSignalValidation.output_contract.runtime_actions.includes('insert_annotation'), true);
 
 const { stdout: textStdout } = await execFileAsync(process.execPath, [
   'scripts/meeting-platform-adapter-export-package.mjs',

@@ -10,6 +10,7 @@ import type { MeetingPlatformAdaptationPackageOptions } from './platform-adaptat
 
 export const MEETING_PLATFORM_ADAPTER_EXPORT_PACKAGE_SCHEMA: 'meeting_platform_adapter_export_package';
 export const MEETING_PLATFORM_ADAPTER_EXPORT_PACKAGE_MATRIX_SCHEMA: 'meeting_platform_adapter_export_package_matrix';
+export const MEETING_PLATFORM_ADAPTER_RAW_SIGNAL_VALIDATION_SCHEMA: 'meeting_platform_adapter_raw_signal_validation';
 export const MEETING_PLATFORM_ADAPTER_EXPORT_PACKAGE_SCHEMA_VERSION: 1;
 
 export interface MeetingPlatformAdapterExportPackageOptions
@@ -83,6 +84,7 @@ export interface MeetingPlatformAdapterExportPackageMatrix {
   provider_reconcile_count: number;
   adapter_preflight_startup_ready_count: number;
   adapter_preflight_realtime_ready_count: number;
+  raw_signal_validation_ready_count: number;
   platforms: string[];
   rows: Array<Record<string, unknown>>;
   packages: MeetingPlatformAdapterExportPackage[];
