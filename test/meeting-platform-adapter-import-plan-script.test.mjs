@@ -45,11 +45,14 @@ assert.equal(report.accepted_count, 1);
 assert.equal(report.blocked_count, 0);
 assert.equal(report.adapter_preflight_startup_ready_count, 1);
 assert.equal(report.adapter_preflight_realtime_ready_count, 0);
+assert.equal(report.raw_signal_validation_ready_count, 1);
 assert.equal(report.available_file_count >= 8, true);
 assert.equal(report.rows[0].platform, 'google_meet');
 assert.equal(report.rows[0].selected_surface, 'browser_extension');
 assert.equal(report.rows[0].file_coverage_ready, true);
 assert.equal(report.rows[0].adapter_blueprint_available, true);
+assert.equal(report.rows[0].raw_signal_validation_ready, true);
+assert.equal(report.rows[0].raw_signal_validation_status, 'ready');
 assert.equal(report.rows[0].adapter_blueprint_primary_surface, 'browser_extension');
 assert.equal(report.rows[0].adapter_preflight_status, 'needs_live_page_evidence');
 assert.equal(report.rows[0].adapter_preflight_selected_surface, 'browser_extension');
@@ -65,10 +68,14 @@ assert.equal(importPlan.schema, 'meeting_platform_adapter_import_plan');
 assert.equal(importPlan.accepted, true);
 assert.equal(importPlan.adapter_blueprint.primary_surface, 'browser_extension');
 assert.equal(importPlan.adapter_blueprint.provider_blocks_realtime, false);
+assert.equal(importPlan.raw_signal_validation.status, 'ready');
+assert.equal(importPlan.raw_signal_validation.runtime_actions.includes('observe_meeting_app'), true);
+assert.equal(importPlan.runtime_contract.raw_signal_validation_required_before_preflight, true);
 assert.equal(importPlan.runtime_contract.adapter_preflight_required_before_realtime_insert, true);
 assert.equal(importPlan.adapter_preflight.status, 'needs_live_page_evidence');
 assert.equal(importPlan.adapter_preflight.realtime_annotation_ready, false);
 assert.equal(importPlan.host_file_coverage.status, 'complete');
+assert.equal(importPlan.install_steps.find((step) => step.id === 'run_raw_signal_validation').sdk_method, 'platformRawSignalBatch');
 assert.equal(importPlan.install_steps.find((step) => step.id === 'run_adapter_preflight').sdk_method, 'platformAdapterPreflight');
 assert.equal(importPlan.install_steps.find((step) => step.id === 'insert_realtime_marks').sdk_method, 'insertAnnotation');
 
@@ -100,6 +107,7 @@ const { stdout: textStdout } = await execFileAsync(process.execPath, [
 });
 assert.match(textStdout, /meeting_platform_adapter_import_plan_report/);
 assert.match(textStdout, /google_meet: accepted=yes/);
+assert.match(textStdout, /raw_signal=yes/);
 assert.match(textStdout, /preflight=needs_live_page_evidence/);
 assert.match(textStdout, /realtime=no/);
 

@@ -89,11 +89,14 @@ async function readPackages(options = {}) {
       const pkg = await readJson(file);
       const blueprintPath = pkg.host_files?.find((hostFile) => hostFile.source === 'adapter_blueprint')?.path;
       const adapterBlueprint = blueprintPath ? await readOptionalJson(resolve(options.dir, blueprintPath)) : undefined;
-      packages.push(adapterBlueprint ? {
+      const rawSignalPath = pkg.host_files?.find((hostFile) => hostFile.source === 'raw_signal_validation')?.path;
+      const rawSignalValidation = rawSignalPath ? await readOptionalJson(resolve(options.dir, rawSignalPath)) : undefined;
+      packages.push(adapterBlueprint || rawSignalValidation ? {
         ...pkg,
         artifacts: {
           ...(pkg.artifacts ?? {}),
           adapter_blueprint: adapterBlueprint,
+          raw_signal_validation: rawSignalValidation,
         },
       } : pkg);
     } catch {
@@ -169,6 +172,7 @@ export async function buildMeetingPlatformAdapterImportPlanCliReport(options = {
     blocked_count: matrix.blocked_count,
     adapter_preflight_startup_ready_count: matrix.adapter_preflight_startup_ready_count,
     adapter_preflight_realtime_ready_count: matrix.adapter_preflight_realtime_ready_count,
+    raw_signal_validation_ready_count: matrix.raw_signal_validation_ready_count,
     missing_package_files: missing,
     missing_package_file_count: missing.length,
     available_file_count: collectedFiles.length,
@@ -189,10 +193,10 @@ export async function buildMeetingPlatformAdapterImportPlanCliReport(options = {
 
 export function formatMeetingPlatformAdapterImportPlanCliReport(report = {}) {
   const lines = [
-    `meeting_platform_adapter_import_plan_report | ok=${boolLabel(report.ok)} | target=${report.target} | packages=${report.package_count} | accepted=${report.accepted_count} | blocked=${report.blocked_count} | preflight=${report.adapter_preflight_realtime_ready_count}/${report.package_count} | missing_packages=${report.missing_package_file_count} | available_files=${report.available_file_count} | written=${report.written_files?.length ?? 0}`,
+    `meeting_platform_adapter_import_plan_report | ok=${boolLabel(report.ok)} | target=${report.target} | packages=${report.package_count} | accepted=${report.accepted_count} | blocked=${report.blocked_count} | raw_signal=${report.raw_signal_validation_ready_count}/${report.package_count} | preflight=${report.adapter_preflight_realtime_ready_count}/${report.package_count} | missing_packages=${report.missing_package_file_count} | available_files=${report.available_file_count} | written=${report.written_files?.length ?? 0}`,
   ];
   for (const row of report.rows ?? []) {
-    lines.push(`${row.platform}: accepted=${boolLabel(row.accepted)} surface=${row.selected_surface} hard_contract=${boolLabel(row.hard_contract_ready)} surface_ready=${boolLabel(row.selected_surface_ready)} files=${boolLabel(row.file_coverage_ready)} preflight=${row.adapter_preflight_status ?? 'n/a'} realtime=${boolLabel(row.adapter_preflight_realtime_ready)} missing=${row.missing_file_count ?? 0} next=${row.first_next_action ?? 'none'} plan=${row.plan_file ?? 'n/a'}`);
+    lines.push(`${row.platform}: accepted=${boolLabel(row.accepted)} surface=${row.selected_surface} hard_contract=${boolLabel(row.hard_contract_ready)} raw_signal=${boolLabel(row.raw_signal_validation_ready)} surface_ready=${boolLabel(row.selected_surface_ready)} files=${boolLabel(row.file_coverage_ready)} preflight=${row.adapter_preflight_status ?? 'n/a'} realtime=${boolLabel(row.adapter_preflight_realtime_ready)} missing=${row.missing_file_count ?? 0} next=${row.first_next_action ?? 'none'} plan=${row.plan_file ?? 'n/a'}`);
   }
   if (report.missing_package_files?.length > 0) lines.push(`missing_package_files=${report.missing_package_files.join(',')}`);
   if (report.next_actions?.length > 0) lines.push(`next_actions=${report.next_actions.join(',')}`);

@@ -149,10 +149,15 @@ function readiness(pkg = {}, surface = '', coverage = {}, input = {}, options = 
   const preflightContractReady = pkg.adapter_preflight?.live_evidence_required === true
     && pkg.adapter_preflight?.url_only_status === 'needs_live_page_evidence'
     && Boolean(pkg.adapter_preflight?.required_before);
+  const rawSignalValidationReady = Boolean(
+    pkg.artifact_refs?.raw_signal_validation?.path
+      || pkg.artifacts?.raw_signal_validation
+      || pkg.raw_signal_validation,
+  ) || (allowCustomAuthoring && pkg.built_in !== true);
   const surfaceReady = selected.ready === true || (surface === 'provider_reconcile' && selected.required_for_realtime === false);
   const packageAccepted = pkg.accepted === true || (allowCustomAuthoring && pkg.built_in !== true);
   const fileCoverageReady = coverage.checked !== true || coverage.missing.length === 0;
-  const importReady = schemaValid && hardContractReady && preflightContractReady && surfaceReady && packageAccepted && fileCoverageReady;
+  const importReady = schemaValid && hardContractReady && preflightContractReady && rawSignalValidationReady && surfaceReady && packageAccepted && fileCoverageReady;
   const issues = [
     schemaValid ? undefined : issue('error', 'invalid_export_package_schema', 'Adapter export package schema is invalid.', {
       actual: pkg.schema,
@@ -164,6 +169,9 @@ function readiness(pkg = {}, surface = '', coverage = {}, input = {}, options = 
     pkg.provider_events_block_realtime === false ? undefined : issue('error', 'provider_events_must_be_nonblocking', 'Provider events must not block realtime mark insertion.'),
     pkg.transcript_blocks_realtime === false ? undefined : issue('error', 'transcript_must_be_nonblocking', 'Transcript artifacts must remain post-meeting backfill.'),
     preflightContractReady ? undefined : issue('error', 'adapter_preflight_gate_required', 'Adapter import must declare a live-evidence preflight gate before realtime annotation insertion.'),
+    rawSignalValidationReady ? undefined : issue('error', 'raw_signal_validation_required', 'Adapter import must include raw signal validation before realtime wiring.', {
+      expected: 'raw-signal-validation.json or raw_signal_validation artifact',
+    }),
     surfaceReady ? undefined : issue('error', 'selected_surface_not_ready', 'Selected import surface is not ready in the export package.', {
       surface,
     }),
@@ -180,6 +188,7 @@ function readiness(pkg = {}, surface = '', coverage = {}, input = {}, options = 
     schema_valid: schemaValid,
     hard_contract_ready: hardContractReady,
     adapter_preflight_contract_ready: preflightContractReady,
+    raw_signal_validation_ready: rawSignalValidationReady,
     selected_surface_ready: surfaceReady,
     export_package_accepted: pkg.accepted === true,
     package_accepted_for_import: packageAccepted,
@@ -202,6 +211,7 @@ function sdkImports(pkg = {}) {
     connector: imports.connector ?? '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector',
     runtime_bundle: imports.runtime_bundle ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
     provider_connection: imports.provider_connection ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection',
+    raw_signal: imports.raw_signal ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-raw-signal',
   };
 }
 
@@ -254,7 +264,35 @@ function adapterBlueprintSummary(pkg = {}, input = {}, options = {}) {
   });
 }
 
-function installSteps(pkg = {}, surface = '', coverage = {}) {
+function rawSignalValidationSummary(pkg = {}, input = {}, options = {}) {
+  const rawSignalValidation = firstNonEmpty(
+    options.rawSignalValidation,
+    options.raw_signal_validation,
+    input.rawSignalValidation,
+    input.raw_signal_validation,
+    pkg.artifacts?.raw_signal_validation,
+    pkg.raw_signal_validation,
+  );
+  const ref = pkg.artifact_refs?.raw_signal_validation ?? {};
+  const outputContract = rawSignalValidation?.output_contract ?? {};
+  const sampleSummary = rawSignalValidation?.sample_summary ?? {};
+  return compactObject({
+    available: Boolean(ref.path || rawSignalValidation),
+    schema: rawSignalValidation?.schema ?? ref.schema ?? (ref.path ? 'meeting_platform_adapter_raw_signal_validation' : undefined),
+    path: ref.path,
+    command: rawSignalValidation?.command ?? pkg.commands?.raw_signal_validation,
+    status: rawSignalValidation?.status,
+    input_contract: rawSignalValidation?.input_contract,
+    runtime_actions: outputContract.runtime_actions,
+    runtime_action_count: outputContract.runtime_actions?.length,
+    signal_count: sampleSummary.signal_count,
+    runtime_event_count: sampleSummary.runtime_event_count,
+    filtered_speaker_event_count: sampleSummary.filtered_speaker_event_count,
+    filter_active_speaker_samples: rawSignalValidation?.filter_policy?.filter_active_speaker_samples,
+  });
+}
+
+function installSteps(pkg = {}, surface = '', coverage = {}, rawSignalValidation = {}) {
   const selected = surfaceEntrypoint(pkg, surface) ?? {};
   return [
     {
@@ -289,6 +327,16 @@ function installSteps(pkg = {}, surface = '', coverage = {}) {
     },
     {
       step: 5,
+      id: 'run_raw_signal_validation',
+      action: 'run raw signal validation with examples, then replay host-captured snapshots, marks, and speaker samples',
+      required: true,
+      command: rawSignalValidation.command ?? pkg.commands?.raw_signal_validation,
+      sdk_method: 'platformRawSignalBatch',
+      artifact_path: rawSignalValidation.path,
+      expected_runtime_actions: rawSignalValidation.runtime_actions,
+    },
+    {
+      step: 6,
       id: 'run_adapter_preflight',
       action: 'run adapter preflight with live DOM/native-window evidence before opening a realtime annotation session',
       required: true,
@@ -301,7 +349,7 @@ function installSteps(pkg = {}, surface = '', coverage = {}) {
       timestamp_field: 'captured_at_ms',
     },
     {
-      step: 6,
+      step: 7,
       id: 'bind_current_axis',
       action: 'call observePlatformCandidates before first realtime mark',
       required: true,
@@ -309,7 +357,7 @@ function installSteps(pkg = {}, surface = '', coverage = {}) {
       timestamp_field: 'captured_at_ms',
     },
     {
-      step: 7,
+      step: 8,
       id: 'insert_realtime_marks',
       action: `call insertAnnotation('${pkg.platform}', { captured_at_ms, ...mark })`,
       required: true,
@@ -317,14 +365,14 @@ function installSteps(pkg = {}, surface = '', coverage = {}) {
       timestamp_field: 'captured_at_ms',
     },
     {
-      step: 8,
+      step: 9,
       id: 'emit_speaker_participant_positions',
       action: 'call speakerTrack/participantTrack when local samples are available',
       required: false,
       sdk_methods: ['speakerTrack', 'participantTrack'],
     },
     {
-      step: 9,
+      step: 10,
       id: 'connect_provider_reconcile',
       action: 'connect provider events only as reconcile/backfill after local axis exists',
       required: false,
@@ -339,6 +387,7 @@ function nextActions(pkg = {}, ready = {}, coverage = {}) {
     ...(ready.issues ?? []).map((item) => item.code),
     ...(coverage.missing ?? []).map((file) => `provide_host_file:${file.path}`),
     ...(pkg.next_actions ?? []),
+    ready.import_ready ? 'run_raw_signal_validation_with_host_captured_samples' : undefined,
     ready.import_ready ? 'run_adapter_preflight_with_live_window_evidence_before_first_insert' : undefined,
     ready.import_ready ? 'wire_selected_surface_into_host_runtime' : 'fix_adapter_import_plan_blockers',
   ]);
@@ -351,6 +400,7 @@ export function buildMeetingPlatformAdapterImportPlan(exportPackage = {}, input 
   const ready = readiness(exportPackage, surface, coverage, input, { ...options, target });
   const blueprint = adapterBlueprintSummary(exportPackage, input, options);
   const preflight = adapterPreflightSummary(exportPackage);
+  const rawSignalValidation = rawSignalValidationSummary(exportPackage, input, options);
   return {
     type: 'meeting_platform_adapter_import_plan',
     schema: MEETING_PLATFORM_ADAPTER_IMPORT_PLAN_SCHEMA,
@@ -370,19 +420,22 @@ export function buildMeetingPlatformAdapterImportPlan(exportPackage = {}, input 
       local_axis_first: exportPackage.local_axis_first === true,
       provider_events_block_realtime: exportPackage.provider_events_block_realtime === true,
       transcript_blocks_realtime: exportPackage.transcript_blocks_realtime === true,
+      raw_signal_validation_required_before_preflight: rawSignalValidation.available === true,
       adapter_preflight_required_before_realtime_insert: preflight.live_evidence_required === true,
       adapter_preflight_url_only_status: preflight.url_only_status,
     },
     adapter_blueprint: blueprint,
+    raw_signal_validation: rawSignalValidation,
     adapter_preflight: preflight,
     sdk_imports: sdkImports(exportPackage),
     host_file_coverage: coverage,
     surface_entrypoints: exportPackage.surface_entrypoints,
     surface_entrypoint: surfaceEntrypoint(exportPackage, surface),
-    install_steps: installSteps(exportPackage, surface, coverage),
+    install_steps: installSteps(exportPackage, surface, coverage, rawSignalValidation),
     commands: compactObject({
       export_package: exportPackage.commands?.export_package,
       acceptance_checklist: exportPackage.commands?.acceptance_checklist,
+      raw_signal_validation: exportPackage.commands?.raw_signal_validation,
       runtime_bundle: exportPackage.commands?.runtime_bundle,
       import_plan: 'npm run meeting-platform:adapter-import-plan',
       sdk_test: exportPackage.commands?.sdk_test ?? 'npm run sdk:test',
@@ -395,6 +448,7 @@ export function buildMeetingPlatformAdapterImportPlan(exportPackage = {}, input 
       host_file_count: exportPackage.host_files?.length ?? 0,
       package_role: exportPackage.package_role,
       adapter_blueprint_path: blueprint.path,
+      raw_signal_validation_path: rawSignalValidation.path,
     }),
     next_actions: nextActions(exportPackage, ready, coverage),
   };
@@ -432,6 +486,7 @@ export function buildMeetingPlatformAdapterImportPlanMatrix(packagesOrInput = {}
     missing_file_count: plans.reduce((count, plan) => count + (plan.host_file_coverage.missing?.length ?? 0), 0),
     adapter_preflight_startup_ready_count: plans.filter((plan) => plan.adapter_preflight?.startup_ready === true).length,
     adapter_preflight_realtime_ready_count: plans.filter((plan) => plan.adapter_preflight?.realtime_annotation_ready === true).length,
+    raw_signal_validation_ready_count: plans.filter((plan) => plan.raw_signal_validation?.available === true).length,
     platforms: plans.map((plan) => plan.platform),
     rows: plans.map((plan) => ({
       platform: plan.platform,
@@ -441,6 +496,8 @@ export function buildMeetingPlatformAdapterImportPlanMatrix(packagesOrInput = {}
       built_in: plan.built_in,
       export_package_accepted: plan.export_package_accepted,
       hard_contract_ready: plan.readiness.hard_contract_ready,
+      raw_signal_validation_ready: plan.readiness.raw_signal_validation_ready,
+      raw_signal_validation_status: plan.raw_signal_validation?.status,
       selected_surface_ready: plan.readiness.selected_surface_ready,
       file_coverage_ready: plan.readiness.file_coverage_ready,
       adapter_blueprint_available: plan.adapter_blueprint?.available === true,
