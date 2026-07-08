@@ -101,6 +101,7 @@ function sdkImports(plans = []) {
     platform_kit: first.platform_kit ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit',
     adapter_import_plan: first.adapter_import_plan ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-import-plan',
     adapter_blueprint: first.adapter_blueprint ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint',
+    adapter_selection: first.adapter_selection ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-selection',
     adapter_preflight: first.adapter_preflight ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight',
     raw_signal: first.raw_signal ?? '@ai-annotation/meeting-timeline-sdk/adapters/platform-raw-signal',
     adapter_install_manifest: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-install-manifest',
@@ -128,6 +129,16 @@ function platformRow(plan = {}) {
     provider_path: entry.path,
     provider_transport: entry.transport,
     provider_required_for_realtime: entry.required_for_realtime === true,
+    adapter_selection_path: plan.adapter_selection?.path,
+    adapter_selection_ready: plan.adapter_selection?.ready === true,
+    adapter_selection_axis_source: plan.adapter_selection?.axis_source,
+    adapter_selection_axis_surface: plan.adapter_selection?.axis_surface,
+    adapter_selection_timestamp_field: plan.adapter_selection?.timestamp_field,
+    adapter_selection_provider_reconcile_source: plan.adapter_selection?.provider_reconcile_source,
+    adapter_selection_provider_required_for_production: plan.adapter_selection?.provider_reconcile_required_for_production,
+    adapter_selection_speaker_track_source: plan.adapter_selection?.speaker_track_source,
+    adapter_selection_post_meeting_artifact_source: plan.adapter_selection?.post_meeting_artifact_source,
+    adapter_selection_startup_order: plan.adapter_selection?.startup_order,
     adapter_blueprint_path: plan.adapter_blueprint?.path,
     adapter_blueprint_primary_surface: plan.adapter_blueprint?.primary_surface,
     adapter_blueprint_first_gate: plan.adapter_blueprint?.first_acceptance_gate,
@@ -174,6 +185,35 @@ function surfaceRegistry(plans = [], surface) {
   return {
     enabled: rows.length > 0,
     platform_count: rows.length,
+    rows,
+  };
+}
+
+function adapterSelectionRegistry(plans = []) {
+  const rows = plans.map((plan) => compactObject({
+    platform: plan.platform,
+    display_name: plan.display_name,
+    available: plan.adapter_selection?.available === true,
+    schema: plan.adapter_selection?.schema,
+    path: plan.adapter_selection?.path,
+    command: plan.adapter_selection?.command,
+    ready: plan.adapter_selection?.ready === true,
+    axis_source: plan.adapter_selection?.axis_source,
+    axis_surface: plan.adapter_selection?.axis_surface,
+    annotation_source: plan.adapter_selection?.annotation_source,
+    timestamp_field: plan.adapter_selection?.timestamp_field,
+    provider_reconcile_source: plan.adapter_selection?.provider_reconcile_source,
+    provider_reconcile_required_for_production: plan.adapter_selection?.provider_reconcile_required_for_production,
+    provider_events_block_realtime: plan.adapter_selection?.provider_events_block_realtime,
+    transcript_blocks_realtime: plan.adapter_selection?.transcript_blocks_realtime,
+    speaker_track_source: plan.adapter_selection?.speaker_track_source,
+    post_meeting_artifact_source: plan.adapter_selection?.post_meeting_artifact_source,
+    startup_order: plan.adapter_selection?.startup_order,
+  }));
+  return {
+    enabled: rows.some((row) => row.available === true),
+    platform_count: rows.filter((row) => row.available === true).length,
+    ready_count: rows.filter((row) => row.ready === true).length,
     rows,
   };
 }
@@ -290,6 +330,12 @@ function readiness(plans = [], input = {}, options = {}) {
   const localAxisIssues = plans.filter((plan) => plan.runtime_contract?.local_axis_first !== true);
   const providerBlocking = plans.filter((plan) => plan.runtime_contract?.provider_events_block_realtime === true);
   const transcriptBlocking = plans.filter((plan) => plan.runtime_contract?.transcript_blocks_realtime === true);
+  const adapterSelectionMissing = plans.filter((plan) => plan.built_in === true && plan.adapter_selection?.ready !== true);
+  const adapterSelectionInvalid = plans.filter((plan) => plan.adapter_selection?.available === true && (
+    plan.adapter_selection?.timestamp_field !== 'captured_at_ms'
+    || plan.adapter_selection?.provider_events_block_realtime === true
+    || plan.adapter_selection?.transcript_blocks_realtime === true
+  ));
   const rawSignalMissing = plans.filter((plan) => plan.runtime_contract?.raw_signal_validation_required_before_preflight !== true
     || plan.raw_signal_validation?.available !== true);
   const preflightMissing = plans.filter((plan) => plan.runtime_contract?.adapter_preflight_required_before_realtime_insert !== true);
@@ -313,6 +359,12 @@ function readiness(plans = [], input = {}, options = {}) {
     }) : undefined,
     transcriptBlocking.length > 0 ? issue('error', 'transcript_blocks_realtime', 'Transcript import must not block realtime annotations.', {
       platforms: transcriptBlocking.map((plan) => plan.platform),
+    }) : undefined,
+    adapterSelectionMissing.length > 0 ? issue('error', 'adapter_selection_required', 'Every built-in installed adapter must carry a ready adapter selection.', {
+      platforms: adapterSelectionMissing.map((plan) => plan.platform),
+    }) : undefined,
+    adapterSelectionInvalid.length > 0 ? issue('error', 'adapter_selection_contract_invalid', 'Adapter selection must preserve captured_at_ms and nonblocking provider/transcript policy.', {
+      platforms: adapterSelectionInvalid.map((plan) => plan.platform),
     }) : undefined,
     rawSignalMissing.length > 0 ? issue('error', 'raw_signal_validation_required', 'Every installed adapter must validate raw signals before adapter preflight.', {
       platforms: rawSignalMissing.map((plan) => plan.platform),
@@ -346,13 +398,21 @@ function installSequence(plans = []) {
     },
     {
       step: 2,
+      id: 'load_adapter_selections',
+      action: 'read adapter-selection.json or adapter_selection field for every selected meeting platform',
+      required: true,
+      sdk_method: 'platformAdapterSelection',
+      platform_count: platforms.length,
+    },
+    {
+      step: 3,
       id: 'load_adapter_blueprints',
       action: 'read adapter-blueprint.json for surface order, evidence contract, and acceptance gates',
       required: false,
       platform_count: platforms.length,
     },
     {
-      step: 3,
+      step: 4,
       id: 'create_sdk_facade',
       action: 'createMeetingAppTimelineSdk({ baseUrl, platforms })',
       required: true,
@@ -360,14 +420,14 @@ function installSequence(plans = []) {
       platforms,
     },
     {
-      step: 4,
+      step: 5,
       id: 'register_selected_surfaces',
       action: 'install the selected local surface for each platform before any provider reconcile path',
       required: true,
       surfaces: unique(plans.map((plan) => plan.selected_surface)),
     },
     {
-      step: 5,
+      step: 6,
       id: 'run_raw_signal_validation_before_preflight',
       action: 'validate host-captured snapshots, marks, and speaker samples with platformRawSignalBatch before adapter preflight',
       required: true,
@@ -375,7 +435,7 @@ function installSequence(plans = []) {
       platforms,
     },
     {
-      step: 6,
+      step: 7,
       id: 'run_adapter_preflight_before_realtime_session',
       action: 'run adapter preflight with live DOM/native-window evidence before opening a realtime annotation session',
       required: true,
@@ -388,7 +448,7 @@ function installSequence(plans = []) {
       platforms,
     },
     {
-      step: 7,
+      step: 8,
       id: 'bind_axis_before_marks',
       action: 'start local candidate observation and bind the current meeting axis',
       required: true,
@@ -396,7 +456,7 @@ function installSequence(plans = []) {
       timestamp_field: 'captured_at_ms',
     },
     {
-      step: 8,
+      step: 9,
       id: 'insert_marks_in_realtime',
       action: 'insert every annotation with captured_at_ms from the local device/app clock',
       required: true,
@@ -404,7 +464,7 @@ function installSequence(plans = []) {
       timestamp_field: 'captured_at_ms',
     },
     {
-      step: 9,
+      step: 10,
       id: 'reconcile_provider_events_later',
       action: 'connect provider events only for reconcile/backfill after the local axis exists',
       required: false,
@@ -448,11 +508,13 @@ export function buildMeetingPlatformAdapterInstallManifest(plansOrInput = {}, in
       local_axis_first: true,
       provider_events_block_realtime: false,
       transcript_blocks_realtime: false,
+      adapter_selection_required_before_surface_install: true,
       raw_signal_validation_required_before_preflight: true,
       adapter_preflight_required_before_realtime_insert: true,
       adapter_preflight_url_only_status: 'needs_live_page_evidence',
     },
     platform_registry: rows,
+    adapter_selection: adapterSelectionRegistry(plans),
     browser_extension: browserRegistry(plans, input, options),
     webview_preload: surfaceRegistry(plans, 'webview_preload'),
     native_detector: surfaceRegistry(plans, 'native_detector'),

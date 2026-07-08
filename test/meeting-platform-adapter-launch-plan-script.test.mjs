@@ -67,7 +67,7 @@ assert.equal(report.selected_surface, 'browser_extension');
 assert.equal(report.adapter_blueprint_primary_surface, 'browser_extension');
 assert.equal(report.adapter_blueprint_first_gate, 'local_candidate_preflight_accepts_active_meeting');
 assert.equal(report.raw_signal_validation_status, 'ready');
-assert.equal(report.first_runtime_action, 'validate_raw_signal');
+assert.equal(report.first_runtime_action, 'read_adapter_selection');
 
 const writtenReport = JSON.parse(await readFile(reportFile, 'utf8'));
 assert.equal(writtenReport.ok, true);
@@ -78,8 +78,10 @@ assert.equal(launchPlan.accepted, true);
 assert.equal(launchPlan.adapter_blueprint.primary_surface, 'browser_extension');
 assert.equal(launchPlan.adapter_blueprint.first_acceptance_gate, 'local_candidate_preflight_accepts_active_meeting');
 assert.equal(launchPlan.raw_signal_validation.status, 'ready');
+assert.equal(launchPlan.adapter_selection.axis_surface, 'browser_extension');
 assert.equal(launchPlan.axis_contract.raw_signal_validation_required_before_preflight, true);
-assert.equal(launchPlan.runtime_actions[0].id, 'validate_raw_signal');
+assert.equal(launchPlan.runtime_actions[0].id, 'read_adapter_selection');
+assert.equal(launchPlan.runtime_actions.find((action) => action.id === 'validate_raw_signal').sdk_method, 'platformRawSignalBatch');
 assert.equal(launchPlan.surface_entrypoint.content_script.matches.includes('https://meet.google.com/*'), true);
 
 const { stdout: providerStdout } = await execFileAsync(process.execPath, [

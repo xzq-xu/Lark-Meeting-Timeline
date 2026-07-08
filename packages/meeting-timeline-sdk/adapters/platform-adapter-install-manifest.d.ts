@@ -31,6 +31,7 @@ export interface MeetingPlatformAdapterInstallManifest {
   sdk_imports: Record<string, string>;
   runtime_contract: Record<string, unknown>;
   platform_registry: Array<Record<string, unknown>>;
+  adapter_selection: Record<string, unknown>;
   browser_extension: Record<string, unknown>;
   webview_preload: Record<string, unknown>;
   native_detector: Record<string, unknown>;

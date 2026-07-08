@@ -165,6 +165,10 @@ function rawSignalValidationRow(manifest = {}, platform) {
   return asArray(manifest.raw_signal_validation?.rows).find((row) => row.platform === platform);
 }
 
+function adapterSelectionRow(manifest = {}, platform) {
+  return asArray(manifest.adapter_selection?.rows).find((row) => row.platform === platform);
+}
+
 function resolvePlatform(manifest = {}, input = {}, options = {}) {
   const url = rawUrl(input, options);
   const explicit = explicitPlatform(input, options);
@@ -247,9 +251,19 @@ function surfaceEntrypoint(manifest = {}, row = {}, surface = '', url) {
   });
 }
 
-function runtimeActions(row = {}, surface = '') {
+function runtimeActions(row = {}, surface = '', adapterSelection = {}) {
   const localSurface = surface !== 'provider_reconcile';
   return [
+    localSurface ? {
+      id: 'read_adapter_selection',
+      phase: 'adapter_selection',
+      required: true,
+      sdk_method: 'platformAdapterSelection',
+      artifact_path: adapterSelection.path,
+      axis_source: adapterSelection.axis_source,
+      axis_surface: adapterSelection.axis_surface,
+      timestamp_field: adapterSelection.timestamp_field ?? 'captured_at_ms',
+    } : undefined,
     localSurface ? {
       id: 'validate_raw_signal',
       phase: 'adapter_validation',
@@ -297,7 +311,8 @@ function runtimeActions(row = {}, surface = '') {
   ].filter(Boolean);
 }
 
-function readiness(manifest = {}, row = null, surface = '', entrypoint = {}, resolved = {}) {
+function readiness(manifest = {}, row = null, surface = '', entrypoint = {}, resolved = {}, adapterSelection = {}) {
+  const adapterSelectionRequired = manifest.runtime_contract?.adapter_selection_required_before_surface_install === true;
   const issues = [
     manifest.schema === 'meeting_platform_adapter_install_manifest' ? undefined : issue('error', 'invalid_install_manifest', 'Launch plan requires an adapter install manifest.', {
       actual: manifest.schema,
@@ -313,6 +328,9 @@ function readiness(manifest = {}, row = null, surface = '', entrypoint = {}, res
     row?.raw_signal_validation_path ? undefined : issue('error', 'raw_signal_validation_not_registered', 'Launch plan requires raw signal validation before realtime adapter preflight.', {
       platform: resolved.platform,
     }),
+    adapterSelectionRequired && adapterSelection.ready !== true ? issue('error', 'adapter_selection_not_registered', 'Launch plan requires adapter selection before starting the runtime surface.', {
+      platform: resolved.platform,
+    }) : undefined,
     surface ? undefined : issue('error', 'surface_not_selected', 'No runtime surface is selected for launch.', {
       platform: resolved.platform,
     }),
@@ -417,9 +435,10 @@ export function buildMeetingPlatformAdapterLaunchPlan(manifestOrInput = {}, inpu
   const row = platformRow(manifest, resolved.platform);
   const blueprint = adapterBlueprintRow(manifest, resolved.platform);
   const rawSignalValidation = rawSignalValidationRow(manifest, resolved.platform);
+  const adapterSelection = adapterSelectionRow(manifest, resolved.platform);
   const surface = selectedSurface(row, input, options);
   const entrypoint = row ? surfaceEntrypoint(manifest, row, surface, resolved.url) : {};
-  const ready = readiness(manifest, row, surface, entrypoint, resolved);
+  const ready = readiness(manifest, row, surface, entrypoint, resolved, adapterSelection);
   const plan = {
     type: 'meeting_platform_adapter_launch_plan',
     schema: MEETING_PLATFORM_ADAPTER_LAUNCH_PLAN_SCHEMA,
@@ -433,19 +452,25 @@ export function buildMeetingPlatformAdapterLaunchPlan(manifestOrInput = {}, inpu
     detected_meeting: resolved.detected_meeting,
     current_url: resolved.url,
     platform_row: row,
+    adapter_selection: adapterSelection,
     adapter_blueprint: blueprint,
     raw_signal_validation: rawSignalValidation,
     surface_entrypoint: entrypoint,
     axis_contract: {
       timestamp_field: 'captured_at_ms',
       local_axis_first: true,
+      adapter_selection_required_before_surface_install: manifest.runtime_contract?.adapter_selection_required_before_surface_install === true,
+      adapter_selection_axis_source: adapterSelection?.axis_source,
+      adapter_selection_axis_surface: adapterSelection?.axis_surface,
       raw_signal_validation_required_before_preflight: true,
       provider_events_block_realtime: false,
       transcript_blocks_realtime: false,
     },
-    runtime_actions: row ? runtimeActions(row, surface) : [],
+    runtime_actions: row ? runtimeActions(row, surface, adapterSelection) : [],
     mark_template: row ? {
       platform: row.platform,
+      axis_source: adapterSelection?.axis_source,
+      axis_surface: adapterSelection?.axis_surface,
       captured_at_ms: firstNonEmpty(options.capturedAtMs, options.captured_at_ms, input.capturedAtMs, input.captured_at_ms, 0),
       source: 'meeting_platform_adapter_launch_plan',
     } : undefined,
@@ -485,6 +510,7 @@ export function buildMeetingPlatformAdapterCandidateLaunchPlan(manifestOrInput =
     launch_input: launchInput,
     launch_plan: launchPlan,
     axis_contract: launchPlan.axis_contract,
+    adapter_selection: launchPlan.adapter_selection,
     adapter_blueprint: launchPlan.adapter_blueprint,
     raw_signal_validation: launchPlan.raw_signal_validation,
     runtime_actions: launchPlan.runtime_actions,

@@ -1,4 +1,5 @@
 import type { MeetingPlatformAdapterExportPackage } from './platform-adapter-export-package.mjs';
+import type { MeetingPlatformAdapterSelection } from './platform-adapter-selection.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_IMPORT_PLAN_SCHEMA: 'meeting_platform_adapter_import_plan';
 export const MEETING_PLATFORM_ADAPTER_IMPORT_PLAN_MATRIX_SCHEMA: 'meeting_platform_adapter_import_plan_matrix';
@@ -15,6 +16,8 @@ export interface MeetingPlatformAdapterImportPlanOptions {
   available_files?: string[];
   allowCustomAuthoring?: boolean;
   allow_custom_authoring?: boolean;
+  adapterSelection?: MeetingPlatformAdapterSelection | Record<string, unknown>;
+  adapter_selection?: MeetingPlatformAdapterSelection | Record<string, unknown>;
 }
 
 export interface MeetingPlatformAdapterImportPlan {
@@ -33,6 +36,7 @@ export interface MeetingPlatformAdapterImportPlan {
   export_package_accepted: boolean;
   runtime_contract: Record<string, unknown>;
   adapter_blueprint: Record<string, unknown>;
+  adapter_selection: Record<string, unknown>;
   raw_signal_validation: Record<string, unknown>;
   adapter_preflight: Record<string, unknown>;
   sdk_imports: Record<string, string>;
@@ -58,6 +62,7 @@ export interface MeetingPlatformAdapterImportPlanMatrix {
   missing_file_count: number;
   adapter_preflight_startup_ready_count: number;
   adapter_preflight_realtime_ready_count: number;
+  adapter_selection_ready_count: number;
   raw_signal_validation_ready_count: number;
   platforms: string[];
   rows: Array<Record<string, unknown>>;

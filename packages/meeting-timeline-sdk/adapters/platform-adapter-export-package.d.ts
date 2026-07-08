@@ -7,6 +7,7 @@ import type { MeetingPlatformRuntimeBundleOptions } from './platform-runtime-bun
 import type { MeetingPlatformProviderConnectionOptions } from './platform-provider-connection.mjs';
 import type { MeetingPlatformAdapterContractOptions } from './platform-adapter-contract.mjs';
 import type { MeetingPlatformAdaptationPackageOptions } from './platform-adaptation-package.mjs';
+import type { MeetingPlatformAdapterSelection } from './platform-adapter-selection.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_EXPORT_PACKAGE_SCHEMA: 'meeting_platform_adapter_export_package';
 export const MEETING_PLATFORM_ADAPTER_EXPORT_PACKAGE_MATRIX_SCHEMA: 'meeting_platform_adapter_export_package_matrix';
@@ -51,6 +52,7 @@ export interface MeetingPlatformAdapterExportPackage {
   export_ready: boolean;
   package_role: string;
   recommended_first_surface?: string;
+  adapter_selection?: Record<string, unknown>;
   local_axis_first: boolean;
   timestamp_field: 'captured_at_ms';
   provider_events_block_realtime: false;
@@ -66,7 +68,7 @@ export interface MeetingPlatformAdapterExportPackage {
   portfolio_item: Record<string, unknown>;
   acceptance_checklist: Record<string, unknown>;
   authoring_plan?: Record<string, unknown>;
-  artifacts?: Record<string, unknown>;
+  artifacts?: Record<string, unknown> & { adapter_selection?: MeetingPlatformAdapterSelection };
   next_actions: string[];
 }
 
@@ -78,6 +80,7 @@ export interface MeetingPlatformAdapterExportPackageMatrix {
   platform_count: number;
   accepted_count: number;
   export_ready_count: number;
+  adapter_selection_ready_count: number;
   built_in_count: number;
   custom_authoring_count: number;
   browser_extension_ready_count: number;

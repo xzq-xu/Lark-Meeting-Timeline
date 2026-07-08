@@ -55,15 +55,25 @@ assert.equal(googlePlan.selected_surface, 'browser_extension');
 assert.equal(googlePlan.adapter_blueprint.primary_surface, 'browser_extension');
 assert.equal(googlePlan.adapter_blueprint.first_acceptance_gate, 'local_candidate_preflight_accepts_active_meeting');
 assert.equal(googlePlan.raw_signal_validation.status, 'ready');
+assert.equal(googlePlan.adapter_selection.ready, true);
+assert.equal(googlePlan.adapter_selection.axis_source, 'local_observer_axis');
+assert.equal(googlePlan.adapter_selection.axis_surface, 'browser_extension');
+assert.equal(googlePlan.adapter_selection.timestamp_field, 'captured_at_ms');
+assert.equal(googlePlan.axis_contract.adapter_selection_required_before_surface_install, true);
+assert.equal(googlePlan.axis_contract.adapter_selection_axis_source, 'local_observer_axis');
+assert.equal(googlePlan.axis_contract.adapter_selection_axis_surface, 'browser_extension');
 assert.equal(googlePlan.axis_contract.raw_signal_validation_required_before_preflight, true);
 assert.equal(googlePlan.detected_meeting.meeting_id, 'abc-defg-hij');
 assert.equal(googlePlan.surface_entrypoint.content_script.matches.includes('https://meet.google.com/*'), true);
-assert.equal(googlePlan.runtime_actions[0].id, 'validate_raw_signal');
-assert.equal(googlePlan.runtime_actions[0].sdk_method, 'platformRawSignalBatch');
-assert.equal(googlePlan.runtime_actions[0].artifact_path, 'google_meet/raw-signal-validation.json');
+assert.equal(googlePlan.runtime_actions.find((action) => action.id === 'read_adapter_selection').sdk_method, 'platformAdapterSelection');
+assert.equal(googlePlan.runtime_actions.find((action) => action.id === 'read_adapter_selection').axis_surface, 'browser_extension');
+assert.equal(googlePlan.runtime_actions.find((action) => action.id === 'validate_raw_signal').sdk_method, 'platformRawSignalBatch');
+assert.equal(googlePlan.runtime_actions.find((action) => action.id === 'validate_raw_signal').artifact_path, 'google_meet/raw-signal-validation.json');
 assert.equal(googlePlan.runtime_actions.find((action) => action.id === 'observe_platform_candidates').sdk_method, 'observePlatformCandidates');
 assert.equal(googlePlan.runtime_actions.find((action) => action.id === 'insert_realtime_annotation').sdk_method, 'insertAnnotation');
 assert.equal(googlePlan.mark_template.platform, 'google_meet');
+assert.equal(googlePlan.mark_template.axis_source, 'local_observer_axis');
+assert.equal(googlePlan.mark_template.axis_surface, 'browser_extension');
 assert.equal(googlePlan.mark_template.captured_at_ms, 1_782_614_400_000);
 assert.equal(assertMeetingPlatformAdapterLaunchPlan(googlePlan), googlePlan);
 
@@ -101,10 +111,12 @@ assert.equal(candidateLaunchPlan.selected_candidate_reason, 'accepted_live_candi
 assert.equal(candidateLaunchPlan.candidate_preflight.accepted_count, 1);
 assert.equal(candidateLaunchPlan.launch_plan.accepted, true);
 assert.equal(candidateLaunchPlan.launch_plan.platform, 'google_meet');
+assert.equal(candidateLaunchPlan.adapter_selection.axis_surface, 'browser_extension');
 assert.equal(candidateLaunchPlan.adapter_blueprint.primary_surface, 'browser_extension');
 assert.equal(candidateLaunchPlan.raw_signal_validation.status, 'ready');
-assert.equal(candidateLaunchPlan.runtime_actions[0].id, 'validate_raw_signal');
-assert.equal(candidateLaunchPlan.runtime_actions[1].id, 'observe_platform_candidates');
+assert.equal(candidateLaunchPlan.runtime_actions.find((action) => action.id === 'read_adapter_selection').axis_surface, 'browser_extension');
+assert.equal(candidateLaunchPlan.runtime_actions.find((action) => action.id === 'validate_raw_signal').sdk_method, 'platformRawSignalBatch');
+assert.equal(candidateLaunchPlan.runtime_actions.find((action) => action.id === 'observe_platform_candidates').id, 'observe_platform_candidates');
 assert.equal(assertMeetingPlatformAdapterCandidateLaunchPlan(candidateLaunchPlan), candidateLaunchPlan);
 
 const urlOnlyCandidateLaunchPlan = buildMeetingPlatformAdapterCandidateLaunchPlan(manifest, {
@@ -133,6 +145,7 @@ assert.equal(zoomPlan.accepted, true);
 assert.equal(zoomPlan.platform, 'zoom');
 assert.equal(zoomPlan.detection_reason, 'explicit_platform');
 assert.equal(zoomPlan.selected_surface, 'native_detector');
+assert.equal(zoomPlan.adapter_selection.axis_surface, 'native_detector');
 assert.equal(zoomPlan.adapter_blueprint.primary_surface, 'native_detector');
 assert.equal(zoomPlan.surface_entrypoint.registry_row.platform, 'zoom');
 

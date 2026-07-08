@@ -29,6 +29,9 @@ import {
   buildMeetingPlatformAdaptationPackage,
 } from './platform-adaptation-package.mjs';
 import {
+  buildMeetingPlatformAdapterSelection,
+} from './platform-adapter-selection.mjs';
+import {
   MEETING_PLATFORM_RAW_SIGNAL_KINDS,
   buildMeetingPlatformRawSignalExampleBatch,
 } from './platform-raw-signal.mjs';
@@ -147,6 +150,14 @@ function buildHostFiles(platform, artifacts = {}, builtIn = false) {
       purpose: 'step-by-step host integration flow and SDK entrypoints',
     });
   }
+  if (builtIn || artifacts.adapter_selection) {
+    files.push({
+      path: packagePath(platform, 'adapter-selection.json'),
+      source: 'adapter_selection',
+      required_from: 'static',
+      purpose: 'single source of truth for selected realtime axis, surface, timestamp field, and provider reconcile policy',
+    });
+  }
   if (builtIn || artifacts.adapter_blueprint) {
     files.push({
       path: packagePath(platform, 'adapter-blueprint.json'),
@@ -209,6 +220,7 @@ function importPaths() {
     adapter_preflight: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight',
     adapter_acceptance_checklist: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-acceptance-checklist',
     implementation_handoff: '@ai-annotation/meeting-timeline-sdk/adapters/platform-implementation-handoff',
+    adapter_selection: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-selection',
     runtime_bundle: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
     adapter_contract: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract',
     provider_connection: '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection',
@@ -227,6 +239,7 @@ function commandSet(platform, target, options = {}) {
     adapter_portfolio: commandWithBase('meeting-platform:adapter-portfolio', options, `--platforms=${platform}`),
     adapter_blueprint: commandWithBase('meeting-platform:adapter-blueprint', options, `--platforms=${platform}`),
     adapter_preflight: commandWithBase('meeting-platform:adapter-preflight', options, `--platforms=${platform}`),
+    adapter_selection: commandWithBase('meeting-platform:adapter-selection', options, `--platforms=${platform}`),
     acceptance_checklist: commandWithBase('meeting-platform:adapter-acceptance-checklist', options, `--platforms=${platform} --target=${target}`),
     implementation_handoff: commandWithBase('meeting-platform:implementation-handoff', options, `--platforms=${platform}`),
     runtime_bundle: commandWithBase('meeting-platform:runtime-bundle', options, `--platforms=${platform}`),
@@ -581,6 +594,7 @@ function artifactRefs(artifacts = {}, files = []) {
     portfolio_item: artifactRef('portfolio_item', artifacts.portfolio_item, undefined, 'static'),
     acceptance_checklist: artifactRef('acceptance_checklist', artifacts.acceptance_checklist, bySource.acceptance_checklist, 'static'),
     implementation_handoff: artifactRef('implementation_handoff', artifacts.implementation_handoff, bySource.implementation_handoff, 'static'),
+    adapter_selection: artifactRef('adapter_selection', artifacts.adapter_selection, bySource.adapter_selection, 'static'),
     adapter_blueprint: artifactRef('adapter_blueprint', artifacts.adapter_blueprint, bySource.adapter_blueprint, 'static'),
     runtime_bundle: artifactRef('runtime_bundle', artifacts.runtime_bundle, bySource.runtime_bundle, 'static'),
     adapter_contract: artifactRef('adapter_contract', artifacts.adapter_contract, bySource.adapter_contract, 'static'),
@@ -598,6 +612,13 @@ function builtInArtifactRefs(platform, files = [], refs = {}) {
       name: 'implementation_handoff',
       schema: 'meeting_platform_implementation_handoff',
       path: bySource.implementation_handoff,
+      required_from: 'static',
+      platform,
+    },
+    adapter_selection: refs.adapter_selection ?? {
+      name: 'adapter_selection',
+      schema: 'meeting_platform_adapter_selection',
+      path: bySource.adapter_selection,
       required_from: 'static',
       platform,
     },
@@ -657,27 +678,34 @@ function setupOrder(platform, builtIn, target) {
     },
     {
       step: 2,
+      id: 'read_adapter_selection',
+      action: 'read adapter_selection before installing any runtime surface',
+      required: true,
+      output: 'selected realtime axis, selected surface, timestamp field, and provider reconcile policy',
+    },
+    {
+      step: 3,
       id: 'wire_sdk_facade',
       action: 'createMeetingAppTimelineSdk_or_createMeetingPlatformTimelineKit',
       required: true,
       output: 'SDK object with observePlatformCandidates/insertAnnotation/speakerTrack',
     },
     {
-      step: 3,
+      step: 4,
       id: 'install_local_surface',
       action: builtIn ? 'install_browser_extension_webview_or_native_detector_from_runtime_bundle' : 'author_first_local_surface_from_authoring_plan',
       required: true,
       output: 'meeting candidate observation before marks',
     },
     {
-      step: 4,
+      step: 5,
       id: 'validate_raw_signals',
       action: `run meeting-platform:raw-signal examples for ${platform}, then replay host-captured raw signals before first live wiring`,
       required: true,
       output: 'runtime events generated from meeting_app_snapshot/annotation/speaker_track raw signals',
     },
     {
-      step: 5,
+      step: 6,
       id: 'run_adapter_preflight',
       action: 'run adapter preflight with live DOM/native-window evidence before opening a realtime annotation session',
       required: true,
@@ -685,34 +713,55 @@ function setupOrder(platform, builtIn, target) {
       url_only_status: 'needs_live_page_evidence',
     },
     {
-      step: 6,
+      step: 7,
       id: 'insert_realtime_marks',
       action: `call insertAnnotation('${platform}', { captured_at_ms, ...mark })`,
       required: true,
       output: 'timeline marks aligned to device capture time',
     },
     {
-      step: 7,
+      step: 8,
       id: 'emit_speaker_positions',
       action: 'call speakerTrack/participantTrack when local evidence is available',
       required: false,
       output: 'speaker and participant position markers without transcript text',
     },
     {
-      step: 8,
+      step: 9,
       id: 'connect_provider_reconcile',
       action: 'ingest official provider events only after local realtime axis is available',
       required: target === 'production',
       output: 'start/end/participant/artifact reconcile and backfill',
     },
     {
-      step: 9,
+      step: 10,
       id: 'run_acceptance',
       action: `run adapter acceptance checklist target=${target}`,
       required: true,
       output: 'static/pilot/production readiness gate',
     },
   ];
+}
+
+function adapterSelectionSummary(selection = {}) {
+  if (!selection?.schema) return undefined;
+  const selected = selection.selection ?? {};
+  return compactObject({
+    schema: selection.schema,
+    ready: selection.readiness?.selection_ready === true,
+    axis_source: selected.axis_source,
+    axis_surface: selected.axis_surface,
+    annotation_source: selected.annotation_source,
+    timestamp_field: selected.timestamp_field,
+    provider_reconcile_source: selected.provider_reconcile_source,
+    provider_reconcile_required_for_production: selected.provider_reconcile_required_for_production,
+    speaker_track_source: selected.speaker_track_source,
+    post_meeting_artifact_source: selected.post_meeting_artifact_source,
+    provider_events_block_realtime: selection.runtime_policy?.provider_events_block_realtime,
+    transcript_blocks_realtime: selection.runtime_policy?.transcript_blocks_realtime,
+    startup_order: selection.runtime_policy?.startup_order,
+    next_actions: selection.next_actions,
+  });
 }
 
 function nextActionsFor(packageObject = {}) {
@@ -746,15 +795,17 @@ export function buildMeetingPlatformAdapterExportPackage(platform, input = {}, o
   const buildArtifacts = includeArtifacts || boolOption(merged, 'buildArtifacts', 'build_artifacts', false);
   const buildFullCompanions = buildArtifacts || boolOption(merged, 'fullCompanions', 'full_companions', false);
   const portfolioItem = buildMeetingPlatformAdapterPortfolioItem(platform, merged);
+  const builtIn = portfolioItem.built_in === true;
+  const adapterSelection = safeArtifact(builtIn, buildMeetingPlatformAdapterSelection, key, merged);
   const checklist = buildFullCompanions
     ? buildMeetingPlatformAdapterAcceptanceChecklist(platform, input, merged)
     : lightweightAcceptanceChecklist(authoringPlan, portfolioItem, target);
-  const builtIn = portfolioItem.built_in === true;
   const artifacts = compactObject({
     authoring_plan: authoringPlan,
     portfolio_item: portfolioItem,
     acceptance_checklist: checklist,
     implementation_handoff: buildArtifacts ? safeArtifact(builtIn, buildMeetingPlatformImplementationHandoff, key, merged) : undefined,
+    adapter_selection: buildArtifacts ? adapterSelection : undefined,
     adapter_blueprint: buildArtifacts ? safeArtifact(builtIn, buildMeetingPlatformAdapterBlueprint, key, merged) : undefined,
     runtime_bundle: buildArtifacts ? safeArtifact(builtIn, buildMeetingPlatformRuntimeBundle, key, merged) : undefined,
     provider_connection: buildArtifacts ? safeArtifact(builtIn, buildMeetingPlatformProviderConnectionPack, key, merged) : undefined,
@@ -781,6 +832,7 @@ export function buildMeetingPlatformAdapterExportPackage(platform, input = {}, o
     export_ready: builtIn && checklist.summary?.blocking_count === 0,
     package_role: 'portable_adapter_handoff_for_external_host_project',
     recommended_first_surface: portfolioItem.recommended_first_surface,
+    adapter_selection: adapterSelectionSummary(adapterSelection),
     local_axis_first: true,
     timestamp_field: 'captured_at_ms',
     provider_events_block_realtime: false,
@@ -892,6 +944,7 @@ export function buildMeetingPlatformAdapterExportPackageMatrix(input = {}, optio
     platform_count: packages.length,
     accepted_count: packages.filter((item) => item.accepted === true).length,
     export_ready_count: packages.filter((item) => item.export_ready === true).length,
+    adapter_selection_ready_count: packages.filter((item) => item.adapter_selection?.ready === true).length,
     built_in_count: packages.filter((item) => item.built_in === true).length,
     custom_authoring_count: packages.filter((item) => item.built_in !== true).length,
     browser_extension_ready_count: packages.filter((item) => item.surface_entrypoints?.browser_extension?.ready === true).length,
@@ -909,6 +962,10 @@ export function buildMeetingPlatformAdapterExportPackageMatrix(input = {}, optio
       target: item.target,
       adapter_status: item.readiness.adapter_status,
       recommended_first_surface: item.recommended_first_surface,
+      adapter_selection_ready: item.adapter_selection?.ready === true,
+      adapter_selection_axis_source: item.adapter_selection?.axis_source,
+      adapter_selection_axis_surface: item.adapter_selection?.axis_surface,
+      adapter_selection_timestamp_field: item.adapter_selection?.timestamp_field,
       browser_extension_ready: item.surface_entrypoints?.browser_extension?.ready === true,
       provider_reconcile_ready: item.surface_entrypoints?.provider_reconcile?.ready === true,
       adapter_preflight_status: item.adapter_preflight?.status,
