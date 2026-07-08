@@ -10,6 +10,9 @@ import {
   buildMeetingPlatformAdapterInstallManifest,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-install-manifest.mjs';
 import {
+  buildMeetingPlatformAdapterRuntimeManifest,
+} from '../packages/meeting-timeline-sdk/adapters/platform-adapter-runtime-recipe.mjs';
+import {
   buildMeetingPlatformAdapterMessageBridgeHandoff,
   createMeetingPlatformAdapterMessageBridge,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-message-bridge.mjs';
@@ -252,6 +255,62 @@ assert.equal(handoff.message_types.includes('meeting_timeline.open_candidate_ses
 assert.equal(handoff.supported_surfaces.includes('electron_webview_preload'), true);
 assert.equal(handoff.runtime_sequence.includes('runner_reads_adapter_selection_before_runtime_wiring'), true);
 
+const runtimeManifest = buildMeetingPlatformAdapterRuntimeManifest({}, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom'],
+});
+const runtimeBridge = createMeetingPlatformAdapterMessageBridge(runtimeManifest, adapterClient, {
+  clock: () => 1_782_800_001_000,
+});
+const runtimeTargetEvent = await runtimeBridge.handleMessage({
+  type: 'meeting_timeline.runtime_target',
+  request_id: 'runtime-target-1',
+  payload: {
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Runtime bridge review',
+  },
+});
+assert.equal(runtimeTargetEvent.action, 'runtime_target');
+assert.equal(runtimeTargetEvent.request_id, 'runtime-target-1');
+assert.equal(runtimeTargetEvent.platform, 'google_meet');
+assert.equal(runtimeTargetEvent.plan_kind, 'runtime_target');
+assert.equal(runtimeTargetEvent.runtime_target.schema, 'meeting_platform_adapter_runtime_target');
+assert.equal(runtimeTargetEvent.runtime_target_host_kind, 'browser_extension_content_script');
+assert.equal(runtimeTargetEvent.runtime_target_bridge_kind, 'browser_content_script');
+
+const runtimeOpened = await runtimeBridge.handleMessage({
+  type: 'meeting_timeline.open_session',
+  payload: {
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Runtime bridge review',
+  },
+});
+assert.equal(runtimeOpened.action, 'open_session');
+assert.equal(runtimeOpened.plan_kind, 'runtime_target');
+assert.equal(runtimeOpened.result.payload.session.plan_kind, 'runtime_target');
+assert.equal(runtimeOpened.result.payload.runtime_target.host_kind, 'browser_extension_content_script');
+assert.equal(runtimeOpened.runtime_target_host_kind, 'browser_extension_content_script');
+assert.equal(runtimeOpened.runner_state.current_runtime_target.host_kind, 'browser_extension_content_script');
+assert.equal(runtimeBridge.getState().runner.current_session.plan_kind, 'runtime_target');
+
+const runtimeInserted = await runtimeBridge.handleMessage({
+  type: 'meeting_timeline.insert_mark',
+  payload: {
+    mark: { label: 'runtime bridge mark' },
+  },
+});
+assert.equal(runtimeInserted.action, 'insert_annotation');
+assert.equal(runtimeInserted.plan_kind, 'runtime_target');
+assert.equal(runtimeInserted.result.payload.surface, 'browser_extension');
+assert.equal(runtimeInserted.runtime_target_host_kind, 'browser_extension_content_script');
+
+const runtimeHandoff = buildMeetingPlatformAdapterMessageBridgeHandoff(runtimeManifest);
+assert.equal(runtimeHandoff.runtime_manifest_schema, 'meeting_platform_adapter_runtime_manifest');
+assert.equal(runtimeHandoff.install_manifest_schema, undefined);
+assert.equal(runtimeHandoff.message_types.includes('meeting_timeline.runtime_target'), true);
+assert.equal(runtimeHandoff.runtime_sequence.includes('optional_runtime_target_checks_current_surface'), true);
+assert.equal(runtimeHandoff.next_actions.includes('create_message_bridge_from_adapter_runtime_manifest'), true);
+
 const timelineCalls = [];
 const timelineClient = {
   async startMeeting(input) {
@@ -284,6 +343,14 @@ await kitBridge.handleMessage({
 assert.equal(timelineCalls.some((call) => call[0] === 'startMeeting'), true);
 assert.equal(timelineCalls.some((call) => call[0] === 'insertMark' && call[1].label === 'kit bridge mark'), true);
 assert.equal(kit.platformAdapterMessageBridgeHandoff(manifest).schema, 'meeting_platform_adapter_message_bridge_handoff');
+const kitRuntimeBridge = kit.platformAdapterMessageBridge(runtimeManifest, {
+  clock: () => 445,
+});
+assert.equal((await kitRuntimeBridge.handleMessage({
+  type: 'meeting_timeline.open_session',
+  payload: { url: 'https://meet.google.com/abc-defg-hij' },
+})).result.payload.session.plan_kind, 'runtime_target');
+assert.equal(kit.platformAdapterMessageBridgeHandoff(runtimeManifest).runtime_manifest_schema, 'meeting_platform_adapter_runtime_manifest');
 
 const rootSdk = createMeetingAppTimelineSdk({
   baseUrl,
@@ -297,5 +364,13 @@ assert.equal((await rootBridge.handleMessage({
   payload: { url: 'https://meet.google.com/abc-defg-hij' },
 })).result.payload.observe_event.captured_at_ms, 555);
 assert.equal(rootSdk.adapterMessageBridgeHandoff(manifest).schema, 'meeting_platform_adapter_message_bridge_handoff');
+const rootRuntimeBridge = rootSdk.platformAdapterMessageBridge(runtimeManifest, adapterClient, {
+  clock: () => 556,
+});
+assert.equal((await rootRuntimeBridge.handleMessage({
+  type: 'meeting_timeline.runtime_target',
+  payload: { url: 'https://meet.google.com/abc-defg-hij' },
+})).runtime_target_host_kind, 'browser_extension_content_script');
+assert.equal(rootSdk.adapterMessageBridgeHandoff(runtimeManifest).runtime_manifest_schema, 'meeting_platform_adapter_runtime_manifest');
 
 console.log('ok meeting platform adapter message bridge');

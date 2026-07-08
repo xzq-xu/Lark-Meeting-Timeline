@@ -64,6 +64,13 @@ const LAUNCH_PLAN_ACTIONS = new Set([
   'meeting_timeline.launch_plan',
 ]);
 
+const RUNTIME_TARGET_ACTIONS = new Set([
+  'runtime_target',
+  'adapter_runtime_target',
+  'meeting_timeline.runtime_target',
+  'meeting_timeline.adapter_runtime_target',
+]);
+
 const CANDIDATE_LAUNCH_PLAN_ACTIONS = new Set([
   'candidate_launch_plan',
   'launch_candidates',
@@ -96,6 +103,10 @@ function isRunner(value) {
   return value?.schema === MEETING_PLATFORM_ADAPTER_RUNNER_SCHEMA
     && typeof value.open === 'function'
     && typeof value.insertAnnotation === 'function';
+}
+
+function isRuntimeTarget(value) {
+  return value?.schema === 'meeting_platform_adapter_runtime_target';
 }
 
 function bridgeId(input = {}, options = {}) {
@@ -308,6 +319,12 @@ function shouldAutoOpen(payload = {}, options = {}) {
 
 function event(action, bridge, message = {}, payload = {}, result, handled = true) {
   const state = bridge.runner?.getState?.();
+  const runtimeTarget = firstNonEmpty(
+    isRuntimeTarget(result) ? result : undefined,
+    result?.runtime_target,
+    result?.payload?.runtime_target,
+    state?.current_runtime_target,
+  );
   const adapterBlueprint = firstNonEmpty(
     result?.adapter_blueprint,
     result?.launch_plan?.adapter_blueprint,
@@ -337,8 +354,12 @@ function event(action, bridge, message = {}, payload = {}, result, handled = tru
     action,
     message_type: messageType(message),
     request_id: requestId(message, payload),
-    platform: result?.platform ?? result?.payload?.platform ?? state?.current_launch_plan?.platform,
-    selected_surface: result?.selected_surface ?? result?.payload?.selected_surface ?? state?.current_launch_plan?.selected_surface,
+    platform: result?.platform ?? result?.payload?.platform ?? runtimeTarget?.platform ?? state?.current_launch_plan?.platform,
+    selected_surface: result?.selected_surface ?? result?.payload?.selected_surface ?? runtimeTarget?.selected_surface ?? state?.current_launch_plan?.selected_surface,
+    plan_kind: runtimeTarget ? 'runtime_target' : state?.current_session?.plan_kind,
+    runtime_target: runtimeTarget,
+    runtime_target_host_kind: runtimeTarget?.host_kind,
+    runtime_target_bridge_kind: runtimeTarget?.bridge_kind,
     adapter_selection: adapterSelection,
     adapter_selection_axis_source: adapterSelection?.axis_source,
     adapter_selection_axis_surface: adapterSelection?.axis_surface,
@@ -419,6 +440,10 @@ export function createMeetingPlatformAdapterMessageBridge(manifestOrRunner = {},
         const result = runner.launchPlan(launchInputFrom(payload, message, mergedOptions), mergedOptions);
         return event('launch_plan', bridge, message, payload, result);
       }
+      if (RUNTIME_TARGET_ACTIONS.has(type)) {
+        const result = runner.runtimeTarget(launchInputFrom(payload, message, mergedOptions), mergedOptions);
+        return event('runtime_target', bridge, message, payload, result);
+      }
       if (CANDIDATE_LAUNCH_PLAN_ACTIONS.has(type)) {
         const result = runner.candidateLaunchPlan(candidateLaunchInputFrom(payload, message, mergedOptions), mergedOptions);
         return event('candidate_launch_plan', bridge, message, payload, result);
@@ -453,16 +478,21 @@ export function createMeetingPlatformAdapterMessageBridge(manifestOrRunner = {},
 }
 
 export function buildMeetingPlatformAdapterMessageBridgeHandoff(manifestOrInput = {}, options = {}) {
+  const runtimeInput = manifestOrInput?.schema === 'meeting_platform_adapter_runtime_manifest'
+    || manifestOrInput?.schema === 'meeting_platform_adapter_runtime_target';
   return {
     type: 'meeting_platform_adapter_message_bridge_handoff',
     schema: 'meeting_platform_adapter_message_bridge_handoff',
     schema_version: MEETING_PLATFORM_ADAPTER_MESSAGE_BRIDGE_SCHEMA_VERSION,
     bridge_factory: 'createMeetingPlatformAdapterMessageBridge',
     required_runner_factory: 'createMeetingPlatformAdapterRunner',
-    install_manifest_schema: manifestOrInput?.schema,
+    install_manifest_schema: runtimeInput ? undefined : manifestOrInput?.schema,
+    runtime_manifest_schema: manifestOrInput?.schema === 'meeting_platform_adapter_runtime_manifest' ? manifestOrInput.schema : undefined,
+    runtime_target_schema: manifestOrInput?.schema === 'meeting_platform_adapter_runtime_target' ? manifestOrInput.schema : undefined,
     message_types: [
       'meeting_timeline.observe_candidates',
       'meeting_timeline.open_session',
+      'meeting_timeline.runtime_target',
       'meeting_timeline.open_candidate_session',
       'meeting_timeline.candidate_launch_plan',
       'meeting_timeline.insert_mark',
@@ -474,8 +504,8 @@ export function buildMeetingPlatformAdapterMessageBridgeHandoff(manifestOrInput 
       'meeting_timeline.reset',
     ],
     runtime_sequence: [
-      'background_or_native_host_sends_observe_candidates',
-      'optional_candidate_launch_plan_checks_live_evidence',
+      runtimeInput ? 'background_or_native_host_sends_current_url_or_platform' : 'background_or_native_host_sends_observe_candidates',
+      runtimeInput ? 'optional_runtime_target_checks_current_surface' : 'optional_candidate_launch_plan_checks_live_evidence',
       'bridge_opens_adapter_runner_session',
       'runner_reads_adapter_selection_before_runtime_wiring',
       'runner_validates_raw_signal_before_axis_observation',
@@ -490,8 +520,8 @@ export function buildMeetingPlatformAdapterMessageBridgeHandoff(manifestOrInput 
     ],
     auto_open_on_insert: options.autoOpenOnInsert !== false && options.auto_open_on_insert !== false,
     next_actions: [
-      'create_message_bridge_from_adapter_install_manifest',
-      'route_meeting_timeline_observe_candidates_from_host',
+      runtimeInput ? 'create_message_bridge_from_adapter_runtime_manifest' : 'create_message_bridge_from_adapter_install_manifest',
+      runtimeInput ? 'route_meeting_timeline_runtime_target_from_host' : 'route_meeting_timeline_observe_candidates_from_host',
       'route_meeting_timeline_insert_mark_from_content_or_device',
     ],
   };

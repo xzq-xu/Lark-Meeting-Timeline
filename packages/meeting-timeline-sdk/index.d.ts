@@ -550,13 +550,13 @@ export interface MeetingAppTimelineSdk {
   ): import('./adapters/platform-adapter-runner.mjs').MeetingPlatformAdapterRunnerHandoff;
   adapterRunnerHandoff: MeetingAppTimelineSdk['platformAdapterRunnerHandoff'];
   platformAdapterMessageBridge(
-    manifestOrRunner?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | import('./adapters/platform-adapter-runner.mjs').MeetingPlatformAdapterRunner | Record<string, unknown>,
+    manifestOrRunner?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | import('./adapters/platform-adapter-runner.mjs').MeetingPlatformAdapterRunner | Record<string, unknown>,
     clientOrOptions?: import('./adapters/platform-adapter-session.mjs').MeetingPlatformAdapterSessionClient | import('./adapters/platform-adapter-message-bridge.mjs').MeetingPlatformAdapterMessageBridgeOptions,
     options?: import('./adapters/platform-adapter-message-bridge.mjs').MeetingPlatformAdapterMessageBridgeOptions,
   ): import('./adapters/platform-adapter-message-bridge.mjs').MeetingPlatformAdapterMessageBridge;
   adapterMessageBridge: MeetingAppTimelineSdk['platformAdapterMessageBridge'];
   platformAdapterMessageBridgeHandoff(
-    manifestOrInput?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | Record<string, unknown>,
+    manifestOrInput?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | Record<string, unknown>,
     options?: import('./adapters/platform-adapter-message-bridge.mjs').MeetingPlatformAdapterMessageBridgeOptions,
   ): import('./adapters/platform-adapter-message-bridge.mjs').MeetingPlatformAdapterMessageBridgeHandoff;
   adapterMessageBridgeHandoff: MeetingAppTimelineSdk['platformAdapterMessageBridgeHandoff'];

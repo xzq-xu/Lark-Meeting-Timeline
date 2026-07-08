@@ -1534,6 +1534,13 @@ assert.equal((await rootMeetingAppSdk.openPlatformAdapterSession(rootRuntimeMani
   client: rootAdapterSessionClient,
   clock: () => 781,
 })).payload.session.plan_kind, 'runtime_target');
+const rootRuntimeMessageBridge = rootMeetingAppSdk.platformAdapterMessageBridge(rootRuntimeManifest, rootAdapterSessionClient, {
+  clock: () => 782,
+});
+assert.equal((await rootRuntimeMessageBridge.handleMessage({
+  type: 'meeting_timeline.runtime_target',
+  payload: { url: 'https://meet.google.com/abc-defg-hij' },
+})).runtime_target_host_kind, 'browser_extension_content_script');
 assert.equal(rootMeetingAppSdk.adapterRunnerHandoff(rootInstallManifest).schema, 'meeting_platform_adapter_runner_handoff');
 const rootAdapterMessageBridge = rootMeetingAppSdk.platformAdapterMessageBridge(rootInstallManifest, rootAdapterSessionClient, {
   clock: () => 780,
@@ -3172,6 +3179,18 @@ assert.equal((await openMeetingPlatformAdapterRuntimeSessionFromRoot(directRunti
   clock: () => 916,
 })).payload.session.plan_kind, 'runtime_target');
 assert.equal(buildMeetingPlatformAdapterRunnerHandoff(directRuntimeManifest).convenience_method, 'openMeetingPlatformAdapterRuntimeSession');
+const directRuntimeMessageBridge = createMeetingPlatformAdapterMessageBridge(directRuntimeManifest, directRunnerClient, {
+  clock: () => 917,
+});
+assert.equal((await directRuntimeMessageBridge.handleMessage({
+  type: 'meeting_timeline.runtime_target',
+  payload: { url: 'https://meet.google.com/abc-defg-hij' },
+})).runtime_target_host_kind, 'browser_extension_content_script');
+assert.equal((await directRuntimeMessageBridge.handleMessage({
+  type: 'meeting_timeline.open_session',
+  payload: { url: 'https://meet.google.com/abc-defg-hij' },
+})).result.payload.session.plan_kind, 'runtime_target');
+assert.equal(buildMeetingPlatformAdapterMessageBridgeHandoff(directRuntimeManifest).runtime_manifest_schema, 'meeting_platform_adapter_runtime_manifest');
 assert.equal(buildMeetingPlatformAdapterMessageBridgeHandoff(directInstallManifest).schema, 'meeting_platform_adapter_message_bridge_handoff');
 assert.equal(buildMeetingPlatformAdapterMessageBridgeHandoffFromRoot(directInstallManifest).bridge_factory, 'createMeetingPlatformAdapterMessageBridge');
 const directMessageBridge = createMeetingPlatformAdapterMessageBridge(directInstallManifest, directRunnerClient, {

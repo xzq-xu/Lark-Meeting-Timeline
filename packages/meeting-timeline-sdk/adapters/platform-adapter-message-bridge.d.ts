@@ -4,6 +4,10 @@ import type {
   MeetingPlatformAdapterLaunchPlan,
 } from './platform-adapter-launch-plan.mjs';
 import type {
+  MeetingPlatformAdapterRuntimeManifest,
+  MeetingPlatformAdapterRuntimeTarget,
+} from './platform-adapter-runtime-recipe.mjs';
+import type {
   MeetingPlatformAdapterRunner,
   MeetingPlatformAdapterRunnerOptions,
 } from './platform-adapter-runner.mjs';
@@ -34,6 +38,10 @@ export interface MeetingPlatformAdapterMessageBridgeEvent {
   request_id?: string;
   platform?: string;
   selected_surface?: string;
+  plan_kind?: 'launch_plan' | 'runtime_target' | string;
+  runtime_target?: MeetingPlatformAdapterRuntimeTarget;
+  runtime_target_host_kind?: string;
+  runtime_target_bridge_kind?: string;
   adapter_selection?: Record<string, unknown>;
   adapter_selection_axis_source?: string;
   adapter_selection_axis_surface?: string;
@@ -56,7 +64,7 @@ export interface MeetingPlatformAdapterMessageBridge {
   getState(): Record<string, unknown>;
   handleMessage(message?: Record<string, unknown>, options?: MeetingPlatformAdapterMessageBridgeOptions): Promise<MeetingPlatformAdapterMessageBridgeEvent>;
   dispatchMessage(message?: Record<string, unknown>, options?: MeetingPlatformAdapterMessageBridgeOptions): Promise<MeetingPlatformAdapterMessageBridgeEvent>;
-  open(input?: Record<string, unknown> | MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterCandidateLaunchPlan | string, options?: MeetingPlatformAdapterMessageBridgeOptions): Promise<MeetingPlatformAdapterMessageBridgeEvent>;
+  open(input?: Record<string, unknown> | MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterCandidateLaunchPlan | MeetingPlatformAdapterRuntimeTarget | string | URL, options?: MeetingPlatformAdapterMessageBridgeOptions): Promise<MeetingPlatformAdapterMessageBridgeEvent>;
   insertAnnotation(input?: Record<string, unknown>, options?: MeetingPlatformAdapterMessageBridgeOptions): Promise<MeetingPlatformAdapterMessageBridgeEvent>;
   insertMark(input?: Record<string, unknown>, options?: MeetingPlatformAdapterMessageBridgeOptions): Promise<MeetingPlatformAdapterMessageBridgeEvent>;
 }
@@ -68,6 +76,8 @@ export interface MeetingPlatformAdapterMessageBridgeHandoff {
   bridge_factory: 'createMeetingPlatformAdapterMessageBridge';
   required_runner_factory: 'createMeetingPlatformAdapterRunner';
   install_manifest_schema?: string;
+  runtime_manifest_schema?: string;
+  runtime_target_schema?: string;
   message_types: string[];
   runtime_sequence: string[];
   supported_surfaces: string[];
@@ -76,13 +86,13 @@ export interface MeetingPlatformAdapterMessageBridgeHandoff {
 }
 
 export function createMeetingPlatformAdapterMessageBridge(
-  manifestOrRunner?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterRunner | Record<string, unknown>,
+  manifestOrRunner?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterRuntimeManifest | MeetingPlatformAdapterRuntimeTarget | MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterRunner | Record<string, unknown>,
   clientOrOptions?: MeetingPlatformAdapterSessionClient | MeetingPlatformAdapterMessageBridgeOptions,
   options?: MeetingPlatformAdapterMessageBridgeOptions,
 ): MeetingPlatformAdapterMessageBridge;
 
 export function buildMeetingPlatformAdapterMessageBridgeHandoff(
-  manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>,
+  manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterRuntimeManifest | MeetingPlatformAdapterRuntimeTarget | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>,
   options?: MeetingPlatformAdapterMessageBridgeOptions,
 ): MeetingPlatformAdapterMessageBridgeHandoff;
 
