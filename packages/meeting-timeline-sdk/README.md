@@ -930,6 +930,14 @@ npx meeting-platform-adapter-runtime-recipe \
 
 如果宿主项目要一次接多个会议软件，用 `platformAdapterRuntimeManifest()` 汇总 recipe matrix。Manifest 会按 `bridge_kind` 生成统一分发表：Google Meet 这类 browser surface 会落到 `browser_extension_content_script`，Teams/Zoom 这类桌面优先 surface 会落到 `native_desktop_detector`，并统一声明 `observePlatformCandidates -> insertAnnotation` 顺序、`captured_at_ms` 时间戳字段、speaker/participant 位置标记滤波策略，以及 provider/transcript 只能做 reconcile/backfill、不能阻塞实时标注。
 
+```sh
+npx meeting-platform-adapter-runtime-manifest \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --base-url=https://timeline.example.com \
+  --out-file=meeting-platform-adapter-runtime-manifest.json \
+  --report-file=meeting-platform-adapter-runtime-manifest-report.json
+```
+
 startup plan 只能说明“应该启动哪个 surface”；真正打开会议窗口后，还需要用 `platformAdapterPreflight()` 或 SDK CLI 验证 live DOM/native evidence 是否足够建实时轴。Google Meet 这类 browser surface 可以传 DOM snapshot；Teams/Zoom 这类 native-first surface 可以传窗口、进程、Accessibility 或音频通话状态。URL-only preflight 会返回 `needs_live_page_evidence`，不会误报 realtime ready：
 
 ```sh
