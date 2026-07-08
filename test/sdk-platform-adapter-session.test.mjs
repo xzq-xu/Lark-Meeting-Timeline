@@ -13,6 +13,10 @@ import {
   buildMeetingPlatformAdapterLaunchPlan,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-launch-plan.mjs';
 import {
+  buildMeetingPlatformAdapterRuntimeManifest,
+  buildMeetingPlatformAdapterRuntimeTarget,
+} from '../packages/meeting-timeline-sdk/adapters/platform-adapter-runtime-recipe.mjs';
+import {
   buildMeetingPlatformAdapterSessionHandoff,
   createMeetingPlatformAdapterSession,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-session.mjs';
@@ -131,10 +135,73 @@ assert.equal(calls.map((call) => call[0]).includes('ingestProvider'), true);
 const handoff = buildMeetingPlatformAdapterSessionHandoff(googlePlan);
 assert.equal(handoff.schema, 'meeting_platform_adapter_session_handoff');
 assert.equal(handoff.session_factory, 'createMeetingPlatformAdapterSession');
+assert.equal(handoff.plan_kind, 'launch_plan');
+assert.equal(handoff.input_schema, 'meeting_platform_adapter_launch_plan');
 assert.equal(handoff.required_client_methods.includes('observePlatformCandidates'), true);
 assert.equal(handoff.optional_client_methods.includes('platformAdapterSelection'), true);
 assert.equal(handoff.next_actions.includes('call_session_readAdapterSelection_before_runtime_wiring'), true);
 assert.equal(handoff.next_actions.includes('call_session_insertAnnotation_for_realtime_marks'), true);
+
+const runtimeManifest = buildMeetingPlatformAdapterRuntimeManifest({}, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom'],
+});
+const googleTarget = buildMeetingPlatformAdapterRuntimeTarget(runtimeManifest, {
+  url: 'https://meet.google.com/abc-defg-hij',
+  title: 'Runtime target review',
+});
+assert.equal(googleTarget.accepted, true);
+
+const targetCalls = [];
+const targetClient = {
+  async observePlatformCandidates(payload, options) {
+    targetCalls.push(['observePlatformCandidates', payload, options]);
+    return { ok: true, observed_platform: payload.platform };
+  },
+  async insertAnnotation(platform, payload, options) {
+    targetCalls.push(['insertAnnotation', platform, payload, options]);
+    return { ok: true, platform, label: payload.label };
+  },
+};
+const targetSession = createMeetingPlatformAdapterSession(googleTarget, targetClient, {
+  clock: () => 1_782_614_401_000,
+});
+assert.equal(targetSession.plan_kind, 'runtime_target');
+assert.equal(targetSession.platform, 'google_meet');
+assert.equal(targetSession.selected_surface, 'browser_extension');
+assert.equal(targetSession.host_kind, 'browser_extension_content_script');
+assert.equal(targetSession.bridge_kind, 'browser_content_script');
+assert.equal(targetSession.launch_plan, undefined);
+assert.equal(targetSession.runtime_target.schema, 'meeting_platform_adapter_runtime_target');
+assert.equal(targetSession.axis_contract.timestamp_field, 'captured_at_ms');
+assert.equal(targetSession.getState().plan_kind, 'runtime_target');
+
+const targetObserved = await targetSession.observeAxis({
+  title: 'Runtime target review',
+});
+assert.equal(targetObserved.action, 'observe_axis');
+assert.equal(targetObserved.payload.platform, 'google_meet');
+assert.equal(targetObserved.payload.surface, 'browser_extension');
+assert.equal(targetObserved.payload.current_url, 'https://meet.google.com/abc-defg-hij');
+assert.equal(targetCalls[0][0], 'observePlatformCandidates');
+
+const targetInserted = await targetSession.insertAnnotation({
+  label: 'runtime target mark',
+});
+assert.equal(targetInserted.action, 'insert_annotation');
+assert.equal(targetInserted.payload.platform, 'google_meet');
+assert.equal(targetInserted.payload.surface, 'browser_extension');
+assert.equal(targetInserted.payload.source, 'meeting_platform_adapter_session');
+assert.equal(targetCalls[1][0], 'insertAnnotation');
+assert.equal(targetCalls[1][1], 'google_meet');
+
+const targetHandoff = buildMeetingPlatformAdapterSessionHandoff(googleTarget);
+assert.equal(targetHandoff.plan_kind, 'runtime_target');
+assert.equal(targetHandoff.input_schema, 'meeting_platform_adapter_runtime_target');
+assert.equal(targetHandoff.runtime_target_schema, 'meeting_platform_adapter_runtime_target');
+assert.equal(targetHandoff.launch_plan_schema, undefined);
+assert.equal(targetHandoff.host_kind, 'browser_extension_content_script');
+assert.equal(targetHandoff.next_actions.includes('create_session_from_runtime_target'), true);
 
 const bridgeCalls = [];
 const bridgeStyleClient = {

@@ -947,6 +947,17 @@ npx meeting-platform-adapter-runtime-target \
   --out-file=meeting-platform-adapter-runtime-target.json
 ```
 
+`platformAdapterRuntimeTarget()` 的返回值可以直接传给 `platformAdapterSession()`。这条路径适合浏览器插件、桌面 detector 或 WebView preload 在运行时完成目标选择后，马上接入 `observeAxis()` 和 `insertAnnotation()`：
+
+```js
+const manifest = sdk.platformAdapterRuntimeManifest({ platforms: ['google-meet', 'zoom'] });
+const target = sdk.platformAdapterRuntimeTarget(manifest, { url: location.href });
+const session = sdk.platformAdapterSession(target, adapterClient);
+
+await session.observeAxis();
+await session.insertAnnotation({ label: 'why?', captured_at_ms: Date.now() });
+```
+
 startup plan 只能说明“应该启动哪个 surface”；真正打开会议窗口后，还需要用 `platformAdapterPreflight()` 或 SDK CLI 验证 live DOM/native evidence 是否足够建实时轴。Google Meet 这类 browser surface 可以传 DOM snapshot；Teams/Zoom 这类 native-first surface 可以传窗口、进程、Accessibility 或音频通话状态。URL-only preflight 会返回 `needs_live_page_evidence`，不会误报 realtime ready：
 
 ```sh

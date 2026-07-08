@@ -3090,6 +3090,33 @@ assert.equal(createMeetingPlatformAdapterSessionFromRoot(directGoogleLaunchPlan,
     return { ok: true };
   },
 }).platform, 'google_meet');
+const directRuntimeTarget = buildMeetingPlatformAdapterRuntimeTarget(buildMeetingPlatformAdapterRuntimeManifest({}, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet', 'zoom'],
+}), {
+  url: 'https://meet.google.com/abc-defg-hij',
+});
+const directRuntimeTargetSession = createMeetingPlatformAdapterSession(directRuntimeTarget, {
+  async observePlatformCandidates(payload) {
+    return { ok: true, platform: payload.platform };
+  },
+  async insertAnnotation(platform, payload) {
+    return { ok: true, platform, label: payload.label };
+  },
+});
+assert.equal(directRuntimeTargetSession.plan_kind, 'runtime_target');
+assert.equal(directRuntimeTargetSession.host_kind, 'browser_extension_content_script');
+assert.equal((await directRuntimeTargetSession.observeAxis()).payload.current_url, 'https://meet.google.com/abc-defg-hij');
+assert.equal((await directRuntimeTargetSession.insertAnnotation({ label: 'runtime target smoke' })).payload.surface, 'browser_extension');
+assert.equal(buildMeetingPlatformAdapterSessionHandoff(directRuntimeTarget).next_actions.includes('create_session_from_runtime_target'), true);
+assert.equal(createMeetingPlatformAdapterSessionFromRoot(directRuntimeTarget, {
+  async observePlatformCandidates() {
+    return { ok: true };
+  },
+  async insertAnnotation() {
+    return { ok: true };
+  },
+}).runtime_target.schema, 'meeting_platform_adapter_runtime_target');
 const directRunnerClient = {
   async observePlatformCandidates() {
     return { ok: true };

@@ -1,4 +1,5 @@
 import type { MeetingPlatformAdapterLaunchPlan } from './platform-adapter-launch-plan.mjs';
+import type { MeetingPlatformAdapterRuntimeTarget } from './platform-adapter-runtime-recipe.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_SESSION_SCHEMA: 'meeting_platform_adapter_session';
 export const MEETING_PLATFORM_ADAPTER_SESSION_EVENT_SCHEMA: 'meeting_platform_adapter_session_event';
@@ -25,6 +26,8 @@ export interface MeetingPlatformAdapterSessionOptions {
   sdk?: MeetingPlatformAdapterSessionClient;
   launchPlan?: MeetingPlatformAdapterLaunchPlan;
   launch_plan?: MeetingPlatformAdapterLaunchPlan;
+  runtimeTarget?: MeetingPlatformAdapterRuntimeTarget;
+  runtime_target?: MeetingPlatformAdapterRuntimeTarget;
   sessionId?: string;
   session_id?: string;
   source?: string;
@@ -65,10 +68,15 @@ export interface MeetingPlatformAdapterSession {
   schema: 'meeting_platform_adapter_session';
   schema_version: 1;
   id: string;
+  plan_kind: 'launch_plan' | 'runtime_target' | 'unknown';
   platform?: string;
   selected_surface?: string;
+  host_kind?: string;
+  bridge_kind?: string;
+  adapter_module?: string;
   adapter_selection?: Record<string, unknown>;
-  launch_plan: MeetingPlatformAdapterLaunchPlan;
+  launch_plan?: MeetingPlatformAdapterLaunchPlan;
+  runtime_target?: MeetingPlatformAdapterRuntimeTarget;
   axis_contract: Record<string, unknown>;
   runtime_actions: Array<Record<string, unknown>>;
   getState(): Record<string, unknown>;
@@ -88,22 +96,27 @@ export interface MeetingPlatformAdapterSessionHandoff {
   schema_version: 1;
   platform?: string;
   selected_surface?: string;
+  plan_kind: 'launch_plan' | 'runtime_target' | 'unknown';
+  host_kind?: string;
+  bridge_kind?: string;
   session_factory: 'createMeetingPlatformAdapterSession';
   required_client_methods: string[];
   optional_client_methods: string[];
-  launch_plan_schema: string;
+  input_schema: string;
+  launch_plan_schema?: string;
+  runtime_target_schema?: string;
   runtime_actions: Array<Record<string, unknown>>;
   axis_contract: Record<string, unknown>;
   next_actions: string[];
 }
 
 export function createMeetingPlatformAdapterSession(
-  launchPlanOrInput?: MeetingPlatformAdapterLaunchPlan | Record<string, unknown>,
+  launchPlanOrInput?: MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterRuntimeTarget | Record<string, unknown>,
   clientOrOptions?: MeetingPlatformAdapterSessionClient | MeetingPlatformAdapterSessionOptions,
   options?: MeetingPlatformAdapterSessionOptions,
 ): MeetingPlatformAdapterSession;
 
 export function buildMeetingPlatformAdapterSessionHandoff(
-  launchPlanOrInput?: MeetingPlatformAdapterLaunchPlan | Record<string, unknown>,
+  launchPlanOrInput?: MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterRuntimeTarget | Record<string, unknown>,
   options?: MeetingPlatformAdapterSessionOptions,
 ): MeetingPlatformAdapterSessionHandoff;

@@ -3,6 +3,10 @@ import {
   MEETING_PLATFORM_ADAPTER_LAUNCH_PLAN_SCHEMA,
   assertMeetingPlatformAdapterLaunchPlan,
 } from './platform-adapter-launch-plan.mjs';
+import {
+  MEETING_PLATFORM_ADAPTER_RUNTIME_TARGET_SCHEMA,
+  assertMeetingPlatformAdapterRuntimeTarget,
+} from './platform-adapter-runtime-recipe.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_SESSION_SCHEMA = 'meeting_platform_adapter_session';
 export const MEETING_PLATFORM_ADAPTER_SESSION_EVENT_SCHEMA = 'meeting_platform_adapter_session_event';
@@ -24,11 +28,54 @@ function nowMs(options = {}) {
   return Date.now();
 }
 
-function launchPlanFrom(input = {}, options = {}) {
-  const plan = input?.schema === MEETING_PLATFORM_ADAPTER_LAUNCH_PLAN_SCHEMA
+function isLaunchPlan(value = {}) {
+  return value?.schema === MEETING_PLATFORM_ADAPTER_LAUNCH_PLAN_SCHEMA;
+}
+
+function isRuntimeTarget(value = {}) {
+  return value?.schema === MEETING_PLATFORM_ADAPTER_RUNTIME_TARGET_SCHEMA;
+}
+
+function planKind(plan = {}) {
+  if (isRuntimeTarget(plan)) return 'runtime_target';
+  if (isLaunchPlan(plan)) return 'launch_plan';
+  return 'unknown';
+}
+
+function sessionPlanFrom(input = {}, options = {}) {
+  const plan = isLaunchPlan(input) || isRuntimeTarget(input)
     ? input
-    : firstNonEmpty(options.launchPlan, options.launch_plan, input.launchPlan, input.launch_plan, input.plan);
-  return assertMeetingPlatformAdapterLaunchPlan(plan ?? input);
+    : firstNonEmpty(
+      options.runtimeTarget,
+      options.runtime_target,
+      options.launchPlan,
+      options.launch_plan,
+      input.runtimeTarget,
+      input.runtime_target,
+      input.launchPlan,
+      input.launch_plan,
+      input.target,
+      input.plan,
+    );
+  const candidate = plan ?? input;
+  if (isRuntimeTarget(candidate)) return assertMeetingPlatformAdapterRuntimeTarget(candidate);
+  return assertMeetingPlatformAdapterLaunchPlan(candidate);
+}
+
+function axisContractFrom(plan = {}) {
+  const axisContract = plan.axis_contract ?? {};
+  return compactObject({
+    ...axisContract,
+    timestamp_field: firstNonEmpty(axisContract.timestamp_field, plan.timestamp_field, plan.runtime_contract?.timestamp_field),
+    provider_events_block_realtime: firstNonEmpty(
+      axisContract.provider_events_block_realtime,
+      plan.runtime_contract?.provider_events_block_realtime,
+    ),
+    transcript_blocks_realtime: firstNonEmpty(
+      axisContract.transcript_blocks_realtime,
+      plan.runtime_contract?.transcript_blocks_realtime,
+    ),
+  });
 }
 
 function sessionId(plan = {}, options = {}) {
@@ -219,7 +266,9 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
     ...options,
     ...(clientOrOptions.options ?? {}),
   };
-  const plan = launchPlanFrom(launchPlanOrInput, defaults);
+  const plan = sessionPlanFrom(launchPlanOrInput, defaults);
+  const axisContract = axisContractFrom(plan);
+  const kind = planKind(plan);
   const state = {
     adapter_selection_read: false,
     raw_signal_validated: false,
@@ -234,18 +283,26 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
     schema: MEETING_PLATFORM_ADAPTER_SESSION_SCHEMA,
     schema_version: MEETING_PLATFORM_ADAPTER_SESSION_SCHEMA_VERSION,
     id: sessionId(plan, defaults),
+    plan_kind: kind,
     platform: plan.platform,
     selected_surface: plan.selected_surface,
+    host_kind: plan.host_kind,
+    bridge_kind: plan.bridge_kind,
+    adapter_module: plan.adapter_module,
     adapter_selection: plan.adapter_selection,
-    launch_plan: plan,
-    axis_contract: plan.axis_contract,
+    launch_plan: isLaunchPlan(plan) ? plan : undefined,
+    runtime_target: isRuntimeTarget(plan) ? plan : undefined,
+    axis_contract: axisContract,
     runtime_actions: plan.runtime_actions,
     getState() {
       return {
         ...state,
         session_id: session.id,
+        plan_kind: session.plan_kind,
         platform: session.platform,
         selected_surface: session.selected_surface,
+        host_kind: session.host_kind,
+        bridge_kind: session.bridge_kind,
         adapter_selection: session.adapter_selection,
       };
     },
@@ -343,21 +400,28 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
 }
 
 export function buildMeetingPlatformAdapterSessionHandoff(launchPlanOrInput = {}, options = {}) {
-  const plan = launchPlanFrom(launchPlanOrInput, options);
+  const plan = sessionPlanFrom(launchPlanOrInput, options);
+  const kind = planKind(plan);
+  const axisContract = axisContractFrom(plan);
   return {
     type: 'meeting_platform_adapter_session_handoff',
     schema: 'meeting_platform_adapter_session_handoff',
     schema_version: MEETING_PLATFORM_ADAPTER_SESSION_SCHEMA_VERSION,
     platform: plan.platform,
     selected_surface: plan.selected_surface,
+    plan_kind: kind,
+    host_kind: plan.host_kind,
+    bridge_kind: plan.bridge_kind,
     session_factory: 'createMeetingPlatformAdapterSession',
     required_client_methods: ['observePlatformCandidates', 'insertAnnotation'],
     optional_client_methods: ['platformAdapterSelection', 'adapterSelection', 'platformRawSignalBatch', 'rawSignalBatch', 'speakerTrack', 'participantTrack', 'ingestProvider'],
-    launch_plan_schema: plan.schema,
+    input_schema: plan.schema,
+    launch_plan_schema: isLaunchPlan(plan) ? plan.schema : undefined,
+    runtime_target_schema: isRuntimeTarget(plan) ? plan.schema : undefined,
     runtime_actions: plan.runtime_actions,
-    axis_contract: plan.axis_contract,
+    axis_contract: axisContract,
     next_actions: [
-      'create_session_from_launch_plan',
+      kind === 'runtime_target' ? 'create_session_from_runtime_target' : 'create_session_from_launch_plan',
       'call_session_readAdapterSelection_before_runtime_wiring',
       'call_session_validateRawSignal_before_adapter_preflight',
       'call_session_observeAxis_before_first_mark',
