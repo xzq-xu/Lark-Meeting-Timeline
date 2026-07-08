@@ -44,6 +44,10 @@ const manifest = buildMeetingPlatformAdapterInstallManifest(importMatrix.plans, 
 
 const calls = [];
 const adapterClient = {
+  async platformRawSignalBatch(payload, options) {
+    calls.push(['platformRawSignalBatch', payload, options]);
+    return { ok: true, runtime_event_count: 1 };
+  },
   async observePlatformCandidates(payload, options) {
     calls.push(['observePlatformCandidates', payload, options]);
     return { ok: true, observed: payload.platform };
@@ -100,6 +104,7 @@ assert.equal(candidatePlan.result.accepted, true);
 assert.equal(candidatePlan.result.status, 'ready_for_realtime_launch');
 assert.equal(candidatePlan.result.launch_plan.platform, 'google_meet');
 assert.equal(candidatePlan.adapter_blueprint_primary_surface, 'browser_extension');
+assert.equal(candidatePlan.raw_signal_validation_status, 'ready');
 assert.equal(candidatePlan.result.selected_candidate.tab_id, 7);
 
 const urlOnlyCandidatePlan = await bridge.handleMessage({
@@ -146,6 +151,8 @@ assert.equal(strictOpened.action, 'open_candidate_session');
 assert.equal(strictOpened.platform, 'google_meet');
 assert.equal(strictOpened.result.payload.launch_plan.platform, 'google_meet');
 assert.equal(strictOpened.adapter_blueprint_primary_surface, 'browser_extension');
+assert.equal(strictOpened.raw_signal_validation_status, 'ready');
+assert.equal(strictOpened.result.payload.raw_signal_event.action, 'validate_raw_signal');
 assert.equal(strictCalls[0][0], 'observePlatformCandidates');
 assert.equal(strictCalls[0][1].candidates[0].tab_id, 9);
 
@@ -165,9 +172,12 @@ assert.equal(opened.request_id, 'observe-1');
 assert.equal(opened.platform, 'google_meet');
 assert.equal(opened.adapter_blueprint_primary_surface, 'browser_extension');
 assert.equal(opened.adapter_blueprint_first_gate, 'local_candidate_preflight_accepts_active_meeting');
+assert.equal(opened.raw_signal_validation_status, 'ready');
+assert.equal(opened.result.payload.raw_signal_event.action, 'validate_raw_signal');
 assert.equal(opened.result.payload.observe_event.action, 'observe_axis');
 assert.equal(opened.result.payload.observe_event.captured_at_ms, 1_782_800_000_123);
-assert.equal(calls[0][0], 'observePlatformCandidates');
+assert.equal(calls[0][0], 'platformRawSignalBatch');
+assert.equal(calls[1][0], 'observePlatformCandidates');
 
 const inserted = await bridge.handleMessage({
   type: 'meeting_timeline.insert_mark',

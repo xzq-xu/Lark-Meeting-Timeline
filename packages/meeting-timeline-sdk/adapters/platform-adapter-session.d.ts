@@ -5,6 +5,9 @@ export const MEETING_PLATFORM_ADAPTER_SESSION_EVENT_SCHEMA: 'meeting_platform_ad
 export const MEETING_PLATFORM_ADAPTER_SESSION_SCHEMA_VERSION: 1;
 
 export interface MeetingPlatformAdapterSessionClient {
+  platformRawSignalBatch?(payload: Record<string, unknown>, options?: Record<string, unknown>): unknown | Promise<unknown>;
+  rawSignalBatch?(payload: Record<string, unknown>, options?: Record<string, unknown>): unknown | Promise<unknown>;
+  validateRawSignal?(payload: Record<string, unknown>, options?: Record<string, unknown>): unknown | Promise<unknown>;
   observePlatformCandidates?(payload: Record<string, unknown>, options?: Record<string, unknown>): unknown | Promise<unknown>;
   observeCandidates?(candidates: Array<Record<string, unknown>>, options?: Record<string, unknown>): unknown | Promise<unknown>;
   observe?(payload: Record<string, unknown>, options?: Record<string, unknown>): unknown | Promise<unknown>;
@@ -31,6 +34,10 @@ export interface MeetingPlatformAdapterSessionOptions {
   platform_argument?: boolean;
   allowUnobservedAxis?: boolean;
   allow_unobserved_axis?: boolean;
+  validateRawSignal?: boolean;
+  validate_raw_signal?: boolean;
+  allowUnvalidatedRawSignal?: boolean;
+  allow_unvalidated_raw_signal?: boolean;
   [key: string]: unknown;
 }
 
@@ -58,6 +65,7 @@ export interface MeetingPlatformAdapterSession {
   axis_contract: Record<string, unknown>;
   runtime_actions: Array<Record<string, unknown>>;
   getState(): Record<string, unknown>;
+  validateRawSignal(input?: Record<string, unknown>, options?: MeetingPlatformAdapterSessionOptions): Promise<MeetingPlatformAdapterSessionEvent>;
   observeAxis(input?: Record<string, unknown>, options?: MeetingPlatformAdapterSessionOptions): Promise<MeetingPlatformAdapterSessionEvent>;
   insertAnnotation(input?: Record<string, unknown>, options?: MeetingPlatformAdapterSessionOptions): Promise<MeetingPlatformAdapterSessionEvent>;
   insertMark(input?: Record<string, unknown>, options?: MeetingPlatformAdapterSessionOptions): Promise<MeetingPlatformAdapterSessionEvent>;

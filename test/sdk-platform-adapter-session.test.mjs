@@ -46,6 +46,10 @@ assert.equal(googlePlan.accepted, true);
 
 const calls = [];
 const adapterClient = {
+  async platformRawSignalBatch(payload, options) {
+    calls.push(['platformRawSignalBatch', payload, options]);
+    return { ok: true, runtime_event_count: 1 };
+  },
   async observePlatformCandidates(payload, options) {
     calls.push(['observePlatformCandidates', payload, options]);
     return { ok: true, axis: payload.candidates?.[0]?.platform };
@@ -78,8 +82,16 @@ assert.equal(session.selected_surface, 'browser_extension');
 assert.equal(session.getState().axis_observed, false);
 await assert.rejects(
   () => session.insertAnnotation({ label: 'why?' }),
-  (error) => error.details?.code === 'adapter_session_axis_not_observed',
+  (error) => error.details?.code === 'adapter_session_raw_signal_not_validated',
 );
+
+const validated = await session.validateRawSignal({
+  url: 'https://meet.google.com/abc-defg-hij',
+});
+assert.equal(validated.action, 'validate_raw_signal');
+assert.equal(validated.payload.raw_signals[0].platform, 'google_meet');
+assert.equal(session.getState().raw_signal_validated, true);
+assert.equal(calls[0][0], 'platformRawSignalBatch');
 
 const observed = await session.observeAxis({
   url: 'https://meet.google.com/abc-defg-hij',
@@ -89,7 +101,7 @@ assert.equal(observed.action, 'observe_axis');
 assert.equal(observed.payload.candidates[0].platform, 'google_meet');
 assert.equal(observed.payload.captured_at_ms, 1_782_614_400_321);
 assert.equal(session.getState().axis_observed, true);
-assert.equal(calls[0][0], 'observePlatformCandidates');
+assert.equal(calls[1][0], 'observePlatformCandidates');
 
 const inserted = await session.insertAnnotation({
   label: 'why?',
@@ -99,9 +111,9 @@ assert.equal(inserted.action, 'insert_annotation');
 assert.equal(inserted.payload.platform, 'google_meet');
 assert.equal(inserted.payload.surface, 'browser_extension');
 assert.equal(inserted.payload.captured_at_ms, 1_782_614_400_321);
-assert.equal(calls[1][0], 'insertAnnotation');
-assert.equal(calls[1][1], 'google_meet');
-assert.equal(calls[1][2].label, 'why?');
+assert.equal(calls[2][0], 'insertAnnotation');
+assert.equal(calls[2][1], 'google_meet');
+assert.equal(calls[2][2].label, 'why?');
 
 assert.equal((await session.insertMark({ label: 'alias mark' })).action, 'insert_annotation');
 assert.equal((await session.speakerTrack({ speaker_id: 's1', active: true })).action, 'speaker_track');
@@ -159,7 +171,8 @@ const kit = createMeetingPlatformTimelineKit(timelineClient, {
 const kitSession = kit.platformAdapterSession(googlePlan, {
   clock: () => 99,
 });
-await kitSession.observeAxis();
+assert.equal((await kitSession.validateRawSignal()).action, 'validate_raw_signal');
+await kitSession.observeAxis({}, { validateRawSignal: false });
 await kitSession.insertAnnotation({ label: 'kit mark' });
 assert.equal(timelineCalls.some((call) => call[0] === 'insertMark' && call[1].platform === 'google_meet'), true);
 assert.equal(kit.platformAdapterSessionHandoff(googlePlan).schema, 'meeting_platform_adapter_session_handoff');

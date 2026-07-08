@@ -101,6 +101,13 @@ function shouldObserveAxis(options = {}) {
     && options.auto_observe !== false;
 }
 
+function shouldValidateRawSignal(options = {}) {
+  return options.validateRawSignal !== false
+    && options.validate_raw_signal !== false
+    && options.autoValidateRawSignal !== false
+    && options.auto_validate_raw_signal !== false;
+}
+
 function launchPlanFromCandidate(plan) {
   return assertMeetingPlatformAdapterCandidateLaunchPlan(plan).launch_plan;
 }
@@ -217,8 +224,12 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
           ? state.current_launch_plan
         : assertMeetingPlatformAdapterLaunchPlan(runner.launchPlan(input, mergedOptions));
       const session = createMeetingPlatformAdapterSession(launchPlan, client, mergedOptions);
+      const validationInput = observeInputFor(input);
+      const rawSignalEvent = shouldValidateRawSignal(mergedOptions)
+        ? await session.validateRawSignal(validationInput, mergedOptions)
+        : undefined;
       const observeEvent = shouldObserveAxis(mergedOptions)
-        ? await session.observeAxis(observeInputFor(input), mergedOptions)
+        ? await session.observeAxis(validationInput, mergedOptions)
         : undefined;
       state.opened = true;
       state.current_launch_plan = launchPlan;
@@ -233,6 +244,7 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
           platform: session.platform,
           selected_surface: session.selected_surface,
         },
+        raw_signal_event: rawSignalEvent,
         observe_event: observeEvent,
       }, observeEvent?.result);
       return state.last_open_event;
@@ -254,6 +266,11 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
     async observeAxis(input = {}, observeOptions = {}) {
       const session = requireCurrentSession(state);
       state.last_session_event = await session.observeAxis(input, observeOptions);
+      return state.last_session_event;
+    },
+    async validateRawSignal(input = {}, validationOptions = {}) {
+      const session = requireCurrentSession(state);
+      state.last_session_event = await session.validateRawSignal(input, validationOptions);
       return state.last_session_event;
     },
     async insertAnnotation(input = {}, markOptions = {}) {
@@ -312,10 +329,11 @@ export function buildMeetingPlatformAdapterRunnerHandoff(manifestOrInput = {}, o
     convenience_method: 'openMeetingPlatformAdapterSession',
     install_manifest_schema: installManifest?.schema,
     required_client_methods: ['observePlatformCandidates', 'insertAnnotation'],
-    optional_client_methods: ['speakerTrack', 'participantTrack', 'ingestProvider'],
+    optional_client_methods: ['platformRawSignalBatch', 'rawSignalBatch', 'speakerTrack', 'participantTrack', 'ingestProvider'],
     runtime_sequence: [
       'build_launch_plan_from_current_url_or_platform',
       'create_session_from_launch_plan',
+      'validate_raw_signal_before_adapter_preflight',
       'observe_axis_before_first_mark',
       'insert_realtime_annotations_with_captured_at_ms',
     ],

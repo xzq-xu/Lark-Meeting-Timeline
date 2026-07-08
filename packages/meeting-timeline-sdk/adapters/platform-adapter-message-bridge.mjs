@@ -314,6 +314,13 @@ function event(action, bridge, message = {}, payload = {}, result, handled = tru
     result?.payload?.launch_plan?.adapter_blueprint,
     state?.current_launch_plan?.adapter_blueprint,
   );
+  const rawSignalValidation = firstNonEmpty(
+    result?.raw_signal_validation,
+    result?.launch_plan?.raw_signal_validation,
+    result?.payload?.launch_plan?.raw_signal_validation,
+    result?.payload?.raw_signal_event?.payload?.validation,
+    state?.current_launch_plan?.raw_signal_validation,
+  );
   return compactObject({
     type: 'meeting_platform_adapter_message_bridge_event',
     schema: MEETING_PLATFORM_ADAPTER_MESSAGE_BRIDGE_EVENT_SCHEMA,
@@ -328,6 +335,8 @@ function event(action, bridge, message = {}, payload = {}, result, handled = tru
     adapter_blueprint: adapterBlueprint,
     adapter_blueprint_primary_surface: adapterBlueprint?.primary_surface,
     adapter_blueprint_first_gate: adapterBlueprint?.first_acceptance_gate,
+    raw_signal_validation: rawSignalValidation,
+    raw_signal_validation_status: rawSignalValidation?.status,
     result,
     runner_state: state,
   });
@@ -457,6 +466,7 @@ export function buildMeetingPlatformAdapterMessageBridgeHandoff(manifestOrInput 
       'background_or_native_host_sends_observe_candidates',
       'optional_candidate_launch_plan_checks_live_evidence',
       'bridge_opens_adapter_runner_session',
+      'runner_validates_raw_signal_before_axis_observation',
       'content_or_device_sends_insert_mark_with_captured_at_ms',
       'bridge_routes_mark_to_current_runner_session',
     ],

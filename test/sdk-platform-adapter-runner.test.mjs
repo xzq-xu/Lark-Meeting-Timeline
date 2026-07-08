@@ -42,6 +42,10 @@ const manifest = buildMeetingPlatformAdapterInstallManifest(importMatrix.plans, 
 
 const calls = [];
 const adapterClient = {
+  async platformRawSignalBatch(payload, options) {
+    calls.push(['platformRawSignalBatch', payload, options]);
+    return { ok: true, runtime_event_count: 1 };
+  },
   async observePlatformCandidates(payload, options) {
     calls.push(['observePlatformCandidates', payload, options]);
     return { ok: true, observed: payload.platform };
@@ -87,6 +91,7 @@ const launchPlanRunner = createMeetingPlatformAdapterRunner(launchPlan, adapterC
   clock: () => 321,
 });
 assert.equal((await launchPlanRunner.open()).payload.observe_event.captured_at_ms, 321);
+assert.equal(launchPlanRunner.getState().last_open_event.payload.raw_signal_event.action, 'validate_raw_signal');
 
 const opened = await runner.open({
   url: 'https://meet.google.com/abc-defg-hij',
@@ -97,11 +102,13 @@ assert.equal(opened.action, 'open_session');
 assert.equal(opened.platform, 'google_meet');
 assert.equal(opened.payload.launch_plan.platform, 'google_meet');
 assert.equal(opened.payload.launch_plan.adapter_blueprint.primary_surface, 'browser_extension');
+assert.equal(opened.payload.raw_signal_event.action, 'validate_raw_signal');
 assert.equal(opened.payload.observe_event.action, 'observe_axis');
 assert.equal(opened.payload.observe_event.captured_at_ms, 1_782_700_000_123);
 assert.equal(runner.getState().opened, true);
 assert.equal(runner.currentSession().platform, 'google_meet');
-assert.equal(calls[0][0], 'observePlatformCandidates');
+assert.equal(calls[0][0], 'platformRawSignalBatch');
+assert.equal(calls[1][0], 'observePlatformCandidates');
 
 const mark = await runner.insertAnnotation({
   label: 'why?',
@@ -126,6 +133,7 @@ const zoomPlan = buildMeetingPlatformAdapterLaunchPlan(manifest, {
 const openedWithoutObserve = await runner.open(zoomPlan, {
   observe: false,
 });
+assert.equal(openedWithoutObserve.payload.raw_signal_event.action, 'validate_raw_signal');
 assert.equal(openedWithoutObserve.payload.observe_event, undefined);
 await assert.rejects(
   () => runner.insertAnnotation({ label: 'needs observed axis' }),

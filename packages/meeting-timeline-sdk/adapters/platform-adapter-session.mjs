@@ -63,6 +63,37 @@ function observePayload(plan = {}, input = {}, options = {}) {
   });
 }
 
+function rawSignalValidationPayload(plan = {}, input = {}, options = {}) {
+  const capturedAtMs = firstNonEmpty(input.captured_at_ms, input.capturedAtMs, options.captured_at_ms, options.capturedAtMs, nowMs(options));
+  const snapshot = compactObject({
+    kind: 'meeting_app_snapshot',
+    platform: plan.platform,
+    source: firstNonEmpty(input.source, options.source, 'meeting_platform_adapter_session'),
+    url: firstNonEmpty(input.url, input.href, plan.current_url),
+    title: firstNonEmpty(input.title, plan.detected_meeting?.title),
+    observed_at_ms: capturedAtMs,
+    in_meeting: firstNonEmpty(input.in_meeting, input.inMeeting, true),
+    active_speaker: firstNonEmpty(input.active_speaker, input.activeSpeaker, input.speaker),
+    current_meeting: plan.detected_meeting,
+  });
+  return compactObject({
+    platform: plan.platform,
+    source: snapshot.source,
+    captured_at_ms: capturedAtMs,
+    validation: plan.raw_signal_validation,
+    raw_signal_validation_path: plan.raw_signal_validation?.path,
+    expected_runtime_actions: plan.raw_signal_validation?.runtime_actions,
+    raw_signals: asArray(firstNonEmpty(
+      input.raw_signals,
+      input.rawSignals,
+      input.samples,
+      input.signals,
+      [snapshot],
+    )),
+    filter_active_speaker_samples: true,
+  });
+}
+
 function markPayload(plan = {}, input = {}, options = {}) {
   return {
     ...input,
@@ -104,6 +135,19 @@ async function callObserve(client = {}, payload = {}, options = {}) {
   });
 }
 
+async function callValidateRawSignal(client = {}, payload = {}, options = {}) {
+  if (typeof client.platformRawSignalBatch === 'function') return client.platformRawSignalBatch(payload, options);
+  if (typeof client.rawSignalBatch === 'function') return client.rawSignalBatch(payload, options);
+  if (typeof client.validateRawSignal === 'function') return client.validateRawSignal(payload, options);
+  return {
+    ok: true,
+    mode: 'launch_plan_contract',
+    status: payload.validation?.status ?? 'ready',
+    runtime_actions: payload.expected_runtime_actions,
+    signal_count: payload.raw_signals?.length ?? 0,
+  };
+}
+
 async function callTrack(client = {}, method, platform, payload = {}, options = {}) {
   if (typeof client[method] !== 'function') {
     throw new MeetingTimelineSdkError(`Adapter session client cannot call ${method}`, {
@@ -139,7 +183,9 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
   };
   const plan = launchPlanFrom(launchPlanOrInput, defaults);
   const state = {
+    raw_signal_validated: false,
     axis_observed: false,
+    last_raw_signal_event: undefined,
     last_observe_event: undefined,
     last_annotation_event: undefined,
   };
@@ -161,8 +207,19 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
         selected_surface: session.selected_surface,
       };
     },
+    async validateRawSignal(input = {}, validationOptions = {}) {
+      const mergedOptions = { ...defaults, ...validationOptions };
+      const payload = rawSignalValidationPayload(plan, input, mergedOptions);
+      const result = await callValidateRawSignal(client, payload, mergedOptions);
+      state.raw_signal_validated = true;
+      state.last_raw_signal_event = event('validate_raw_signal', session, payload, result);
+      return state.last_raw_signal_event;
+    },
     async observeAxis(input = {}, observeOptions = {}) {
       const mergedOptions = { ...defaults, ...observeOptions };
+      if (state.raw_signal_validated !== true && mergedOptions.validateRawSignal !== false && mergedOptions.validate_raw_signal !== false) {
+        await session.validateRawSignal(input, mergedOptions);
+      }
       const payload = observePayload(plan, input, mergedOptions);
       const result = await callObserve(client, payload, mergedOptions);
       state.axis_observed = true;
@@ -171,6 +228,13 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
     },
     async insertAnnotation(input = {}, markOptions = {}) {
       const mergedOptions = { ...defaults, ...markOptions };
+      if (state.raw_signal_validated !== true && mergedOptions.allowUnvalidatedRawSignal !== true && mergedOptions.allow_unvalidated_raw_signal !== true) {
+        throw new MeetingTimelineSdkError('Adapter session must validate raw signals before inserting realtime annotation', {
+          code: 'adapter_session_raw_signal_not_validated',
+          session_id: session.id,
+          platform: session.platform,
+        });
+      }
       if (state.axis_observed !== true && mergedOptions.allowUnobservedAxis !== true && mergedOptions.allow_unobserved_axis !== true) {
         throw new MeetingTimelineSdkError('Adapter session must observe local axis before inserting realtime annotation', {
           code: 'adapter_session_axis_not_observed',
@@ -225,12 +289,13 @@ export function buildMeetingPlatformAdapterSessionHandoff(launchPlanOrInput = {}
     selected_surface: plan.selected_surface,
     session_factory: 'createMeetingPlatformAdapterSession',
     required_client_methods: ['observePlatformCandidates', 'insertAnnotation'],
-    optional_client_methods: ['speakerTrack', 'participantTrack', 'ingestProvider'],
+    optional_client_methods: ['platformRawSignalBatch', 'rawSignalBatch', 'speakerTrack', 'participantTrack', 'ingestProvider'],
     launch_plan_schema: plan.schema,
     runtime_actions: plan.runtime_actions,
     axis_contract: plan.axis_contract,
     next_actions: [
       'create_session_from_launch_plan',
+      'call_session_validateRawSignal_before_adapter_preflight',
       'call_session_observeAxis_before_first_mark',
       'call_session_insertAnnotation_for_realtime_marks',
     ],
