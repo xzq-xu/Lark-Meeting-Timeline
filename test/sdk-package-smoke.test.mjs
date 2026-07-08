@@ -65,6 +65,8 @@ assert.equal(packedFiles.includes('adapters/platform-integration-runtime.mjs'), 
 assert.equal(packedFiles.includes('adapters/platform-integration-runtime.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-runtime-event.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-runtime-event.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-raw-signal.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-raw-signal.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-registry.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-registry.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-ingest.mjs'), true);
@@ -521,6 +523,8 @@ import {
   buildMeetingPlatformAdapterCurrentWindowPreflight as buildMeetingPlatformAdapterCurrentWindowPreflightFromRoot,
   buildMeetingPlatformAdapterPreflight as buildMeetingPlatformAdapterPreflightFromRoot,
   buildMeetingPlatformAdapterPreflightMatrix as buildMeetingPlatformAdapterPreflightMatrixFromRoot,
+  buildMeetingPlatformRawSignal as buildMeetingPlatformRawSignalFromRoot,
+  buildMeetingPlatformRawSignalExampleBatch as buildMeetingPlatformRawSignalExampleBatchFromRoot,
   buildMeetingPlatformAdapterRoute as buildMeetingPlatformAdapterRouteFromRoot,
   buildMeetingPlatformAdapterMessageBridgeHandoff as buildMeetingPlatformAdapterMessageBridgeHandoffFromRoot,
   buildMeetingPlatformAdapterRunnerHandoff as buildMeetingPlatformAdapterRunnerHandoffFromRoot,
@@ -581,6 +585,10 @@ import {
   createMeetingPlatformRuntimeEventClient,
   meetingPlatformRuntimeEventEndpoint,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event';
+import {
+  buildMeetingPlatformRawSignal,
+  buildMeetingPlatformRawSignalExampleBatch,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-raw-signal';
 import {
   assertMeetingPlatformRegistryManifest,
   buildMeetingPlatformRegistryAcceptanceReport,
@@ -2350,6 +2358,32 @@ assert.equal(buildMeetingPlatformRuntimeEventPlanMatrix({
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).transcript_realtime_dependency_count, 0);
+assert.equal(kit.platformRawSignal({
+  kind: 'meeting_app_snapshot',
+  url: 'https://meet.google.com/abc-defg-hij',
+  observed_at_ms: 1_782_614_400_000,
+}).runtime_events[0].action, 'observe_meeting_app');
+assert.equal(kit.platformRawSignalExampleBatch({
+  platforms: ['google-meet', 'zoom'],
+}).platform_count, 2);
+assert.equal(buildMeetingPlatformRawSignalFromRoot({
+  kind: 'annotation',
+  platform: 'zoom',
+  label: 'why?',
+  captured_at_ms: 1_782_614_430_000,
+}).runtime_events[0].action, 'insert_annotation');
+assert.equal(buildMeetingPlatformRawSignal({
+  kind: 'speaker_track',
+  platform: 'google-meet',
+  speaker: 'Alex',
+  occurred_at_ms: 1_782_614_435_000,
+}).runtime_events[0].action, 'speaker_track');
+assert.equal(buildMeetingPlatformRawSignalExampleBatchFromRoot({
+  platforms: ['teams'],
+}).platforms[0], 'microsoft_teams');
+assert.equal(buildMeetingPlatformRawSignalExampleBatch({
+  platforms: ['webex'],
+}).signal_count, 3);
 const smokeGoogleRuntimeProfile = buildMeetingPlatformRuntimeProfile('google-meet', {
   baseUrl: 'http://localhost:8787',
 });

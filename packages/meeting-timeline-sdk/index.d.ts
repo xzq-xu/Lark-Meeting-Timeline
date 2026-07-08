@@ -698,6 +698,25 @@ export interface MeetingAppTimelineSdk {
   manifest(options?: Record<string, unknown>): Record<string, unknown>;
   readiness(options?: Record<string, unknown>): Record<string, unknown>;
   handoffReadiness(options?: Record<string, unknown>): Record<string, unknown>;
+  platformRawSignal(
+    input?: string | URL | import('./adapters/platform-raw-signal.mjs').MeetingPlatformRawSignalInput,
+    options?: import('./adapters/platform-raw-signal.mjs').MeetingPlatformRawSignalOptions,
+  ): import('./adapters/platform-raw-signal.mjs').MeetingPlatformRawSignal;
+  rawSignal: MeetingAppTimelineSdk['platformRawSignal'];
+  platformRuntimeEventsFromRawSignal(
+    input?: string | URL | import('./adapters/platform-raw-signal.mjs').MeetingPlatformRawSignalInput,
+    options?: import('./adapters/platform-raw-signal.mjs').MeetingPlatformRawSignalOptions,
+  ): import('./adapters/platform-runtime-event.mjs').MeetingPlatformRuntimeEvent[];
+  runtimeEventsFromRawSignal: MeetingAppTimelineSdk['platformRuntimeEventsFromRawSignal'];
+  platformRawSignalBatch(
+    input?: import('./adapters/platform-raw-signal.mjs').MeetingPlatformRawSignalInput[] | Record<string, unknown>,
+    options?: import('./adapters/platform-raw-signal.mjs').MeetingPlatformRawSignalOptions,
+  ): import('./adapters/platform-raw-signal.mjs').MeetingPlatformRawSignalBatch;
+  rawSignalBatch: MeetingAppTimelineSdk['platformRawSignalBatch'];
+  platformRawSignalExampleBatch(
+    options?: import('./adapters/platform-raw-signal.mjs').MeetingPlatformRawSignalOptions,
+  ): import('./adapters/platform-raw-signal.mjs').MeetingPlatformRawSignalBatch;
+  rawSignalExampleBatch: MeetingAppTimelineSdk['platformRawSignalExampleBatch'];
   observePlatformCandidates(input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown> | unknown;
   observeMeetingApp(
     platformOrInput: string | Record<string, unknown>,
@@ -725,6 +744,14 @@ export interface MeetingAppTimelineSdk {
   participantTrack: MeetingAppTimelineSdk['speakerTrack'];
   timelineView: MeetingAppTimelineSdk['speakerTrack'];
   sendRuntimeEvent(input?: Record<string, unknown>, options?: Record<string, unknown>): Promise<unknown>;
+  sendRawSignal(
+    input?: string | URL | import('./adapters/platform-raw-signal.mjs').MeetingPlatformRawSignalInput,
+    options?: import('./adapters/platform-raw-signal.mjs').MeetingPlatformRawSignalOptions,
+  ): Promise<Record<string, unknown>>;
+  sendRawSignalBatch(
+    input?: import('./adapters/platform-raw-signal.mjs').MeetingPlatformRawSignalInput[] | Record<string, unknown>,
+    options?: import('./adapters/platform-raw-signal.mjs').MeetingPlatformRawSignalOptions,
+  ): Promise<Record<string, unknown>>;
   handleRuntimeEvent(input?: Record<string, unknown>, payload?: unknown, options?: Record<string, unknown>): Promise<unknown> | unknown;
 }
 
@@ -737,6 +764,7 @@ export * from './adapters/meeting-app-connector-package.mjs';
 export * from './adapters/meeting-platform-connector.mjs';
 export * from './adapters/platform-integration-runtime.mjs';
 export * from './adapters/platform-runtime-event.mjs';
+export * from './adapters/platform-raw-signal.mjs';
 export * from './adapters/platform-ingest.mjs';
 export * from './adapters/platform-adaptation-package.mjs';
 export * from './adapters/platform-consumer-handoff.mjs';

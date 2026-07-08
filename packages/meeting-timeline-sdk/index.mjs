@@ -1732,6 +1732,30 @@ export function createMeetingAppTimelineSdk(options = {}) {
     handoffReadiness(readinessOptions = {}) {
       return runtime.handoffReadiness(readinessOptions);
     },
+    platformRawSignal(input = {}, signalOptions = {}) {
+      return runtime.kit.platformRawSignal(input, sdkPlatformOptions(runtime, signalOptions));
+    },
+    rawSignal(input = {}, signalOptions = {}) {
+      return sdk.platformRawSignal(input, signalOptions);
+    },
+    platformRuntimeEventsFromRawSignal(input = {}, signalOptions = {}) {
+      return runtime.kit.platformRuntimeEventsFromRawSignal(input, sdkPlatformOptions(runtime, signalOptions));
+    },
+    runtimeEventsFromRawSignal(input = {}, signalOptions = {}) {
+      return sdk.platformRuntimeEventsFromRawSignal(input, signalOptions);
+    },
+    platformRawSignalBatch(input = {}, signalOptions = {}) {
+      return runtime.kit.platformRawSignalBatch(input, sdkPlatformOptions(runtime, signalOptions));
+    },
+    rawSignalBatch(input = {}, signalOptions = {}) {
+      return sdk.platformRawSignalBatch(input, signalOptions);
+    },
+    platformRawSignalExampleBatch(signalOptions = {}) {
+      return runtime.kit.platformRawSignalExampleBatch(sdkPlatformOptions(runtime, signalOptions));
+    },
+    rawSignalExampleBatch(signalOptions = {}) {
+      return sdk.platformRawSignalExampleBatch(signalOptions);
+    },
     observePlatformCandidates(input = {}, observeOptions = {}) {
       return shouldUseRuntimeEvent(observeOptions, defaults)
         ? runtimeEvents.observePlatformCandidates(input, observeOptions)
@@ -1787,6 +1811,37 @@ export function createMeetingAppTimelineSdk(options = {}) {
     sendRuntimeEvent(eventInput = {}, sendOptions = {}) {
       return runtimeEvents.send(eventInput, sendOptions);
     },
+    async sendRawSignal(input = {}, sendOptions = {}) {
+      const rawSignal = sdk.platformRawSignal(input, sendOptions);
+      const results = [];
+      for (const event of rawSignal.runtime_events ?? []) {
+        results.push(await runtimeEvents.send(event, sendOptions));
+      }
+      return {
+        type: 'meeting_platform_raw_signal_send_result',
+        schema: 'meeting_platform_raw_signal_send_result',
+        signal: rawSignal,
+        runtime_event_count: rawSignal.runtime_event_count,
+        runtime_events: rawSignal.runtime_events,
+        results,
+      };
+    },
+    async sendRawSignalBatch(input = {}, sendOptions = {}) {
+      const batch = sdk.platformRawSignalBatch(input, sendOptions);
+      const results = [];
+      for (const event of batch.runtime_events ?? []) {
+        results.push(await runtimeEvents.send(event, sendOptions));
+      }
+      return {
+        type: 'meeting_platform_raw_signal_batch_send_result',
+        schema: 'meeting_platform_raw_signal_batch_send_result',
+        batch,
+        signal_count: batch.signal_count,
+        runtime_event_count: batch.runtime_event_count,
+        runtime_events: batch.runtime_events,
+        results,
+      };
+    },
     handleRuntimeEvent(eventInput = {}, payload, eventOptions = {}) {
       return runtime.handleEvent(eventInput, payload, eventOptions);
     },
@@ -1801,6 +1856,7 @@ export * from './adapters/meeting-app-connector-package.mjs';
 export * from './adapters/meeting-platform-connector.mjs';
 export * from './adapters/platform-integration-runtime.mjs';
 export * from './adapters/platform-runtime-event.mjs';
+export * from './adapters/platform-raw-signal.mjs';
 export * from './adapters/platform-ingest.mjs';
 export * from './adapters/platform-adaptation-package.mjs';
 export * from './adapters/platform-consumer-handoff.mjs';

@@ -556,7 +556,11 @@ export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
   const firstRoute = route.routes?.[0];
   const providerRoute = routeByName(route.routes, 'provider_reconcile');
   const transcriptRoute = routeByName(route.routes, 'post_meeting_artifact_import');
-  const realtimeReady = routeReadiness.ready === true && executionPlan.realtime_ready === true;
+  const hostDetectorReady = platform === 'local_detector'
+    && routeReadiness.ready === true
+    && adapterBlueprintReady
+    && route.realtime_invariants?.provider_events_block_realtime === false;
+  const realtimeReady = routeReadiness.ready === true && (executionPlan.realtime_ready === true || hostDetectorReady);
   const decision = {
     realtime_ready: realtimeReady,
   };

@@ -203,6 +203,12 @@ import type {
   MeetingPlatformRuntimeEventPlanMatrix,
 } from './platform-runtime-event.mjs';
 import type {
+  MeetingPlatformRawSignal,
+  MeetingPlatformRawSignalBatch,
+  MeetingPlatformRawSignalInput,
+  MeetingPlatformRawSignalOptions,
+} from './platform-raw-signal.mjs';
+import type {
   MeetingPlatformAdapterContract,
   MeetingPlatformAdapterContractAcceptanceMatrix,
   MeetingPlatformAdapterContractAcceptanceReport,
@@ -753,6 +759,11 @@ export interface MeetingPlatformTimelineKit {
   ): MeetingPlatformRuntimeHost;
   platformRuntimeEventPlan(platform: string, planOptions?: MeetingPlatformRuntimeEventClientOptions): MeetingPlatformRuntimeEventPlan;
   platformRuntimeEventPlanMatrix(planOptions?: MeetingPlatformRuntimeEventClientOptions): MeetingPlatformRuntimeEventPlanMatrix;
+  platformRawSignal(input?: string | URL | MeetingPlatformRawSignalInput, signalOptions?: MeetingPlatformRawSignalOptions): MeetingPlatformRawSignal;
+  platformRuntimeEventsFromRawSignal(input?: string | URL | MeetingPlatformRawSignalInput, signalOptions?: MeetingPlatformRawSignalOptions): import('./platform-runtime-event.mjs').MeetingPlatformRuntimeEvent[];
+  platformRawSignalBatch(input?: MeetingPlatformRawSignalInput[] | Record<string, unknown>, signalOptions?: MeetingPlatformRawSignalOptions): MeetingPlatformRawSignalBatch;
+  platformRawSignalExamples(platform: string, signalOptions?: MeetingPlatformRawSignalOptions): MeetingPlatformRawSignalInput[];
+  platformRawSignalExampleBatch(signalOptions?: MeetingPlatformRawSignalOptions): MeetingPlatformRawSignalBatch;
   platformRegistryEntry(platform: string, registryOptions?: MeetingPlatformRegistryOptions): MeetingPlatformRegistryEntry;
   platformRegistryManifest(registryOptions?: MeetingPlatformRegistryOptions): MeetingPlatformRegistryManifest;
   platformRegistryAcceptance(

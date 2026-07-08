@@ -140,6 +140,14 @@ assert.equal(assertMeetingPlatformAdapterDecisionMatrix({}, {
   baseUrl,
   platforms: ['google-meet', 'zoom'],
 }).accepted_count, 2);
+const localDetectorMatrix = buildMeetingPlatformAdapterDecisionMatrix({}, {
+  baseUrl,
+  platforms: ['local-detector'],
+});
+assert.equal(localDetectorMatrix.accepted_count, 1);
+assert.equal(localDetectorMatrix.realtime_ready_count, 1);
+assert.equal(localDetectorMatrix.rows[0].selected_surface, 'host_detector');
+assert.equal(localDetectorMatrix.rows[0].selected_observer_mode, 'host_surface_observer');
 
 const kit = createMeetingPlatformTimelineKit({}, {
   baseUrl,

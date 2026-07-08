@@ -291,6 +291,13 @@ import {
   buildMeetingPlatformRuntimeEventPlanMatrix,
 } from './platform-runtime-event.mjs';
 import {
+  buildMeetingPlatformRawSignal,
+  buildMeetingPlatformRawSignalBatch,
+  buildMeetingPlatformRawSignalExampleBatch,
+  buildMeetingPlatformRawSignalExamples,
+  buildMeetingPlatformRuntimeEventsFromRawSignal,
+} from './platform-raw-signal.mjs';
+import {
   assertMeetingPlatformAdapterContract,
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
   buildMeetingPlatformAdapterContractAcceptanceReport,
@@ -658,6 +665,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_runtime_profile_matrix: buildMeetingPlatformRuntimeProfileMatrix(options),
     platform_adaptation_package_matrix: buildMeetingPlatformAdaptationPackageMatrix(options),
     platform_runtime_event_plan_matrix: buildMeetingPlatformRuntimeEventPlanMatrix(options),
+    platform_raw_signal_example_batch: buildMeetingPlatformRawSignalExampleBatch(options),
     platform_runtime_bundle_matrix: buildMeetingPlatformRuntimeBundleMatrix(options),
     platform_runtime_host_config_matrix: buildMeetingPlatformRuntimeHostConfigMatrix(options),
     platform_runtime_host_handoff_matrix: buildMeetingPlatformRuntimeHostHandoffMatrix(options),
@@ -1350,6 +1358,21 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformRuntimeEventPlanMatrix(planOptions = {}) {
       return buildMeetingPlatformRuntimeEventPlanMatrix(withDefaults(defaults, planOptions));
+    },
+    platformRawSignal(input = {}, signalOptions = {}) {
+      return buildMeetingPlatformRawSignal(input, withDefaults(defaults, signalOptions));
+    },
+    platformRuntimeEventsFromRawSignal(input = {}, signalOptions = {}) {
+      return buildMeetingPlatformRuntimeEventsFromRawSignal(input, withDefaults(defaults, signalOptions));
+    },
+    platformRawSignalBatch(input = {}, signalOptions = {}) {
+      return buildMeetingPlatformRawSignalBatch(input, withDefaults(defaults, signalOptions));
+    },
+    platformRawSignalExamples(platform, signalOptions = {}) {
+      return buildMeetingPlatformRawSignalExamples(platform, withDefaults(defaults, signalOptions));
+    },
+    platformRawSignalExampleBatch(signalOptions = {}) {
+      return buildMeetingPlatformRawSignalExampleBatch(withDefaults(defaults, signalOptions));
     },
     platformAdapterContract(platform, contractOptions = {}) {
       return buildMeetingPlatformAdapterContract(platform, withDefaults(defaults, contractOptions));
