@@ -206,8 +206,10 @@ import {
   buildMeetingPlatformAdapterStartupPlanMatrix,
 } from './platform-adapter-startup.mjs';
 import {
+  assertMeetingPlatformAdapterRuntimeManifest,
   assertMeetingPlatformAdapterRuntimeRecipe,
   assertMeetingPlatformAdapterRuntimeRecipeMatrix,
+  buildMeetingPlatformAdapterRuntimeManifest,
   buildMeetingPlatformAdapterRuntimeRecipe,
   buildMeetingPlatformAdapterRuntimeRecipeMatrix,
 } from './platform-adapter-runtime-recipe.mjs';
@@ -640,6 +642,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
   const platformRealtimeAxisReadinessMatrix = buildMeetingPlatformRealtimeAxisReadinessMatrix(options, options);
   const platformHostProfileCompatibilityMatrix = buildMeetingPlatformHostProfileCompatibilityMatrix(options, options);
   const platformAdapterRuntimeRecipeMatrix = buildMeetingPlatformAdapterRuntimeRecipeMatrix(options, options);
+  const platformAdapterRuntimeManifest = buildMeetingPlatformAdapterRuntimeManifest(options, options);
   const platformAdapterExportPackageMatrix = buildMeetingPlatformAdapterExportPackageMatrix(options);
   const platformAdapterImportPlanMatrix = buildMeetingPlatformAdapterImportPlanMatrix({
     packages: platformAdapterExportPackageMatrix.packages,
@@ -707,6 +710,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     platform_adapter_decision_matrix: buildMeetingPlatformAdapterDecisionMatrix(options),
     platform_adapter_startup_plan_matrix: buildMeetingPlatformAdapterStartupPlanMatrix(options),
     platform_adapter_runtime_recipe_matrix: platformAdapterRuntimeRecipeMatrix,
+    platform_adapter_runtime_manifest: platformAdapterRuntimeManifest,
     platform_live_adapter_matrix: buildMeetingPlatformLiveAdapterMatrix(options),
     platform_live_adapter_readiness_matrix: buildMeetingPlatformLiveAdapterReadinessMatrix(options),
     platform_live_adapter_handoff_bundle: buildMeetingPlatformLiveAdapterHandoffBundle(options),
@@ -919,11 +923,17 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     platformAdapterRuntimeRecipeMatrix(input = {}, recipeOptions = {}) {
       return buildMeetingPlatformAdapterRuntimeRecipeMatrix(input, withDefaults(defaults, recipeOptions));
     },
+    platformAdapterRuntimeManifest(input = {}, recipeOptions = {}) {
+      return buildMeetingPlatformAdapterRuntimeManifest(input, withDefaults(defaults, recipeOptions));
+    },
     assertPlatformAdapterRuntimeRecipe(input = {}, recipeOptions = {}) {
       return assertMeetingPlatformAdapterRuntimeRecipe(input, withDefaults(defaults, recipeOptions));
     },
     assertPlatformAdapterRuntimeRecipeMatrix(input = {}, recipeOptions = {}) {
       return assertMeetingPlatformAdapterRuntimeRecipeMatrix(input, withDefaults(defaults, recipeOptions));
+    },
+    assertPlatformAdapterRuntimeManifest(input = {}, recipeOptions = {}) {
+      return assertMeetingPlatformAdapterRuntimeManifest(input, withDefaults(defaults, recipeOptions));
     },
     platformAdapterPreflight(input = {}, preflightOptions = {}) {
       return buildMeetingPlatformAdapterPreflight(input, withDefaults(defaults, preflightOptions));

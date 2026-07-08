@@ -11,6 +11,7 @@ import type {
 
 export const MEETING_PLATFORM_ADAPTER_RUNTIME_RECIPE_SCHEMA: 'meeting_platform_adapter_runtime_recipe';
 export const MEETING_PLATFORM_ADAPTER_RUNTIME_RECIPE_MATRIX_SCHEMA: 'meeting_platform_adapter_runtime_recipe_matrix';
+export const MEETING_PLATFORM_ADAPTER_RUNTIME_MANIFEST_SCHEMA: 'meeting_platform_adapter_runtime_manifest';
 export const MEETING_PLATFORM_ADAPTER_RUNTIME_RECIPE_SCHEMA_VERSION: 1;
 
 export interface MeetingPlatformAdapterRuntimeRecipeOptions extends MeetingPlatformAdapterDecisionOptions {
@@ -61,6 +62,34 @@ export interface MeetingPlatformAdapterRuntimeRecipeMatrix {
   next_actions: string[];
 }
 
+export interface MeetingPlatformAdapterRuntimeManifest {
+  type: 'meeting_platform_adapter_runtime_manifest';
+  schema: 'meeting_platform_adapter_runtime_manifest';
+  schema_version: 1;
+  accepted: boolean;
+  runtime_ready: boolean;
+  platform_count: number;
+  accepted_count: number;
+  runtime_ready_count: number;
+  local_surface_count: number;
+  browser_surface_count: number;
+  native_surface_count: number;
+  provider_reconcile_surface_count: number;
+  raw_signal_runtime_event_count: number;
+  base_url?: string;
+  host_endpoints: Record<string, string>;
+  runtime_contract: Record<string, unknown>;
+  dispatch_policy: Record<string, string>;
+  bridge_groups: Array<Record<string, unknown>>;
+  platform_registry: {
+    row_count: number;
+    rows: Array<Record<string, unknown>>;
+  };
+  recipes?: MeetingPlatformAdapterRuntimeRecipe[];
+  matrix_summary: Record<string, unknown>;
+  next_actions: string[];
+}
+
 export function buildMeetingPlatformAdapterRuntimeRecipe(
   input?: string | URL | MeetingPlatformAdapterDecisionInput,
   options?: MeetingPlatformAdapterRuntimeRecipeOptions,
@@ -80,3 +109,13 @@ export function assertMeetingPlatformAdapterRuntimeRecipeMatrix(
   input?: MeetingPlatformAdapterDecisionInput,
   options?: MeetingPlatformAdapterRuntimeRecipeOptions,
 ): MeetingPlatformAdapterRuntimeRecipeMatrix;
+
+export function buildMeetingPlatformAdapterRuntimeManifest(
+  input?: MeetingPlatformAdapterDecisionInput,
+  options?: MeetingPlatformAdapterRuntimeRecipeOptions,
+): MeetingPlatformAdapterRuntimeManifest;
+
+export function assertMeetingPlatformAdapterRuntimeManifest(
+  input?: MeetingPlatformAdapterDecisionInput,
+  options?: MeetingPlatformAdapterRuntimeRecipeOptions,
+): MeetingPlatformAdapterRuntimeManifest;

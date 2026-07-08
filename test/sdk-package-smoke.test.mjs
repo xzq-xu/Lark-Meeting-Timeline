@@ -600,6 +600,7 @@ import {
   buildMeetingPlatformHostProfileCompatibilityMatrix as buildMeetingPlatformHostProfileCompatibilityMatrixFromRoot,
   buildMeetingPlatformAdapterStartupPlan as buildMeetingPlatformAdapterStartupPlanFromRoot,
   buildMeetingPlatformAdapterStartupPlanMatrix as buildMeetingPlatformAdapterStartupPlanMatrixFromRoot,
+  buildMeetingPlatformAdapterRuntimeManifest as buildMeetingPlatformAdapterRuntimeManifestFromRoot,
   buildMeetingPlatformAdapterRuntimeRecipe as buildMeetingPlatformAdapterRuntimeRecipeFromRoot,
   buildMeetingPlatformAdapterRuntimeRecipeMatrix as buildMeetingPlatformAdapterRuntimeRecipeMatrixFromRoot,
   buildMeetingPlatformAdapterCandidatePreflight as buildMeetingPlatformAdapterCandidatePreflightFromRoot,
@@ -715,6 +716,7 @@ import {
   buildMeetingPlatformAdapterStartupPlanMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-startup';
 import {
+  buildMeetingPlatformAdapterRuntimeManifest,
   buildMeetingPlatformAdapterRuntimeRecipe,
   buildMeetingPlatformAdapterRuntimeRecipeMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-runtime-recipe';
@@ -1653,6 +1655,10 @@ assert.equal(buildMeetingPlatformAdapterRuntimeRecipeMatrixFromRoot({}, {
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet', 'zoom'],
 }).runtime_ready_count, 2);
+assert.equal(buildMeetingPlatformAdapterRuntimeManifestFromRoot({}, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet', 'zoom'],
+}).platform_registry.rows.find((row) => row.platform === 'zoom').host_kind, 'native_desktop_detector');
 assert.equal(buildMeetingPlatformAdapterPreflightFromRoot({
   url: 'https://meet.google.com/abc-defg-hij',
   snapshots: [rootGoogleActiveSnapshot],
@@ -3196,6 +3202,10 @@ assert.equal(buildMeetingPlatformAdapterRuntimeRecipeMatrix({}, {
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).rows[0].bridge_kind, 'native_detector_runtime_event_client');
+assert.equal(buildMeetingPlatformAdapterRuntimeManifest({}, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+}).platform_registry.rows[0].host_kind, 'browser_extension_content_script');
 assert.equal(buildMeetingPlatformAdapterPreflight({
   url: 'https://meet.google.com/abc-defg-hij',
   snapshots: [rootGoogleActiveSnapshot],

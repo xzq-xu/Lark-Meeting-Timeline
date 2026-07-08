@@ -8,9 +8,13 @@ import {
 import {
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
+import {
+  MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT,
+} from './platform-runtime-event.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_RUNTIME_RECIPE_SCHEMA = 'meeting_platform_adapter_runtime_recipe';
 export const MEETING_PLATFORM_ADAPTER_RUNTIME_RECIPE_MATRIX_SCHEMA = 'meeting_platform_adapter_runtime_recipe_matrix';
+export const MEETING_PLATFORM_ADAPTER_RUNTIME_MANIFEST_SCHEMA = 'meeting_platform_adapter_runtime_manifest';
 export const MEETING_PLATFORM_ADAPTER_RUNTIME_RECIPE_SCHEMA_VERSION = 1;
 
 const DEFAULT_RUNTIME_RECIPE_PLATFORMS = Object.freeze([
@@ -91,6 +95,16 @@ function runtimeEventActionCounts(events = []) {
     counts[event.action] = (counts[event.action] ?? 0) + 1;
   }
   return counts;
+}
+
+function endpointUrl(path, options = {}) {
+  const baseUrl = firstNonEmpty(options.baseUrl, options.base_url);
+  return baseUrl ? new URL(path, baseUrl).toString() : path;
+}
+
+function adapterModuleFor(platform) {
+  const slug = platform === 'microsoft_teams' ? 'microsoft-teams' : platform.replaceAll('_', '-');
+  return `@ai-annotation/meeting-timeline-sdk/adapters/${slug}`;
 }
 
 function bridgeKind(surface, plan = {}) {
@@ -314,6 +328,176 @@ export function buildMeetingPlatformAdapterRuntimeRecipeMatrix(input = {}, optio
   };
 }
 
+function manifestHostKind(recipe = {}) {
+  const bridge = recipe.host_wiring?.bridge_kind;
+  if (bridge === 'browser_content_script') return 'browser_extension_content_script';
+  if (bridge === 'webview_preload_bridge') return 'embedded_webview_preload';
+  if (bridge === 'native_detector_runtime_event_client') return 'native_desktop_detector';
+  if (bridge === 'provider_reconcile_only_not_realtime_axis') return 'provider_reconcile_only';
+  return 'custom_host_surface_adapter';
+}
+
+function bridgeGroups(rows = []) {
+  const groups = new Map();
+  for (const row of rows) {
+    const bridge = row.bridge_kind ?? 'unknown_bridge';
+    const current = groups.get(bridge) ?? {
+      bridge_kind: bridge,
+      host_kind: manifestHostKind({ host_wiring: { bridge_kind: bridge } }),
+      platform_count: 0,
+      runtime_ready_count: 0,
+      platforms: [],
+    };
+    current.platform_count += 1;
+    if (row.runtime_ready === true) current.runtime_ready_count += 1;
+    current.platforms.push(row.platform);
+    groups.set(bridge, current);
+  }
+  return [...groups.values()];
+}
+
+function registryRow(recipe = {}) {
+  const runtimeActions = recipe.host_wiring?.runtime_event_actions ?? recipe.raw_signal_examples?.runtime_actions ?? [];
+  return compactObject({
+    platform: recipe.platform,
+    display_name: recipe.display_name,
+    accepted: recipe.accepted,
+    runtime_ready: recipe.runtime_ready,
+    status: recipe.status,
+    selected_surface: recipe.selected_surface,
+    host_profile: recipe.host_profile,
+    host_kind: manifestHostKind(recipe),
+    bridge_kind: recipe.host_wiring?.bridge_kind,
+    install_target: recipe.install_target,
+    adapter_module: recipe.platform ? adapterModuleFor(recipe.platform) : undefined,
+    first_required_method: recipe.host_wiring?.first_required_method,
+    insert_method: recipe.host_wiring?.insert_method,
+    optional_track_methods: recipe.host_wiring?.optional_track_methods,
+    provider_method: recipe.host_wiring?.provider_method,
+    timestamp_field: 'captured_at_ms',
+    runtime_event_actions: runtimeActions,
+    runtime_event_action_counts: recipe.host_wiring?.runtime_event_action_counts,
+    sample_runtime_event_count: recipe.raw_signal_examples?.runtime_event_count,
+    speaker_position_markers: {
+      enabled: recipe.readiness?.sample_speaker_track_ready === true,
+      text_required: false,
+      filter_policy: 'debounce_active_speaker_samples_before_drawing_position_markers',
+    },
+    participant_position_markers: {
+      enabled: runtimeActions.includes('participant_track'),
+      text_required: false,
+    },
+    provider_reconcile: {
+      method: recipe.host_wiring?.provider_method ?? 'ingestProvider',
+      blocks_realtime_annotation: recipe.runtime_contract?.provider_events_block_realtime === true,
+      role: 'reconcile_or_backfill_only',
+    },
+    transcript: {
+      blocks_realtime_annotation: recipe.runtime_contract?.transcript_blocks_realtime === true,
+    },
+    first_next_action: recipe.next_actions?.[0],
+  });
+}
+
+function compactRecipeForManifest(recipe = {}) {
+  return compactObject({
+    schema: recipe.schema,
+    schema_version: recipe.schema_version,
+    accepted: recipe.accepted,
+    runtime_ready: recipe.runtime_ready,
+    status: recipe.status,
+    platform: recipe.platform,
+    display_name: recipe.display_name,
+    selected_surface: recipe.selected_surface,
+    host_profile: recipe.host_profile,
+    install_target: recipe.install_target,
+    host_wiring: recipe.host_wiring,
+    sequence: recipe.sequence,
+    raw_signal_examples: {
+      schema: recipe.raw_signal_examples?.schema,
+      signal_count: recipe.raw_signal_examples?.signal_count,
+      runtime_event_count: recipe.raw_signal_examples?.runtime_event_count,
+      filtered_speaker_event_count: recipe.raw_signal_examples?.filtered_speaker_event_count,
+      runtime_actions: recipe.raw_signal_examples?.runtime_actions
+        ?? unique(recipe.raw_signal_examples?.runtime_events?.map((event) => event.action) ?? []),
+    },
+    readiness: recipe.readiness,
+    issues: recipe.issues,
+    next_actions: recipe.next_actions,
+  });
+}
+
+export function buildMeetingPlatformAdapterRuntimeManifest(input = {}, options = {}) {
+  const matrix = buildMeetingPlatformAdapterRuntimeRecipeMatrix(input, options);
+  const rows = matrix.recipes.map((recipe) => registryRow(recipe));
+  const includeRecipes = options.includeRecipes === true || options.include_recipes === true;
+  const providerBlockingCount = rows.filter((row) => row.provider_reconcile?.blocks_realtime_annotation === true).length;
+  const transcriptBlockingCount = rows.filter((row) => row.transcript?.blocks_realtime_annotation === true).length;
+  return {
+    type: 'meeting_platform_adapter_runtime_manifest',
+    schema: MEETING_PLATFORM_ADAPTER_RUNTIME_MANIFEST_SCHEMA,
+    schema_version: MEETING_PLATFORM_ADAPTER_RUNTIME_RECIPE_SCHEMA_VERSION,
+    accepted: matrix.platform_count > 0 && matrix.accepted_count === matrix.platform_count,
+    runtime_ready: matrix.platform_count > 0 && matrix.runtime_ready_count === matrix.platform_count,
+    platform_count: matrix.platform_count,
+    accepted_count: matrix.accepted_count,
+    runtime_ready_count: matrix.runtime_ready_count,
+    local_surface_count: matrix.browser_surface_count + matrix.native_surface_count,
+    browser_surface_count: matrix.browser_surface_count,
+    native_surface_count: matrix.native_surface_count,
+    provider_reconcile_surface_count: matrix.provider_reconcile_surface_count,
+    raw_signal_runtime_event_count: matrix.raw_signal_runtime_event_count,
+    base_url: firstNonEmpty(options.baseUrl, options.base_url),
+    host_endpoints: {
+      runtime_events: endpointUrl(MEETING_PLATFORM_RUNTIME_EVENT_ENDPOINT, options),
+      insert_annotation: endpointUrl('/api/annotations', options),
+      insert_annotations: endpointUrl('/api/annotations/batch', options),
+    },
+    runtime_contract: {
+      timestamp_field: 'captured_at_ms',
+      observe_before_insert: true,
+      provider_events_block_realtime: providerBlockingCount > 0,
+      transcript_blocks_realtime: transcriptBlockingCount > 0,
+      speaker_text_required: false,
+      participant_text_required: false,
+      required_methods: [
+        'observePlatformCandidates',
+        'insertAnnotation',
+      ],
+      optional_methods: [
+        'speakerTrack',
+        'participantTrack',
+        'ingestProvider',
+      ],
+    },
+    dispatch_policy: {
+      browser_content_script: 'use_for_google_meet_and_browser_meeting_surfaces',
+      native_detector_runtime_event_client: 'use_for_teams_zoom_or_desktop_surfaces_when_browser_dom_is_not_the_primary_surface',
+      webview_preload_bridge: 'use_for_embedded_meeting_webviews',
+      provider_reconcile_only_not_realtime_axis: 'do_not_use_as_primary_realtime_axis',
+    },
+    bridge_groups: bridgeGroups(rows),
+    platform_registry: {
+      row_count: rows.length,
+      rows,
+    },
+    recipes: includeRecipes ? matrix.recipes.map((recipe) => compactRecipeForManifest(recipe)) : undefined,
+    matrix_summary: {
+      schema: matrix.schema,
+      platforms: matrix.platforms,
+      next_actions: matrix.next_actions,
+    },
+    next_actions: unique([
+      'install_host_runtime_for_each_bridge_kind',
+      'route_google_meet_to_browser_content_script_when_available',
+      'route_desktop_platforms_to_native_detector_when_selected_surface_is_native_detector',
+      'send_captured_at_ms_with_every_observation_and_annotation',
+      'filter_speaker_position_markers_before_drawing_timeline_positions',
+      ...matrix.next_actions,
+    ]),
+  };
+}
+
 export function assertMeetingPlatformAdapterRuntimeRecipe(input = {}, options = {}) {
   const recipe = buildMeetingPlatformAdapterRuntimeRecipe(input, options);
   if (recipe.accepted !== true) {
@@ -340,4 +524,18 @@ export function assertMeetingPlatformAdapterRuntimeRecipeMatrix(input = {}, opti
     });
   }
   return matrix;
+}
+
+export function assertMeetingPlatformAdapterRuntimeManifest(input = {}, options = {}) {
+  const manifest = buildMeetingPlatformAdapterRuntimeManifest(input, options);
+  if (manifest.accepted !== true || manifest.runtime_ready !== true) {
+    throw new MeetingTimelineSdkError('Meeting platform adapter runtime manifest is not ready', {
+      platform_count: manifest.platform_count,
+      accepted_count: manifest.accepted_count,
+      runtime_ready_count: manifest.runtime_ready_count,
+      next_actions: manifest.next_actions,
+      manifest,
+    });
+  }
+  return manifest;
 }

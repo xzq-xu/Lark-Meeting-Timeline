@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 
 import {
+  assertMeetingPlatformAdapterRuntimeManifest,
   assertMeetingPlatformAdapterRuntimeRecipe,
   assertMeetingPlatformAdapterRuntimeRecipeMatrix,
+  buildMeetingPlatformAdapterRuntimeManifest,
   buildMeetingPlatformAdapterRuntimeRecipe,
   buildMeetingPlatformAdapterRuntimeRecipeMatrix,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-runtime-recipe.mjs';
@@ -100,6 +102,47 @@ assert.equal(assertMeetingPlatformAdapterRuntimeRecipeMatrix({}, {
   platforms: ['google-meet', 'zoom'],
 }).accepted_count, 2);
 
+const manifest = buildMeetingPlatformAdapterRuntimeManifest({}, {
+  baseUrl,
+  platforms: ['google-meet', 'teams', 'zoom'],
+});
+assert.equal(manifest.schema, 'meeting_platform_adapter_runtime_manifest');
+assert.equal(manifest.accepted, true);
+assert.equal(manifest.runtime_ready, true);
+assert.equal(manifest.platform_count, 3);
+assert.equal(manifest.accepted_count, 3);
+assert.equal(manifest.runtime_ready_count, 3);
+assert.equal(manifest.local_surface_count, 3);
+assert.equal(manifest.browser_surface_count, 1);
+assert.equal(manifest.native_surface_count, 2);
+assert.equal(manifest.provider_reconcile_surface_count, 0);
+assert.equal(manifest.host_endpoints.runtime_events, `${baseUrl}/api/meeting-platform/runtime-events`);
+assert.equal(manifest.host_endpoints.insert_annotation, `${baseUrl}/api/annotations`);
+assert.equal(manifest.runtime_contract.timestamp_field, 'captured_at_ms');
+assert.equal(manifest.runtime_contract.observe_before_insert, true);
+assert.equal(manifest.runtime_contract.provider_events_block_realtime, false);
+assert.equal(manifest.runtime_contract.transcript_blocks_realtime, false);
+assert.equal(manifest.dispatch_policy.browser_content_script, 'use_for_google_meet_and_browser_meeting_surfaces');
+assert.equal(manifest.bridge_groups.find((row) => row.bridge_kind === 'browser_content_script').platforms.includes('google_meet'), true);
+assert.equal(manifest.bridge_groups.find((row) => row.bridge_kind === 'native_detector_runtime_event_client').platform_count, 2);
+assert.equal(manifest.platform_registry.row_count, 3);
+assert.equal(manifest.platform_registry.rows.find((row) => row.platform === 'google_meet').host_kind, 'browser_extension_content_script');
+assert.equal(manifest.platform_registry.rows.find((row) => row.platform === 'google_meet').adapter_module, '@ai-annotation/meeting-timeline-sdk/adapters/google-meet');
+assert.equal(manifest.platform_registry.rows.find((row) => row.platform === 'google_meet').first_required_method, 'observePlatformCandidates');
+assert.equal(manifest.platform_registry.rows.find((row) => row.platform === 'google_meet').insert_method, 'insertAnnotation');
+assert.equal(manifest.platform_registry.rows.find((row) => row.platform === 'microsoft_teams').host_kind, 'native_desktop_detector');
+assert.equal(manifest.platform_registry.rows.find((row) => row.platform === 'microsoft_teams').adapter_module, '@ai-annotation/meeting-timeline-sdk/adapters/microsoft-teams');
+assert.equal(manifest.platform_registry.rows.find((row) => row.platform === 'zoom').bridge_kind, 'native_detector_runtime_event_client');
+assert.equal(manifest.platform_registry.rows.find((row) => row.platform === 'zoom').speaker_position_markers.enabled, true);
+assert.equal(manifest.platform_registry.rows.find((row) => row.platform === 'zoom').speaker_position_markers.text_required, false);
+assert.equal(manifest.platform_registry.rows.find((row) => row.platform === 'zoom').provider_reconcile.blocks_realtime_annotation, false);
+assert.equal(manifest.matrix_summary.platforms.includes('google_meet'), true);
+assert.equal(manifest.recipes, undefined);
+assert.equal(assertMeetingPlatformAdapterRuntimeManifest({}, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom'],
+}).runtime_ready, true);
+
 const browserProfileMatrix = buildMeetingPlatformAdapterRuntimeRecipeMatrix({}, {
   baseUrl,
   platforms: ['google-meet', 'zoom'],
@@ -117,9 +160,15 @@ assert.equal(kit.platformAdapterRuntimeRecipe({
 assert.equal(kit.platformAdapterRuntimeRecipeMatrix({}, {
   platforms: ['webex', 'lark'],
 }).platform_count, 2);
+assert.equal(kit.platformAdapterRuntimeManifest({}, {
+  platforms: ['google-meet', 'zoom'],
+}).bridge_groups.find((row) => row.bridge_kind === 'native_detector_runtime_event_client').platforms.includes('zoom'), true);
 assert.equal(kit.assertPlatformAdapterRuntimeRecipe({
   platform: 'webex',
 }).accepted, true);
+assert.equal(kit.assertPlatformAdapterRuntimeManifest({}, {
+  platforms: ['google-meet'],
+}).platform_registry.rows[0].host_kind, 'browser_extension_content_script');
 
 const sdk = createMeetingAppTimelineSdk({
   baseUrl,
@@ -136,8 +185,17 @@ assert.equal(sdk.adapterRuntimeRecipe({
 assert.equal(sdk.platformAdapterRuntimeRecipeMatrix({}, {
   platforms: ['google-meet', 'zoom'],
 }).runtime_ready_count, 2);
+assert.equal(sdk.platformAdapterRuntimeManifest({}, {
+  platforms: ['google-meet', 'zoom'],
+}).runtime_contract.timestamp_field, 'captured_at_ms');
+assert.equal(sdk.adapterRuntimeManifest({}, {
+  platforms: ['google-meet', 'zoom'],
+}).platform_registry.rows.find((row) => row.platform === 'zoom').host_kind, 'native_desktop_detector');
 assert.equal(sdk.assertAdapterRuntimeRecipe({
   url: 'https://meet.google.com/abc-defg-hij',
 }).accepted, true);
+assert.equal(sdk.assertAdapterRuntimeManifest({}, {
+  platforms: ['google-meet'],
+}).runtime_ready, true);
 
 console.log('ok meeting platform adapter runtime recipe');

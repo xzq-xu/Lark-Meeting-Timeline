@@ -672,6 +672,11 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeOptions,
   ): import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeMatrix;
   adapterRuntimeRecipeMatrix: MeetingAppTimelineSdk['platformAdapterRuntimeRecipeMatrix'];
+  platformAdapterRuntimeManifest(
+    input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeOptions,
+  ): import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeManifest;
+  adapterRuntimeManifest: MeetingAppTimelineSdk['platformAdapterRuntimeManifest'];
   assertPlatformAdapterRuntimeRecipe(
     input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
     options?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeOptions,
@@ -682,6 +687,11 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeOptions,
   ): import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeMatrix;
   assertAdapterRuntimeRecipeMatrix: MeetingAppTimelineSdk['assertPlatformAdapterRuntimeRecipeMatrix'];
+  assertPlatformAdapterRuntimeManifest(
+    input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeOptions,
+  ): import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeManifest;
+  assertAdapterRuntimeManifest: MeetingAppTimelineSdk['assertPlatformAdapterRuntimeManifest'];
   platformAdapterPreflight(
     input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
     options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,

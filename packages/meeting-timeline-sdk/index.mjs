@@ -1687,6 +1687,12 @@ export function createMeetingAppTimelineSdk(options = {}) {
     adapterRuntimeRecipeMatrix(input = {}, recipeOptions = {}) {
       return sdk.platformAdapterRuntimeRecipeMatrix(input, recipeOptions);
     },
+    platformAdapterRuntimeManifest(input = {}, recipeOptions = {}) {
+      return runtime.kit.platformAdapterRuntimeManifest(input, sdkPlatformOptions(runtime, recipeOptions));
+    },
+    adapterRuntimeManifest(input = {}, recipeOptions = {}) {
+      return sdk.platformAdapterRuntimeManifest(input, recipeOptions);
+    },
     assertPlatformAdapterRuntimeRecipe(input = {}, recipeOptions = {}) {
       return runtime.kit.assertPlatformAdapterRuntimeRecipe(input, sdkPlatformOptions(runtime, recipeOptions));
     },
@@ -1698,6 +1704,12 @@ export function createMeetingAppTimelineSdk(options = {}) {
     },
     assertAdapterRuntimeRecipeMatrix(input = {}, recipeOptions = {}) {
       return sdk.assertPlatformAdapterRuntimeRecipeMatrix(input, recipeOptions);
+    },
+    assertPlatformAdapterRuntimeManifest(input = {}, recipeOptions = {}) {
+      return runtime.kit.assertPlatformAdapterRuntimeManifest(input, sdkPlatformOptions(runtime, recipeOptions));
+    },
+    assertAdapterRuntimeManifest(input = {}, recipeOptions = {}) {
+      return sdk.assertPlatformAdapterRuntimeManifest(input, recipeOptions);
     },
     platformAdapterPreflight(input = {}, preflightOptions = {}) {
       return runtime.kit.platformAdapterPreflight(input, sdkPlatformOptions(runtime, preflightOptions));

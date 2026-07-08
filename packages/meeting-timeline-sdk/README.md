@@ -928,6 +928,8 @@ npx meeting-platform-adapter-runtime-recipe \
 
 `adapter-runtime-recipe-report.json` 的关键字段是 `runtime_ready_count`、`rows[*].bridge_kind`、`first_required_method`、`insert_method`、`speaker_track_sample_ready` 和 `raw_signal_runtime_event_count`。默认写出的 per-platform recipe 是压缩版，不把完整 raw runtime events 和 startup plan 展开；调试时可以加 `--include-examples=true` 或 `--include-recipes=true`。这份 recipe 更适合作为 Google Meet content script、Teams/Zoom native detector、WebView preload 的工程接线输入。
 
+如果宿主项目要一次接多个会议软件，用 `platformAdapterRuntimeManifest()` 汇总 recipe matrix。Manifest 会按 `bridge_kind` 生成统一分发表：Google Meet 这类 browser surface 会落到 `browser_extension_content_script`，Teams/Zoom 这类桌面优先 surface 会落到 `native_desktop_detector`，并统一声明 `observePlatformCandidates -> insertAnnotation` 顺序、`captured_at_ms` 时间戳字段、speaker/participant 位置标记滤波策略，以及 provider/transcript 只能做 reconcile/backfill、不能阻塞实时标注。
+
 startup plan 只能说明“应该启动哪个 surface”；真正打开会议窗口后，还需要用 `platformAdapterPreflight()` 或 SDK CLI 验证 live DOM/native evidence 是否足够建实时轴。Google Meet 这类 browser surface 可以传 DOM snapshot；Teams/Zoom 这类 native-first surface 可以传窗口、进程、Accessibility 或音频通话状态。URL-only preflight 会返回 `needs_live_page_evidence`，不会误报 realtime ready：
 
 ```sh
