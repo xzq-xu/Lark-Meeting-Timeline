@@ -135,6 +135,15 @@ assert.equal(captured.page.tiles[0].id, 'ada');
 assert.equal(captured.page.tiles[0].audioLevel, 0.84);
 assert.equal(captured.capture.participant_count, 2);
 assert.equal(captured.capture.profile, 'google_meet');
+assert.equal(captured.inMeeting, true);
+assert.equal(captured.page.inMeeting, true);
+assert.equal(captured.page.interaction.in_call, true);
+assert.equal(captured.page.interaction.can_leave, true);
+assert.equal(captured.page.interaction.microphone_control_available, true);
+assert.equal(captured.page.interaction.screen_share_active, true);
+assert.equal(captured.page.interaction.active_speaker_candidate.id, 'ada');
+assert.ok(captured.page.semanticSignals.some((signal) => signal.type === 'meeting_leave_available'));
+assert.ok(captured.page.semanticSignals.some((signal) => signal.type === 'screen_share_active'));
 
 const profileOnlyGoogleCapture = captureMeetingAppDomSnapshot({
   document: fakeDocument({
@@ -158,6 +167,7 @@ assert.equal(profileOnlyGoogleCapture.page.buttons[0].label, 'Leave call');
 assert.equal(profileOnlyGoogleCapture.page.tiles[0].id, 'ada-tile');
 assert.equal(profileOnlyGoogleCapture.page.tiles[0].name, 'Ada Lovelace');
 assert.equal(profileOnlyGoogleCapture.page.tiles[0].speaking, true);
+assert.equal(profileOnlyGoogleCapture.page.interaction.active_speaker_candidate.name, 'Ada Lovelace');
 
 const shadowHost = node('meet-shell');
 shadowHost.shadowRoot = fakeShadowRoot([
@@ -221,6 +231,9 @@ const teamsPrejoin = normalizeCapturedMeetingAppDomSnapshot({
 });
 assert.equal(teamsPrejoin.platform, 'microsoft_teams');
 assert.equal(teamsPrejoin.inMeeting, false);
+assert.equal(teamsPrejoin.page.interaction.pre_join, true);
+assert.equal(teamsPrejoin.page.interaction.can_join, true);
+assert.ok(teamsPrejoin.page.semanticSignals.some((signal) => signal.type === 'meeting_join_available'));
 
 const zoomCaptured = captureMeetingAppDomSnapshot({
   document: fakeDocument({
@@ -244,6 +257,9 @@ observed = createMeetingAppObserver({
 assert.deepEqual(observed.signals.map((item) => item.type), ['meeting_started', 'speaker_started']);
 assert.equal(observed.signals[0].meeting.platform, 'zoom');
 assert.equal(observed.signals[1].speaker_name, 'Mira Patel');
+assert.equal(zoomCaptured.page.interaction.can_leave, true);
+assert.equal(zoomCaptured.page.interaction.participant_roster_observed, true);
+assert.ok(zoomCaptured.page.semanticSignals.some((signal) => signal.type === 'participants_control'));
 
 const larkCaptured = captureMeetingAppDomSnapshot({
   document: fakeDocument({
@@ -273,6 +289,7 @@ observed = createMeetingAppObserver({
 assert.deepEqual(observed.signals.map((item) => item.type), ['meeting_started', 'speaker_started']);
 assert.equal(observed.signals[0].meeting.platform, 'lark');
 assert.equal(observed.signals[1].speaker_name, '徐智强');
+assert.equal(larkCaptured.page.interaction.ai_summary_available, true);
 
 const webexCaptured = normalizeCapturedMeetingAppDomSnapshot({
   document: fakeDocument({
@@ -296,6 +313,7 @@ assert.equal(webexCaptured.meeting_id, 'meet-product-review');
 assert.equal(webexCaptured.inMeeting, true);
 assert.equal(webexCaptured.activeSpeaker.id, 'maya');
 assert.equal(webexCaptured.activeSpeaker.name, 'Maya Chen');
+assert.equal(webexCaptured.page.interaction.can_leave, true);
 
 const calls = [];
 const source = createMeetingSourceAggregator({

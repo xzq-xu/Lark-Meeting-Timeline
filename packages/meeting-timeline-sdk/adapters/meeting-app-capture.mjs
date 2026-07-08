@@ -48,6 +48,139 @@ const DEFAULT_TEXT_SELECTORS = Object.freeze([
   '[data-topic]',
 ]);
 
+const COMMON_INTERACTION_HINTS = Object.freeze({
+  join: Object.freeze([
+    /\bjoin now\b/i,
+    /\bjoin meeting\b/i,
+    /\bask to join\b/i,
+    /\bready to join\b/i,
+    /\bstart meeting\b/i,
+    /立即加入/,
+    /加入会议/,
+    /申请加入/,
+    /开始会议/,
+  ]),
+  waiting: Object.freeze([
+    /\bwaiting room\b/i,
+    /\bwaiting to be admitted\b/i,
+    /\bwaiting for the host\b/i,
+    /等候室/,
+    /等待主持人/,
+    /等待加入/,
+  ]),
+  leave: Object.freeze([
+    /\bleave call\b/i,
+    /\bleave meeting\b/i,
+    /\bend call\b/i,
+    /\bend meeting\b/i,
+    /\bhang up\b/i,
+    /离开通话/,
+    /退出通话/,
+    /离开会议/,
+    /结束通话/,
+    /结束会议/,
+    /挂断/,
+  ]),
+  microphone: Object.freeze([
+    /\bmicrophone\b/i,
+    /\bmute\b/i,
+    /\bunmute\b/i,
+    /\bmic\b/i,
+    /麦克风/,
+    /静音/,
+  ]),
+  camera: Object.freeze([
+    /\bcamera\b/i,
+    /\bvideo\b/i,
+    /\bturn camera\b/i,
+    /\bstart video\b/i,
+    /\bstop video\b/i,
+    /摄像头/,
+    /视频/,
+  ]),
+  screen_share: Object.freeze([
+    /\bpresent now\b/i,
+    /\byou are presenting\b/i,
+    /\bstop presenting\b/i,
+    /\bshare screen\b/i,
+    /\bscreen share\b/i,
+    /\bshare content\b/i,
+    /正在展示/,
+    /停止展示/,
+    /共享屏幕/,
+    /共享内容/,
+  ]),
+  screen_share_active: Object.freeze([
+    /\byou are presenting\b/i,
+    /\bstop presenting\b/i,
+    /正在展示/,
+    /停止展示/,
+  ]),
+  captions: Object.freeze([
+    /\bcaption\b/i,
+    /\bsubtitle\b/i,
+    /\bclosed captions\b/i,
+    /\bturn on captions\b/i,
+    /\bturn off captions\b/i,
+    /\bcc\b/i,
+    /字幕/,
+  ]),
+  recording: Object.freeze([
+    /\brecording\b/i,
+    /\brecorded\b/i,
+    /\brecord\b/i,
+    /录制/,
+    /正在录制/,
+  ]),
+  participants: Object.freeze([
+    /\bparticipants\b/i,
+    /\bpeople\b/i,
+    /\battendees\b/i,
+    /\bmembers\b/i,
+    /与会者/,
+    /参会人/,
+    /参与者/,
+    /成员/,
+  ]),
+  chat: Object.freeze([
+    /\bchat\b/i,
+    /\bconversation\b/i,
+    /聊天/,
+    /会议聊天/,
+  ]),
+  ai_summary: Object.freeze([
+    /\bai summary\b/i,
+    /\bai notes\b/i,
+    /AI 总结/i,
+    /AI 视图/i,
+  ]),
+});
+
+const PLATFORM_INTERACTION_HINTS = Object.freeze({
+  google_meet: Object.freeze({
+    leave: Object.freeze([/\bleave call\b/i]),
+    join: Object.freeze([/\bask to join\b/i, /\bready to join\b/i]),
+    screen_share: Object.freeze([/\bpresent now\b/i]),
+  }),
+  microsoft_teams: Object.freeze({
+    leave: Object.freeze([/\bhang up\b/i]),
+    screen_share: Object.freeze([/\bshare content\b/i]),
+    chat: Object.freeze([/\bshow conversation\b/i]),
+  }),
+  zoom: Object.freeze({
+    leave: Object.freeze([/\bleave meeting\b/i, /\bend meeting\b/i]),
+    participants: Object.freeze([/\bparticipants\b/i]),
+  }),
+  lark: Object.freeze({
+    leave: Object.freeze([/挂断/, /离开会议/]),
+    screen_share: Object.freeze([/共享屏幕/]),
+    ai_summary: Object.freeze([/AI 总结/i, /AI 视图/i]),
+  }),
+  webex: Object.freeze({
+    leave: Object.freeze([/\bleave meeting\b/i, /\bend meeting\b/i]),
+  }),
+});
+
 export const MEETING_APP_DOM_CAPTURE_PROFILES = Object.freeze({
   google_meet: Object.freeze({
     platform: 'google_meet',
@@ -338,6 +471,16 @@ function boolish(value) {
   return undefined;
 }
 
+function labelHasSpeakingHint(value) {
+  const text = normalizeText(value);
+  if (!text) return undefined;
+  if (/\b(is speaking|speaking|talking|active speaker)\b/i.test(text)) return true;
+  if (/(正在发言|正在讲话|正在说话)/.test(text)) return true;
+  if (/\b(muted|microphone off|mic off)\b/i.test(text)) return false;
+  if (/(已静音|麦克风已关闭)/.test(text)) return false;
+  return undefined;
+}
+
 function numberish(value) {
   if (value == null || value === '') return undefined;
   const numeric = Number(value);
@@ -511,7 +654,7 @@ function controlSummary(node) {
 
 function participantSummary(node) {
   const label = nodeText(node);
-  const speaking = boolish(firstNonEmpty(
+  const explicitSpeaking = boolish(firstNonEmpty(
     dataAttr(node, 'speaking', 'is-speaking', 'is-speaking-now', 'active-speaker', 'is-active-speaker', 'active'),
     attr(node, 'aria-current'),
   ));
@@ -519,6 +662,7 @@ function participantSummary(node) {
     dataAttr(node, 'audio-level', 'voice-activity', 'volume'),
     attr(node, 'aria-valuenow'),
   ));
+  const speaking = explicitSpeaking ?? (level == null ? undefined : level >= 0.2) ?? labelHasSpeakingHint(label);
   return compactObject({
     tag: String(node?.tagName ?? '').toLowerCase() || undefined,
     role: nodeRole(node),
@@ -592,6 +736,156 @@ function browserName(win = {}, options = {}) {
   );
 }
 
+function profileHintPatterns(profile, kind) {
+  return [
+    ...(COMMON_INTERACTION_HINTS[kind] ?? []),
+    ...(PLATFORM_INTERACTION_HINTS[profile?.platform]?.[kind] ?? []),
+  ];
+}
+
+function matchesAnyText(patterns = [], value) {
+  const text = normalizeText(value);
+  if (!text) return false;
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+function itemCorpus(item = {}) {
+  return uniqueStrings([
+    item.label,
+    item.text,
+    item.ariaLabel,
+    item.aria_label,
+    item.title,
+    item.name,
+    item.role,
+  ]);
+}
+
+function itemMatches(item = {}, patterns = []) {
+  return itemCorpus(item).some((text) => matchesAnyText(patterns, text));
+}
+
+function semanticSignal(type, source, item = {}, extra = {}) {
+  return compactObject({
+    type,
+    source,
+    confidence: extra.confidence ?? 'heuristic',
+    label: item.label,
+    text: item.text,
+    role: item.role,
+    id: item.id,
+    participant_id: extra.participant_id,
+    participant_name: extra.participant_name,
+  });
+}
+
+function firstActiveParticipant(participants = []) {
+  return participants.find((participant) => (
+    participant.speaking === true
+    || participant.isSpeaking === true
+    || participant.active_speaker === true
+    || participant.activeSpeaker === true
+  ));
+}
+
+function buildSemanticSignals({ controls = [], participants = [], texts = [], profile = null } = {}) {
+  const signals = [];
+  const controlClassifiers = [
+    ['meeting_join_available', 'control', 'join'],
+    ['meeting_waiting_room', 'control', 'waiting'],
+    ['meeting_leave_available', 'control', 'leave'],
+    ['microphone_control', 'control', 'microphone'],
+    ['camera_control', 'control', 'camera'],
+    ['screen_share_control', 'control', 'screen_share'],
+    ['captions_control', 'control', 'captions'],
+    ['recording_control', 'control', 'recording'],
+    ['participants_control', 'control', 'participants'],
+    ['chat_control', 'control', 'chat'],
+    ['ai_summary_control', 'control', 'ai_summary'],
+  ];
+  for (const control of controls) {
+    for (const [type, source, kind] of controlClassifiers) {
+      if (itemMatches(control, profileHintPatterns(profile, kind))) {
+        signals.push(semanticSignal(type, source, control));
+      }
+    }
+  }
+
+  const textClassifiers = [
+    ['meeting_join_available', 'status_text', 'join'],
+    ['meeting_waiting_room', 'status_text', 'waiting'],
+    ['meeting_leave_available', 'status_text', 'leave'],
+    ['screen_share_active', 'status_text', 'screen_share_active'],
+    ['captions_status', 'status_text', 'captions'],
+    ['recording_indicator', 'status_text', 'recording'],
+    ['ai_summary_status', 'status_text', 'ai_summary'],
+  ];
+  for (const text of texts) {
+    for (const [type, source, kind] of textClassifiers) {
+      if (itemMatches(text, profileHintPatterns(profile, kind))) {
+        signals.push(semanticSignal(type, source, text));
+      }
+    }
+  }
+
+  for (const participant of participants) {
+    if (participant.speaking === true || participant.isSpeaking === true) {
+      signals.push(semanticSignal('active_speaker_candidate', 'participant_tile', participant, {
+        confidence: participant.audioLevel == null ? 'heuristic' : 'audio_or_dom',
+        participant_id: participant.id,
+        participant_name: participant.name,
+      }));
+    }
+  }
+  if (participants.length > 0) {
+    signals.push(compactObject({
+      type: 'participant_roster_observed',
+      source: 'participant_tiles',
+      confidence: 'heuristic',
+      participant_count: participants.length,
+    }));
+  }
+  return signals;
+}
+
+function signalTypes(signals = []) {
+  return new Set(signals.map((signal) => signal.type).filter(Boolean));
+}
+
+function buildInteractionState(signals = [], participants = []) {
+  const types = signalTypes(signals);
+  const activeParticipant = firstActiveParticipant(participants);
+  const hasLeave = types.has('meeting_leave_available');
+  const hasJoin = types.has('meeting_join_available');
+  const hasWaiting = types.has('meeting_waiting_room');
+  const inCall = hasLeave || Boolean(activeParticipant) || types.has('screen_share_active');
+  const preJoin = !inCall && (hasJoin || hasWaiting);
+  return compactObject({
+    in_call: inCall === true ? true : undefined,
+    pre_join: preJoin === true ? true : undefined,
+    can_join: hasJoin === true ? true : undefined,
+    waiting_room: hasWaiting === true ? true : undefined,
+    can_leave: hasLeave === true ? true : undefined,
+    microphone_control_available: types.has('microphone_control') || undefined,
+    camera_control_available: types.has('camera_control') || undefined,
+    screen_share_available: types.has('screen_share_control') || undefined,
+    screen_share_active: types.has('screen_share_active') || undefined,
+    captions_available: types.has('captions_control') || types.has('captions_status') || undefined,
+    recording_observed: types.has('recording_indicator') || types.has('recording_control') || undefined,
+    participant_roster_observed: types.has('participant_roster_observed') || undefined,
+    chat_available: types.has('chat_control') || undefined,
+    ai_summary_available: types.has('ai_summary_control') || types.has('ai_summary_status') || undefined,
+    active_speaker_candidate: activeParticipant ? compactObject({
+      id: activeParticipant.id,
+      name: activeParticipant.name,
+      display_name: activeParticipant.name,
+      speaking: true,
+      audioLevel: activeParticipant.audioLevel,
+    }) : undefined,
+    participant_count: participants.length || undefined,
+  });
+}
+
 export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
   const doc = maybeDocument(input);
   const win = maybeWindow(input);
@@ -633,6 +927,15 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
       ...DEFAULT_TEXT_SELECTORS,
     ]),
   ], textLimit, selectorOptions).map(textSummary).filter((item) => item.label || item.text);
+  const semanticSignals = buildSemanticSignals({
+    controls,
+    participants,
+    texts,
+    profile,
+  });
+  const interaction = buildInteractionState(semanticSignals, participants);
+  const activeSpeaker = interaction.active_speaker_candidate;
+  const inferredInMeeting = interaction.in_call === true ? true : interaction.pre_join === true ? false : undefined;
 
   return compactObject({
     schema: MEETING_APP_DOM_CAPTURE_SCHEMA,
@@ -641,6 +944,10 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
     observedAtMs: atMs,
     url,
     title,
+    inMeeting: inferredInMeeting,
+    activeSpeaker,
+    interaction,
+    semanticSignals,
     browser: {
       name: browserName(win, options),
     },
@@ -648,6 +955,10 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
       url,
       title,
       documentVisible: documentVisible(doc),
+      inMeeting: inferredInMeeting,
+      activeSpeaker,
+      interaction,
+      semanticSignals,
       buttons: controls,
       controls,
       tiles: participants,
@@ -657,6 +968,10 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
     dom: {
       url,
       title,
+      inMeeting: inferredInMeeting,
+      activeSpeaker,
+      interaction,
+      semanticSignals,
       controls,
       participants,
       texts,
@@ -668,6 +983,7 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
       control_count: controls.length,
       participant_count: participants.length,
       text_count: texts.length,
+      semantic_signal_count: semanticSignals.length,
     },
   });
 }

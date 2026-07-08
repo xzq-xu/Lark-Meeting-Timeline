@@ -238,6 +238,8 @@ const viewModel = runtime.timelineView('google-meet', {
 
 浏览器扩展或 WebView preload 可以再包一层 `createMeetingPlatformIntegrationBrowserRuntime()`。它会从当前 `window.location`/DOM capture profile 自动识别 Google Meet、Teams、Zoom、Webex、Lark，然后把 content-script sample、provider event 和手写标注路由到同一个 integration runtime：
 
+`meeting-app-capture` 的 DOM snapshot 不只是保存按钮和参会人节点列表，也会输出低成本语义层：`semanticSignals` 和 `interaction`。它会从控件、状态文本、参与人 tile 或 aria-label 里识别 `meeting_join_available`、`meeting_leave_available`、`active_speaker_candidate`、`screen_share_active`、`captions_control`、`recording_indicator` 等信号，并同步给出 `page.inMeeting`、`page.interaction.can_leave`、`page.interaction.pre_join`、`page.interaction.active_speaker_candidate`。这些字段用于本地观察器实时建轴、发言人位置轨和标注落轴；provider webhook 与会后 transcript 仍然只做校准或回填。
+
 ```js
 import {
   createMeetingPlatformIntegrationBrowserRuntime,

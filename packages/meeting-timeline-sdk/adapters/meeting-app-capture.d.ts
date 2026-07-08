@@ -13,6 +13,47 @@ export interface MeetingAppDomCaptureProfile {
   textSelectors: string[];
 }
 
+export interface MeetingAppDomSemanticSignal {
+  type: string;
+  source?: string;
+  confidence?: string;
+  label?: string;
+  text?: string;
+  role?: string;
+  id?: string;
+  participant_id?: string;
+  participant_name?: string;
+  participant_count?: number;
+  [key: string]: unknown;
+}
+
+export interface MeetingAppDomInteractionState {
+  in_call?: boolean;
+  pre_join?: boolean;
+  can_join?: boolean;
+  waiting_room?: boolean;
+  can_leave?: boolean;
+  microphone_control_available?: boolean;
+  camera_control_available?: boolean;
+  screen_share_available?: boolean;
+  screen_share_active?: boolean;
+  captions_available?: boolean;
+  recording_observed?: boolean;
+  participant_roster_observed?: boolean;
+  chat_available?: boolean;
+  ai_summary_available?: boolean;
+  active_speaker_candidate?: {
+    id?: string;
+    name?: string;
+    display_name?: string;
+    speaking?: boolean;
+    audioLevel?: number;
+    [key: string]: unknown;
+  };
+  participant_count?: number;
+  [key: string]: unknown;
+}
+
 export interface MeetingAppDomCaptureOptions extends MeetingAppObserverOptions {
   observedAtMs?: number | string | Date;
   observed_at_ms?: number | string | Date;
@@ -73,14 +114,24 @@ export interface MeetingAppDomCaptureSnapshot extends MeetingAppSnapshot {
   schema_version: number;
   source?: string;
   observedAtMs: number;
+  inMeeting?: boolean;
+  interaction?: MeetingAppDomInteractionState;
+  semanticSignals?: MeetingAppDomSemanticSignal[];
   page?: Record<string, unknown> & {
+    inMeeting?: boolean;
+    interaction?: MeetingAppDomInteractionState;
+    semanticSignals?: MeetingAppDomSemanticSignal[];
     buttons?: Record<string, unknown>[];
     controls?: Record<string, unknown>[];
     tiles?: Record<string, unknown>[];
     participants?: Record<string, unknown>[];
     texts?: Record<string, unknown>[];
   };
-  dom?: Record<string, unknown>;
+  dom?: Record<string, unknown> & {
+    inMeeting?: boolean;
+    interaction?: MeetingAppDomInteractionState;
+    semanticSignals?: MeetingAppDomSemanticSignal[];
+  };
   capture?: {
     profile?: MeetingAppDomCaptureProfilePlatform;
     profile_display_name?: string;
@@ -88,6 +139,7 @@ export interface MeetingAppDomCaptureSnapshot extends MeetingAppSnapshot {
     control_count?: number;
     participant_count?: number;
     text_count?: number;
+    semantic_signal_count?: number;
   };
 }
 
