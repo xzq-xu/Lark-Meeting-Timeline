@@ -1,4 +1,4 @@
-import { compactObject, normalizeAbsoluteMs } from '../index.mjs';
+import { compactObject, normalizeAbsoluteMs } from './internal-utils.mjs';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');

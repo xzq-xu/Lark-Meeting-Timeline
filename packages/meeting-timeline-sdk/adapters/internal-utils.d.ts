@@ -5,3 +5,5 @@ export class MeetingTimelineSdkError extends Error {
 }
 
 export function compactObject<T>(value: T): T;
+
+export function normalizeAbsoluteMs(value: unknown, fieldName?: string): number | undefined;
