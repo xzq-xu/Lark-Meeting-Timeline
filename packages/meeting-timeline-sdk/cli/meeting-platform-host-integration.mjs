@@ -52,6 +52,16 @@ function compactPlan(plan = {}) {
         rows: plan.adapter_startup_plan_matrix.rows,
       }
       : undefined,
+    adapter_preflight_matrix: plan.adapter_preflight_matrix
+      ? {
+        schema: plan.adapter_preflight_matrix.schema,
+        platform_count: plan.adapter_preflight_matrix.platform_count,
+        accepted_count: plan.adapter_preflight_matrix.accepted_count,
+        realtime_ready_count: plan.adapter_preflight_matrix.realtime_ready_count,
+        live_evidence_ready_count: plan.adapter_preflight_matrix.live_evidence_ready_count,
+        rows: plan.adapter_preflight_matrix.rows,
+      }
+      : undefined,
     candidate_observation_contract: plan.candidate_observation_contract,
     meeting_track_contract: plan.meeting_track_contract,
     platform_conformance: plan.platform_conformance_report
@@ -95,6 +105,10 @@ function compactAcceptance(acceptance = {}) {
     adapter_blueprint_ready_count: acceptance.adapter_blueprint_ready_count,
     adapter_startup_ready: acceptance.adapter_startup_ready,
     adapter_startup_ready_count: acceptance.adapter_startup_ready_count,
+    adapter_preflight_available: acceptance.adapter_preflight_available,
+    adapter_preflight_platform_count: acceptance.adapter_preflight_platform_count,
+    adapter_preflight_accepted_count: acceptance.adapter_preflight_accepted_count,
+    adapter_preflight_realtime_ready_count: acceptance.adapter_preflight_realtime_ready_count,
     adapter_runtime_ready: acceptance.adapter_runtime_ready,
     adapter_runtime_ready_count: acceptance.adapter_runtime_ready_count,
     meeting_track_ready: acceptance.meeting_track_ready,
@@ -219,6 +233,9 @@ export async function buildMeetingPlatformHostIntegrationCliReport(options = {})
     adapter_blueprint_ready: acceptance.adapter_blueprint_ready === true,
     adapter_startup_ready: acceptance.adapter_startup_ready === true,
     adapter_startup_ready_count: acceptance.adapter_startup_ready_count,
+    adapter_preflight_available: acceptance.adapter_preflight_available === true,
+    adapter_preflight_platform_count: acceptance.adapter_preflight_platform_count,
+    adapter_preflight_accepted_count: acceptance.adapter_preflight_accepted_count,
     blocking_count: acceptance.blocking_count,
     warning_count: acceptance.warning_count,
     required_platforms: requiredPlatforms,
@@ -236,7 +253,7 @@ export async function buildMeetingPlatformHostIntegrationCliReport(options = {})
 
 export function formatMeetingPlatformHostIntegrationCliReport(report = {}) {
   const lines = [
-    `meeting_platform_host_integration_scaffold_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | files=${report.file_count} | written=${report.written_file_count} | adapters=${boolLabel(report.adapter_runtime_ready)} | startup=${boolLabel(report.adapter_startup_ready)} | candidates=${boolLabel(report.candidate_observation_ready)} | tracks=${boolLabel(report.meeting_track_ready)} | conformance=${boolLabel(report.platform_conformance_ready)} | blocking=${report.blocking_count}`,
+    `meeting_platform_host_integration_scaffold_report | ok=${boolLabel(report.ok)} | platforms=${report.platform_count} | files=${report.file_count} | written=${report.written_file_count} | adapters=${boolLabel(report.adapter_runtime_ready)} | startup=${boolLabel(report.adapter_startup_ready)} | preflight=${boolLabel(report.adapter_preflight_available)} | candidates=${boolLabel(report.candidate_observation_ready)} | tracks=${boolLabel(report.meeting_track_ready)} | conformance=${boolLabel(report.platform_conformance_ready)} | blocking=${report.blocking_count}`,
   ];
   for (const platform of report.platforms ?? []) {
     const adapterFile = report.generated_files?.find((file) => file.path === `src/platform-adapters/${platform}.mjs`);

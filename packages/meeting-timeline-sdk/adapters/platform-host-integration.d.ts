@@ -1,6 +1,7 @@
 import type { MeetingPlatformAdapterBlueprintMatrix } from './platform-adapter-blueprint.mjs';
 import type { MeetingPlatformAdapterRouteMatrix } from './platform-adapter-route.mjs';
 import type { MeetingPlatformAdapterStartupPlanMatrix } from './platform-adapter-startup.mjs';
+import type { MeetingPlatformAdapterPreflightMatrix } from './platform-adapter-preflight.mjs';
 import type { MeetingPlatformConformanceReport } from './platform-conformance.mjs';
 
 export const MEETING_PLATFORM_HOST_INTEGRATION_SCHEMA: string;
@@ -39,6 +40,7 @@ export interface MeetingPlatformHostIntegrationPlan {
   adapter_route_matrix: MeetingPlatformAdapterRouteMatrix;
   adapter_blueprint_matrix: MeetingPlatformAdapterBlueprintMatrix;
   adapter_startup_plan_matrix: MeetingPlatformAdapterStartupPlanMatrix;
+  adapter_preflight_matrix: MeetingPlatformAdapterPreflightMatrix;
   adapter_runtime_contract: Record<string, unknown>;
   adaptation_strategy_matrix: Record<string, unknown>;
   runtime_event_plan_matrix: Record<string, unknown>;
@@ -96,6 +98,11 @@ export interface MeetingPlatformHostIntegrationScaffoldAcceptanceReport {
   adapter_startup_ready: boolean;
   adapter_startup_ready_count: number;
   adapter_startup_plan_matrix?: MeetingPlatformAdapterStartupPlanMatrix;
+  adapter_preflight_available: boolean;
+  adapter_preflight_platform_count: number;
+  adapter_preflight_accepted_count: number;
+  adapter_preflight_realtime_ready_count: number;
+  adapter_preflight_matrix?: MeetingPlatformAdapterPreflightMatrix;
   adapter_runtime_ready: boolean;
   adapter_runtime_ready_count: number;
   adapter_runtime_contract?: Record<string, unknown>;

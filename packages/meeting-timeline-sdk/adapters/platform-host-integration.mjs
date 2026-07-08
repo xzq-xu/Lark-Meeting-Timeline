@@ -38,6 +38,9 @@ import {
   buildMeetingPlatformAdapterStartupPlanMatrix,
 } from './platform-adapter-startup.mjs';
 import {
+  buildMeetingPlatformAdapterPreflightMatrix,
+} from './platform-adapter-preflight.mjs';
+import {
   buildMeetingPlatformAdapterContractAcceptanceMatrix,
   buildMeetingPlatformAdapterContractMatrix,
 } from './platform-adapter-contract.mjs';
@@ -290,6 +293,21 @@ export function createMeetingPlatformHost(options = {}) {
         platforms: startupOptions.platforms ?? startupOptions.platform_keys ?? platforms,
       });
     },
+    adapterPreflight(input = {}, preflightOptions = {}) {
+      return kit.platformAdapterPreflight(input, preflightOptions);
+    },
+    adapterPreflightMatrix(input = {}, preflightOptions = {}) {
+      return kit.platformAdapterPreflightMatrix(input, {
+        ...preflightOptions,
+        platforms: preflightOptions.platforms ?? preflightOptions.platform_keys ?? platforms,
+      });
+    },
+    adapterCandidatePreflight(input = {}, preflightOptions = {}) {
+      return kit.platformAdapterCandidatePreflight(input, {
+        ...preflightOptions,
+        platforms: preflightOptions.platforms ?? preflightOptions.platform_keys ?? platforms,
+      });
+    },
     adaptationStrategyMatrix(strategyOptions = {}) {
       return kit.platformAdaptationStrategyMatrix({
         ...strategyOptions,
@@ -458,6 +476,14 @@ function routesSource(options = {}) {
   if (url.pathname === '/api/meeting-platform/adapter-startup') {
     return Response.json(host.adapterStartupPlans(options));
   }
+  if (url.pathname === '/api/meeting-platform/adapter-preflight') {
+    const payload = request.method === 'POST' ? await request.json() : Object.fromEntries(url.searchParams.entries());
+    const mode = payload.mode ?? options.mode;
+    const input = payload.input ?? payload;
+    if (mode === 'matrix') return Response.json(host.adapterPreflightMatrix(input, options));
+    if (mode === 'candidates' || mode === 'candidate') return Response.json(host.adapterCandidatePreflight(input, options));
+    return Response.json(host.adapterPreflight(input, options));
+  }
   if (url.pathname === '/api/meeting-platform/strategy') {
     return Response.json(host.adaptationStrategyMatrix(options));
   }
@@ -623,6 +649,7 @@ function readmeSource(plan = {}) {
   const trackRows = plan.meeting_track_contract?.rows ?? [];
   const adapterRows = plan.adapter_runtime_contract?.rows ?? [];
   const startupRows = plan.adapter_startup_plan_matrix?.rows ?? [];
+  const preflightRows = plan.adapter_preflight_matrix?.rows ?? [];
   return `# Meeting Platform Timeline Host
 
 This scaffold wires a host project to @ai-annotation/meeting-timeline-sdk.
@@ -639,6 +666,7 @@ Runtime rule:
 - Adapter routes describe each platform's implementation path: local observer realtime axis first, provider reconciliation second, transcript/artifact import last.
 - Adapter blueprints expose the concrete browser/native/provider/artifact surface contract each host must wire for Google Meet, Teams, Zoom, Webex, Lark, and local detector.
 - Adapter startup plans tell the host which browser/native/webview surface to launch first and which observe/insert actions to call before realtime marks are accepted.
+- Adapter preflight validates current live DOM/native evidence before the host lets realtime annotations bind to a meeting axis.
 - Per-platform adapter runtime entries live under src/platform-adapters/*.mjs. They provide resolve, observeCandidates, insertAnnotation, speakerTrack, participantTrack, and ingestProvider methods while preserving captured_at_ms.
 - Speaker and participant position tracks are required realtime contracts. They use local samples/snapshots first and must not wait for provider events or transcript export.
 - Platform conformance is the static SDK handoff gate before real evidence replay: normalizer, setup, contract, route, runtime bundle, registry, candidate observation, captured_at_ms, and provider/transcript non-blocking rules must all pass.
@@ -692,6 +720,16 @@ Adapter startup plans:
 
 ${startupRows.map((row) => `- ${row.platform}: surface=${row.selected_surface ?? 'unknown_surface'}, install=${row.install_target ?? 'unknown_target'}, observe=${row.observe_action ?? 'observePlatformCandidates'}, insert=${row.insert_action ?? 'insertAnnotation'}`).join('\n')}
 
+Adapter preflight:
+
+- endpoint: ${plan.endpoints?.adapter_preflight ?? '/api/meeting-platform/adapter-preflight'}
+- script: npm run meeting-platform:adapter-preflight
+- platform count: ${plan.adapter_preflight_matrix?.platform_count ?? 0}
+- accepted count without live evidence: ${plan.adapter_preflight_matrix?.accepted_count ?? 0}
+- realtime ready count without live evidence: ${plan.adapter_preflight_matrix?.realtime_ready_count ?? 0}
+
+${preflightRows.map((row) => `- ${row.platform}: status=${row.status ?? 'unknown_status'}, surface=${row.selected_surface ?? 'unknown_surface'}, startup=${row.startup_ready ? 'ready' : 'missing'}, live=${row.live_evidence_ready ? 'ready' : 'missing'}`).join('\n')}
+
 Platform conformance:
 
 - accepted: ${plan.platform_conformance_report?.accepted === true ? 'true' : 'false'}
@@ -741,6 +779,10 @@ const runtimeEventPlans = host.runtimeEventPlans();
 const adapterRoutes = host.adapterRoutes();
 const adapterBlueprints = host.adapterBlueprints();
 const adapterStartupPlans = host.adapterStartupPlans();
+const adapterPreflight = host.adapterPreflight({
+  platform: 'google-meet',
+  url: 'https://meet.google.com/abc-defg-hij',
+});
 const googleMeetAdapter = host.platformAdapter('google_meet');
 await googleMeetAdapter.observeCandidates({
   windows: [{
@@ -782,6 +824,7 @@ npm run meeting-platform:runtime-event-plans
 npm run meeting-platform:resolve
 npm run meeting-platform:adapter-blueprints
 npm run meeting-platform:adapter-startup
+npm run meeting-platform:adapter-preflight
 npm run meeting-platform:resolve-candidates
 npm run meeting-platform:observe-candidates
 npm run meeting-platform:extension-plan
@@ -959,6 +1002,12 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     baseUrl,
     basePath,
   });
+  const adapterPreflightMatrix = buildMeetingPlatformAdapterPreflightMatrix({}, {
+    ...options,
+    platforms,
+    baseUrl,
+    basePath,
+  });
   const adapterRuntimeContract = buildAdapterRuntimeContract(platforms, adapterRouteMatrix, adapterBlueprintMatrix);
   const adaptationStrategyMatrix = buildMeetingPlatformAdaptationStrategyMatrix({
     ...options,
@@ -989,6 +1038,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       platform_conformance_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-conformance',
       consumer_handoff_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-consumer-handoff',
       adapter_startup_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-startup',
+      adapter_preflight_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight',
     },
     runtime_contract: {
       annotation_timestamp_field: 'captured_at_ms',
@@ -1015,6 +1065,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       adapter_routes: '/api/meeting-platform/adapter-routes',
       adapter_blueprints: '/api/meeting-platform/adapter-blueprints',
       adapter_startup: '/api/meeting-platform/adapter-startup',
+      adapter_preflight: '/api/meeting-platform/adapter-preflight',
       strategy: '/api/meeting-platform/strategy',
       platform_resolution: '/api/meeting-platform/resolve',
       platform_candidate_resolution: '/api/meeting-platform/resolve-candidates',
@@ -1031,6 +1082,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       validate_platform_conformance: 'npm run meeting-platform:conformance',
       export_consumer_handoff: 'npm run meeting-platform:consumer-handoff',
       export_adapter_startup: 'npm run meeting-platform:adapter-startup',
+      run_adapter_preflight: 'npm run meeting-platform:adapter-preflight',
       validate_integration_runtime_manifest: 'npm run meeting-platform:integration-runtime-run-manifest',
       validate_handoff_readiness: 'npm run meeting-platform:handoff-readiness',
     },
@@ -1043,6 +1095,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
     adapter_route_matrix: adapterRouteMatrix,
     adapter_blueprint_matrix: adapterBlueprintMatrix,
     adapter_startup_plan_matrix: adapterStartupPlanMatrix,
+    adapter_preflight_matrix: adapterPreflightMatrix,
     adapter_runtime_contract: adapterRuntimeContract,
     adaptation_strategy_matrix: adaptationStrategyMatrix,
     runtime_event_plan_matrix: runtimeEventPlanMatrix,
@@ -1067,6 +1120,7 @@ export function buildMeetingPlatformHostIntegrationPlan(options = {}) {
       'publish_adapter_blueprints_endpoint_for_downstream_hosts',
       'publish_adapter_startup_plan_endpoint_for_downstream_hosts',
       'generate_adapter_startup_plan_before_runtime_surface_install',
+      'run_adapter_preflight_with_live_window_evidence_before_realtime_marks',
       'wire_platform_adapter_runtime_entries_into_host_surface',
       'verify_candidate_observation_contract_for_each_target_platform',
       'verify_meeting_track_contract_for_each_target_platform',
@@ -1098,6 +1152,7 @@ export function buildMeetingPlatformHostIntegrationScaffold(options = {}) {
       'meeting-platform:adapter-routes': 'node ./scripts/print-adapter-routes.mjs',
       'meeting-platform:adapter-blueprints': 'node ./scripts/print-adapter-blueprints.mjs',
       'meeting-platform:adapter-startup': 'node ./scripts/print-adapter-startup.mjs',
+      'meeting-platform:adapter-preflight': 'node ./scripts/print-adapter-preflight.mjs',
       'meeting-platform:adapters': 'node ./scripts/print-platform-adapters.mjs',
       'meeting-platform:extension-plan': 'node ./scripts/print-extension-plan.mjs',
       'meeting-platform:resolve': 'node ./scripts/resolve-platform.mjs',
@@ -1295,6 +1350,25 @@ const input = process.env.MEETING_PLATFORM_STARTUP_INPUT_JSON
 
 console.log(JSON.stringify(host.adapterStartupPlans({ input }), null, 2));
 `;
+  const adapterPreflightScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
+
+const host = createMeetingPlatformHost({
+  baseUrl: process.env.MEETING_TIMELINE_BASE_URL ?? ${JSON.stringify(plan.base_url)},
+});
+
+const input = process.env.MEETING_PLATFORM_PREFLIGHT_INPUT_JSON
+  ? JSON.parse(process.env.MEETING_PLATFORM_PREFLIGHT_INPUT_JSON)
+  : {};
+const mode = process.env.MEETING_PLATFORM_PREFLIGHT_MODE ?? 'matrix';
+
+const result = mode === 'candidates' || mode === 'candidate'
+  ? host.adapterCandidatePreflight(input)
+  : mode === 'single'
+    ? host.adapterPreflight(input)
+    : host.adapterPreflightMatrix(input);
+
+console.log(JSON.stringify(result, null, 2));
+`;
   const platformAdaptersScript = `import { createMeetingPlatformHost } from '../src/meeting-platform-host.mjs';
 
 const host = createMeetingPlatformHost({
@@ -1412,6 +1486,7 @@ if (
       sourceFile('scripts/print-adapter-routes.mjs', adapterRoutesScript, 'adapter_route_script', 'text/javascript'),
       sourceFile('scripts/print-adapter-blueprints.mjs', adapterBlueprintsScript, 'adapter_blueprint_script', 'text/javascript'),
       sourceFile('scripts/print-adapter-startup.mjs', adapterStartupScript, 'adapter_startup_script', 'text/javascript'),
+      sourceFile('scripts/print-adapter-preflight.mjs', adapterPreflightScript, 'adapter_preflight_script', 'text/javascript'),
       sourceFile('scripts/print-platform-adapters.mjs', platformAdaptersScript, 'platform_adapter_script', 'text/javascript'),
       sourceFile('scripts/print-extension-plan.mjs', extensionPlanScript, 'extension_plan_script', 'text/javascript'),
       sourceFile('scripts/resolve-platform.mjs', platformResolutionScript, 'platform_resolution_script', 'text/javascript'),
@@ -1451,6 +1526,7 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
     'scripts/print-adapter-routes.mjs',
     'scripts/print-adapter-blueprints.mjs',
     'scripts/print-adapter-startup.mjs',
+    'scripts/print-adapter-preflight.mjs',
     'scripts/print-platform-adapters.mjs',
     'scripts/resolve-platform.mjs',
     'scripts/resolve-platform-candidates.mjs',
@@ -1518,6 +1594,12 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!host.includes('platformAdapterStartupPlanMatrix')) {
     issues.push(issue('error', 'missing_adapter_startup_plan_matrix', 'Host source must expose the platform adapter startup plan matrix.'));
+  }
+  if (!host.includes('platformAdapterPreflightMatrix')) {
+    issues.push(issue('error', 'missing_adapter_preflight_matrix', 'Host source must expose the platform adapter preflight matrix.'));
+  }
+  if (!host.includes('platformAdapterCandidatePreflight')) {
+    issues.push(issue('error', 'missing_adapter_candidate_preflight', 'Host source must expose candidate preflight for active meeting windows.'));
   }
   if (!host.includes('platformAdaptationStrategyMatrix')) {
     issues.push(issue('error', 'missing_adaptation_strategy_matrix', 'Host source must expose the adaptation strategy matrix.'));
@@ -1592,6 +1674,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   if (!routes.includes('/api/meeting-platform/adapter-startup')) {
     issues.push(issue('error', 'missing_adapter_startup_route', 'Route source must expose the platform adapter startup plan endpoint.'));
   }
+  if (!routes.includes('/api/meeting-platform/adapter-preflight')) {
+    issues.push(issue('error', 'missing_adapter_preflight_route', 'Route source must expose the platform adapter preflight endpoint.'));
+  }
   if (!routes.includes('/api/meeting-platform/strategy')) {
     issues.push(issue('error', 'missing_adaptation_strategy_route', 'Route source must expose the adaptation strategy matrix endpoint.'));
   }
@@ -1636,6 +1721,9 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
   }
   if (!readme.includes('Adapter startup plans')) {
     issues.push(issue('warning', 'readme_missing_adapter_startup_plan', 'README should state the adapter startup plan contract.'));
+  }
+  if (!readme.includes('Adapter preflight')) {
+    issues.push(issue('warning', 'readme_missing_adapter_preflight', 'README should state the adapter preflight contract.'));
   }
   if (!readme.includes('Platform conformance')) {
     issues.push(issue('warning', 'readme_missing_platform_conformance', 'README should state the platform conformance gate.'));
@@ -1708,6 +1796,15 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
       accepted_count: adapterStartupPlanMatrix.accepted_count,
     }));
   }
+  const adapterPreflightMatrix = scaffold.plan?.adapter_preflight_matrix;
+  if (!adapterPreflightMatrix) {
+    issues.push(issue('error', 'missing_adapter_preflight_matrix', 'Scaffold plan must include the adapter preflight matrix.'));
+  } else if (adapterPreflightMatrix.platform_count !== (scaffold.platforms?.length ?? 0)) {
+    issues.push(issue('error', 'adapter_preflight_matrix_platform_mismatch', 'Adapter preflight matrix must cover every selected platform.', {
+      platform_count: adapterPreflightMatrix.platform_count,
+      scaffold_platform_count: scaffold.platforms?.length ?? 0,
+    }));
+  }
   const adapterRuntimeContract = scaffold.plan?.adapter_runtime_contract;
   if (!adapterRuntimeContract) {
     issues.push(issue('error', 'missing_adapter_runtime_contract', 'Scaffold plan must include the per-platform adapter runtime contract.'));
@@ -1763,6 +1860,11 @@ export function buildMeetingPlatformHostIntegrationScaffoldAcceptanceReport(scaf
       : false,
     adapter_startup_ready_count: adapterStartupPlanMatrix?.realtime_startup_ready_count ?? 0,
     adapter_startup_plan_matrix: adapterStartupPlanMatrix,
+    adapter_preflight_available: adapterPreflightMatrix?.platform_count === (scaffold.platforms?.length ?? 0),
+    adapter_preflight_platform_count: adapterPreflightMatrix?.platform_count ?? 0,
+    adapter_preflight_accepted_count: adapterPreflightMatrix?.accepted_count ?? 0,
+    adapter_preflight_realtime_ready_count: adapterPreflightMatrix?.realtime_ready_count ?? 0,
+    adapter_preflight_matrix: adapterPreflightMatrix,
     adapter_runtime_ready: adapterRuntimeContract?.all_ready === true,
     adapter_runtime_ready_count: adapterRuntimeContract?.ready_count ?? 0,
     adapter_runtime_contract: adapterRuntimeContract,
