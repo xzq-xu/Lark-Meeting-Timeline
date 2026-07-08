@@ -1574,6 +1574,19 @@ export function createMeetingAppTimelineSdk(options = {}) {
     adapterRouteMatrix(routeOptions = {}) {
       return sdk.platformAdapterRouteMatrix(routeOptions);
     },
+    platformAdapterSelection(platformOrOptions = {}, input = {}, selectionOptions = {}) {
+      const resolved = singlePlatformInput(runtime, platformOrOptions, selectionOptions);
+      return runtime.kit.platformAdapterSelection(resolved.platform, input, sdkPlatformOptions(runtime, resolved.options));
+    },
+    adapterSelection(platformOrOptions = {}, input = {}, selectionOptions = {}) {
+      return sdk.platformAdapterSelection(platformOrOptions, input, selectionOptions);
+    },
+    platformAdapterSelectionMatrix(input = {}, selectionOptions = {}) {
+      return runtime.kit.platformAdapterSelectionMatrix(input, sdkPlatformOptions(runtime, selectionOptions));
+    },
+    adapterSelectionMatrix(input = {}, selectionOptions = {}) {
+      return sdk.platformAdapterSelectionMatrix(input, selectionOptions);
+    },
     platformAdapterBlueprint(platformOrOptions = {}, blueprintOptions = {}) {
       const resolved = singlePlatformInput(runtime, platformOrOptions, blueprintOptions);
       return runtime.kit.platformAdapterBlueprint(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
@@ -1875,6 +1888,7 @@ export * from './adapters/platform-adapter-smoke.mjs';
 export * from './adapters/platform-runtime-profile.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
+export * from './adapters/platform-adapter-selection.mjs';
 export * from './adapters/platform-adapter-blueprint.mjs';
 export * from './adapters/platform-adapter-decision.mjs';
 export * from './adapters/platform-adapter-startup.mjs';

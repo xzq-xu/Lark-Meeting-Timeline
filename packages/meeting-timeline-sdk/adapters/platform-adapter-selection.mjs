@@ -310,7 +310,7 @@ export function buildMeetingPlatformAdapterSelection(platform, input = {}, optio
 }
 
 export function buildMeetingPlatformAdapterSelectionMatrix(input = {}, options = {}) {
-  const platforms = selectedPlatforms({ ...input, ...options });
+  const platforms = selectedPlatforms({ ...options, ...input });
   const selections = platforms.map((platform) => buildMeetingPlatformAdapterSelection(platform, input, options));
   return {
     type: 'meeting_platform_adapter_selection_matrix',

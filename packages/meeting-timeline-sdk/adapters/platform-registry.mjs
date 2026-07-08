@@ -20,6 +20,9 @@ import {
   buildMeetingPlatformAdapterRoute,
 } from './platform-adapter-route.mjs';
 import {
+  buildMeetingPlatformAdapterSelection,
+} from './platform-adapter-selection.mjs';
+import {
   buildMeetingPlatformAdapterBlueprint,
 } from './platform-adapter-blueprint.mjs';
 import {
@@ -145,6 +148,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
   const runtimeBundle = buildMeetingPlatformRuntimeBundle(key, options);
   const runtimeEventPlan = buildMeetingPlatformRuntimeEventPlan(key, options);
   const adapterRoute = buildMeetingPlatformAdapterRoute(key, options);
+  const adapterSelection = buildMeetingPlatformAdapterSelection(key, options);
   const adapterBlueprint = buildMeetingPlatformAdapterBlueprint(key, options);
   const candidateObservation = runtimeBundle.messaging?.candidate_observation ?? runtimeBundle.browser?.candidate_observation;
   const candidateObservationReady = candidateObservation?.runtime_event_action === 'observe_platform_candidates'
@@ -231,6 +235,21 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
       provider_events_block_realtime: adapterRoute.realtime_invariants?.provider_events_block_realtime,
       transcript_blocks_realtime: adapterRoute.realtime_invariants?.transcript_blocks_realtime,
     },
+    adapter_selection: {
+      schema: adapterSelection.schema,
+      recommended_mode: adapterSelection.recommended_mode,
+      axis_source: adapterSelection.selection?.axis_source,
+      axis_surface: adapterSelection.selection?.axis_surface,
+      timestamp_field: adapterSelection.selection?.timestamp_field,
+      provider_reconcile_source: adapterSelection.selection?.provider_reconcile_source,
+      provider_reconcile_required_for_production: adapterSelection.selection?.provider_reconcile_required_for_production,
+      speaker_track_source: adapterSelection.selection?.speaker_track_source,
+      post_meeting_artifact_source: adapterSelection.selection?.post_meeting_artifact_source,
+      selection_ready: adapterSelection.readiness?.selection_ready === true,
+      provider_events_block_realtime: adapterSelection.runtime_policy?.provider_events_block_realtime,
+      transcript_blocks_realtime: adapterSelection.runtime_policy?.transcript_blocks_realtime,
+      startup_order: adapterSelection.runtime_policy?.startup_order,
+    },
     adapter_blueprint: {
       schema: adapterBlueprint.schema,
       ready: adapterBlueprint.readiness?.ready === true,
@@ -258,6 +277,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
         platform_event: `${hostBasePath}/${key.replaceAll('_', '-')}`,
         annotations: '/api/annotations',
         adapter_routes: '/api/meeting-platform/adapter-routes',
+        adapter_selections: '/api/meeting-platform/adapter-selections',
         adapter_blueprints: '/api/meeting-platform/adapter-blueprints',
         runtime_bundles: '/api/meeting-platform/runtime-bundles',
         runtime_event_plans: '/api/meeting-platform/runtime-event-plans',
@@ -276,6 +296,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
         runtime_bundle: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
         runtime_event: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event',
         adapter_route: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-route',
+        adapter_selection: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-selection',
         adapter_blueprint: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-blueprint',
         adapter_contract: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-contract',
         provider_connection: '@ai-annotation/meeting-timeline-sdk/adapters/platform-provider-connection',
@@ -299,6 +320,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
       print_registry: `npm run meeting-platform:registry -- --platforms=${key}`,
       print_runtime_bundle: `npm run meeting-platform:runtime-bundle -- --platforms=${key}`,
       print_adapter_route: `npm run meeting-platform:adapter-route -- --platforms=${key}`,
+      print_adapter_selection: `npm run meeting-platform:adapter-selection -- --platforms=${key}`,
       print_adapter_blueprint: `npm run meeting-platform:adapter-blueprint -- --platforms=${key}`,
       print_runtime_event_plan: `npm run meeting-platform:runtime-event-plan -- --platforms=${key}`,
       print_adaptation_package: `npm run meeting-platform:adaptation-package -- --platforms=${key}`,
@@ -310,8 +332,10 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
       ...(contract.next_actions ?? []),
       'choose_platform_from_registry_manifest',
       'read_adapter_blueprint_before_wiring_external_host',
+      'read_adapter_selection_before_wiring_external_host',
       'wire_host_runtime_bundles_endpoint_before_building_extension',
       'export_adapter_route_before_wiring_external_host',
+      'export_adapter_selection_before_wiring_external_host',
       'export_runtime_event_plan_before_wiring_external_host',
       'verify_candidate_observation_before_host_handoff',
     ]),
@@ -333,6 +357,7 @@ export function buildMeetingPlatformRegistryManifest(options = {}) {
     runtime_ready_count: entries.filter((entry) => entry.readiness?.runtime_ready).length,
     contract_accepted_count: entries.filter((entry) => entry.readiness?.contract_accepted).length,
     candidate_observer_count: entries.filter((entry) => entry.readiness?.candidate_observation_ready).length,
+    adapter_selection_ready_count: entries.filter((entry) => entry.adapter_selection?.selection_ready === true).length,
     adapter_blueprint_ready_count: entries.filter((entry) => entry.adapter_blueprint?.ready === true).length,
     provider_required_for_realtime_count: entries.filter((entry) => entry.readiness?.provider_required_for_realtime).length,
     transcript_blocking_count: entries.filter((entry) => entry.readiness?.transcript_blocks_realtime).length,
@@ -353,6 +378,13 @@ export function buildMeetingPlatformRegistryManifest(options = {}) {
       adapter_route_mode: entry.adapter_route?.recommended_mode,
       adapter_first_route: entry.adapter_route?.first_route,
       adapter_route_count: entry.adapter_route?.route_count ?? 0,
+      adapter_selection_ready: entry.adapter_selection?.selection_ready === true,
+      adapter_selection_axis_source: entry.adapter_selection?.axis_source,
+      adapter_selection_axis_surface: entry.adapter_selection?.axis_surface,
+      adapter_selection_timestamp_field: entry.adapter_selection?.timestamp_field,
+      adapter_selection_provider_reconcile_source: entry.adapter_selection?.provider_reconcile_source,
+      adapter_selection_provider_blocks_realtime: entry.adapter_selection?.provider_events_block_realtime,
+      adapter_selection_transcript_blocks_realtime: entry.adapter_selection?.transcript_blocks_realtime,
       adapter_blueprint_ready: entry.adapter_blueprint?.ready === true,
       adapter_blueprint_primary_surface: entry.adapter_blueprint?.primary_surface,
       adapter_blueprint_surface_order: entry.adapter_blueprint?.surface_order,
@@ -383,6 +415,7 @@ function registryManifestFrom(input = {}, options = {}) {
       runtime_ready_count: input.readiness?.runtime_ready === true ? 1 : 0,
       contract_accepted_count: input.readiness?.contract_accepted === true ? 1 : 0,
       candidate_observer_count: input.readiness?.candidate_observation_ready === true ? 1 : 0,
+      adapter_selection_ready_count: input.adapter_selection?.selection_ready === true ? 1 : 0,
       adapter_blueprint_ready_count: input.adapter_blueprint?.ready === true ? 1 : 0,
       provider_required_for_realtime_count: input.readiness?.provider_required_for_realtime === true ? 1 : 0,
       transcript_blocking_count: input.readiness?.transcript_blocks_realtime === true ? 1 : 0,
@@ -403,6 +436,13 @@ function registryManifestFrom(input = {}, options = {}) {
         adapter_route_mode: input.adapter_route?.recommended_mode,
         adapter_first_route: input.adapter_route?.first_route,
         adapter_route_count: input.adapter_route?.route_count ?? 0,
+        adapter_selection_ready: input.adapter_selection?.selection_ready === true,
+        adapter_selection_axis_source: input.adapter_selection?.axis_source,
+        adapter_selection_axis_surface: input.adapter_selection?.axis_surface,
+        adapter_selection_timestamp_field: input.adapter_selection?.timestamp_field,
+        adapter_selection_provider_reconcile_source: input.adapter_selection?.provider_reconcile_source,
+        adapter_selection_provider_blocks_realtime: input.adapter_selection?.provider_events_block_realtime,
+        adapter_selection_transcript_blocks_realtime: input.adapter_selection?.transcript_blocks_realtime,
         adapter_blueprint_ready: input.adapter_blueprint?.ready === true,
         adapter_blueprint_primary_surface: input.adapter_blueprint?.primary_surface,
         adapter_blueprint_surface_order: input.adapter_blueprint?.surface_order,
@@ -456,6 +496,12 @@ function registryAcceptanceIssues(manifest = {}, options = {}) {
   if (manifest.candidate_observer_count !== manifest.platform_count) {
     issues.push(issue('error', 'candidate_observer_not_ready', 'Every selected platform must expose candidate observation for host-level axis binding.', {
       candidate_observer_count: manifest.candidate_observer_count,
+      platform_count: manifest.platform_count,
+    }));
+  }
+  if (manifest.adapter_selection_ready_count !== manifest.platform_count) {
+    issues.push(issue('error', 'adapter_selection_not_ready', 'Every selected platform must expose a ready adapter selection for host wiring.', {
+      adapter_selection_ready_count: manifest.adapter_selection_ready_count,
       platform_count: manifest.platform_count,
     }));
   }
@@ -543,6 +589,9 @@ function registryAcceptanceIssues(manifest = {}, options = {}) {
     if (!entry.host?.endpoints?.adapter_routes) {
       issues.push(issue('error', 'entry_missing_adapter_route_endpoint', 'Registry entry must include the host adapter route endpoint.', { platform }));
     }
+    if (!entry.host?.endpoints?.adapter_selections) {
+      issues.push(issue('error', 'entry_missing_adapter_selection_endpoint', 'Registry entry must include the host adapter selection endpoint.', { platform }));
+    }
     if (!entry.host?.endpoints?.adapter_blueprints) {
       issues.push(issue('error', 'entry_missing_adapter_blueprint_endpoint', 'Registry entry must include the host adapter blueprint endpoint.', { platform }));
     }
@@ -552,6 +601,9 @@ function registryAcceptanceIssues(manifest = {}, options = {}) {
     if (!entry.sdk?.imports?.adapter_route) {
       issues.push(issue('error', 'entry_missing_adapter_route_import', 'Registry entry must include the adapter route SDK import path.', { platform }));
     }
+    if (!entry.sdk?.imports?.adapter_selection) {
+      issues.push(issue('error', 'entry_missing_adapter_selection_import', 'Registry entry must include the adapter selection SDK import path.', { platform }));
+    }
     if (!entry.sdk?.imports?.adapter_blueprint) {
       issues.push(issue('error', 'entry_missing_adapter_blueprint_import', 'Registry entry must include the adapter blueprint SDK import path.', { platform }));
     }
@@ -560,6 +612,18 @@ function registryAcceptanceIssues(manifest = {}, options = {}) {
     }
     if (entry.adapter_route?.provider_events_block_realtime === true || entry.adapter_route?.transcript_blocks_realtime === true) {
       issues.push(issue('error', 'entry_adapter_route_blocks_realtime', 'Adapter route must keep provider events and transcript non-blocking for realtime annotations.', { platform }));
+    }
+    if (entry.adapter_selection?.selection_ready !== true || !entry.adapter_selection?.axis_source) {
+      issues.push(issue('error', 'entry_missing_adapter_selection', 'Registry entry must include a ready adapter selection with an axis source.', { platform }));
+    }
+    if (entry.adapter_selection?.timestamp_field !== 'captured_at_ms') {
+      issues.push(issue('error', 'entry_adapter_selection_invalid_timestamp_field', 'Adapter selection must keep realtime annotation timestamps on captured_at_ms.', {
+        platform,
+        timestamp_field: entry.adapter_selection?.timestamp_field,
+      }));
+    }
+    if (entry.adapter_selection?.provider_events_block_realtime === true || entry.adapter_selection?.transcript_blocks_realtime === true) {
+      issues.push(issue('error', 'entry_adapter_selection_blocks_realtime', 'Adapter selection must keep provider events and transcript non-blocking for realtime annotations.', { platform }));
     }
     if (entry.adapter_blueprint?.ready !== true || !entry.adapter_blueprint?.primary_surface) {
       issues.push(issue('error', 'entry_missing_adapter_blueprint', 'Registry entry must include a ready adapter blueprint with a primary surface.', { platform }));
@@ -598,6 +662,7 @@ export function buildMeetingPlatformRegistryAcceptanceReport(manifestOrOptions =
     contract_accepted_count: manifest.contract_accepted_count ?? 0,
     candidate_observer_count: manifest.candidate_observer_count ?? 0,
     adapter_blueprint_ready_count: manifest.adapter_blueprint_ready_count ?? 0,
+    adapter_selection_ready_count: manifest.adapter_selection_ready_count ?? 0,
     provider_required_for_realtime_count: manifest.provider_required_for_realtime_count ?? 0,
     transcript_blocking_count: manifest.transcript_blocking_count ?? 0,
     blocking_count: blocking.length,

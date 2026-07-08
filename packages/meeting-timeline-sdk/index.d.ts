@@ -584,6 +584,17 @@ export interface MeetingAppTimelineSdk {
   adapterRoute: MeetingAppTimelineSdk['platformAdapterRoute'];
   platformAdapterRouteMatrix(options?: Record<string, unknown>): import('./adapters/platform-adapter-route.mjs').MeetingPlatformAdapterRouteMatrix;
   adapterRouteMatrix: MeetingAppTimelineSdk['platformAdapterRouteMatrix'];
+  platformAdapterSelection(
+    platformOrOptions?: string | Record<string, unknown>,
+    input?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-selection.mjs').MeetingPlatformAdapterSelection;
+  adapterSelection: MeetingAppTimelineSdk['platformAdapterSelection'];
+  platformAdapterSelectionMatrix(
+    input?: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): import('./adapters/platform-adapter-selection.mjs').MeetingPlatformAdapterSelectionMatrix;
+  adapterSelectionMatrix: MeetingAppTimelineSdk['platformAdapterSelectionMatrix'];
   platformAdapterBlueprint(
     platformOrOptions?: string | Record<string, unknown>,
     options?: import('./adapters/platform-adapter-blueprint.mjs').MeetingPlatformAdapterBlueprintOptions,
@@ -783,6 +794,7 @@ export * from './adapters/platform-adapter-smoke.mjs';
 export * from './adapters/platform-runtime-profile.mjs';
 export * from './adapters/platform-runtime-bundle.mjs';
 export * from './adapters/platform-adapter-route.mjs';
+export * from './adapters/platform-adapter-selection.mjs';
 export * from './adapters/platform-adapter-blueprint.mjs';
 export * from './adapters/platform-adapter-decision.mjs';
 export * from './adapters/platform-adapter-startup.mjs';
