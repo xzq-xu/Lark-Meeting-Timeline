@@ -170,6 +170,7 @@ assert.equal(connectorAdoptionIndex.schema, 'meeting_app_timeline_connector_adop
 assert.equal(connectorAdoptionIndex.accepted, true);
 assert.equal(connectorAdoptionIndex.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
 assert.equal(connectorAdoptionIndex.rows.find((row) => row.platform === 'google_meet').adapter_preflight.url_only_status, 'needs_live_page_evidence');
+assert.equal(connectorAdoptionIndex.rows.find((row) => row.platform === 'google_meet').local_observer_contract.observer_mode, 'browser_dom_observer');
 assert.equal(connectorAdoptionIndex.rows.find((row) => row.platform === 'zoom').status, 'pilot_ready_needs_live_evidence');
 assert.equal(connectorAdoptionIndex.rows.every((row) => row.production_evidence_required.includes('runtime_host_replay')), true);
 assert.equal(connectorAdoptionIndex.rows.find((row) => row.platform === 'google_meet').field_intake.field_evidence_input.endsWith('/meeting-platform-field-evidence/google_meet.json'), true);
@@ -209,6 +210,8 @@ assert.equal(connectorAdapterMatrix.runtime_invariants.provider_replay_blocks_re
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').evidence_contract.adapter_preflight.evidence_kind, 'live_dom_snapshot');
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').evidence_contract.pilot_required.includes('adapter_preflight_live_evidence'), true);
+assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').local_observer_contract.input_contract.kind, 'browser_live_dom');
+assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').evidence_contract.local_observer.filters.speaker.min_stable_ms, 700);
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').runtime_sequence[1].required_field, 'captured_at_ms');
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').provider_replay.accepted, true);
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').provider_replay.file, 'provider-replay-matrix.json');
@@ -222,6 +225,8 @@ assert.equal(hostAdapterConfigIndex.schema, 'meeting_app_timeline_host_adapter_c
 assert.equal(hostAdapterConfigIndex.accepted, true);
 assert.equal(hostAdapterConfigIndex.row_count, 2);
 assert.equal(hostAdapterConfigIndex.rows.find((row) => row.platform === 'zoom').config_file, 'host-adapter-configs/zoom.json');
+assert.equal(hostAdapterConfigIndex.rows.find((row) => row.platform === 'google_meet').local_observer_mode, 'browser_dom_observer');
+assert.equal(hostAdapterConfigIndex.rows.find((row) => row.platform === 'zoom').local_observer_mode, 'native_window_observer');
 
 const hostAdapterBootstrapPlanMatrix = JSON.parse(await readFile(join(outDir, 'host-adapter-bootstrap-plan-matrix.json'), 'utf8'));
 assert.equal(hostAdapterBootstrapPlanMatrix.schema, 'meeting_app_timeline_host_adapter_bootstrap_plan_matrix');
@@ -244,6 +249,8 @@ assert.equal(googleHostAdapterConfig.selected_surface, 'browser_extension');
 assert.equal(googleHostAdapterConfig.realtime_contract.mark_timestamp_field, 'captured_at_ms');
 assert.equal(googleHostAdapterConfig.evidence_contract.adapter_preflight.required, true);
 assert.equal(googleHostAdapterConfig.evidence_contract.adapter_preflight.bridge_messages.includes('meeting_timeline.preflight_current_window'), true);
+assert.equal(googleHostAdapterConfig.local_observer_contract.sampling.speaker_sample_interval_ms, 300);
+assert.equal(googleHostAdapterConfig.local_observer_contract.input_contract.selector_groups.participants.some((selector) => selector.includes('speaking')), true);
 assert.equal(googleHostAdapterConfig.provider_replay.accepted, true);
 assert.equal(googleHostAdapterConfig.runtime_sequence[0].action, 'observe_platform_candidates');
 
@@ -251,6 +258,7 @@ const zoomHostAdapterConfig = JSON.parse(await readFile(join(outDir, 'host-adapt
 assert.equal(zoomHostAdapterConfig.platform, 'zoom');
 assert.equal(zoomHostAdapterConfig.selected_surface, 'native_detector');
 assert.equal(zoomHostAdapterConfig.evidence_contract.adapter_preflight.evidence_kind, 'native_window_or_process_state');
+assert.equal(zoomHostAdapterConfig.local_observer_contract.input_contract.required_inputs.includes('candidate_windows'), true);
 assert.equal(zoomHostAdapterConfig.provider_replay.provider_events_block_realtime, false);
 
 const connectorAdapterMatrixAcceptance = JSON.parse(await readFile(join(outDir, 'connector-adapter-matrix-acceptance.json'), 'utf8'));
@@ -284,6 +292,7 @@ assert.equal(hostInstallChecklist.accepted, true);
 assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
 assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
 assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'zoom').client_methods.insert_annotation, 'insertAnnotation');
+assert.equal(hostInstallChecklist.rows.find((row) => row.platform === 'google_meet').required_host_steps.includes('apply_local_observer_sampling_and_filter_contract'), true);
 
 const hostInstallChecklistAcceptance = JSON.parse(await readFile(join(outDir, 'host-install-checklist-acceptance.json'), 'utf8'));
 assert.equal(hostInstallChecklistAcceptance.schema, 'meeting_app_timeline_connector_host_install_checklist_acceptance_report');

@@ -11,6 +11,12 @@ import {
   buildMeetingPlatformFieldIntakeMatrix,
 } from './platform-field-intake.mjs';
 import {
+  buildMeetingPlatformRuntimeProfile,
+} from './platform-runtime-profile.mjs';
+import {
+  meetingAppDomCaptureProfile,
+} from './meeting-app-capture.mjs';
+import {
   createMeetingPlatformConnectorContentScriptBridge,
   resolveMeetingPlatformConnectorInput,
 } from './meeting-platform-connector.mjs';
@@ -151,13 +157,24 @@ function runtimeActionByName(rows = [], action) {
   return rows.find((row) => row.action === action);
 }
 
+function browserLikeSurface(surface) {
+  const normalized = normalizeKey(surface);
+  return normalized === 'browser_extension'
+    || normalized === 'webview_preload'
+    || normalized === 'electron_webview';
+}
+
+function nativeLikeSurface(surface) {
+  const normalized = normalizeKey(surface);
+  return normalized === 'native_detector'
+    || normalized === 'native_host'
+    || normalized === 'desktop_observer';
+}
+
 function adapterPreflightEvidenceContract(row = {}) {
   const surface = normalizeKey(row.selected_surface);
-  const browserLike = surface === 'browser_extension'
-    || surface === 'webview_preload'
-    || surface === 'electron_webview';
-  const nativeLike = surface === 'native_detector'
-    || surface === 'native_host';
+  const browserLike = browserLikeSurface(surface);
+  const nativeLike = nativeLikeSurface(surface);
   const evidenceKind = browserLike ? 'live_dom_snapshot' : nativeLike ? 'native_window_or_process_state' : 'live_surface_evidence';
   return compactObject({
     required: true,
@@ -193,6 +210,99 @@ function adapterPreflightEvidenceContract(row = {}) {
       'rows[].selection_score',
       'rows[].selection_reason',
     ],
+  });
+}
+
+function runtimeProfileForRow(row = {}) {
+  const platform = normalizeKey(row.platform);
+  if (!platform) return {};
+  try {
+    return buildMeetingPlatformRuntimeProfile(platform);
+  } catch {
+    return {};
+  }
+}
+
+function localObserverInputContract(surface, domProfile = {}) {
+  const browserLike = browserLikeSurface(surface);
+  const nativeLike = nativeLikeSurface(surface);
+  if (browserLike) {
+    return {
+      kind: 'browser_live_dom',
+      required_inputs: ['current_window_document_or_live_dom_snapshot', 'candidate_tabs_or_windows'],
+      optional_inputs: ['shadow_dom_snapshot', 'active_speaker_dom_signal', 'participant_roster_dom_signal'],
+      capture_profile: domProfile.platform,
+      selector_groups: {
+        controls: domProfile.controlSelectors ?? [],
+        participants: domProfile.participantSelectors ?? [],
+        texts: domProfile.textSelectors ?? [],
+      },
+    };
+  }
+  if (nativeLike) {
+    return {
+      kind: 'native_window_or_process',
+      required_inputs: ['candidate_windows', 'process_or_bundle_identity', 'call_active_state'],
+      optional_inputs: ['accessibility_tree', 'audio_activity_sample', 'active_speaker_accessibility_signal'],
+      native_fields: ['process.name', 'bundle.id', 'window.title', 'window.active', 'accessibility.call_active', 'audio.active_speaker'],
+    };
+  }
+  return {
+    kind: 'host_surface_snapshot',
+    required_inputs: ['candidate_surface_snapshot'],
+    optional_inputs: ['active_speaker_signal', 'participant_roster_signal'],
+  };
+}
+
+function localObserverContract(row = {}) {
+  const platform = normalizeKey(row.platform);
+  const surface = normalizeKey(row.selected_surface);
+  const profile = runtimeProfileForRow({ ...row, platform });
+  const domProfile = browserLikeSurface(surface) ? meetingAppDomCaptureProfile(platform) ?? {} : {};
+  const speakerFilter = profile.speaker_markers?.filter ?? {};
+  return compactObject({
+    required: true,
+    platform,
+    selected_surface: surface,
+    observer_mode: browserLikeSurface(surface)
+      ? 'browser_dom_observer'
+      : nativeLikeSurface(surface)
+        ? 'native_window_observer'
+        : 'host_surface_observer',
+    axis: {
+      start_create_on: profile.axis?.start?.create_on ?? 'local_observer_active_meeting_detected',
+      end_create_on: profile.axis?.end?.create_on ?? 'local_observer_meeting_inactive_or_manual_stop',
+      end_fallbacks: profile.axis?.end?.fallbacks ?? [],
+      provider_reconcile_required_for_realtime: false,
+    },
+    sampling: {
+      candidate_scan_interval_ms: 1_000,
+      active_snapshot_interval_ms: browserLikeSurface(surface) ? 1_000 : 750,
+      speaker_sample_interval_ms: speakerFilter.sample_interval_ms,
+      participant_snapshot_interval_ms: 2_000,
+      max_snapshot_age_ms_before_insert: 2_500,
+    },
+    filters: {
+      speaker: speakerFilter,
+      participant: {
+        duplicate_window_ms: 1_500,
+        leave_stable_ms: 3_000,
+      },
+    },
+    input_contract: localObserverInputContract(surface, domProfile),
+    output_events: [
+      'observe_platform_candidates',
+      'observe_meeting_app',
+      'speaker_track',
+      'participant_track',
+    ],
+    realtime_rules: {
+      timestamp_field: 'captured_at_ms',
+      provider_events_block_realtime: false,
+      transcript_blocks_realtime: false,
+      may_insert_before_provider_start_event: true,
+      require_preflight_before_first_insert: true,
+    },
   });
 }
 
@@ -837,6 +947,7 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, o
       required_host_steps: [
         'install_selected_surface_runtime',
         'run_adapter_preflight_with_live_evidence_before_first_annotation',
+        'apply_local_observer_sampling_and_filter_contract',
         'observe_platform_candidates_before_first_annotation',
         'insert_annotation_with_captured_at_ms',
         'keep_provider_events_nonblocking',
@@ -850,6 +961,7 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, o
     return compactObject({
       ...row,
       adapter_preflight: adapterPreflightEvidenceContract(row),
+      local_observer_contract: localObserverContract(row),
     });
   });
   const readyCount = rows.filter((row) => row.realtime_startup_ready === true && row.adapter_blueprint_ready === true).length;
@@ -884,6 +996,7 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, o
       startup_plan_required_before_runtime_install: pkg.contracts?.startup_plan_required_before_runtime_install,
       adapter_blueprint_required_before_host_wiring: pkg.contracts?.adapter_blueprint_required_before_host_wiring,
       adapter_preflight_required_before_realtime_insert: true,
+      local_observer_contract_required_for_realtime_axis: true,
     },
     files_to_read_first: [
       'connector-handoff.json',
@@ -934,6 +1047,9 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceRe
   if (checklist.contracts?.adapter_preflight_required_before_realtime_insert !== true) {
     addIssue(issues, 'adapter_preflight_not_required', 'Adapter preflight must be required before realtime annotation insertion');
   }
+  if (checklist.contracts?.local_observer_contract_required_for_realtime_axis !== true) {
+    addIssue(issues, 'local_observer_contract_not_required', 'Local observer contract must be required for realtime axis creation');
+  }
   if ((checklist.platform_count ?? 0) <= 0) addIssue(issues, 'missing_platforms', 'Host install checklist must include at least one platform');
   if (rows.length !== checklist.platform_count) {
     addIssue(issues, 'row_count_mismatch', 'Host install checklist row count must equal platform_count', {
@@ -969,6 +1085,9 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceRe
     if (!requiredSteps.includes('run_adapter_preflight_with_live_evidence_before_first_annotation')) {
       addIssue(issues, 'row_missing_adapter_preflight_step', 'Checklist row must require adapter preflight before realtime annotation insertion', { platform });
     }
+    if (!requiredSteps.includes('apply_local_observer_sampling_and_filter_contract')) {
+      addIssue(issues, 'row_missing_local_observer_contract_step', 'Checklist row must require applying local observer sampling and filter contract', { platform });
+    }
     if (row.adapter_preflight?.required !== true) {
       addIssue(issues, 'row_missing_adapter_preflight_contract', 'Checklist row must include adapter preflight contract', { platform });
     }
@@ -980,6 +1099,15 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceRe
     }
     if (row.adapter_preflight?.blocks_realtime_if_missing !== true) {
       addIssue(issues, 'row_adapter_preflight_must_block_realtime_when_missing', 'Missing adapter preflight must block realtime annotation insertion', { platform });
+    }
+    if (row.local_observer_contract?.required !== true) {
+      addIssue(issues, 'row_missing_local_observer_contract', 'Checklist row must include local observer contract', { platform });
+    }
+    if (row.local_observer_contract?.realtime_rules?.timestamp_field !== 'captured_at_ms') {
+      addIssue(issues, 'row_local_observer_missing_captured_at_ms', 'Local observer contract must preserve captured_at_ms', { platform });
+    }
+    if (row.local_observer_contract?.realtime_rules?.require_preflight_before_first_insert !== true) {
+      addIssue(issues, 'row_local_observer_missing_preflight_gate', 'Local observer contract must require preflight before first insert', { platform });
     }
     if (row.provider_events_block_realtime !== false) {
       addIssue(issues, 'row_provider_events_block_realtime', 'Provider events must not block realtime annotations for row', { platform });
@@ -1013,6 +1141,8 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceRe
       insert_annotation_client_method: row.client_methods?.insert_annotation,
       adapter_preflight_required: row.adapter_preflight?.required,
       adapter_preflight_url_only_status: row.adapter_preflight?.url_only_status,
+      local_observer_mode: row.local_observer_contract?.observer_mode,
+      local_observer_timestamp_field: row.local_observer_contract?.realtime_rules?.timestamp_field,
     })),
     next_actions: issues.length > 0
       ? unique([
@@ -1245,6 +1375,7 @@ export function buildMeetingAppTimelineConnectorAdoptionIndex(checklistOrPackage
         timestamp_field: checklist.timestamp_field,
       },
       adapter_preflight: row.adapter_preflight,
+      local_observer_contract: row.local_observer_contract,
       p0_annotation_intake: {
         action: row.insert_action ?? 'insertAnnotation',
         required_field: 'captured_at_ms',
@@ -2781,6 +2912,7 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
       runtime_event_endpoint: hostInstallChecklist.runtime_event_endpoint,
       timestamp_field: hostInstallChecklist.timestamp_field,
       input_sources: adapterMatrixPrimaryInputs(row, fieldRow),
+      local_observer_contract: row.local_observer_contract,
       runtime_sequence: runtimeSequence,
       bridge_contract: {
         module: bridgeHandoff.module,
@@ -2813,6 +2945,7 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
         field_evidence_input: fieldRow.field_evidence_input,
         evidence_package: fieldRow.evidence_package,
         adapter_preflight: row.adapter_preflight,
+        local_observer: row.local_observer_contract,
       },
       validation_files: [
         'connector-adapter-matrix.json',
@@ -2951,6 +3084,12 @@ export function buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(ma
     if (row.provider_replay?.provider_events_block_realtime !== false) {
       addIssue(issues, 'row_provider_replay_blocks_realtime', 'Provider replay must not block realtime annotations for row', { platform });
     }
+    if (row.local_observer_contract?.required !== true) {
+      addIssue(issues, 'row_missing_local_observer_contract', 'Adapter matrix row must include local observer contract', { platform });
+    }
+    if (row.local_observer_contract?.realtime_rules?.timestamp_field !== 'captured_at_ms') {
+      addIssue(issues, 'row_local_observer_missing_captured_at_ms', 'Local observer contract must preserve captured_at_ms', { platform });
+    }
     if (sequence[0]?.action !== 'observe_platform_candidates') {
       addIssue(issues, 'row_first_action_not_observe_candidates', 'First runtime action must observe platform candidates', { platform });
     }
@@ -2987,6 +3126,8 @@ export function buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport(ma
       second_action: row.runtime_sequence?.[1]?.action,
       timestamp_field: row.timestamp_field,
       provider_replay_accepted: row.provider_replay?.accepted,
+      local_observer_mode: row.local_observer_contract?.observer_mode,
+      local_observer_sample_interval_ms: row.local_observer_contract?.sampling?.active_snapshot_interval_ms,
     })),
     next_actions: issues.length > 0
       ? unique([
@@ -3073,6 +3214,15 @@ function hostAdapterConfigIssues(config = {}) {
       url_only_status: config.evidence_contract?.adapter_preflight?.url_only_status,
     });
   }
+  if (config.local_observer_contract?.required !== true) {
+    addIssue(issues, 'missing_local_observer_contract', 'Host adapter config must include local observer contract', { platform: config.platform });
+  }
+  if (config.local_observer_contract?.realtime_rules?.timestamp_field !== 'captured_at_ms') {
+    addIssue(issues, 'local_observer_missing_captured_at_ms', 'Host adapter local observer contract must preserve captured_at_ms', { platform: config.platform });
+  }
+  if (config.local_observer_contract?.realtime_rules?.require_preflight_before_first_insert !== true) {
+    addIssue(issues, 'local_observer_missing_preflight_gate', 'Host adapter local observer contract must require preflight before first insert', { platform: config.platform });
+  }
   const sequence = config.runtime_sequence ?? [];
   if (sequence[0]?.action !== 'observe_platform_candidates') {
     addIssue(issues, 'first_action_not_observe_candidates', 'Host adapter first runtime action must observe platform candidates', { platform: config.platform });
@@ -3113,6 +3263,7 @@ function hostAdapterConfigFromMatrixRow(row = {}, matrix = {}) {
       can_insert_annotation_on_current_axis: row.can_insert_annotation_on_current_axis,
     },
     input_sources: row.input_sources,
+    local_observer_contract: row.local_observer_contract,
     runtime_sequence: row.runtime_sequence,
     bridge_contract: row.bridge_contract,
     sdk_facade_methods: {
@@ -3208,6 +3359,8 @@ export function buildMeetingAppTimelineHostAdapterConfigIndex(matrixOrChecklistO
       provider_replay_accepted: row.provider_replay?.accepted === true,
       can_start_axis_before_provider: row.can_start_axis_before_provider === true,
       timestamp_field: row.timestamp_field,
+      local_observer_mode: config.local_observer_contract?.observer_mode,
+      local_observer_sample_interval_ms: config.local_observer_contract?.sampling?.active_snapshot_interval_ms,
     });
   });
   const issues = [
