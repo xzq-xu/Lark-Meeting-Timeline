@@ -12,6 +12,7 @@ import type {
 export const MEETING_PLATFORM_ADAPTER_RUNTIME_RECIPE_SCHEMA: 'meeting_platform_adapter_runtime_recipe';
 export const MEETING_PLATFORM_ADAPTER_RUNTIME_RECIPE_MATRIX_SCHEMA: 'meeting_platform_adapter_runtime_recipe_matrix';
 export const MEETING_PLATFORM_ADAPTER_RUNTIME_MANIFEST_SCHEMA: 'meeting_platform_adapter_runtime_manifest';
+export const MEETING_PLATFORM_ADAPTER_RUNTIME_TARGET_SCHEMA: 'meeting_platform_adapter_runtime_target';
 export const MEETING_PLATFORM_ADAPTER_RUNTIME_RECIPE_SCHEMA_VERSION: 1;
 
 export interface MeetingPlatformAdapterRuntimeRecipeOptions extends MeetingPlatformAdapterDecisionOptions {
@@ -90,6 +91,34 @@ export interface MeetingPlatformAdapterRuntimeManifest {
   next_actions: string[];
 }
 
+export interface MeetingPlatformAdapterRuntimeTarget {
+  type: 'meeting_platform_adapter_runtime_target';
+  schema: 'meeting_platform_adapter_runtime_target';
+  schema_version: 1;
+  accepted: boolean;
+  status: string;
+  platform?: string;
+  detection_reason?: string;
+  detected_meeting?: Record<string, unknown>;
+  current_url?: string;
+  selected_surface?: string;
+  host_kind?: string;
+  bridge_kind?: string;
+  adapter_module?: string;
+  first_required_method?: string;
+  insert_method?: string;
+  timestamp_field: 'captured_at_ms';
+  runtime_event_actions?: string[];
+  host_endpoints?: Record<string, string>;
+  runtime_contract?: Record<string, unknown>;
+  dispatch_policy?: string;
+  platform_registry_row?: Record<string, unknown>;
+  runtime_actions: Array<Record<string, unknown>>;
+  mark_template?: Record<string, unknown>;
+  readiness: Record<string, unknown>;
+  next_actions: string[];
+}
+
 export function buildMeetingPlatformAdapterRuntimeRecipe(
   input?: string | URL | MeetingPlatformAdapterDecisionInput,
   options?: MeetingPlatformAdapterRuntimeRecipeOptions,
@@ -119,3 +148,15 @@ export function assertMeetingPlatformAdapterRuntimeManifest(
   input?: MeetingPlatformAdapterDecisionInput,
   options?: MeetingPlatformAdapterRuntimeRecipeOptions,
 ): MeetingPlatformAdapterRuntimeManifest;
+
+export function buildMeetingPlatformAdapterRuntimeTarget(
+  manifestOrInput?: MeetingPlatformAdapterRuntimeManifest | string | URL | MeetingPlatformAdapterDecisionInput,
+  input?: string | URL | MeetingPlatformAdapterDecisionInput,
+  options?: MeetingPlatformAdapterRuntimeRecipeOptions,
+): MeetingPlatformAdapterRuntimeTarget;
+
+export function assertMeetingPlatformAdapterRuntimeTarget(
+  manifestOrInput?: MeetingPlatformAdapterRuntimeManifest | MeetingPlatformAdapterRuntimeTarget | string | URL | MeetingPlatformAdapterDecisionInput,
+  input?: string | URL | MeetingPlatformAdapterDecisionInput,
+  options?: MeetingPlatformAdapterRuntimeRecipeOptions,
+): MeetingPlatformAdapterRuntimeTarget;

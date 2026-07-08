@@ -209,9 +209,11 @@ import {
   assertMeetingPlatformAdapterRuntimeManifest,
   assertMeetingPlatformAdapterRuntimeRecipe,
   assertMeetingPlatformAdapterRuntimeRecipeMatrix,
+  assertMeetingPlatformAdapterRuntimeTarget,
   buildMeetingPlatformAdapterRuntimeManifest,
   buildMeetingPlatformAdapterRuntimeRecipe,
   buildMeetingPlatformAdapterRuntimeRecipeMatrix,
+  buildMeetingPlatformAdapterRuntimeTarget,
 } from './platform-adapter-runtime-recipe.mjs';
 import {
   assertMeetingPlatformAdapterCandidatePreflight,
@@ -926,6 +928,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     platformAdapterRuntimeManifest(input = {}, recipeOptions = {}) {
       return buildMeetingPlatformAdapterRuntimeManifest(input, withDefaults(defaults, recipeOptions));
     },
+    platformAdapterRuntimeTarget(manifestOrInput = {}, input = {}, targetOptions = {}) {
+      return buildMeetingPlatformAdapterRuntimeTarget(manifestOrInput, input, withDefaults(defaults, targetOptions));
+    },
     assertPlatformAdapterRuntimeRecipe(input = {}, recipeOptions = {}) {
       return assertMeetingPlatformAdapterRuntimeRecipe(input, withDefaults(defaults, recipeOptions));
     },
@@ -934,6 +939,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertPlatformAdapterRuntimeManifest(input = {}, recipeOptions = {}) {
       return assertMeetingPlatformAdapterRuntimeManifest(input, withDefaults(defaults, recipeOptions));
+    },
+    assertPlatformAdapterRuntimeTarget(manifestOrInput = {}, input = {}, targetOptions = {}) {
+      return assertMeetingPlatformAdapterRuntimeTarget(manifestOrInput, input, withDefaults(defaults, targetOptions));
     },
     platformAdapterPreflight(input = {}, preflightOptions = {}) {
       return buildMeetingPlatformAdapterPreflight(input, withDefaults(defaults, preflightOptions));

@@ -1693,6 +1693,12 @@ export function createMeetingAppTimelineSdk(options = {}) {
     adapterRuntimeManifest(input = {}, recipeOptions = {}) {
       return sdk.platformAdapterRuntimeManifest(input, recipeOptions);
     },
+    platformAdapterRuntimeTarget(manifestOrInput = {}, input = {}, targetOptions = {}) {
+      return runtime.kit.platformAdapterRuntimeTarget(manifestOrInput, input, sdkPlatformOptions(runtime, targetOptions));
+    },
+    adapterRuntimeTarget(manifestOrInput = {}, input = {}, targetOptions = {}) {
+      return sdk.platformAdapterRuntimeTarget(manifestOrInput, input, targetOptions);
+    },
     assertPlatformAdapterRuntimeRecipe(input = {}, recipeOptions = {}) {
       return runtime.kit.assertPlatformAdapterRuntimeRecipe(input, sdkPlatformOptions(runtime, recipeOptions));
     },
@@ -1710,6 +1716,12 @@ export function createMeetingAppTimelineSdk(options = {}) {
     },
     assertAdapterRuntimeManifest(input = {}, recipeOptions = {}) {
       return sdk.assertPlatformAdapterRuntimeManifest(input, recipeOptions);
+    },
+    assertPlatformAdapterRuntimeTarget(manifestOrInput = {}, input = {}, targetOptions = {}) {
+      return runtime.kit.assertPlatformAdapterRuntimeTarget(manifestOrInput, input, sdkPlatformOptions(runtime, targetOptions));
+    },
+    assertAdapterRuntimeTarget(manifestOrInput = {}, input = {}, targetOptions = {}) {
+      return sdk.assertPlatformAdapterRuntimeTarget(manifestOrInput, input, targetOptions);
     },
     platformAdapterPreflight(input = {}, preflightOptions = {}) {
       return runtime.kit.platformAdapterPreflight(input, sdkPlatformOptions(runtime, preflightOptions));

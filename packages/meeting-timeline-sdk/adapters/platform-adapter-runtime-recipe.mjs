@@ -1,4 +1,5 @@
 import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
+import { detectMeetingFromUrl } from './meeting-url.mjs';
 import {
   buildMeetingPlatformAdapterStartupPlan,
 } from './platform-adapter-startup.mjs';
@@ -15,7 +16,28 @@ import {
 export const MEETING_PLATFORM_ADAPTER_RUNTIME_RECIPE_SCHEMA = 'meeting_platform_adapter_runtime_recipe';
 export const MEETING_PLATFORM_ADAPTER_RUNTIME_RECIPE_MATRIX_SCHEMA = 'meeting_platform_adapter_runtime_recipe_matrix';
 export const MEETING_PLATFORM_ADAPTER_RUNTIME_MANIFEST_SCHEMA = 'meeting_platform_adapter_runtime_manifest';
+export const MEETING_PLATFORM_ADAPTER_RUNTIME_TARGET_SCHEMA = 'meeting_platform_adapter_runtime_target';
 export const MEETING_PLATFORM_ADAPTER_RUNTIME_RECIPE_SCHEMA_VERSION = 1;
+
+const SURFACE_ALIASES = Object.freeze({
+  browser: 'browser_extension',
+  browser_extension: 'browser_extension',
+  'browser-extension': 'browser_extension',
+  extension: 'browser_extension',
+  webview: 'webview_preload',
+  webview_preload: 'webview_preload',
+  'webview-preload': 'webview_preload',
+  electron: 'webview_preload',
+  native: 'native_detector',
+  native_detector: 'native_detector',
+  'native-detector': 'native_detector',
+  native_host: 'native_detector',
+  'native-host': 'native_detector',
+  host: 'native_detector',
+  provider: 'provider_reconcile',
+  provider_reconcile: 'provider_reconcile',
+  'provider-reconcile': 'provider_reconcile',
+});
 
 const DEFAULT_RUNTIME_RECIPE_PLATFORMS = Object.freeze([
   'google_meet',
@@ -41,6 +63,36 @@ function unique(values = []) {
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function issue(severity, code, message, details = {}) {
+  return compactObject({ severity, code, message, ...details });
+}
+
+function normalizeSurface(value) {
+  if (value == null || value === '') return undefined;
+  const raw = String(value).trim();
+  return SURFACE_ALIASES[raw] ?? SURFACE_ALIASES[raw.toLowerCase()] ?? raw;
+}
+
+function getPath(raw, path) {
+  const parts = path.split('.');
+  let node = raw;
+  for (const part of parts) node = node?.[part];
+  return node;
+}
+
+function firstPath(raw, paths = []) {
+  return firstNonEmpty(...paths.map((path) => getPath(raw, path)));
+}
+
+function maybeNormalizePlatform(value) {
+  if (value == null || value === '') return undefined;
+  try {
+    return normalizeMeetingPlatform(value);
+  } catch {
+    return undefined;
+  }
 }
 
 function selectedPlatforms(input = {}, options = {}) {
@@ -498,6 +550,255 @@ export function buildMeetingPlatformAdapterRuntimeManifest(input = {}, options =
   };
 }
 
+function runtimeManifestFrom(manifestOrInput = {}, input = {}, options = {}) {
+  if (manifestOrInput?.schema === MEETING_PLATFORM_ADAPTER_RUNTIME_MANIFEST_SCHEMA) return manifestOrInput;
+  return firstNonEmpty(
+    options.runtimeManifest,
+    options.runtime_manifest,
+    input.runtimeManifest,
+    input.runtime_manifest,
+    manifestOrInput.runtimeManifest,
+    manifestOrInput.runtime_manifest,
+    manifestOrInput.manifest,
+  ) ?? buildMeetingPlatformAdapterRuntimeManifest({}, {
+    ...input,
+    ...options,
+    platforms: firstNonEmpty(options.platforms, options.platform_keys, input.platforms, input.platform_keys, manifestOrInput.platforms, manifestOrInput.platform_keys),
+  });
+}
+
+function runtimeTargetInput(manifestOrInput = {}, input = {}) {
+  return manifestOrInput?.schema === MEETING_PLATFORM_ADAPTER_RUNTIME_MANIFEST_SCHEMA ? input : manifestOrInput;
+}
+
+function rawTargetUrl(input = {}, options = {}) {
+  if (typeof input === 'string' || input instanceof URL) return String(input);
+  return firstNonEmpty(
+    options.url,
+    options.href,
+    options.meetingUrl,
+    options.meeting_url,
+    firstPath(input, [
+      'meeting.meeting_url',
+      'meeting.meetingUrl',
+      'meeting.url',
+      'meeting.join_url',
+      'meeting.joinUrl',
+      'meeting_url',
+      'meetingUrl',
+      'join_url',
+      'joinUrl',
+      'url',
+      'href',
+      'window.url',
+      'browser.url',
+      'tab.url',
+    ]),
+  );
+}
+
+function explicitTargetPlatform(input = {}, options = {}) {
+  if (typeof input === 'string' || input instanceof URL) return maybeNormalizePlatform(options.platform);
+  return maybeNormalizePlatform(firstNonEmpty(
+    options.platform,
+    options.platform_key,
+    input.platform,
+    input.platform_key,
+    input.provider,
+    input.adapter,
+    input.meeting?.platform,
+    input.current_meeting?.platform,
+    input.currentMeeting?.platform,
+    input.detected_meeting?.platform,
+    input.detectedMeeting?.platform,
+    input.tab?.platform,
+    input.window?.platform,
+  ));
+}
+
+function resolveRuntimeTargetPlatform(manifest = {}, input = {}, options = {}) {
+  const url = rawTargetUrl(input, options);
+  const explicit = explicitTargetPlatform(input, options);
+  const detected = detectMeetingFromUrl({
+    url,
+    title: typeof input === 'object' ? firstPath(input, ['title', 'tab.title', 'window.title', 'meeting.title']) : undefined,
+  });
+  const platform = firstNonEmpty(explicit, detected?.platform);
+  return {
+    platform,
+    detected_meeting: detected,
+    detection_reason: explicit ? 'explicit_platform' : detected ? 'meeting_url' : 'none',
+    url,
+    manifest_schema: manifest.schema,
+  };
+}
+
+function runtimeRegistryRows(manifest = {}) {
+  return asArray(manifest.platform_registry?.rows);
+}
+
+function runtimeRegistryRow(manifest = {}, platform) {
+  return runtimeRegistryRows(manifest).find((row) => row.platform === platform);
+}
+
+function requiredSurface(input = {}, options = {}) {
+  if (typeof input === 'string' || input instanceof URL) return normalizeSurface(options.surface ?? options.preferredSurface ?? options.preferred_surface);
+  return normalizeSurface(firstNonEmpty(
+    options.surface,
+    options.preferredSurface,
+    options.preferred_surface,
+    input.surface,
+    input.preferredSurface,
+    input.preferred_surface,
+  ));
+}
+
+function targetRuntimeActions(row = {}) {
+  const localSurface = row.selected_surface !== 'provider_reconcile';
+  return [
+    localSurface ? {
+      id: 'observe_platform_candidates',
+      phase: 'local_axis',
+      required: true,
+      sdk_method: row.first_required_method ?? 'observePlatformCandidates',
+      bridge_kind: row.bridge_kind,
+      timestamp_field: 'captured_at_ms',
+    } : undefined,
+    localSurface ? {
+      id: 'insert_realtime_annotation',
+      phase: 'realtime_mark',
+      required: true,
+      sdk_method: row.insert_method ?? 'insertAnnotation',
+      timestamp_field: 'captured_at_ms',
+    } : undefined,
+    row.speaker_position_markers?.enabled === true ? {
+      id: 'emit_speaker_position',
+      phase: 'optional_track',
+      required: false,
+      sdk_method: 'speakerTrack',
+      text_required: false,
+      filter_policy: row.speaker_position_markers.filter_policy,
+      timestamp_field: 'captured_at_ms',
+    } : undefined,
+    row.participant_position_markers?.enabled === true ? {
+      id: 'emit_participant_position',
+      phase: 'optional_track',
+      required: false,
+      sdk_method: 'participantTrack',
+      text_required: false,
+      timestamp_field: 'captured_at_ms',
+    } : undefined,
+    {
+      id: 'provider_reconcile_backfill',
+      phase: 'post_axis_reconcile',
+      required: false,
+      sdk_method: row.provider_reconcile?.method ?? 'ingestProvider',
+      realtime_blocking: false,
+    },
+  ].filter(Boolean);
+}
+
+function runtimeTargetReadiness(manifest = {}, row = null, resolved = {}, surface = undefined) {
+  const required = surface;
+  const issues = [
+    manifest.schema === MEETING_PLATFORM_ADAPTER_RUNTIME_MANIFEST_SCHEMA ? undefined : issue('error', 'invalid_runtime_manifest', 'Runtime target requires a runtime manifest.', {
+      actual: manifest.schema,
+    }),
+    manifest.runtime_ready === true ? undefined : issue('error', 'runtime_manifest_not_ready', 'Runtime manifest must be ready before selecting a runtime target.'),
+    resolved.platform ? undefined : issue('error', 'platform_not_detected', 'No supported meeting platform was detected from the current input.'),
+    row?.platform ? undefined : issue('error', 'platform_not_registered', 'Detected meeting platform is not present in the runtime manifest.', {
+      platform: resolved.platform,
+    }),
+    row?.runtime_ready === true ? undefined : issue('error', 'runtime_target_not_ready', 'Runtime manifest row is not ready.', {
+      platform: resolved.platform,
+    }),
+    required && row?.selected_surface && required !== row.selected_surface ? issue('error', 'surface_mismatch', 'Requested surface does not match the runtime manifest target surface.', {
+      platform: resolved.platform,
+      requested_surface: required,
+      selected_surface: row.selected_surface,
+    }) : undefined,
+    row?.selected_surface === 'provider_reconcile' ? issue('error', 'provider_reconcile_not_realtime_target', 'Provider reconcile cannot be the primary realtime runtime target.', {
+      platform: resolved.platform,
+    }) : undefined,
+  ].filter(Boolean);
+  return {
+    accepted: issues.filter((item) => item.severity === 'error').length === 0,
+    issue_count: issues.length,
+    issues,
+  };
+}
+
+function runtimeTargetStatus(ready = {}, row = null, resolved = {}) {
+  if (ready.accepted === true) return 'ready_to_start_runtime_target';
+  if (!resolved.platform) return 'platform_not_detected';
+  if (!row?.platform) return 'platform_not_registered';
+  if (row?.selected_surface === 'provider_reconcile') return 'needs_local_surface_for_realtime_axis';
+  return 'runtime_target_not_ready';
+}
+
+function runtimeTargetNextActions(target = {}, ready = {}) {
+  if (ready.accepted !== true) return unique([
+    ...(ready.issues ?? []).map((item) => item.code),
+    'fix_runtime_target_blockers',
+  ]);
+  return unique([
+    `start_${target.host_kind}`,
+    'observe_platform_candidates_before_first_mark',
+    'insert_realtime_marks_with_captured_at_ms',
+    'filter_speaker_position_markers_before_drawing_timeline_positions',
+    'reconcile_provider_events_after_local_axis',
+  ]);
+}
+
+export function buildMeetingPlatformAdapterRuntimeTarget(manifestOrInput = {}, input = {}, options = {}) {
+  const manifest = runtimeManifestFrom(manifestOrInput, input, options);
+  const targetInput = runtimeTargetInput(manifestOrInput, input);
+  const resolved = resolveRuntimeTargetPlatform(manifest, targetInput, options);
+  const row = runtimeRegistryRow(manifest, resolved.platform);
+  const surface = requiredSurface(targetInput, options);
+  const ready = runtimeTargetReadiness(manifest, row, resolved, surface);
+  const target = compactObject({
+    type: 'meeting_platform_adapter_runtime_target',
+    schema: MEETING_PLATFORM_ADAPTER_RUNTIME_TARGET_SCHEMA,
+    schema_version: MEETING_PLATFORM_ADAPTER_RUNTIME_RECIPE_SCHEMA_VERSION,
+    accepted: ready.accepted,
+    status: runtimeTargetStatus(ready, row, resolved),
+    platform: resolved.platform,
+    detection_reason: resolved.detection_reason,
+    detected_meeting: resolved.detected_meeting,
+    current_url: resolved.url,
+    selected_surface: row?.selected_surface,
+    host_kind: row?.host_kind,
+    bridge_kind: row?.bridge_kind,
+    adapter_module: row?.adapter_module,
+    first_required_method: row?.first_required_method,
+    insert_method: row?.insert_method,
+    timestamp_field: 'captured_at_ms',
+    runtime_event_actions: row?.runtime_event_actions,
+    host_endpoints: manifest.host_endpoints,
+    runtime_contract: manifest.runtime_contract,
+    dispatch_policy: row?.bridge_kind ? manifest.dispatch_policy?.[row.bridge_kind] : undefined,
+    platform_registry_row: row,
+    runtime_actions: row ? targetRuntimeActions(row) : [],
+    mark_template: row ? {
+      platform: row.platform,
+      captured_at_ms: firstNonEmpty(
+        options.capturedAtMs,
+        options.captured_at_ms,
+        targetInput.capturedAtMs,
+        targetInput.captured_at_ms,
+        0,
+      ),
+      source: 'meeting_platform_adapter_runtime_target',
+    } : undefined,
+    readiness: ready,
+  });
+  return {
+    ...target,
+    next_actions: runtimeTargetNextActions(target, ready),
+  };
+}
+
 export function assertMeetingPlatformAdapterRuntimeRecipe(input = {}, options = {}) {
   const recipe = buildMeetingPlatformAdapterRuntimeRecipe(input, options);
   if (recipe.accepted !== true) {
@@ -538,4 +839,20 @@ export function assertMeetingPlatformAdapterRuntimeManifest(input = {}, options 
     });
   }
   return manifest;
+}
+
+export function assertMeetingPlatformAdapterRuntimeTarget(manifestOrInput = {}, input = {}, options = {}) {
+  const target = manifestOrInput.schema === MEETING_PLATFORM_ADAPTER_RUNTIME_TARGET_SCHEMA
+    ? manifestOrInput
+    : buildMeetingPlatformAdapterRuntimeTarget(manifestOrInput, input, options);
+  if (target.accepted !== true) {
+    throw new MeetingTimelineSdkError('Meeting platform adapter runtime target is not ready', {
+      code: 'meeting_platform_adapter_runtime_target_not_ready',
+      status: target.status,
+      issues: target.readiness?.issues ?? [],
+      platform: target.platform,
+      selected_surface: target.selected_surface,
+    });
+  }
+  return target;
 }

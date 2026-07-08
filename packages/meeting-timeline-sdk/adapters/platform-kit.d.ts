@@ -97,6 +97,7 @@ import type {
   MeetingPlatformAdapterRuntimeRecipe,
   MeetingPlatformAdapterRuntimeRecipeMatrix,
   MeetingPlatformAdapterRuntimeRecipeOptions,
+  MeetingPlatformAdapterRuntimeTarget,
 } from './platform-adapter-runtime-recipe.mjs';
 import type {
   MeetingPlatformAdapterCandidatePreflight,
@@ -533,9 +534,19 @@ export interface MeetingPlatformTimelineKit {
   platformAdapterRuntimeRecipe(input?: string | URL | MeetingPlatformAdapterDecisionInput, recipeOptions?: MeetingPlatformAdapterRuntimeRecipeOptions): MeetingPlatformAdapterRuntimeRecipe;
   platformAdapterRuntimeRecipeMatrix(input?: MeetingPlatformAdapterDecisionInput, recipeOptions?: MeetingPlatformAdapterRuntimeRecipeOptions): MeetingPlatformAdapterRuntimeRecipeMatrix;
   platformAdapterRuntimeManifest(input?: MeetingPlatformAdapterDecisionInput, recipeOptions?: MeetingPlatformAdapterRuntimeRecipeOptions): MeetingPlatformAdapterRuntimeManifest;
+  platformAdapterRuntimeTarget(
+    manifestOrInput?: MeetingPlatformAdapterRuntimeManifest | string | URL | MeetingPlatformAdapterDecisionInput,
+    input?: string | URL | MeetingPlatformAdapterDecisionInput,
+    targetOptions?: MeetingPlatformAdapterRuntimeRecipeOptions,
+  ): MeetingPlatformAdapterRuntimeTarget;
   assertPlatformAdapterRuntimeRecipe(input?: string | URL | MeetingPlatformAdapterDecisionInput, recipeOptions?: MeetingPlatformAdapterRuntimeRecipeOptions): MeetingPlatformAdapterRuntimeRecipe;
   assertPlatformAdapterRuntimeRecipeMatrix(input?: MeetingPlatformAdapterDecisionInput, recipeOptions?: MeetingPlatformAdapterRuntimeRecipeOptions): MeetingPlatformAdapterRuntimeRecipeMatrix;
   assertPlatformAdapterRuntimeManifest(input?: MeetingPlatformAdapterDecisionInput, recipeOptions?: MeetingPlatformAdapterRuntimeRecipeOptions): MeetingPlatformAdapterRuntimeManifest;
+  assertPlatformAdapterRuntimeTarget(
+    manifestOrInput?: MeetingPlatformAdapterRuntimeManifest | MeetingPlatformAdapterRuntimeTarget | string | URL | MeetingPlatformAdapterDecisionInput,
+    input?: string | URL | MeetingPlatformAdapterDecisionInput,
+    targetOptions?: MeetingPlatformAdapterRuntimeRecipeOptions,
+  ): MeetingPlatformAdapterRuntimeTarget;
   platformAdapterPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
   platformAdapterCurrentWindowPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
   platformAdapterPreflightMatrix(input?: MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflightMatrix;

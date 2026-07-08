@@ -677,6 +677,12 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeOptions,
   ): import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeManifest;
   adapterRuntimeManifest: MeetingAppTimelineSdk['platformAdapterRuntimeManifest'];
+  platformAdapterRuntimeTarget(
+    manifestOrInput?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeManifest | string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeOptions,
+  ): import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget;
+  adapterRuntimeTarget: MeetingAppTimelineSdk['platformAdapterRuntimeTarget'];
   assertPlatformAdapterRuntimeRecipe(
     input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
     options?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeOptions,
@@ -692,6 +698,12 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeOptions,
   ): import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeManifest;
   assertAdapterRuntimeManifest: MeetingAppTimelineSdk['assertPlatformAdapterRuntimeManifest'];
+  assertPlatformAdapterRuntimeTarget(
+    manifestOrInput?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeRecipeOptions,
+  ): import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget;
+  assertAdapterRuntimeTarget: MeetingAppTimelineSdk['assertPlatformAdapterRuntimeTarget'];
   platformAdapterPreflight(
     input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
     options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
