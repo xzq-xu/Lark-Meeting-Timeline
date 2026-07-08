@@ -6,6 +6,7 @@ import {
   assertMeetingPlatformAdapterDecisionMatrix,
   buildMeetingPlatformAdapterDecision,
   buildMeetingPlatformAdapterDecisionMatrix,
+  buildMeetingPlatformHostProfileCompatibilityMatrix,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-decision.mjs';
 import {
   createMeetingPlatformTimelineKit,
@@ -192,6 +193,32 @@ assert.equal(providerProfileMatrix.realtime_ready_count, 0);
 assert.equal(providerProfileMatrix.rows.every((row) => row.host_profile === 'provider_reconcile_only'), true);
 assert.equal(providerProfileMatrix.rows.every((row) => row.status === 'needs_local_surface_for_realtime_axis'), true);
 
+const hostProfileCompatibility = buildMeetingPlatformHostProfileCompatibilityMatrix({}, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom', 'teams'],
+  hostProfiles: ['browser_extension', 'native_detector', 'provider_reconcile_only'],
+});
+assert.equal(hostProfileCompatibility.schema, 'meeting_platform_host_profile_compatibility_matrix');
+assert.deepEqual(hostProfileCompatibility.platforms, ['google_meet', 'zoom', 'microsoft_teams']);
+assert.deepEqual(hostProfileCompatibility.host_profiles, ['browser_extension', 'native_detector', 'provider_reconcile_only']);
+assert.equal(hostProfileCompatibility.platform_count, 3);
+assert.equal(hostProfileCompatibility.host_profile_count, 3);
+assert.equal(hostProfileCompatibility.cell_count, 9);
+assert.equal(hostProfileCompatibility.full_realtime_profile_count, 2);
+assert.equal(hostProfileCompatibility.provider_only_profile_count, 1);
+assert.equal(hostProfileCompatibility.recommended_host_profile, 'browser_extension');
+assert.equal(hostProfileCompatibility.rows.find((row) => row.host_profile === 'browser_extension').accepted_count, 3);
+assert.equal(hostProfileCompatibility.rows.find((row) => row.host_profile === 'browser_extension').browser_surface_count, 3);
+assert.equal(hostProfileCompatibility.rows.find((row) => row.host_profile === 'native_detector').accepted_count, 3);
+assert.equal(hostProfileCompatibility.rows.find((row) => row.host_profile === 'native_detector').native_surface_count, 3);
+assert.equal(hostProfileCompatibility.rows.find((row) => row.host_profile === 'provider_reconcile_only').accepted_count, 0);
+assert.equal(hostProfileCompatibility.rows.find((row) => row.host_profile === 'provider_reconcile_only').provider_reconcile_surface_count, 3);
+assert.equal(hostProfileCompatibility.cells.some((cell) => (
+  cell.host_profile === 'browser_extension'
+  && cell.platform === 'zoom'
+  && cell.selected_surface === 'browser_extension'
+)), true);
+
 const unavailableExplicitSurface = buildMeetingPlatformAdapterDecision({
   platform: 'google-meet',
   surface: 'browser_extension',
@@ -254,6 +281,10 @@ assert.equal(kit.platformAdapterDecision({
 assert.equal(kit.platformAdapterDecisionMatrix({}, {
   platforms: ['webex', 'lark'],
 }).platform_count, 2);
+assert.equal(kit.platformHostProfileCompatibilityMatrix({}, {
+  platforms: ['webex', 'lark'],
+  hostProfiles: ['browser_extension'],
+}).cell_count, 2);
 assert.equal(kit.assertPlatformAdapterDecision({
   platform: 'webex',
 }).accepted, true);
@@ -274,6 +305,14 @@ assert.equal(sdk.platformAdapterDecisionMatrix({}, {
 assert.equal(sdk.adapterDecisionMatrix({}, {
   platforms: ['google-meet'],
 }).rows[0].provider_events_block_realtime, false);
+assert.equal(sdk.platformHostProfileCompatibilityMatrix({}, {
+  platforms: ['google-meet'],
+  hostProfiles: ['browser_extension'],
+}).recommended_host_profile, 'browser_extension');
+assert.equal(sdk.hostProfileCompatibilityMatrix({}, {
+  platforms: ['google-meet'],
+  hostProfiles: ['provider_reconcile_only'],
+}).full_realtime_profile_count, 0);
 assert.equal(sdk.assertAdapterDecision({
   url: 'https://meet.google.com/abc-defg-hij',
 }).accepted, true);

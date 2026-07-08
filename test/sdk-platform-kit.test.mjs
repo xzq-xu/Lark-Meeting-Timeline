@@ -103,6 +103,13 @@ assert.equal(kit.platformProviderReplayMatrix({ platforms: ['google-meet', 'zoom
 assert.equal(kit.assertPlatformProviderReplayMatrix({ platforms: ['google-meet'] }).accepted, true);
 const googleKitReport = kit.report({ platforms: ['google-meet'] });
 assert.equal(googleKitReport.platform_provider_replay_matrix.accepted_count, 1);
+assert.equal(googleKitReport.platform_host_profile_compatibility_matrix.platform_count, 1);
+assert.equal(googleKitReport.platform_host_profile_compatibility_matrix.host_profile_count, 9);
+assert.equal(googleKitReport.platform_host_profile_compatibility_matrix.full_realtime_profile_count >= 1, true);
+assert.equal(kit.platformHostProfileCompatibilityMatrix({}, {
+  platforms: ['google-meet', 'zoom'],
+  hostProfiles: ['browser_extension', 'native_detector'],
+}).cell_count, 4);
 const googleConnector = kit.platformConnector('google-meet');
 assert.equal(googleConnector.schema, 'meeting_platform_connector');
 assert.equal(googleConnector.platform, 'google_meet');

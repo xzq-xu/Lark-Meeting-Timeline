@@ -627,6 +627,11 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionOptions,
   ): import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionMatrix;
   adapterDecisionMatrix: MeetingAppTimelineSdk['platformAdapterDecisionMatrix'];
+  platformHostProfileCompatibilityMatrix(
+    input?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
+    options?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionOptions,
+  ): import('./adapters/platform-adapter-decision.mjs').MeetingPlatformHostProfileCompatibilityMatrix;
+  hostProfileCompatibilityMatrix: MeetingAppTimelineSdk['platformHostProfileCompatibilityMatrix'];
   assertPlatformAdapterDecision(
     input?: string | URL | import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionInput,
     options?: import('./adapters/platform-adapter-decision.mjs').MeetingPlatformAdapterDecisionOptions,

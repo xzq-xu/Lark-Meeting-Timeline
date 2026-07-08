@@ -197,6 +197,7 @@ import {
   assertMeetingPlatformAdapterDecisionMatrix,
   buildMeetingPlatformAdapterDecision,
   buildMeetingPlatformAdapterDecisionMatrix,
+  buildMeetingPlatformHostProfileCompatibilityMatrix,
 } from './platform-adapter-decision.mjs';
 import {
   assertMeetingPlatformAdapterStartupPlan,
@@ -631,6 +632,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
   const meetingAppLaunchGateSummary = buildMeetingAppLaunchGateSummary(options);
   const platformProviderReplayMatrix = buildMeetingPlatformProviderReplayMatrix(providerReplayKitOptions(options));
   const platformRealtimeAxisReadinessMatrix = buildMeetingPlatformRealtimeAxisReadinessMatrix(options, options);
+  const platformHostProfileCompatibilityMatrix = buildMeetingPlatformHostProfileCompatibilityMatrix(options, options);
   const platformAdapterExportPackageMatrix = buildMeetingPlatformAdapterExportPackageMatrix(options);
   const platformAdapterImportPlanMatrix = buildMeetingPlatformAdapterImportPlanMatrix({
     packages: platformAdapterExportPackageMatrix.packages,
@@ -649,6 +651,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
     }),
     platform_provider_replay_matrix: platformProviderReplayMatrix,
     platform_realtime_axis_readiness_matrix: platformRealtimeAxisReadinessMatrix,
+    platform_host_profile_compatibility_matrix: platformHostProfileCompatibilityMatrix,
     platform_connector_matrix: buildMeetingPlatformConnectorMatrix(options),
     platform_connector_hub: buildMeetingPlatformConnectorHub(options),
     platform_conformance_report: buildMeetingPlatformConformanceReport(options),
@@ -880,6 +883,9 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     platformAdapterDecisionMatrix(input = {}, decisionOptions = {}) {
       return buildMeetingPlatformAdapterDecisionMatrix(input, withDefaults(defaults, decisionOptions));
+    },
+    platformHostProfileCompatibilityMatrix(input = {}, decisionOptions = {}) {
+      return buildMeetingPlatformHostProfileCompatibilityMatrix(input, withDefaults(defaults, decisionOptions));
     },
     assertPlatformAdapterDecision(input = {}, decisionOptions = {}) {
       return assertMeetingPlatformAdapterDecision(input, withDefaults(defaults, decisionOptions));

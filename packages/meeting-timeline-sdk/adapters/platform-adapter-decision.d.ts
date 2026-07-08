@@ -11,6 +11,7 @@ import type {
 
 export const MEETING_PLATFORM_ADAPTER_DECISION_SCHEMA: 'meeting_platform_adapter_decision';
 export const MEETING_PLATFORM_ADAPTER_DECISION_MATRIX_SCHEMA: 'meeting_platform_adapter_decision_matrix';
+export const MEETING_PLATFORM_HOST_PROFILE_COMPATIBILITY_MATRIX_SCHEMA: 'meeting_platform_host_profile_compatibility_matrix';
 export const MEETING_PLATFORM_ADAPTER_DECISION_SCHEMA_VERSION: 1;
 export const MEETING_PLATFORM_HOST_PROFILE_PRESETS: Readonly<Record<string, {
   profile: string;
@@ -36,6 +37,10 @@ export interface MeetingPlatformAdapterDecisionOptions {
   host_profile?: string;
   hostRuntimeProfile?: string;
   host_runtime_profile?: string;
+  hostProfiles?: string[];
+  host_profiles?: string[];
+  hostProfileKeys?: string[];
+  host_profile_keys?: string[];
   availableSurfaces?: string[] | Record<string, unknown>;
   available_surfaces?: string[] | Record<string, unknown>;
   surfaceCapabilities?: Record<string, unknown>;
@@ -80,6 +85,10 @@ export interface MeetingPlatformAdapterDecisionInput {
   host_profile?: string;
   hostRuntimeProfile?: string;
   host_runtime_profile?: string;
+  hostProfiles?: string[];
+  host_profiles?: string[];
+  hostProfileKeys?: string[];
+  host_profile_keys?: string[];
   availableSurfaces?: string[] | Record<string, unknown>;
   available_surfaces?: string[] | Record<string, unknown>;
   surfaceCapabilities?: Record<string, unknown>;
@@ -279,6 +288,56 @@ export interface MeetingPlatformAdapterDecisionMatrix {
   next_actions: string[];
 }
 
+export interface MeetingPlatformHostProfileCompatibilityRow {
+  host_profile: string;
+  label?: string;
+  available_surfaces?: string[];
+  realtime_axis_surface?: string;
+  platform_count: number;
+  accepted_count: number;
+  realtime_ready_count: number;
+  local_surface_selected_count: number;
+  browser_surface_count: number;
+  native_surface_count: number;
+  provider_reconcile_surface_count: number;
+  all_platforms_accepted: boolean;
+  blocked_platforms: string[];
+  first_blocker?: string;
+  [key: string]: unknown;
+}
+
+export interface MeetingPlatformHostProfileCompatibilityCell {
+  host_profile: string;
+  platform?: string;
+  display_name?: string;
+  accepted?: boolean;
+  realtime_ready?: boolean;
+  status?: string;
+  selected_surface?: string;
+  selected_observer_mode?: string;
+  first_evidence_to_collect?: string;
+  first_next_action?: string;
+  [key: string]: unknown;
+}
+
+export interface MeetingPlatformHostProfileCompatibilityMatrix {
+  type: 'meeting_platform_host_profile_compatibility_matrix';
+  schema: 'meeting_platform_host_profile_compatibility_matrix';
+  schema_version: 1;
+  platform_count: number;
+  host_profile_count: number;
+  cell_count: number;
+  full_realtime_profile_count: number;
+  provider_only_profile_count: number;
+  recommended_host_profile?: string;
+  platforms: string[];
+  host_profiles: string[];
+  rows: MeetingPlatformHostProfileCompatibilityRow[];
+  cells: MeetingPlatformHostProfileCompatibilityCell[];
+  matrices: MeetingPlatformAdapterDecisionMatrix[];
+  next_actions: string[];
+}
+
 export function buildMeetingPlatformAdapterDecision(
   input?: string | URL | MeetingPlatformAdapterDecisionInput,
   options?: MeetingPlatformAdapterDecisionOptions,
@@ -288,6 +347,11 @@ export function buildMeetingPlatformAdapterDecisionMatrix(
   input?: MeetingPlatformAdapterDecisionInput,
   options?: MeetingPlatformAdapterDecisionOptions,
 ): MeetingPlatformAdapterDecisionMatrix;
+
+export function buildMeetingPlatformHostProfileCompatibilityMatrix(
+  input?: MeetingPlatformAdapterDecisionInput,
+  options?: MeetingPlatformAdapterDecisionOptions,
+): MeetingPlatformHostProfileCompatibilityMatrix;
 
 export function assertMeetingPlatformAdapterDecision(
   input?: string | URL | MeetingPlatformAdapterDecisionInput,

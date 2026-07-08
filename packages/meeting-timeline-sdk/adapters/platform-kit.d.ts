@@ -85,6 +85,7 @@ import type {
   MeetingPlatformAdapterDecisionInput,
   MeetingPlatformAdapterDecisionMatrix,
   MeetingPlatformAdapterDecisionOptions,
+  MeetingPlatformHostProfileCompatibilityMatrix,
 } from './platform-adapter-decision.mjs';
 import type {
   MeetingPlatformAdapterStartupPlan,
@@ -516,6 +517,7 @@ export interface MeetingPlatformTimelineKit {
   ): MeetingPlatformAdapterBlueprintMatrix;
   platformAdapterDecision(input?: string | URL | MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecision;
   platformAdapterDecisionMatrix(input?: MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecisionMatrix;
+  platformHostProfileCompatibilityMatrix(input?: MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformHostProfileCompatibilityMatrix;
   assertPlatformAdapterDecision(input?: string | URL | MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecision;
   assertPlatformAdapterDecisionMatrix(input?: MeetingPlatformAdapterDecisionInput, decisionOptions?: MeetingPlatformAdapterDecisionOptions): MeetingPlatformAdapterDecisionMatrix;
   platformAdapterStartupPlan(input?: string | URL | MeetingPlatformAdapterDecisionInput, startupOptions?: MeetingPlatformAdapterStartupPlanOptions): MeetingPlatformAdapterStartupPlan;

@@ -20,6 +20,7 @@ import {
 
 export const MEETING_PLATFORM_ADAPTER_DECISION_SCHEMA = 'meeting_platform_adapter_decision';
 export const MEETING_PLATFORM_ADAPTER_DECISION_MATRIX_SCHEMA = 'meeting_platform_adapter_decision_matrix';
+export const MEETING_PLATFORM_HOST_PROFILE_COMPATIBILITY_MATRIX_SCHEMA = 'meeting_platform_host_profile_compatibility_matrix';
 export const MEETING_PLATFORM_ADAPTER_DECISION_SCHEMA_VERSION = 1;
 export const MEETING_PLATFORM_HOST_PROFILE_PRESETS = Object.freeze({
   browser_extension: Object.freeze({
@@ -93,6 +94,18 @@ const DEFAULT_DECISION_PLATFORMS = Object.freeze([
   'zoom',
   'webex',
   'lark',
+]);
+
+const DEFAULT_HOST_PROFILE_COMPATIBILITY_ORDER = Object.freeze([
+  'hybrid_desktop',
+  'browser_or_native',
+  'browser_extension',
+  'native_detector',
+  'webview_preload',
+  'full_local',
+  'full',
+  'local_detector',
+  'provider_reconcile_only',
 ]);
 
 function firstNonEmpty(...values) {
@@ -388,6 +401,44 @@ function selectedPlatforms(input = {}, options = {}) {
     input.platform_keys,
     DEFAULT_DECISION_PLATFORMS,
   )).map((platform) => normalizeMeetingPlatform(platform)));
+}
+
+function selectedHostProfiles(input = {}, options = {}) {
+  return unique(asArray(firstNonEmpty(
+    options.hostProfiles,
+    options.host_profiles,
+    options.hostProfileKeys,
+    options.host_profile_keys,
+    input.hostProfiles,
+    input.host_profiles,
+    input.hostProfileKeys,
+    input.host_profile_keys,
+    DEFAULT_HOST_PROFILE_COMPATIBILITY_ORDER,
+  )).map((profile) => normalizeHostProfile(profile))).filter((profile) => MEETING_PLATFORM_HOST_PROFILE_PRESETS[profile]);
+}
+
+function withoutHostSurfaceSelection(options = {}) {
+  const {
+    hostProfile,
+    host_profile,
+    hostRuntimeProfile,
+    host_runtime_profile,
+    hostProfiles,
+    host_profiles,
+    hostProfileKeys,
+    host_profile_keys,
+    availableSurfaces,
+    available_surfaces,
+    surfaceCapabilities,
+    surface_capabilities,
+    hostSurfaces,
+    host_surfaces,
+    hostCapabilities,
+    host_capabilities,
+    capabilities,
+    ...rest
+  } = options;
+  return rest;
 }
 
 function inputForPlatform(platform, input = {}, options = {}) {
@@ -977,6 +1028,71 @@ export function buildMeetingPlatformAdapterDecisionMatrix(input = {}, options = 
     })),
     decisions,
     next_actions: unique(decisions.flatMap((decision) => decision.next_actions ?? [])),
+  };
+}
+
+export function buildMeetingPlatformHostProfileCompatibilityMatrix(input = {}, options = {}) {
+  const platforms = selectedPlatforms(input, options);
+  const hostProfiles = selectedHostProfiles(input, options);
+  const cleanInput = withoutHostSurfaceSelection(input);
+  const cleanOptions = withoutHostSurfaceSelection(options);
+  const matrices = hostProfiles.map((profile) => buildMeetingPlatformAdapterDecisionMatrix(cleanInput, {
+    ...cleanOptions,
+    platforms,
+    hostProfile: profile,
+  }));
+  const profileRows = matrices.map((matrix, index) => {
+    const profile = hostProfiles[index];
+    const preset = MEETING_PLATFORM_HOST_PROFILE_PRESETS[profile];
+    const unavailableRows = matrix.rows.filter((row) => row.accepted !== true);
+    return {
+      host_profile: profile,
+      label: preset?.label,
+      available_surfaces: [...(preset?.available_surfaces ?? [])],
+      realtime_axis_surface: preset?.realtime_axis_surface,
+      platform_count: matrix.platform_count,
+      accepted_count: matrix.accepted_count,
+      realtime_ready_count: matrix.realtime_ready_count,
+      local_surface_selected_count: matrix.local_surface_selected_count,
+      browser_surface_count: matrix.browser_surface_count,
+      native_surface_count: matrix.native_surface_count,
+      provider_reconcile_surface_count: matrix.provider_reconcile_surface_count,
+      all_platforms_accepted: matrix.accepted_count === matrix.platform_count,
+      blocked_platforms: unavailableRows.map((row) => row.platform).filter(Boolean),
+      first_blocker: unavailableRows[0]?.status,
+    };
+  });
+  const cells = matrices.flatMap((matrix, profileIndex) => matrix.rows.map((row) => ({
+    host_profile: hostProfiles[profileIndex],
+    platform: row.platform,
+    display_name: row.display_name,
+    accepted: row.accepted,
+    realtime_ready: row.realtime_ready,
+    status: row.status,
+    selected_surface: row.selected_surface,
+    selected_observer_mode: row.selected_observer_mode,
+    first_evidence_to_collect: row.first_evidence_to_collect,
+    first_next_action: row.first_next_action,
+  })));
+  const recommended = DEFAULT_HOST_PROFILE_COMPATIBILITY_ORDER
+    .map((profile) => profileRows.find((row) => row.host_profile === profile))
+    .find((row) => row?.all_platforms_accepted === true && row.provider_reconcile_surface_count === 0);
+  return {
+    type: 'meeting_platform_host_profile_compatibility_matrix',
+    schema: MEETING_PLATFORM_HOST_PROFILE_COMPATIBILITY_MATRIX_SCHEMA,
+    schema_version: MEETING_PLATFORM_ADAPTER_DECISION_SCHEMA_VERSION,
+    platform_count: platforms.length,
+    host_profile_count: hostProfiles.length,
+    cell_count: cells.length,
+    full_realtime_profile_count: profileRows.filter((row) => row.all_platforms_accepted && row.provider_reconcile_surface_count === 0).length,
+    provider_only_profile_count: profileRows.filter((row) => row.provider_reconcile_surface_count === row.platform_count).length,
+    recommended_host_profile: recommended?.host_profile,
+    platforms,
+    host_profiles: hostProfiles,
+    rows: profileRows,
+    cells,
+    matrices,
+    next_actions: unique(matrices.flatMap((matrix) => matrix.next_actions ?? [])),
   };
 }
 

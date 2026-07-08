@@ -1633,6 +1633,12 @@ export function createMeetingAppTimelineSdk(options = {}) {
     adapterDecisionMatrix(input = {}, decisionOptions = {}) {
       return sdk.platformAdapterDecisionMatrix(input, decisionOptions);
     },
+    platformHostProfileCompatibilityMatrix(input = {}, decisionOptions = {}) {
+      return runtime.kit.platformHostProfileCompatibilityMatrix(input, sdkPlatformOptions(runtime, decisionOptions));
+    },
+    hostProfileCompatibilityMatrix(input = {}, decisionOptions = {}) {
+      return sdk.platformHostProfileCompatibilityMatrix(input, decisionOptions);
+    },
     assertPlatformAdapterDecision(input = {}, decisionOptions = {}) {
       return runtime.kit.assertPlatformAdapterDecision(input, sdkPlatformOptions(runtime, decisionOptions));
     },

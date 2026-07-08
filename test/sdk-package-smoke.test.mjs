@@ -573,6 +573,7 @@ import {
   MEETING_PLATFORM_HOST_PROFILE_PRESETS as MEETING_PLATFORM_HOST_PROFILE_PRESETS_FROM_ROOT,
   buildMeetingPlatformAdapterDecision as buildMeetingPlatformAdapterDecisionFromRoot,
   buildMeetingPlatformAdapterDecisionMatrix as buildMeetingPlatformAdapterDecisionMatrixFromRoot,
+  buildMeetingPlatformHostProfileCompatibilityMatrix as buildMeetingPlatformHostProfileCompatibilityMatrixFromRoot,
   buildMeetingPlatformAdapterStartupPlan as buildMeetingPlatformAdapterStartupPlanFromRoot,
   buildMeetingPlatformAdapterStartupPlanMatrix as buildMeetingPlatformAdapterStartupPlanMatrixFromRoot,
   buildMeetingPlatformAdapterCandidatePreflight as buildMeetingPlatformAdapterCandidatePreflightFromRoot,
@@ -681,6 +682,7 @@ import {
 import {
   buildMeetingPlatformAdapterDecision,
   buildMeetingPlatformAdapterDecisionMatrix,
+  buildMeetingPlatformHostProfileCompatibilityMatrix,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-decision';
 import {
   buildMeetingPlatformAdapterStartupPlan,
@@ -1387,6 +1389,14 @@ assert.equal(rootMeetingAppSdk.platformAdapterDecisionMatrix({}, {
   platforms: ['google-meet', 'zoom'],
   availableSurfaces: ['provider_reconcile'],
 }).accepted_count, 0);
+assert.equal(rootMeetingAppSdk.platformHostProfileCompatibilityMatrix({}, {
+  platforms: ['google-meet', 'zoom'],
+  hostProfiles: ['browser_extension', 'native_detector'],
+}).cell_count, 4);
+assert.equal(rootMeetingAppSdk.hostProfileCompatibilityMatrix({}, {
+  platforms: ['google-meet'],
+  hostProfiles: ['provider_reconcile_only'],
+}).full_realtime_profile_count, 0);
 assert.equal(rootMeetingAppSdk.platformAdapterAcceptanceChecklist('google-meet', {}, { target: 'static' }).accepted, true);
 assert.equal(rootMeetingAppSdk.adapterAcceptanceChecklistMatrix({ platforms: ['google-meet'] }, { target: 'static' }).accepted_count, 1);
 assert.equal(rootMeetingAppSdk.platformAdapterExportPackage('google-meet', {}, { target: 'static' }).export_ready, true);
@@ -1576,6 +1586,11 @@ assert.equal(buildMeetingPlatformAdapterDecisionMatrixFromRoot({}, {
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet'],
 }).accepted_count, 1);
+assert.equal(buildMeetingPlatformHostProfileCompatibilityMatrixFromRoot({}, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet'],
+  hostProfiles: ['browser_extension'],
+}).recommended_host_profile, 'browser_extension');
 assert.equal(buildMeetingPlatformAdapterStartupPlanFromRoot({
   url: 'https://meet.google.com/abc-defg-hij',
 }, {
@@ -3105,6 +3120,11 @@ assert.equal(buildMeetingPlatformAdapterDecisionMatrix({}, {
   baseUrl: 'http://localhost:8787',
   platforms: ['zoom'],
 }).rows[0].provider_events_block_realtime, false);
+assert.equal(buildMeetingPlatformHostProfileCompatibilityMatrix({}, {
+  baseUrl: 'http://localhost:8787',
+  platforms: ['google-meet', 'zoom'],
+  hostProfiles: ['native_detector'],
+}).rows[0].native_surface_count, 2);
 assert.equal(buildMeetingPlatformAdapterStartupPlan({
   url: 'https://meet.google.com/abc-defg-hij',
 }, {
@@ -3160,6 +3180,10 @@ assert.equal(kit.platformAdapterDecision({
 assert.equal(kit.platformAdapterDecisionMatrix({}, {
   platforms: ['webex'],
 }).accepted_count, 1);
+assert.equal(kit.platformHostProfileCompatibilityMatrix({}, {
+  platforms: ['webex'],
+  hostProfiles: ['browser_extension'],
+}).cell_count, 1);
 assert.equal(kit.platformAdapterStartupPlan({
   url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
 }).platform, 'microsoft_teams');
