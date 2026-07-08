@@ -22,9 +22,12 @@ import {
   assertMeetingAppTimelineHostAdapterBootstrapPlanMatrix,
   assertMeetingAppTimelineHostAdapterConfigIndex,
   assertMeetingAppTimelineResolvedHostAdapterConfig,
+  assertMeetingAppTimelineConnectorHostWiringGuide,
   assertMeetingAppTimelineConnectorPlatformRoadmap,
   assertMeetingAppTimelineConnectorReleaseGate,
   buildMeetingAppTimelineConnectorAdapterMatrix,
+  buildMeetingAppTimelineConnectorHostWiringGuide,
+  buildMeetingAppTimelineConnectorHostWiringGuideAcceptanceReport,
   buildMeetingAppTimelineHostAdapterBootstrapPlan,
   buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix,
   buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport,
@@ -1155,6 +1158,39 @@ export function createMeetingAppTimelineSdk(options = {}) {
       return assertMeetingAppTimelineHostAdapterConfigIndex(source, {
         ...sdkPlatformOptions(runtime, connectorOptions),
         ...indexOptions,
+      });
+    },
+    connectorHostWiringGuide(connectorOptions = {}, guideOptions = {}) {
+      const source = connectorOptions?.schema === 'meeting_app_timeline_connector_host_wiring_guide'
+        || isConnectorHostAdapterSource(connectorOptions)
+        ? connectorOptions
+        : sdk.connectorPackage(connectorOptions);
+      return buildMeetingAppTimelineConnectorHostWiringGuide(source, {
+        ...sdkPlatformOptions(runtime, isConnectorHostAdapterSource(connectorOptions) ? {} : connectorOptions),
+        ...guideOptions,
+      });
+    },
+    connectorHostWiringGuideAcceptanceReport(guideOrConnectorOptions = {}, acceptanceOptions = {}) {
+      const source = guideOrConnectorOptions?.schema === 'meeting_app_timeline_connector_host_wiring_guide'
+        ? guideOrConnectorOptions
+        : (
+          isConnectorHostAdapterSource(guideOrConnectorOptions)
+            ? guideOrConnectorOptions
+            : sdk.connectorPackage(guideOrConnectorOptions)
+        );
+      return buildMeetingAppTimelineConnectorHostWiringGuideAcceptanceReport(source, {
+        ...sdkPlatformOptions(runtime, isConnectorHostAdapterSource(guideOrConnectorOptions) ? {} : guideOrConnectorOptions),
+        ...acceptanceOptions,
+      });
+    },
+    assertConnectorHostWiringGuide(connectorOptions = {}, guideOptions = {}) {
+      const source = connectorOptions?.schema === 'meeting_app_timeline_connector_host_wiring_guide'
+        || isConnectorHostAdapterSource(connectorOptions)
+        ? connectorOptions
+        : sdk.connectorPackage(connectorOptions);
+      return assertMeetingAppTimelineConnectorHostWiringGuide(source, {
+        ...sdkPlatformOptions(runtime, isConnectorHostAdapterSource(connectorOptions) ? {} : connectorOptions),
+        ...guideOptions,
       });
     },
     resolveConnectorHostAdapterConfig(input = {}, connectorOptions = {}, resolveOptions = {}) {

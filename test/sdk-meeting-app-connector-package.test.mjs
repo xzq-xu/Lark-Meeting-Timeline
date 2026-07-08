@@ -6,6 +6,7 @@ import {
   MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_FIELD_INTAKE_INDEX_SCHEMA,
   MEETING_APP_TIMELINE_CONNECTOR_HANDOFF_SCHEMA,
+  MEETING_APP_TIMELINE_CONNECTOR_HOST_WIRING_GUIDE_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_ACCEPTANCE_SCHEMA,
   MEETING_APP_TIMELINE_HOST_ADAPTER_BOOTSTRAP_PLAN_MATRIX_SCHEMA,
@@ -39,6 +40,8 @@ import {
   buildMeetingAppTimelineConnectorAdapterMatrixAcceptanceReport,
   buildMeetingAppTimelineConnectorFieldIntakeIndex,
   buildMeetingAppTimelineConnectorHandoff,
+  buildMeetingAppTimelineConnectorHostWiringGuide,
+  buildMeetingAppTimelineConnectorHostWiringGuideAcceptanceReport,
   buildMeetingAppTimelineHostAdapterBootstrapPlan,
   buildMeetingAppTimelineHostAdapterBootstrapPlanMatrix,
   buildMeetingAppTimelineHostAdapterBootstrapPlanMatrixAcceptanceReport,
@@ -443,6 +446,20 @@ assert.equal(hostAdapterConfigIndex.rows.find((row) => row.platform === 'zoom').
 assert.equal(hostAdapterConfigIndex.rows.find((row) => row.platform === 'google_meet').local_observer_runtime_factory, 'createMeetingAppBrowserRuntime');
 assert.equal(hostAdapterConfigIndex.rows.find((row) => row.platform === 'zoom').local_observer_runtime_factory, 'createMeetingAppTrackRuntime');
 assert.equal(assertMeetingAppTimelineHostAdapterConfigIndex(adapterMatrix).accepted, true);
+
+const hostWiringGuide = buildMeetingAppTimelineConnectorHostWiringGuide(adapterMatrix);
+assert.equal(hostWiringGuide.schema, MEETING_APP_TIMELINE_CONNECTOR_HOST_WIRING_GUIDE_SCHEMA);
+assert.equal(hostWiringGuide.accepted, true);
+assert.equal(hostWiringGuide.row_count, 2);
+assert.equal(hostWiringGuide.files_to_read_first.includes('connector-host-wiring-guide.json'), true);
+assert.equal(hostWiringGuide.rows.find((row) => row.platform === 'google_meet').code_snippet.includes('observePlatformCandidates'), true);
+assert.equal(hostWiringGuide.rows.find((row) => row.platform === 'google_meet').code_snippet.includes("insertAnnotation('google_meet'"), true);
+assert.equal(hostWiringGuide.rows.find((row) => row.platform === 'google_meet').runtime_sequence[0].action, 'observe_platform_candidates');
+assert.equal(hostWiringGuide.rows.find((row) => row.platform === 'zoom').host_install.local_observer_runtime_factory, 'createMeetingAppTrackRuntime');
+const hostWiringGuideAcceptance = buildMeetingAppTimelineConnectorHostWiringGuideAcceptanceReport(hostWiringGuide);
+assert.equal(hostWiringGuideAcceptance.schema, 'meeting_app_timeline_connector_host_wiring_guide_acceptance_report');
+assert.equal(hostWiringGuideAcceptance.accepted, true);
+assert.equal(hostWiringGuideAcceptance.rows.find((row) => row.platform === 'google_meet').first_action, 'observe_platform_candidates');
 
 const googleHostAdapterConfig = buildMeetingAppTimelineHostAdapterConfig(adapterMatrix, 'google-meet');
 assert.equal(googleHostAdapterConfig.schema, MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA);

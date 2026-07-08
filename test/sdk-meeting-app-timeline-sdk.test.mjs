@@ -162,6 +162,12 @@ assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'zoom').adapter_mode, 'native_or_desktop_observer');
 assert.equal(connectorAdapterMatrix.rows.every((row) => row.runtime_sequence[0].action === 'observe_platform_candidates'), true);
 assert.equal(sdk.assertConnectorAdapterMatrix(connectorPackage).accepted, true);
+const connectorHostWiringGuide = sdk.connectorHostWiringGuide(connectorPackage);
+assert.equal(connectorHostWiringGuide.schema, 'meeting_app_timeline_connector_host_wiring_guide');
+assert.equal(connectorHostWiringGuide.accepted, true);
+assert.equal(connectorHostWiringGuide.rows.find((row) => row.platform === 'google_meet').code_snippet.includes('createMeetingAppTimelineConnectorRuntimeClient'), true);
+assert.equal(sdk.connectorHostWiringGuideAcceptanceReport(connectorHostWiringGuide).accepted, true);
+assert.equal(sdk.assertConnectorHostWiringGuide(connectorPackage).accepted, true);
 const resolvedConnectorHostAdapter = sdk.resolveConnectorHostAdapterConfig({
   tabs: [
     { url: 'https://zoom.us/j/987654321', active: false, in_meeting: true },

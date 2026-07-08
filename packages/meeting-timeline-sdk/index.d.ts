@@ -374,6 +374,15 @@ export interface MeetingAppTimelineSdk {
     indexOptions?: Record<string, unknown>,
   ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineHostAdapterConfigIndex;
   assertConnectorHostAdapterConfigIndex: MeetingAppTimelineSdk['connectorHostAdapterConfigIndex'];
+  connectorHostWiringGuide(
+    connectorOptions?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+    guideOptions?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineConnectorHostWiringGuide;
+  connectorHostWiringGuideAcceptanceReport(
+    guideOrConnectorOptions?: import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineConnectorHostWiringGuide | MeetingAppTimelineConnectorPackage | Record<string, unknown>,
+    acceptanceOptions?: Record<string, unknown>,
+  ): import('./adapters/meeting-app-connector-package.mjs').MeetingAppTimelineConnectorHostWiringGuideAcceptanceReport;
+  assertConnectorHostWiringGuide: MeetingAppTimelineSdk['connectorHostWiringGuide'];
   resolveConnectorHostAdapterConfig(
     input?: string | URL | Record<string, unknown>,
     connectorOptions?: MeetingAppTimelineConnectorPackage | Record<string, unknown>,

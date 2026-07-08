@@ -38,6 +38,8 @@ export const MEETING_APP_TIMELINE_CONNECTOR_RELEASE_GATE_SCHEMA = 'meeting_app_t
 export const MEETING_APP_TIMELINE_CONNECTOR_PLATFORM_ROADMAP_SCHEMA = 'meeting_app_timeline_connector_platform_roadmap';
 export const MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_SCHEMA = 'meeting_app_timeline_connector_adapter_matrix';
 export const MEETING_APP_TIMELINE_CONNECTOR_ADAPTER_MATRIX_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_adapter_matrix_acceptance_report';
+export const MEETING_APP_TIMELINE_CONNECTOR_HOST_WIRING_GUIDE_SCHEMA = 'meeting_app_timeline_connector_host_wiring_guide';
+export const MEETING_APP_TIMELINE_CONNECTOR_HOST_WIRING_GUIDE_ACCEPTANCE_SCHEMA = 'meeting_app_timeline_connector_host_wiring_guide_acceptance_report';
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_SCHEMA = 'meeting_app_timeline_host_adapter_config';
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_INDEX_SCHEMA = 'meeting_app_timeline_host_adapter_config_index';
 export const MEETING_APP_TIMELINE_HOST_ADAPTER_CONFIG_RESOLUTION_SCHEMA = 'meeting_app_timeline_host_adapter_config_resolution';
@@ -3702,6 +3704,226 @@ export function assertMeetingAppTimelineHostAdapterConfigIndex(matrixOrChecklist
     });
   }
   return index;
+}
+
+function hostWiringCodeSnippet(row = {}) {
+  const platform = normalizeKey(row.platform);
+  const lines = [
+    "import { createMeetingAppTimelineConnectorRuntimeClient } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package';",
+    '',
+    'const client = createMeetingAppTimelineConnectorRuntimeClient(connectorPackage, { fetch });',
+    `await client.observePlatformCandidates({ platform: '${platform}', captured_at_ms: Date.now(), ...candidateInput });`,
+    `await client.insertAnnotation('${platform}', { id: 'mark-1', label: 'why?', captured_at_ms: Date.now() });`,
+  ];
+  if (row.sdk_facade_methods?.speaker_track) {
+    lines.push(`await client.speakerTrack('${platform}', { speaker_id: activeSpeakerId, captured_at_ms: Date.now() });`);
+  }
+  return lines.join('\n');
+}
+
+function hostWiringGuideRowIssues(row = {}, matrix = {}) {
+  const platform = normalizeKey(row.platform);
+  const sequence = row.runtime_sequence ?? [];
+  const messages = asArray(row.bridge_contract?.supported_message_types);
+  const issues = [
+    platform ? undefined : 'missing_platform',
+    row.selected_surface ? undefined : 'missing_selected_surface',
+    row.install_target ? undefined : 'missing_install_target',
+    row.install_step ? undefined : 'missing_install_step',
+    matrix.runtime_event_endpoint ? undefined : 'missing_runtime_event_endpoint',
+    row.timestamp_field === 'captured_at_ms' || matrix.timestamp_field === 'captured_at_ms' ? undefined : 'invalid_timestamp_contract',
+    row.sdk_facade_methods?.observe_candidates ? undefined : 'missing_observe_candidates_facade',
+    row.sdk_facade_methods?.insert_annotation ? undefined : 'missing_insert_annotation_facade',
+    row.onboarding_contract?.schema === 'meeting_platform_adapter_acceptance_checklist' ? undefined : 'missing_onboarding_contract',
+    row.local_observer_runtime_wiring?.required === true ? undefined : 'missing_local_observer_runtime_wiring',
+    sequence[0]?.action === 'observe_platform_candidates' ? undefined : 'first_action_not_observe_candidates',
+    sequence[1]?.action === 'insert_annotation' ? undefined : 'second_action_not_insert_annotation',
+    sequence[1]?.required_field === 'captured_at_ms' ? undefined : 'insert_annotation_missing_captured_at_ms',
+    messages.includes('meeting_timeline.observe_candidates') ? undefined : 'missing_observe_candidates_bridge_message',
+    messages.includes('meeting_timeline.insert_mark') ? undefined : 'missing_insert_mark_bridge_message',
+  ].filter(Boolean);
+  return unique(issues);
+}
+
+export function buildMeetingAppTimelineConnectorHostWiringGuide(matrixOrChecklistOrPackage = {}, options = {}) {
+  if (matrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_WIRING_GUIDE_SCHEMA) {
+    return matrixOrChecklistOrPackage;
+  }
+  const matrix = hostAdapterMatrixFrom(matrixOrChecklistOrPackage, options);
+  const rows = (matrix.rows ?? []).map((row) => {
+    const platform = normalizeKey(row.platform);
+    const issues = hostWiringGuideRowIssues(row, matrix);
+    const runtimeSequence = row.runtime_sequence ?? [];
+    return compactObject({
+      platform,
+      display_name: row.display_name,
+      accepted: issues.length === 0,
+      selected_surface: row.selected_surface,
+      adapter_mode: row.adapter_mode,
+      install_target: row.install_target,
+      install_step: row.install_step,
+      config_file: `host-adapter-configs/${platform}.json`,
+      runtime_client: {
+        module: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package',
+        factory: 'createMeetingAppTimelineConnectorRuntimeClient',
+        runtime_event_endpoint: row.runtime_event_endpoint ?? matrix.runtime_event_endpoint,
+        required_methods: [
+          row.sdk_facade_methods?.observe_candidates,
+          row.sdk_facade_methods?.insert_annotation,
+          row.sdk_facade_methods?.speaker_track,
+          row.sdk_facade_methods?.participant_track,
+        ].filter(Boolean),
+      },
+      host_install: {
+        local_observer_mode: row.local_observer_contract?.observer_mode,
+        local_observer_runtime_factory: row.local_observer_runtime_wiring?.runtime_factory,
+        input_contract_kind: row.local_observer_contract?.input_contract?.kind,
+        bridge_messages: row.bridge_contract?.supported_message_types,
+      },
+      runtime_sequence: runtimeSequence.map((step) => compactObject({
+        order: step.order,
+        action: step.action,
+        client_method: step.client_method,
+        message_type: step.message_type,
+        required_field: step.required_field,
+      })),
+      onboarding_step_ids: asArray(row.onboarding_contract?.implementation_sequence).map((step) => step.id),
+      code_snippet: hostWiringCodeSnippet(row),
+      validation_files: unique([
+        'connector-host-wiring-guide.json',
+        'connector-host-wiring-guide-acceptance.json',
+        ...(row.validation_files ?? []),
+        `host-adapter-configs/${platform}.json`,
+      ]),
+      issue_count: issues.length,
+      issues,
+      next_actions: issues.length > 0
+        ? issues.map((issue) => `fix_${issue}`)
+        : [
+          'copy_code_snippet_into_host_adapter',
+          'wire_candidate_input_from_real_meeting_window',
+          'run_connector_host_wiring_guide_acceptance',
+        ],
+    });
+  });
+  const issues = [
+    ...(matrix.accepted === true ? [] : ['connector_adapter_matrix_not_accepted']),
+    ...rows.flatMap((row) => row.issues.map((issue) => `${row.platform}:${issue}`)),
+  ];
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_HOST_WIRING_GUIDE_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_HOST_WIRING_GUIDE_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    package_id: matrix.package_id,
+    platform_count: matrix.platform_count ?? rows.length,
+    row_count: rows.length,
+    accepted_count: rows.filter((row) => row.accepted === true).length,
+    runtime_event_endpoint: matrix.runtime_event_endpoint,
+    timestamp_field: matrix.timestamp_field,
+    source_matrix_schema: matrix.schema,
+    files_to_read_first: [
+      'connector-host-wiring-guide.json',
+      'connector-host-wiring-guide-acceptance.json',
+      'connector-adapter-matrix.json',
+      'host-adapter-config-index.json',
+      'platform-onboarding-checklist-matrix.json',
+    ],
+    runtime_invariants: matrix.runtime_invariants,
+    rows,
+    issue_count: unique(issues).length,
+    issues: unique(issues),
+    next_actions: issues.length > 0
+      ? unique(issues.map((issue) => `fix_${issue}`))
+      : ['copy_host_wiring_guide_into_host_project'],
+  });
+}
+
+export function buildMeetingAppTimelineConnectorHostWiringGuideAcceptanceReport(guideOrMatrixOrChecklistOrPackage = {}, options = {}) {
+  const guide = guideOrMatrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_WIRING_GUIDE_SCHEMA
+    ? guideOrMatrixOrChecklistOrPackage
+    : buildMeetingAppTimelineConnectorHostWiringGuide(guideOrMatrixOrChecklistOrPackage, options);
+  const rows = guide.rows ?? [];
+  const issues = [];
+  if (guide.schema !== MEETING_APP_TIMELINE_CONNECTOR_HOST_WIRING_GUIDE_SCHEMA) {
+    addIssue(issues, 'invalid_schema', 'Expected a meeting app timeline connector host wiring guide', {
+      expected_schema: MEETING_APP_TIMELINE_CONNECTOR_HOST_WIRING_GUIDE_SCHEMA,
+      actual_schema: guide.schema,
+    });
+  }
+  if (guide.accepted !== true) addIssue(issues, 'host_wiring_guide_not_accepted', 'Host wiring guide accepted flag is not true');
+  if ((guide.platform_count ?? 0) <= 0) addIssue(issues, 'missing_platforms', 'Host wiring guide must include at least one platform');
+  if (guide.timestamp_field !== 'captured_at_ms') {
+    addIssue(issues, 'invalid_timestamp_contract', 'Host wiring guide must require captured_at_ms', {
+      timestamp_field: guide.timestamp_field,
+    });
+  }
+  if (!guide.runtime_event_endpoint) addIssue(issues, 'missing_runtime_event_endpoint', 'Host wiring guide must include runtime_event_endpoint');
+  for (const row of rows) {
+    const platform = normalizeKey(row.platform);
+    if (row.accepted !== true) addIssue(issues, 'row_not_accepted', 'Host wiring guide row is not accepted', { platform });
+    if (!row.code_snippet?.includes('createMeetingAppTimelineConnectorRuntimeClient')) {
+      addIssue(issues, 'row_missing_runtime_client_snippet', 'Host wiring guide row must include runtime client snippet', { platform });
+    }
+    if (!row.code_snippet?.includes('observePlatformCandidates')) {
+      addIssue(issues, 'row_missing_observe_snippet', 'Host wiring guide row must include observePlatformCandidates snippet', { platform });
+    }
+    if (!row.code_snippet?.includes('insertAnnotation')) {
+      addIssue(issues, 'row_missing_insert_snippet', 'Host wiring guide row must include insertAnnotation snippet', { platform });
+    }
+    if (row.runtime_sequence?.[0]?.action !== 'observe_platform_candidates') {
+      addIssue(issues, 'row_first_action_not_observe_candidates', 'Host wiring guide first action must observe candidates', { platform });
+    }
+    if (row.runtime_sequence?.[1]?.action !== 'insert_annotation') {
+      addIssue(issues, 'row_second_action_not_insert_annotation', 'Host wiring guide second action must insert annotation', { platform });
+    }
+  }
+  return compactObject({
+    type: MEETING_APP_TIMELINE_CONNECTOR_HOST_WIRING_GUIDE_ACCEPTANCE_SCHEMA,
+    schema: MEETING_APP_TIMELINE_CONNECTOR_HOST_WIRING_GUIDE_ACCEPTANCE_SCHEMA,
+    schema_version: MEETING_APP_TIMELINE_CONNECTOR_PACKAGE_SCHEMA_VERSION,
+    accepted: issues.length === 0,
+    package_id: guide.package_id,
+    platform_count: guide.platform_count ?? rows.length,
+    row_count: rows.length,
+    accepted_count: guide.accepted_count,
+    runtime_event_endpoint: guide.runtime_event_endpoint,
+    timestamp_field: guide.timestamp_field,
+    issue_count: issues.length,
+    issues,
+    rows: rows.map((row) => compactObject({
+      platform: row.platform,
+      accepted: row.accepted === true,
+      selected_surface: row.selected_surface,
+      install_target: row.install_target,
+      install_step: row.install_step,
+      first_action: row.runtime_sequence?.[0]?.action,
+      second_action: row.runtime_sequence?.[1]?.action,
+      runtime_client_factory: row.runtime_client?.factory,
+      local_observer_runtime_factory: row.host_install?.local_observer_runtime_factory,
+    })),
+    next_actions: issues.length > 0
+      ? unique([
+        ...issues.map((issue) => `fix_${issue.code}`),
+        ...(guide.next_actions ?? []),
+      ])
+      : guide.next_actions ?? [],
+  });
+}
+
+export function assertMeetingAppTimelineConnectorHostWiringGuide(guideOrMatrixOrChecklistOrPackage = {}, options = {}) {
+  const guide = guideOrMatrixOrChecklistOrPackage?.schema === MEETING_APP_TIMELINE_CONNECTOR_HOST_WIRING_GUIDE_SCHEMA
+    ? guideOrMatrixOrChecklistOrPackage
+    : buildMeetingAppTimelineConnectorHostWiringGuide(guideOrMatrixOrChecklistOrPackage, options);
+  const report = buildMeetingAppTimelineConnectorHostWiringGuideAcceptanceReport(guide, options);
+  if (report.accepted !== true) {
+    throw new MeetingTimelineSdkError('Meeting app timeline connector host wiring guide is not accepted', {
+      guide,
+      report,
+      issues: report.issues,
+    });
+  }
+  return guide;
 }
 
 export function resolveMeetingAppTimelineHostAdapterConfig(indexOrMatrixOrChecklistOrPackage = {}, input = {}, options = {}) {
