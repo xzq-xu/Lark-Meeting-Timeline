@@ -23,6 +23,7 @@
     "meeting-platform-adapter-startup": "./bin/meeting-platform-adapter-startup.mjs",
     "meeting-platform-adapter-runtime-recipe": "./bin/meeting-platform-adapter-runtime-recipe.mjs",
     "meeting-platform-adapter-runtime-manifest": "./bin/meeting-platform-adapter-runtime-manifest.mjs",
+    "meeting-platform-adapter-runtime-target": "./bin/meeting-platform-adapter-runtime-target.mjs",
     "meeting-platform-host-integration": "./bin/meeting-platform-host-integration.mjs",
     "meeting-platform-provider-replay": "./bin/meeting-platform-provider-replay.mjs"
   },

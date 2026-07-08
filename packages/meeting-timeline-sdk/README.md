@@ -940,6 +940,13 @@ npx meeting-platform-adapter-runtime-manifest \
 
 运行时拿到当前会议 URL、窗口标题或显式 platform 后，再用 `platformAdapterRuntimeTarget(manifest, currentInput)` 从这份 manifest 中选出当前目标。它会返回 `host_kind`、`bridge_kind`、`first_required_method`、`insert_method`、`runtime_actions` 和 mark template；例如 Google Meet URL 会选中 browser content script，Zoom/Teams 显式桌面平台会选中 native detector。如果请求的 surface 和 manifest 不一致，target 会返回 `surface_mismatch`，避免把标注写到错误的轴上。
 
+```sh
+npx meeting-platform-adapter-runtime-target \
+  --manifest-file=meeting-platform-adapter-runtime-manifest.json \
+  --url=https://meet.google.com/abc-defg-hij \
+  --out-file=meeting-platform-adapter-runtime-target.json
+```
+
 startup plan 只能说明“应该启动哪个 surface”；真正打开会议窗口后，还需要用 `platformAdapterPreflight()` 或 SDK CLI 验证 live DOM/native evidence 是否足够建实时轴。Google Meet 这类 browser surface 可以传 DOM snapshot；Teams/Zoom 这类 native-first surface 可以传窗口、进程、Accessibility 或音频通话状态。URL-only preflight 会返回 `needs_live_page_evidence`，不会误报 realtime ready：
 
 ```sh

@@ -44,6 +44,7 @@ assert.equal(packedFiles.includes('bin/meeting-platform-adapter-smoke.mjs'), tru
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-startup.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-runtime-recipe.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-runtime-manifest.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-platform-adapter-runtime-target.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-host-integration.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-provider-replay.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-adapter-integration-package.mjs'), true);
@@ -63,6 +64,7 @@ assert.equal(packedFiles.includes('cli/meeting-platform-adapter-smoke.mjs'), tru
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-startup.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-runtime-recipe.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-runtime-manifest.mjs'), true);
+assert.equal(packedFiles.includes('cli/meeting-platform-adapter-runtime-target.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-host-integration.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-provider-replay.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
@@ -436,6 +438,24 @@ assert.equal(adapterRuntimeManifestBinReport.platform_count, 2);
 assert.equal(adapterRuntimeManifestBinReport.runtime_ready_count, 2);
 assert.equal(adapterRuntimeManifestBinReport.rows.find((row) => row.platform === 'google_meet').host_kind, 'browser_extension_content_script');
 assert.equal(adapterRuntimeManifestBinReport.rows.find((row) => row.platform === 'zoom').host_kind, 'native_desktop_detector');
+
+const { stdout: adapterRuntimeTargetBinStdout } = await execFileAsync(
+  join(consumerDir, 'node_modules', '.bin', 'meeting-platform-adapter-runtime-target'),
+  [
+    '--platforms=google-meet,zoom',
+    '--url=https://meet.google.com/abc-defg-hij',
+    '--json=true',
+  ],
+  {
+    cwd: consumerDir,
+  },
+);
+const adapterRuntimeTargetBinReport = JSON.parse(adapterRuntimeTargetBinStdout);
+assert.equal(adapterRuntimeTargetBinReport.type, 'meeting_platform_adapter_runtime_target_report');
+assert.equal(adapterRuntimeTargetBinReport.ok, true);
+assert.equal(adapterRuntimeTargetBinReport.platform, 'google_meet');
+assert.equal(adapterRuntimeTargetBinReport.host_kind, 'browser_extension_content_script');
+assert.equal(adapterRuntimeTargetBinReport.first_required_method, 'observePlatformCandidates');
 
 const { stdout: adapterDecisionBinStdout } = await execFileAsync(
   join(consumerDir, 'node_modules', '.bin', 'meeting-platform-adapter-decision'),
