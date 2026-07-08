@@ -13,9 +13,14 @@ import {
   buildMeetingPlatformAdapterLaunchPlan,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-launch-plan.mjs';
 import {
+  buildMeetingPlatformAdapterRuntimeManifest,
+  buildMeetingPlatformAdapterRuntimeTarget,
+} from '../packages/meeting-timeline-sdk/adapters/platform-adapter-runtime-recipe.mjs';
+import {
   buildMeetingPlatformAdapterRunnerHandoff,
   createMeetingPlatformAdapterRunner,
   openMeetingPlatformAdapterSession,
+  openMeetingPlatformAdapterRuntimeSession,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-runner.mjs';
 import {
   createMeetingPlatformTimelineKit,
@@ -158,9 +163,61 @@ assert.equal(directOpened.payload.observe_event.captured_at_ms, 123);
 const handoff = buildMeetingPlatformAdapterRunnerHandoff(manifest);
 assert.equal(handoff.schema, 'meeting_platform_adapter_runner_handoff');
 assert.equal(handoff.runner_factory, 'createMeetingPlatformAdapterRunner');
+assert.equal(handoff.convenience_method, 'openMeetingPlatformAdapterSession');
 assert.equal(handoff.optional_client_methods.includes('platformAdapterSelection'), true);
 assert.equal(handoff.runtime_sequence.includes('read_adapter_selection_before_runtime_wiring'), true);
 assert.equal(handoff.runtime_sequence.includes('build_launch_plan_from_current_url_or_platform'), true);
+
+const runtimeManifest = buildMeetingPlatformAdapterRuntimeManifest({}, {
+  baseUrl,
+  platforms: ['google-meet', 'zoom'],
+});
+const runtimeRunner = createMeetingPlatformAdapterRunner(runtimeManifest, adapterClient, {
+  clock: () => 1_782_700_001_000,
+});
+assert.equal(runtimeRunner.runtime_manifest.schema, 'meeting_platform_adapter_runtime_manifest');
+const runtimeTarget = runtimeRunner.runtimeTarget({
+  url: 'https://meet.google.com/abc-defg-hij',
+  title: 'Runtime runner review',
+});
+assert.equal(runtimeTarget.schema, 'meeting_platform_adapter_runtime_target');
+assert.equal(runtimeTarget.host_kind, 'browser_extension_content_script');
+const runtimeOpened = await runtimeRunner.open({
+  url: 'https://meet.google.com/abc-defg-hij',
+  title: 'Runtime runner review',
+});
+assert.equal(runtimeOpened.plan_kind, 'runtime_target');
+assert.equal(runtimeOpened.platform, 'google_meet');
+assert.equal(runtimeOpened.payload.launch_plan, undefined);
+assert.equal(runtimeOpened.payload.runtime_target.schema, 'meeting_platform_adapter_runtime_target');
+assert.equal(runtimeOpened.payload.session.plan_kind, 'runtime_target');
+assert.equal(runtimeOpened.payload.session.host_kind, 'browser_extension_content_script');
+assert.equal(runtimeOpened.payload.observe_event.payload.current_url, 'https://meet.google.com/abc-defg-hij');
+assert.equal(runtimeRunner.getState().current_runtime_target.host_kind, 'browser_extension_content_script');
+assert.equal(runtimeRunner.currentSession().runtime_target.schema, 'meeting_platform_adapter_runtime_target');
+assert.equal((await runtimeRunner.insertAnnotation({ label: 'runtime runner mark' })).payload.surface, 'browser_extension');
+
+const runtimeTargetRunner = createMeetingPlatformAdapterRunner(runtimeTarget, adapterClient, {
+  clock: () => 1_782_700_002_000,
+});
+assert.equal((await runtimeTargetRunner.open()).payload.runtime_target.host_kind, 'browser_extension_content_script');
+
+const directRuntimeOpened = await openMeetingPlatformAdapterRuntimeSession(runtimeManifest, adapterClient, {
+  url: 'https://meet.google.com/abc-defg-hij',
+}, {
+  clock: () => 1_782_700_003_000,
+});
+assert.equal(directRuntimeOpened.payload.session.plan_kind, 'runtime_target');
+assert.equal(directRuntimeOpened.payload.observe_event.captured_at_ms, 1_782_700_003_000);
+assert.equal((await openMeetingPlatformAdapterSession(runtimeTarget, adapterClient, {}, {
+  clock: () => 1_782_700_004_000,
+})).payload.runtime_target.schema, 'meeting_platform_adapter_runtime_target');
+
+const runtimeHandoff = buildMeetingPlatformAdapterRunnerHandoff(runtimeManifest);
+assert.equal(runtimeHandoff.convenience_method, 'openMeetingPlatformAdapterRuntimeSession');
+assert.equal(runtimeHandoff.runtime_manifest_schema, 'meeting_platform_adapter_runtime_manifest');
+assert.equal(runtimeHandoff.runtime_sequence.includes('build_runtime_target_from_current_url_or_platform'), true);
+assert.equal(runtimeHandoff.runtime_sequence.includes('create_session_from_runtime_target'), true);
 
 const timelineCalls = [];
 const timelineClient = {
@@ -190,6 +247,7 @@ await kitRunner.insertAnnotation({ label: 'kit runner mark' });
 assert.equal(timelineCalls.some((call) => call[0] === 'startMeeting'), true);
 assert.equal(timelineCalls.some((call) => call[0] === 'insertMark' && call[1].platform === 'google_meet'), true);
 assert.equal((await kit.openPlatformAdapterSession(manifest, { url: 'https://meet.google.com/abc-defg-hij' })).schema, 'meeting_platform_adapter_open_session_event');
+assert.equal((await kit.openPlatformAdapterSession(runtimeManifest, { url: 'https://meet.google.com/abc-defg-hij' })).payload.session.plan_kind, 'runtime_target');
 assert.equal(kit.platformAdapterRunnerHandoff(manifest).schema, 'meeting_platform_adapter_runner_handoff');
 
 const rootSdk = createMeetingAppTimelineSdk({
@@ -204,5 +262,9 @@ await rootRunner.open({
 });
 assert.equal((await rootRunner.insertAnnotation({ label: 'root runner mark' })).payload.captured_at_ms, 789);
 assert.equal(rootSdk.adapterRunnerHandoff(manifest).schema, 'meeting_platform_adapter_runner_handoff');
+assert.equal((await rootSdk.openPlatformAdapterSession(runtimeManifest, { url: 'https://meet.google.com/abc-defg-hij' }, {
+  client: adapterClient,
+  clock: () => 790,
+})).payload.session.plan_kind, 'runtime_target');
 
 console.log('ok meeting platform adapter runner');

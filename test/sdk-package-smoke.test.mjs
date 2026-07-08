@@ -674,6 +674,7 @@ import {
   createMeetingPlatformAdapterRunner as createMeetingPlatformAdapterRunnerFromRoot,
   createMeetingPlatformAdapterMessageBridge as createMeetingPlatformAdapterMessageBridgeFromRoot,
   openMeetingPlatformAdapterSession as openMeetingPlatformAdapterSessionFromRoot,
+  openMeetingPlatformAdapterRuntimeSession as openMeetingPlatformAdapterRuntimeSessionFromRoot,
   runMeetingPlatformAdapterSmoke as runMeetingPlatformAdapterSmokeFromRoot,
   createMeetingTimelineClient,
   createMeetingPlatformTimelineKit as createMeetingPlatformTimelineKitFromRoot,
@@ -897,6 +898,7 @@ import {
   buildMeetingPlatformAdapterRunnerHandoff,
   createMeetingPlatformAdapterRunner,
   openMeetingPlatformAdapterSession,
+  openMeetingPlatformAdapterRuntimeSession,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-runner';
 import {
   buildMeetingPlatformAdapterMessageBridgeHandoff,
@@ -1523,6 +1525,15 @@ assert.equal((await rootMeetingAppSdk.openPlatformAdapterSession(rootInstallMani
   client: rootAdapterSessionClient,
   clock: () => 779,
 })).payload.observe_event.captured_at_ms, 779);
+const rootRuntimeManifest = rootMeetingAppSdk.platformAdapterRuntimeManifest({}, {
+  platforms: ['google-meet', 'zoom'],
+});
+assert.equal((await rootMeetingAppSdk.openPlatformAdapterSession(rootRuntimeManifest, {
+  url: 'https://meet.google.com/abc-defg-hij',
+}, {
+  client: rootAdapterSessionClient,
+  clock: () => 781,
+})).payload.session.plan_kind, 'runtime_target');
 assert.equal(rootMeetingAppSdk.adapterRunnerHandoff(rootInstallManifest).schema, 'meeting_platform_adapter_runner_handoff');
 const rootAdapterMessageBridge = rootMeetingAppSdk.platformAdapterMessageBridge(rootInstallManifest, rootAdapterSessionClient, {
   clock: () => 780,
@@ -3090,10 +3101,11 @@ assert.equal(createMeetingPlatformAdapterSessionFromRoot(directGoogleLaunchPlan,
     return { ok: true };
   },
 }).platform, 'google_meet');
-const directRuntimeTarget = buildMeetingPlatformAdapterRuntimeTarget(buildMeetingPlatformAdapterRuntimeManifest({}, {
+const directRuntimeManifest = buildMeetingPlatformAdapterRuntimeManifest({}, {
   baseUrl: 'http://localhost:8787',
   platforms: ['google-meet', 'zoom'],
-}), {
+});
+const directRuntimeTarget = buildMeetingPlatformAdapterRuntimeTarget(directRuntimeManifest, {
   url: 'https://meet.google.com/abc-defg-hij',
 });
 const directRuntimeTargetSession = createMeetingPlatformAdapterSession(directRuntimeTarget, {
@@ -3143,6 +3155,23 @@ assert.equal((await openMeetingPlatformAdapterSessionFromRoot(directInstallManif
 }, {
   clock: () => 903,
 })).payload.observe_event.captured_at_ms, 903);
+const directRuntimeRunner = createMeetingPlatformAdapterRunner(directRuntimeManifest, directRunnerClient, {
+  clock: () => 914,
+});
+assert.equal(directRuntimeRunner.runtimeTarget({ url: 'https://meet.google.com/abc-defg-hij' }).host_kind, 'browser_extension_content_script');
+assert.equal((await directRuntimeRunner.open({ url: 'https://meet.google.com/abc-defg-hij' })).payload.session.plan_kind, 'runtime_target');
+assert.equal((await directRuntimeRunner.insertAnnotation({ label: 'runtime runner smoke' })).payload.surface, 'browser_extension');
+assert.equal((await openMeetingPlatformAdapterRuntimeSession(directRuntimeManifest, directRunnerClient, {
+  url: 'https://meet.google.com/abc-defg-hij',
+}, {
+  clock: () => 915,
+})).payload.observe_event.captured_at_ms, 915);
+assert.equal((await openMeetingPlatformAdapterRuntimeSessionFromRoot(directRuntimeManifest, directRunnerClient, {
+  url: 'https://meet.google.com/abc-defg-hij',
+}, {
+  clock: () => 916,
+})).payload.session.plan_kind, 'runtime_target');
+assert.equal(buildMeetingPlatformAdapterRunnerHandoff(directRuntimeManifest).convenience_method, 'openMeetingPlatformAdapterRuntimeSession');
 assert.equal(buildMeetingPlatformAdapterMessageBridgeHandoff(directInstallManifest).schema, 'meeting_platform_adapter_message_bridge_handoff');
 assert.equal(buildMeetingPlatformAdapterMessageBridgeHandoffFromRoot(directInstallManifest).bridge_factory, 'createMeetingPlatformAdapterMessageBridge');
 const directMessageBridge = createMeetingPlatformAdapterMessageBridge(directInstallManifest, directRunnerClient, {

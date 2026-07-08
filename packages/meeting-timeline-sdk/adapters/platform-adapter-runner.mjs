@@ -11,6 +11,12 @@ import {
   MEETING_PLATFORM_ADAPTER_SESSION_SCHEMA,
   createMeetingPlatformAdapterSession,
 } from './platform-adapter-session.mjs';
+import {
+  MEETING_PLATFORM_ADAPTER_RUNTIME_MANIFEST_SCHEMA,
+  MEETING_PLATFORM_ADAPTER_RUNTIME_TARGET_SCHEMA,
+  assertMeetingPlatformAdapterRuntimeTarget,
+  buildMeetingPlatformAdapterRuntimeTarget,
+} from './platform-adapter-runtime-recipe.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_RUNNER_SCHEMA = 'meeting_platform_adapter_runner';
 export const MEETING_PLATFORM_ADAPTER_OPEN_SESSION_EVENT_SCHEMA = 'meeting_platform_adapter_open_session_event';
@@ -30,6 +36,14 @@ function isCandidateLaunchPlan(value) {
 
 function isInstallManifest(value) {
   return value?.schema === 'meeting_platform_adapter_install_manifest';
+}
+
+function isRuntimeManifest(value) {
+  return value?.schema === MEETING_PLATFORM_ADAPTER_RUNTIME_MANIFEST_SCHEMA;
+}
+
+function isRuntimeTarget(value) {
+  return value?.schema === MEETING_PLATFORM_ADAPTER_RUNTIME_TARGET_SCHEMA;
 }
 
 function isEmptyInput(value) {
@@ -83,6 +97,18 @@ function installManifestFrom(manifestOrInput = {}, options = {}) {
   );
 }
 
+function runtimeManifestFrom(manifestOrInput = {}, options = {}) {
+  if (isRuntimeManifest(manifestOrInput)) return manifestOrInput;
+  return firstNonEmpty(
+    options.runtimeManifest,
+    options.runtime_manifest,
+    options.runtime_manifest_input,
+    manifestOrInput.runtimeManifest,
+    manifestOrInput.runtime_manifest,
+    manifestOrInput.runtime_manifest_input,
+  );
+}
+
 function runnerId(input = {}, options = {}) {
   return String(firstNonEmpty(
     options.runnerId,
@@ -119,7 +145,34 @@ function launchPlanFromCandidate(plan) {
   return assertMeetingPlatformAdapterCandidateLaunchPlan(plan).launch_plan;
 }
 
+function runtimeTargetCapturedAtMs(target = {}) {
+  const value = Number(target.mark_template?.captured_at_ms);
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
 function observeInputFor(input = {}) {
+  if (isRuntimeTarget(input)) {
+    const capturedAtMs = runtimeTargetCapturedAtMs(input);
+    return compactObject({
+      platform: input.platform,
+      url: input.current_url,
+      title: input.detected_meeting?.title,
+      active: true,
+      in_meeting: true,
+      surface: input.selected_surface,
+      candidates: input.current_url ? [compactObject({
+        platform: input.platform,
+        url: input.current_url,
+        title: input.detected_meeting?.title,
+        active: true,
+        in_meeting: true,
+        surface: input.selected_surface,
+        source: 'meeting_platform_adapter_runner',
+        captured_at_ms: capturedAtMs,
+      })] : undefined,
+      captured_at_ms: capturedAtMs,
+    });
+  }
   if (!isCandidateLaunchPlan(input)) return input;
   return compactObject({
     platform: input.platform,
@@ -138,13 +191,15 @@ function event(action, runner, payload = {}, result) {
     schema_version: MEETING_PLATFORM_ADAPTER_RUNNER_SCHEMA_VERSION,
     runner_id: runner.id,
     action,
-    platform: payload.launch_plan?.platform,
-    selected_surface: payload.launch_plan?.selected_surface,
+    platform: payload.runtime_target?.platform ?? payload.launch_plan?.platform,
+    selected_surface: payload.runtime_target?.selected_surface ?? payload.launch_plan?.selected_surface,
+    plan_kind: payload.runtime_target ? 'runtime_target' : 'launch_plan',
     payload,
     result,
     captured_at_ms: payload.observe_event?.captured_at_ms
       ?? payload.raw_signal_event?.captured_at_ms
       ?? payload.adapter_selection_event?.captured_at_ms
+      ?? runtimeTargetCapturedAtMs(payload.runtime_target)
       ?? payload.launch_plan?.mark_template?.captured_at_ms,
   });
 }
@@ -161,10 +216,14 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
   const defaults = defaultsFrom(clientOrOptions, options);
   const client = clientFrom(clientOrOptions, defaults);
   const installManifest = installManifestFrom(manifestOrInput, defaults);
+  const runtimeManifest = runtimeManifestFrom(manifestOrInput, defaults);
   const initialLaunchPlan = isLaunchPlan(manifestOrInput)
     ? assertMeetingPlatformAdapterLaunchPlan(manifestOrInput)
     : isCandidateLaunchPlan(manifestOrInput)
       ? launchPlanFromCandidate(manifestOrInput)
+    : undefined;
+  const initialRuntimeTarget = isRuntimeTarget(manifestOrInput)
+    ? assertMeetingPlatformAdapterRuntimeTarget(manifestOrInput)
     : undefined;
   const initialCandidateLaunchPlan = isCandidateLaunchPlan(manifestOrInput)
     ? assertMeetingPlatformAdapterCandidateLaunchPlan(manifestOrInput)
@@ -172,6 +231,7 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
   const state = {
     opened: false,
     current_launch_plan: initialLaunchPlan,
+    current_runtime_target: initialRuntimeTarget,
     current_candidate_launch_plan: initialCandidateLaunchPlan,
     current_session: undefined,
     last_open_event: undefined,
@@ -183,15 +243,31 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
     schema_version: MEETING_PLATFORM_ADAPTER_RUNNER_SCHEMA_VERSION,
     id: runnerId(manifestOrInput, defaults),
     install_manifest: installManifest,
+    runtime_manifest: runtimeManifest,
     getState() {
       return compactObject({
         opened: state.opened,
         runner_id: runner.id,
         current_launch_plan: state.current_launch_plan,
+        current_runtime_target: state.current_runtime_target,
         current_candidate_launch_plan: state.current_candidate_launch_plan,
         current_session: state.current_session?.getState?.(),
         last_open_event: state.last_open_event,
         last_session_event: state.last_session_event,
+      });
+    },
+    runtimeTarget(input = {}, targetOptions = {}) {
+      if (isRuntimeTarget(input)) return assertMeetingPlatformAdapterRuntimeTarget(input);
+      if (state.current_runtime_target && isEmptyInput(input)) return state.current_runtime_target;
+      const manifest = runtimeManifestFrom(input, targetOptions) ?? runtimeManifest;
+      if (!manifest) {
+        throw new MeetingTimelineSdkError('Adapter runner requires a runtime manifest to build a runtime target', {
+          code: 'adapter_runner_missing_runtime_manifest',
+        });
+      }
+      return buildMeetingPlatformAdapterRuntimeTarget(manifest, input, {
+        ...defaults,
+        ...targetOptions,
       });
     },
     launchPlan(input = {}, launchOptions = {}) {
@@ -226,15 +302,25 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
       const candidateLaunchPlan = isCandidateLaunchPlan(input)
         ? assertMeetingPlatformAdapterCandidateLaunchPlan(input)
         : undefined;
-      const launchPlan = isLaunchPlan(input)
+      const runtimeTarget = isRuntimeTarget(input)
+        ? assertMeetingPlatformAdapterRuntimeTarget(input)
+        : state.current_runtime_target && isEmptyInput(input)
+          ? state.current_runtime_target
+          : runtimeManifest && !isLaunchPlan(input) && !candidateLaunchPlan
+            ? assertMeetingPlatformAdapterRuntimeTarget(runner.runtimeTarget(input, mergedOptions))
+            : undefined;
+      const launchPlan = runtimeTarget
+        ? undefined
+        : isLaunchPlan(input)
         ? assertMeetingPlatformAdapterLaunchPlan(input)
         : candidateLaunchPlan
           ? candidateLaunchPlan.launch_plan
         : state.current_launch_plan && isEmptyInput(input)
           ? state.current_launch_plan
         : assertMeetingPlatformAdapterLaunchPlan(runner.launchPlan(input, mergedOptions));
-      const session = createMeetingPlatformAdapterSession(launchPlan, client, mergedOptions);
-      const validationInput = observeInputFor(input);
+      const sessionPlan = runtimeTarget ?? launchPlan;
+      const session = createMeetingPlatformAdapterSession(sessionPlan, client, mergedOptions);
+      const validationInput = runtimeTarget ? observeInputFor(runtimeTarget) : observeInputFor(input);
       const adapterSelectionEvent = shouldReadAdapterSelection(mergedOptions)
         ? await session.readAdapterSelection(validationInput, mergedOptions)
         : undefined;
@@ -246,16 +332,21 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
         : undefined;
       state.opened = true;
       state.current_launch_plan = launchPlan;
+      state.current_runtime_target = runtimeTarget;
       state.current_candidate_launch_plan = candidateLaunchPlan;
       state.current_session = session;
       state.last_session_event = observeEvent;
       state.last_open_event = event('open_session', runner, {
         launch_plan: launchPlan,
+        runtime_target: runtimeTarget,
         session: {
           schema: MEETING_PLATFORM_ADAPTER_SESSION_SCHEMA,
           id: session.id,
+          plan_kind: session.plan_kind,
           platform: session.platform,
           selected_surface: session.selected_surface,
+          host_kind: session.host_kind,
+          bridge_kind: session.bridge_kind,
         },
         adapter_selection_event: adapterSelectionEvent,
         raw_signal_event: rawSignalEvent,
@@ -318,6 +409,7 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
     reset() {
       state.opened = false;
       state.current_launch_plan = initialLaunchPlan;
+      state.current_runtime_target = initialRuntimeTarget;
       state.current_candidate_launch_plan = initialCandidateLaunchPlan;
       state.current_session = undefined;
       state.last_open_event = undefined;
@@ -338,27 +430,43 @@ export async function openMeetingPlatformAdapterSession(
   return runner.open(input, options);
 }
 
+export async function openMeetingPlatformAdapterRuntimeSession(
+  runtimeManifestOrTarget = {},
+  clientOrOptions = {},
+  input = {},
+  options = {},
+) {
+  const runner = createMeetingPlatformAdapterRunner(runtimeManifestOrTarget, clientOrOptions, options);
+  return runner.open(input, options);
+}
+
 export function buildMeetingPlatformAdapterRunnerHandoff(manifestOrInput = {}, options = {}) {
   const installManifest = installManifestFrom(manifestOrInput, options);
+  const runtimeManifest = runtimeManifestFrom(manifestOrInput, options);
+  const runtimeTarget = isRuntimeTarget(manifestOrInput) ? manifestOrInput : undefined;
   return {
     type: 'meeting_platform_adapter_runner_handoff',
     schema: 'meeting_platform_adapter_runner_handoff',
     schema_version: MEETING_PLATFORM_ADAPTER_RUNNER_SCHEMA_VERSION,
     runner_factory: 'createMeetingPlatformAdapterRunner',
-    convenience_method: 'openMeetingPlatformAdapterSession',
+    convenience_method: runtimeManifest || runtimeTarget
+      ? 'openMeetingPlatformAdapterRuntimeSession'
+      : 'openMeetingPlatformAdapterSession',
     install_manifest_schema: installManifest?.schema,
+    runtime_manifest_schema: runtimeManifest?.schema,
+    runtime_target_schema: runtimeTarget?.schema,
     required_client_methods: ['observePlatformCandidates', 'insertAnnotation'],
     optional_client_methods: ['platformAdapterSelection', 'adapterSelection', 'platformRawSignalBatch', 'rawSignalBatch', 'speakerTrack', 'participantTrack', 'ingestProvider'],
     runtime_sequence: [
-      'build_launch_plan_from_current_url_or_platform',
-      'create_session_from_launch_plan',
+      runtimeManifest || runtimeTarget ? 'build_runtime_target_from_current_url_or_platform' : 'build_launch_plan_from_current_url_or_platform',
+      runtimeManifest || runtimeTarget ? 'create_session_from_runtime_target' : 'create_session_from_launch_plan',
       'read_adapter_selection_before_runtime_wiring',
       'validate_raw_signal_before_adapter_preflight',
       'observe_axis_before_first_mark',
       'insert_realtime_annotations_with_captured_at_ms',
     ],
     next_actions: [
-      'create_runner_with_adapter_install_manifest',
+      runtimeManifest || runtimeTarget ? 'create_runner_with_adapter_runtime_manifest' : 'create_runner_with_adapter_install_manifest',
       'call_runner_open_with_current_meeting_url',
       'reuse_runner_insertAnnotation_for_realtime_marks',
     ],
