@@ -101,7 +101,25 @@ assert.equal(candidateReport.mode, 'candidates');
 assert.equal(candidateReport.candidate_count, 1);
 assert.equal(candidateReport.accepted_count, 1);
 assert.equal(candidateReport.selected_platform, 'google_meet');
+assert.equal(candidateReport.selection_strategy, 'score_accepted_live_current_window_then_active_candidate');
+assert.equal(candidateReport.selected_candidate_index, 0);
+assert.equal(candidateReport.selected_candidate_score > 0, true);
+assert.equal(candidateReport.selected_candidate_reason, 'accepted_live_candidate');
 assert.equal(candidateReport.rows[0].realtime_annotation_ready, true);
+assert.equal(candidateReport.rows[0].selection_rank, 1);
+assert.equal(candidateReport.rows[0].selection_score, candidateReport.selected_candidate_score);
+
+const { stdout: candidateTextStdout } = await execFileAsync(process.execPath, [
+  'scripts/meeting-platform-adapter-preflight.mjs',
+  `--base-url=${baseUrl}`,
+  '--mode=candidates',
+  `--input-file=${candidateInputFile}`,
+], {
+  cwd: repoRoot,
+});
+assert.match(candidateTextStdout, /rank=1/);
+assert.match(candidateTextStdout, /score=\d+/);
+assert.match(candidateTextStdout, /reason=accepted_live_candidate/);
 
 let strictStdout = '';
 let strictCode = 0;

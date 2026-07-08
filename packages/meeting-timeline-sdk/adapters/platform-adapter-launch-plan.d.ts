@@ -51,7 +51,11 @@ export interface MeetingPlatformAdapterCandidateLaunchPlan {
   platform?: string;
   selected_platform?: string;
   selected_surface?: string;
+  selection_strategy?: string;
   selected_candidate_index?: number;
+  selected_candidate_score?: number;
+  selected_candidate_rank?: number;
+  selected_candidate_reason?: string;
   selected_candidate?: Record<string, unknown>;
   install_manifest_schema?: string;
   install_manifest_accepted: boolean;

@@ -212,6 +212,10 @@ export async function buildMeetingPlatformAdapterPreflightCliReport(options = {}
     required_platforms: options.requiredPlatforms,
     platform: result.platform,
     selected_platform: result.selected_platform,
+    selection_strategy: result.selection_strategy,
+    selected_candidate_index: result.selected_candidate_index,
+    selected_candidate_score: result.selected_candidate_score,
+    selected_candidate_reason: result.rows?.find?.((row) => row.selected === true)?.selection_reason,
     status: result.status,
     accepted: result.accepted,
     platform_count: result.platform_count,
@@ -238,7 +242,7 @@ export function formatMeetingPlatformAdapterPreflightCliReport(report = {}) {
     `meeting_platform_adapter_preflight_report | ok=${boolLabel(report.ok)} | mode=${report.mode} | status=${report.status ?? 'n/a'} | platforms=${report.platform_count ?? 'n/a'} | candidates=${report.candidate_count ?? 'n/a'} | accepted=${report.accepted_count ?? boolLabel(report.accepted)} | realtime=${report.realtime_ready_count ?? 'n/a'} | live=${report.live_evidence_ready_count ?? 'n/a'} | surface=${report.selected_surface ?? 'n/a'}`,
   ];
   for (const row of report.rows ?? []) {
-    lines.push(`${row.platform ?? row.selected_platform ?? 'candidate'}: accepted=${boolLabel(row.accepted)} realtime=${boolLabel(row.realtime_annotation_ready)} startup=${boolLabel(row.startup_ready)} live=${boolLabel(row.live_evidence_ready)} status=${row.status ?? 'n/a'} surface=${row.selected_surface ?? 'n/a'}`);
+    lines.push(`${row.platform ?? row.selected_platform ?? 'candidate'}: accepted=${boolLabel(row.accepted)} realtime=${boolLabel(row.realtime_annotation_ready)} startup=${boolLabel(row.startup_ready)} live=${boolLabel(row.live_evidence_ready)} status=${row.status ?? 'n/a'} surface=${row.selected_surface ?? 'n/a'} rank=${row.selection_rank ?? 'n/a'} score=${row.selection_score ?? 'n/a'} reason=${row.selection_reason ?? 'n/a'}`);
   }
   if (report.issue_codes?.length > 0) lines.push(`issues=${report.issue_codes.join(',')}`);
   if (report.next_actions?.length > 0) lines.push(`next_actions=${report.next_actions.join(',')}`);
