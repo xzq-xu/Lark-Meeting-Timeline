@@ -32,6 +32,7 @@ assert.equal(packedFiles.includes('bin/meeting-app-connector-package.mjs'), true
 assert.equal(packedFiles.includes('bin/meeting-platform-consumer-handoff.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-blueprint.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-decision.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-platform-raw-signal.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-export-package.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-import-plan.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-install-manifest.mjs'), true);
@@ -47,6 +48,7 @@ assert.equal(packedFiles.includes('cli/meeting-app-connector-package.mjs'), true
 assert.equal(packedFiles.includes('cli/meeting-platform-consumer-handoff.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-blueprint.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-decision.mjs'), true);
+assert.equal(packedFiles.includes('cli/meeting-platform-raw-signal.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-export-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-import-plan.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-install-manifest.mjs'), true);
@@ -398,6 +400,25 @@ assert.equal(adapterDecisionBinReport.host_checklist_ready_count, 2);
 assert.equal(adapterDecisionBinReport.rows.find((row) => row.platform === 'google_meet').selected_observer_mode, 'browser_dom_observer');
 assert.equal(adapterDecisionBinReport.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
 assert.equal(adapterDecisionBinReport.written_files.length, 0);
+
+const { stdout: rawSignalBinStdout } = await execFileAsync(
+  join(consumerDir, 'node_modules', '.bin', 'meeting-platform-raw-signal'),
+  [
+    '--examples=true',
+    '--platforms=google-meet,zoom',
+    '--json=true',
+  ],
+  {
+    cwd: consumerDir,
+  },
+);
+const rawSignalBinReport = JSON.parse(rawSignalBinStdout);
+assert.equal(rawSignalBinReport.type, 'meeting_platform_raw_signal_report');
+assert.equal(rawSignalBinReport.ok, true);
+assert.equal(rawSignalBinReport.platform_count, 2);
+assert.equal(rawSignalBinReport.signal_count, 6);
+assert.equal(rawSignalBinReport.runtime_actions.includes('observe_meeting_app'), true);
+assert.equal(rawSignalBinReport.runtime_actions.includes('insert_annotation'), true);
 
 const { stdout: adapterPreflightBinStdout } = await execFileAsync(
   join(consumerDir, 'node_modules', '.bin', 'meeting-platform-adapter-preflight'),

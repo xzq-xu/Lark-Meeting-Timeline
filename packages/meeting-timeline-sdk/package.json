@@ -11,6 +11,7 @@
     "meeting-platform-consumer-handoff": "./bin/meeting-platform-consumer-handoff.mjs",
     "meeting-platform-adapter-blueprint": "./bin/meeting-platform-adapter-blueprint.mjs",
     "meeting-platform-adapter-decision": "./bin/meeting-platform-adapter-decision.mjs",
+    "meeting-platform-raw-signal": "./bin/meeting-platform-raw-signal.mjs",
     "meeting-platform-adapter-export-package": "./bin/meeting-platform-adapter-export-package.mjs",
     "meeting-platform-adapter-import-plan": "./bin/meeting-platform-adapter-import-plan.mjs",
     "meeting-platform-adapter-install-manifest": "./bin/meeting-platform-adapter-install-manifest.mjs",
