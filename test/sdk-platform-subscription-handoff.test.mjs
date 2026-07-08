@@ -43,6 +43,17 @@ const subscriptions = {
   },
 };
 
+function assertRuntimeHandoff(handoff) {
+  assert.equal(handoff.adapter_selection.readiness.selection_ready, true);
+  assert.equal(handoff.adapter_selection.selection.timestamp_field, 'captured_at_ms');
+  assert.equal(handoff.runtime_binding_contract.annotation_timestamp_field, 'captured_at_ms');
+  assert.equal(handoff.runtime_binding_contract.provider_events_block_realtime, false);
+  assert.equal(handoff.runtime_binding_contract.transcript_blocks_realtime, false);
+  assert.equal(handoff.handoff_contract.adapter_selection_snapshot_required, true);
+  assert.equal(handoff.handoff_contract.provider_reconcile_non_blocking, true);
+  assert.equal(handoff.handoff_contract.post_meeting_artifact_non_blocking, true);
+}
+
 const google = buildMeetingPlatformSubscriptionHandoff('google-meet', {
   baseUrl,
   env,
@@ -59,6 +70,8 @@ assert.equal(google.requests[0].body.notificationEndpoint.pubsubTopic, 'projects
 assert.equal(google.maintenance.renewal_supported, true);
 assert.equal(google.realtime_annotation_policy.provider_events_block_realtime, false);
 assert.equal(google.handoff_contract.annotation_timestamp_field, 'captured_at_ms');
+assert.equal(google.handoff_contract.realtime_axis_source, 'local_observer_axis');
+assertRuntimeHandoff(google);
 assert.equal(assertMeetingPlatformSubscriptionHandoff('google-meet', {
   baseUrl,
   env,
@@ -92,6 +105,12 @@ assert.equal(matrix.security_blocked_count, 0);
 assert.equal(matrix.parameter_missing_count, 0);
 assert.equal(matrix.rows.find((row) => row.platform === 'webex').request_count, 7);
 assert.equal(matrix.rows.find((row) => row.platform === 'lark').status, 'manual_setup');
+assert.equal(matrix.rows.every((row) => row.adapter_selection_ready === true), true);
+assert.equal(matrix.rows.every((row) => row.annotation_timestamp_field === 'captured_at_ms'), true);
+assert.equal(matrix.rows.every((row) => row.provider_events_block_realtime === false), true);
+for (const handoff of matrix.handoffs) {
+  assertRuntimeHandoff(handoff);
+}
 assert.equal(assertMeetingPlatformSubscriptionHandoffMatrix({
   baseUrl,
   env,

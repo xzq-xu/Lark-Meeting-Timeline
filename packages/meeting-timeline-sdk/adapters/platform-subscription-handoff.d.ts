@@ -1,4 +1,7 @@
-import type { MeetingPlatformProviderConnectionPack } from './platform-provider-connection.mjs';
+import type {
+  MeetingPlatformProviderConnectionPack,
+  MeetingPlatformProviderRuntimeBindingContract,
+} from './platform-provider-connection.mjs';
 import type { PlatformSetupOptions } from './platform-setup.mjs';
 
 export const MEETING_PLATFORM_SUBSCRIPTION_HANDOFF_SCHEMA: 'meeting_platform_subscription_handoff';
@@ -47,6 +50,8 @@ export interface MeetingPlatformSubscriptionHandoff {
   status_endpoint?: string;
   transport?: string;
   provider_role?: string;
+  adapter_selection?: Record<string, unknown>;
+  runtime_binding_contract: MeetingPlatformProviderRuntimeBindingContract;
   subscription_builders: string[];
   requests: MeetingPlatformSubscriptionRequest[];
   permissions: Record<string, unknown>;

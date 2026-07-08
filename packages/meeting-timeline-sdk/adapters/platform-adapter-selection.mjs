@@ -1,9 +1,9 @@
-import { compactObject } from '../index.mjs';
 import {
   MEETING_PLATFORM_KEYS,
   normalizeMeetingPlatform,
   platformCapabilityContract,
 } from './platform-setup.mjs';
+import { compactObject } from './internal-utils.mjs';
 import {
   buildMeetingPlatformAdapterRoute,
   verifyMeetingPlatformAdapterRouteReadiness,

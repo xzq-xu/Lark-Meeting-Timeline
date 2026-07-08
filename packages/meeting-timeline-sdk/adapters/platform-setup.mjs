@@ -1,4 +1,4 @@
-import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
+import { MeetingTimelineSdkError, compactObject } from './internal-utils.mjs';
 
 export const LARK_MEETING_EVENT_TYPES = Object.freeze([
   'vc.meeting.all_meeting_started_v1',

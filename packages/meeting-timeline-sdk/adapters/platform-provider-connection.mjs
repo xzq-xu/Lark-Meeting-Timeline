@@ -1,4 +1,4 @@
-import { compactObject } from '../index.mjs';
+import { compactObject } from './internal-utils.mjs';
 import {
   MEETING_PLATFORM_KEYS,
   buildPlatformIntegrationPlan,
@@ -214,6 +214,129 @@ function providerSubscriptionRequest(platform, setup = {}) {
   );
 }
 
+function adapterSelectionFor(platform, options = {}) {
+  const selected = firstNonEmpty(
+    options.adapterSelection,
+    options.adapter_selection,
+    options.adapterSelections?.[platform],
+    options.adapter_selections?.[platform],
+  );
+  if (selected) return selected;
+  const localDetector = platform === 'local_detector';
+  return {
+    schema: 'meeting_platform_adapter_selection_snapshot',
+    schema_version: 1,
+    platform,
+    display_name: {
+      local_detector: 'Local Meeting Detector',
+      lark: 'Feishu / Lark',
+      google_meet: 'Google Meet',
+      microsoft_teams: 'Microsoft Teams',
+      zoom: 'Zoom',
+      webex: 'Webex',
+    }[platform],
+    recommended_mode: localDetector ? 'trusted_host_detector_only' : 'local_observer_first_provider_reconcile',
+    selection: {
+      axis_source: localDetector ? 'host_detector_axis' : 'local_observer_axis',
+      axis_surface: localDetector ? 'host_sdk' : 'browser_extension_or_native_detector',
+      axis_source_role: localDetector ? 'authoritative_realtime_axis' : 'primary_low_latency_axis',
+      annotation_source: 'annotation_insert',
+      timestamp_field: 'captured_at_ms',
+      provider_reconcile_source: localDetector ? undefined : 'provider_reconcile',
+      provider_reconcile_required_for_production: !localDetector,
+      speaker_track_source: localDetector ? 'trusted_host_detector' : 'local_detector_or_post_meeting_transcript',
+      post_meeting_artifact_source: localDetector ? undefined : 'post_meeting_artifact_import',
+    },
+    runtime_policy: {
+      provider_events_block_realtime: false,
+      transcript_blocks_realtime: false,
+      annotations_use_absolute_captured_at_ms: true,
+      per_meeting_annotation_isolation_required: true,
+      startup_order: [
+        'validate_raw_signal',
+        localDetector ? 'host_detector_axis' : 'local_observer_axis',
+        'annotation_insert',
+        localDetector ? undefined : 'speaker_position_markers',
+        localDetector ? undefined : 'provider_reconcile_non_blocking',
+        localDetector ? undefined : 'post_meeting_artifact_import_non_blocking',
+      ].filter(Boolean),
+      runtime_actions: [
+        'validate_raw_signal',
+        localDetector ? 'receive_host_detector_signal' : 'observe_platform_candidates',
+        localDetector ? 'open_host_detector_axis' : 'open_adapter_session',
+        'insert_annotation',
+        'append_speaker_position_marker_if_available',
+        localDetector ? undefined : 'reconcile_provider_event_when_available',
+        localDetector ? undefined : 'import_post_meeting_artifact_when_available',
+      ].filter(Boolean),
+    },
+    readiness: {
+      selection_ready: true,
+      route_ready: true,
+      pilot_evidence_ready: false,
+      production_evidence_ready: false,
+      provider_reconcile_required_for_production: !localDetector,
+      missing: [],
+    },
+  };
+}
+
+function adapterSelectionSummary(selection = {}) {
+  return compactObject({
+    schema: selection.schema,
+    schema_version: selection.schema_version,
+    platform: selection.platform,
+    display_name: selection.display_name,
+    recommended_mode: selection.recommended_mode,
+    selection: {
+      axis_source: selection.selection?.axis_source,
+      axis_surface: selection.selection?.axis_surface,
+      axis_source_role: selection.selection?.axis_source_role,
+      annotation_source: selection.selection?.annotation_source,
+      timestamp_field: selection.selection?.timestamp_field,
+      provider_reconcile_source: selection.selection?.provider_reconcile_source,
+      provider_reconcile_required_for_production: selection.selection?.provider_reconcile_required_for_production,
+      speaker_track_source: selection.selection?.speaker_track_source,
+      post_meeting_artifact_source: selection.selection?.post_meeting_artifact_source,
+    },
+    runtime_policy: {
+      provider_events_block_realtime: selection.runtime_policy?.provider_events_block_realtime,
+      transcript_blocks_realtime: selection.runtime_policy?.transcript_blocks_realtime,
+      annotations_use_absolute_captured_at_ms: selection.runtime_policy?.annotations_use_absolute_captured_at_ms,
+      per_meeting_annotation_isolation_required: selection.runtime_policy?.per_meeting_annotation_isolation_required,
+      startup_order: selection.runtime_policy?.startup_order,
+      runtime_actions: selection.runtime_policy?.runtime_actions,
+    },
+    readiness: {
+      selection_ready: selection.readiness?.selection_ready,
+      pilot_evidence_ready: selection.readiness?.pilot_evidence_ready,
+      production_evidence_ready: selection.readiness?.production_evidence_ready,
+      provider_reconcile_required_for_production: selection.readiness?.provider_reconcile_required_for_production,
+      missing: selection.readiness?.missing,
+    },
+  });
+}
+
+function runtimeBindingContract(platform, selection = {}) {
+  return {
+    realtime_axis_source: selection.selection?.axis_source,
+    realtime_axis_surface: selection.selection?.axis_surface,
+    annotation_source: selection.selection?.annotation_source,
+    annotation_timestamp_field: selection.selection?.timestamp_field ?? 'captured_at_ms',
+    speaker_track_source: selection.selection?.speaker_track_source,
+    provider_reconcile_source: selection.selection?.provider_reconcile_source,
+    provider_role: platform === 'local_detector'
+      ? 'primary_low_latency_axis'
+      : 'reconcile_and_backfill_after_local_axis',
+    provider_reconcile_required_for_production: platform !== 'local_detector',
+    provider_events_block_realtime: false,
+    transcript_blocks_realtime: false,
+    must_read_adapter_selection_before_session: true,
+    per_meeting_annotation_isolation_required: true,
+    startup_order: selection.runtime_policy?.startup_order,
+  };
+}
+
 function missingSecurityNextActions(permissionPlan = {}) {
   return (permissionPlan.missing_security_env ?? []).map((name) => `configure_env:${name}`);
 }
@@ -232,6 +355,8 @@ export function buildMeetingPlatformProviderConnectionPack(platform, options = {
   const integrationPlan = buildPlatformIntegrationPlan(key, merged);
   const setup = buildPlatformSetup(key, merged);
   const request = providerSubscriptionRequest(key, setup);
+  const adapterSelection = adapterSelectionFor(key, merged);
+  const bindingContract = runtimeBindingContract(key, adapterSelection);
   return compactObject({
     type: 'meeting_platform_provider_connection_pack',
     schema: MEETING_PLATFORM_PROVIDER_CONNECTION_PACK_SCHEMA,
@@ -244,6 +369,8 @@ export function buildMeetingPlatformProviderConnectionPack(platform, options = {
     provider_role: key === 'local_detector'
       ? 'primary_low_latency_axis'
       : 'reconcile_and_backfill_after_local_axis',
+    adapter_selection: adapterSelectionSummary(adapterSelection),
+    runtime_binding_contract: bindingContract,
     official_docs: OFFICIAL_DOCS[key] ?? [],
     event_mapping: PROVIDER_EVENT_MAPPING[key] ?? [],
     subscription: compactObject({
@@ -266,10 +393,13 @@ export function buildMeetingPlatformProviderConnectionPack(platform, options = {
       missing_env: permissionPlan.missing_security_env,
     }),
     realtime_annotation_policy: {
-      annotation_timestamp_field: 'captured_at_ms',
-      provider_events_block_realtime: false,
-      transcript_blocks_realtime: false,
+      annotation_timestamp_field: bindingContract.annotation_timestamp_field,
+      provider_events_block_realtime: bindingContract.provider_events_block_realtime,
+      transcript_blocks_realtime: bindingContract.transcript_blocks_realtime,
       local_observer_can_create_axis_before_provider: key !== 'local_detector',
+      realtime_axis_source: bindingContract.realtime_axis_source,
+      realtime_axis_surface: bindingContract.realtime_axis_surface,
+      provider_reconcile_required_for_production: bindingContract.provider_reconcile_required_for_production,
     },
     setup_steps: manifest.required_setup ?? [],
     readiness: permissionPlan.readiness,
@@ -281,6 +411,7 @@ export function buildMeetingPlatformProviderConnectionPack(platform, options = {
     },
     commands: {
       validate_provider_setup: 'buildMeetingPlatformProviderConnectionPack(platform, { baseUrl, env, subscription })',
+      read_adapter_selection: `npm run meeting-platform:adapter-selection -- --platforms=${key} --json=true`,
       validate_provider_events: 'buildPlatformAcceptanceReport(platform, { samples, env, baseUrl })',
       validate_rollout: 'npm run meeting-platform:rollout-matrix',
       validate_live_readiness: 'npm run meeting-platform:live-readiness',
@@ -290,6 +421,7 @@ export function buildMeetingPlatformProviderConnectionPack(platform, options = {
       ...readinessNextActions(permissionPlan.readiness),
       key === 'local_detector' ? 'connect_trusted_local_detector' : 'capture_real_provider_events',
       key === 'local_detector' ? 'verify_timestamp_quality' : 'verify_signature_or_callback_auth',
+      'read_adapter_selection_before_provider_reconcile',
       'keep_realtime_annotations_on_local_axis_until_provider_reconciles',
     ]),
   });
@@ -314,6 +446,11 @@ export function buildMeetingPlatformProviderConnectionMatrix(options = {}) {
       display_name: pack.display_name,
       transport: pack.transport,
       provider_role: pack.provider_role,
+      adapter_selection_ready: pack.adapter_selection?.readiness?.selection_ready === true,
+      realtime_axis_source: pack.runtime_binding_contract?.realtime_axis_source,
+      realtime_axis_surface: pack.runtime_binding_contract?.realtime_axis_surface,
+      annotation_timestamp_field: pack.runtime_binding_contract?.annotation_timestamp_field,
+      provider_events_block_realtime: pack.runtime_binding_contract?.provider_events_block_realtime,
       ready: pack.readiness?.ready === true,
       missing_env: pack.security?.missing_env ?? [],
       event_count: pack.event_mapping?.length ?? 0,

@@ -1,4 +1,4 @@
-import { compactObject } from '../index.mjs';
+import { compactObject } from './internal-utils.mjs';
 import {
   MEETING_PLATFORM_KEYS,
   buildPlatformIntegrationPlan,

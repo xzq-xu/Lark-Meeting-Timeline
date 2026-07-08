@@ -1,7 +1,7 @@
 import {
   MeetingTimelineSdkError,
   compactObject,
-} from '../index.mjs';
+} from './internal-utils.mjs';
 import { buildPlatformAcceptanceReport, buildMeetingPlatformAcceptanceSummary } from './platform-acceptance.mjs';
 import {
   buildPlatformFixtureAcceptanceInput,

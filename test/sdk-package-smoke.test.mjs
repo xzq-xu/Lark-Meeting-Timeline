@@ -63,6 +63,8 @@ assert.equal(packedFiles.includes('cli/meeting-platform-host-integration.mjs'), 
 assert.equal(packedFiles.includes('cli/meeting-platform-provider-replay.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/internal-utils.mjs'), true);
+assert.equal(packedFiles.includes('adapters/internal-utils.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-capability.mjs'), true);
 assert.equal(packedFiles.includes('adapters/meeting-app-adapter-capability.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-integration-runtime.mjs'), true);

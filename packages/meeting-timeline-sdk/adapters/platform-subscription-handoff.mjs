@@ -1,4 +1,4 @@
-import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
+import { MeetingTimelineSdkError, compactObject } from './internal-utils.mjs';
 import { buildMeetingPlatformProviderConnectionPack } from './platform-provider-connection.mjs';
 import {
   evaluatePlatformSubscriptionMaintenance,
@@ -205,6 +205,8 @@ export function buildMeetingPlatformSubscriptionHandoff(platform, options = {}) 
     status_endpoint: pack.status_endpoint,
     transport: pack.transport,
     provider_role: pack.provider_role,
+    adapter_selection: pack.adapter_selection,
+    runtime_binding_contract: pack.runtime_binding_contract,
     subscription_builders: pack.subscription?.builders ?? [],
     requests,
     permissions: pack.permissions,
@@ -216,6 +218,11 @@ export function buildMeetingPlatformSubscriptionHandoff(platform, options = {}) 
       provider_events_block_realtime: false,
       transcript_blocks_realtime: false,
       annotation_timestamp_field: 'captured_at_ms',
+      realtime_axis_source: pack.runtime_binding_contract?.realtime_axis_source,
+      realtime_axis_surface: pack.runtime_binding_contract?.realtime_axis_surface,
+      adapter_selection_snapshot_required: true,
+      provider_reconcile_non_blocking: true,
+      post_meeting_artifact_non_blocking: true,
       returned_metadata_required: ['subscription_id_or_name', 'expiration_when_provider_returns_it', 'provider_resource_or_event_list'],
     },
     commands: {
@@ -256,6 +263,11 @@ export function buildMeetingPlatformSubscriptionHandoffMatrix(options = {}) {
       status: handoff.status,
       ready_to_create: handoff.ready_to_create,
       provider_ready: handoff.provider_ready,
+      adapter_selection_ready: handoff.adapter_selection?.readiness?.selection_ready === true,
+      realtime_axis_source: handoff.runtime_binding_contract?.realtime_axis_source,
+      realtime_axis_surface: handoff.runtime_binding_contract?.realtime_axis_surface,
+      annotation_timestamp_field: handoff.runtime_binding_contract?.annotation_timestamp_field,
+      provider_events_block_realtime: handoff.runtime_binding_contract?.provider_events_block_realtime,
       request_count: handoff.request_count,
       missing_env: handoff.security?.missing_env ?? [],
       renewal_due: handoff.maintenance?.renewal_due === true,
