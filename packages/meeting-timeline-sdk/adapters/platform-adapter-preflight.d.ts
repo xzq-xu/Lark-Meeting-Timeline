@@ -93,6 +93,7 @@ export interface MeetingPlatformAdapterCandidatePreflight {
   type: 'meeting_platform_adapter_candidate_preflight';
   schema: 'meeting_platform_adapter_candidate_preflight';
   schema_version: 1;
+  selection_strategy: string;
   accepted: boolean;
   status: string;
   candidate_count: number;
@@ -104,6 +105,7 @@ export interface MeetingPlatformAdapterCandidatePreflight {
   meeting_end_ready_count: number;
   speaker_track_ready_count: number;
   selected_candidate_index?: number;
+  selected_candidate_score?: number;
   selected_platform?: string;
   selected_status?: string;
   platforms: string[];

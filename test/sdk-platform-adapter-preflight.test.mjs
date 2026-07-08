@@ -269,6 +269,52 @@ assert.equal(zoomCurrentWindow.accepted, true);
 assert.equal(zoomCurrentWindow.captured_snapshot.capture.profile, 'zoom');
 assert.equal(zoomCurrentWindow.capture.participant_count, 1);
 
+const larkCurrentWindow = buildMeetingPlatformAdapterCurrentWindowPreflight({
+  document: fakeDocument({
+    url: 'https://vc.feishu.cn/j/734512345678',
+    title: '飞书会议',
+    nodes: [
+      node('button', { 'aria-label': '挂断' }),
+      node('button', { 'aria-label': 'AI 总结' }),
+      node('div', {
+        'data-user-id': 'xzq',
+        'data-display-name': '徐智强',
+        'aria-label': '徐智强 正在发言',
+      }),
+    ],
+  }),
+}, {
+  baseUrl,
+  requireSpeakerTrack: true,
+});
+assert.equal(larkCurrentWindow.platform, 'lark');
+assert.equal(larkCurrentWindow.accepted, true);
+assert.equal(larkCurrentWindow.capture.profile, 'lark');
+assert.equal(larkCurrentWindow.readiness.realtime_annotation_ready, true);
+
+const webexCurrentWindow = buildMeetingPlatformAdapterCurrentWindowPreflight({
+  document: fakeDocument({
+    url: 'https://example.webex.com/meet/ada',
+    title: 'Webex Meeting',
+    nodes: [
+      node('button', { 'aria-label': 'Leave meeting' }),
+      node('button', { 'aria-label': 'Participants' }),
+      node('div', {
+        'data-person-id': 'ada',
+        'data-display-name': 'Ada Lovelace',
+        'aria-label': 'Ada Lovelace active speaker',
+      }),
+    ],
+  }),
+}, {
+  baseUrl,
+  requireSpeakerTrack: true,
+});
+assert.equal(webexCurrentWindow.platform, 'webex');
+assert.equal(webexCurrentWindow.accepted, true);
+assert.equal(webexCurrentWindow.capture.profile, 'webex');
+assert.equal(webexCurrentWindow.readiness.realtime_annotation_ready, true);
+
 const zoomNativePreflight = buildMeetingPlatformAdapterPreflight({
   platform: 'zoom',
   window: {
@@ -341,12 +387,56 @@ assert.equal(candidatePreflight.supported_candidate_count, 3);
 assert.equal(candidatePreflight.accepted_count, 1);
 assert.equal(candidatePreflight.selected_candidate_index, 2);
 assert.equal(candidatePreflight.selected_platform, 'zoom');
+assert.equal(candidatePreflight.selection_strategy, 'score_accepted_live_current_window_then_active_candidate');
+assert.equal(candidatePreflight.selected_candidate_score > 0, true);
 assert.deepEqual(candidatePreflight.platforms, ['google_meet', 'microsoft_teams', 'zoom']);
 assert.equal(candidatePreflight.rows[0].status, 'needs_live_page_evidence');
 assert.equal(candidatePreflight.rows[0].tab_id, 7);
 assert.equal(candidatePreflight.rows[0].window_id, 'chrome-main');
 assert.equal(candidatePreflight.rows[2].current_window_captured, true);
 assert.equal(candidatePreflight.rows[2].selected, true);
+assert.equal(candidatePreflight.rows[2].selection_rank, 1);
+assert.equal(candidatePreflight.rows[2].selection_reason, 'accepted_current_window_live_candidate');
+
+const activeCandidatePreflight = buildMeetingPlatformAdapterCandidatePreflight({
+  candidates: [{
+    active: false,
+    document: fakeDocument({
+      url: 'https://meet.google.com/abc-defg-hij',
+      title: 'Inactive Google Meet',
+      nodes: [
+        node('button', { 'aria-label': 'Leave call' }),
+        node('div', {
+          'data-participant-id': 'ada',
+          'aria-label': 'Ada Lovelace is speaking',
+        }),
+      ],
+    }),
+  }, {
+    active: true,
+    document: fakeDocument({
+      url: 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_sample',
+      title: 'Active Teams',
+      nodes: [
+        node('button', { 'aria-label': 'Leave' }),
+        node('button', { 'aria-label': 'Share content' }),
+        node('div', {
+          'data-user-id': 'grace',
+          'aria-label': 'Grace Hopper speaking',
+        }),
+      ],
+    }),
+  }],
+}, {
+  baseUrl,
+  requireSpeakerTrack: true,
+});
+assert.equal(activeCandidatePreflight.accepted, true);
+assert.equal(activeCandidatePreflight.selected_candidate_index, 1);
+assert.equal(activeCandidatePreflight.selected_platform, 'microsoft_teams');
+assert.equal(activeCandidatePreflight.rows[1].selection_rank, 1);
+assert.equal(activeCandidatePreflight.rows[0].selection_rank, 2);
+assert.equal(activeCandidatePreflight.rows[1].selection_score > activeCandidatePreflight.rows[0].selection_score, true);
 
 const nativeCandidatePreflight = buildMeetingPlatformAdapterCandidatePreflight({
   platform: 'zoom',

@@ -2063,7 +2063,7 @@ const response = await bridge.dispatchMessage({
 // response.result.accepted 表示当前窗口是否能作为实时标注轴来源。
 ```
 
-如果宿主拿到的是浏览器扩展 background、Electron preload 或桌面观察器的一批候选窗口/标签，用 `buildMeetingPlatformAdapterCandidatePreflight()` 一次性展开 `windows[].tabs[]` / `tabs[]` / `candidates[]`。URL-only 候选只会验证 startup plan 并返回 `needs_live_page_evidence`；浏览器候选需要明确携带当前 `document` 或 live snapshot，native 候选需要携带 platform/process/window/call state，才会被判定为 `ready_for_realtime_annotations`，避免误把静态 URL 匹配当成可实时建轴。
+如果宿主拿到的是浏览器扩展 background、Electron preload 或桌面观察器的一批候选窗口/标签，用 `buildMeetingPlatformAdapterCandidatePreflight()` 一次性展开 `windows[].tabs[]` / `tabs[]` / `candidates[]`。URL-only 候选只会验证 startup plan 并返回 `needs_live_page_evidence`；浏览器候选需要明确携带当前 `document` 或 live snapshot，native 候选需要携带 platform/process/window/call state，才会被判定为 `ready_for_realtime_annotations`，避免误把静态 URL 匹配当成可实时建轴。候选不是简单按输入顺序选择：SDK 会按已通过实时预检、当前窗口/live DOM/native evidence、活跃标签或焦点窗口、meeting start 和 speaker track 证据打分排序，并在 `rows[*].selection_score`、`rows[*].selection_rank`、`rows[*].selection_reason` 里保留原因，方便 popup、native helper 或接入面板解释为什么选择某一个 Google Meet / Teams / Zoom / Webex / Lark 窗口。
 
 ```js
 const candidatePreflight = buildMeetingPlatformAdapterCandidatePreflight({
@@ -2079,7 +2079,7 @@ const candidatePreflight = buildMeetingPlatformAdapterCandidatePreflight({
   requireSpeakerTrack: true,
 });
 
-// candidatePreflight.rows[*] 会保留 window_id / tab_id / url / platform / status。
+// candidatePreflight.rows[*] 会保留 window_id / tab_id / url / platform / status / selection_score。
 // candidatePreflight.selected_platform 是当前最适合建实时标注轴的平台。
 // candidatePreflight.accepted === true 表示至少一个候选已经可实时插入 captured_at_ms 标注。
 ```

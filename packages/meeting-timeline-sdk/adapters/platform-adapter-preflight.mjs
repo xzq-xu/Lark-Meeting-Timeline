@@ -751,17 +751,62 @@ function candidateStatus(preflights = []) {
   return 'no_supported_candidates';
 }
 
-function selectedCandidateIndex(preflights = []) {
-  const accepted = preflights.findIndex((preflight) => preflight.accepted === true);
-  if (accepted >= 0) return accepted;
-  const staticReady = preflights.findIndex((preflight) => preflight.readiness?.static_startup_ready === true);
-  if (staticReady >= 0) return staticReady;
-  return preflights.findIndex((preflight) => preflight.platform);
+function candidateActivityScore(candidate = {}) {
+  return [
+    firstBoolean(candidate, ['active', 'tab.active', 'window.active']) === true ? 35 : 0,
+    firstBoolean(candidate, ['focused', 'selected', 'current', 'tab.highlighted', 'tab.selected', 'window.focused']) === true ? 25 : 0,
+    firstBoolean(candidate, ['audible', 'tab.audible', 'audio.call_active', 'audio.callActive']) === true ? 10 : 0,
+  ].reduce((sum, value) => sum + value, 0);
 }
 
-function candidateRow(candidate = {}, preflight = {}, selected = false) {
+function candidatePreflightScore(candidate = {}, preflight = {}) {
+  if (!preflight.platform) return -1_000 + candidateActivityScore(candidate);
+  return [
+    preflight.accepted === true ? 1_000 : 0,
+    preflight.readiness?.realtime_annotation_ready === true ? 700 : 0,
+    preflight.readiness?.live_evidence_ready === true ? 280 : 0,
+    preflight.readiness?.meeting_start_ready === true ? 220 : 0,
+    preflight.current_window?.captured === true ? 120 : 0,
+    preflight.readiness?.speaker_track_ready === true ? 70 : 0,
+    preflight.readiness?.static_startup_ready === true ? 45 : 0,
+    20,
+    candidateActivityScore(candidate),
+  ].reduce((sum, value) => sum + value, 0);
+}
+
+function candidateSelectionReason(candidate = {}, preflight = {}) {
+  if (!preflight.platform) return 'unsupported_candidate';
+  if (preflight.accepted === true && preflight.current_window?.captured === true) return 'accepted_current_window_live_candidate';
+  if (preflight.accepted === true) return 'accepted_live_candidate';
+  if (preflight.readiness?.live_evidence_ready === true) return 'live_candidate_needs_more_signals';
+  if (preflight.readiness?.static_startup_ready === true && candidateActivityScore(candidate) > 0) return 'active_supported_candidate_needs_live_evidence';
+  if (preflight.readiness?.static_startup_ready === true) return 'supported_candidate_needs_live_evidence';
+  return 'startup_not_ready';
+}
+
+function rankedCandidateEntries(candidates = [], preflights = []) {
+  return candidates
+    .map((candidate, index) => ({
+      index,
+      candidate,
+      preflight: preflights[index] ?? {},
+      score: candidatePreflightScore(candidate, preflights[index] ?? {}),
+      reason: candidateSelectionReason(candidate, preflights[index] ?? {}),
+    }))
+    .filter((entry) => entry.preflight.platform)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map((entry, rankIndex) => ({
+      ...entry,
+      rank: rankIndex + 1,
+    }));
+}
+
+function candidateRow(candidate = {}, preflight = {}, selected = false, selection = {}) {
   return compactObject({
     candidate_index: candidate.candidate_index,
+    selection_rank: selection.rank,
+    selection_score: selection.score,
+    selection_reason: selection.reason,
     selected,
     source: candidate.source,
     window_id: candidate.window_id,
@@ -911,13 +956,21 @@ export function buildMeetingPlatformAdapterCandidatePreflight(input = {}, option
     platforms: undefined,
     platform_keys: undefined,
   }));
-  const selectedIndex = selectedCandidateIndex(preflights);
+  const ranked = rankedCandidateEntries(candidates, preflights);
+  const selectedIndex = ranked[0]?.index ?? -1;
   const selectedPreflight = selectedIndex >= 0 ? preflights[selectedIndex] : undefined;
-  const rows = preflights.map((preflight, index) => candidateRow(candidates[index], preflight, index === selectedIndex));
+  const rankByIndex = new Map(ranked.map((entry) => [entry.index, entry]));
+  const rows = preflights.map((preflight, index) => candidateRow(
+    candidates[index],
+    preflight,
+    index === selectedIndex,
+    rankByIndex.get(index),
+  ));
   return compactObject({
     type: 'meeting_platform_adapter_candidate_preflight',
     schema: MEETING_PLATFORM_ADAPTER_CANDIDATE_PREFLIGHT_SCHEMA,
     schema_version: MEETING_PLATFORM_ADAPTER_PREFLIGHT_SCHEMA_VERSION,
+    selection_strategy: 'score_accepted_live_current_window_then_active_candidate',
     accepted: preflights.some((preflight) => preflight.accepted === true),
     status: candidateStatus(preflights),
     candidate_count: candidates.length,
@@ -929,6 +982,7 @@ export function buildMeetingPlatformAdapterCandidatePreflight(input = {}, option
     meeting_end_ready_count: preflights.filter((preflight) => preflight.readiness?.meeting_end_ready === true).length,
     speaker_track_ready_count: preflights.filter((preflight) => preflight.readiness?.speaker_track_ready === true).length,
     selected_candidate_index: selectedIndex >= 0 ? selectedIndex : undefined,
+    selected_candidate_score: ranked[0]?.score,
     selected_platform: selectedPreflight?.platform,
     selected_status: selectedPreflight?.status,
     platforms: unique(preflights.map((preflight) => preflight.platform).filter(Boolean)),
