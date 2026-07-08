@@ -39,6 +39,13 @@ assert.equal(google.runtime.runtime_event_action_count, 18);
 assert.equal(google.provider.required_for_realtime, false);
 assert.equal(google.provider.security_verifier, 'verifyGooglePubSubOidcJwt');
 assert.equal(google.provider.start_events.includes('google.workspace.meet.conference.v2.started'), true);
+assert.equal(google.provider_replay.accepted, true);
+assert.equal(google.provider_replay.coverage.meeting_start, true);
+assert.equal(google.provider_replay.coverage.meeting_end, true);
+assert.equal(google.provider_replay.coverage.participant_track, true);
+assert.equal(google.provider_replay.coverage.artifact_ready, true);
+assert.equal(google.provider_replay.provider_events_block_realtime, false);
+assert.equal(google.provider_replay.signal_types.includes('artifact_ready'), true);
 assert.equal(google.annotations.insert_endpoint, `${baseUrl}/api/annotations`);
 assert.equal(google.annotations.runtime_event_endpoint, `${baseUrl}/api/meeting-platform/runtime-events`);
 assert.equal(google.annotations.runtime_event_plan.supported_actions.includes('insert_annotation'), true);
@@ -97,6 +104,8 @@ assert.equal(local.platform, 'local_detector');
 assert.equal(local.runtime.browser_matches.length, 0);
 assert.equal(local.event_adapter.source, 'local_detector');
 assert.equal(local.readiness.runtime_ready, true);
+assert.equal(local.provider_replay.accepted, true);
+assert.equal(local.provider_replay.not_applicable, true);
 
 const manifest = buildMeetingPlatformRegistryManifest({
   baseUrl,
@@ -110,9 +119,16 @@ assert.equal(manifest.contract_accepted_count, 5);
 assert.equal(manifest.candidate_observer_count, 5);
 assert.equal(manifest.adapter_selection_ready_count, 5);
 assert.equal(manifest.adapter_blueprint_ready_count, 5);
+assert.equal(manifest.provider_replay_accepted_count, 5);
+assert.equal(manifest.provider_replay_record_count, 20);
+assert.equal(manifest.provider_replay_signal_count, 20);
+assert.equal(manifest.provider_replay_blocking_count, 0);
 assert.equal(manifest.provider_required_for_realtime_count, 0);
 assert.equal(manifest.transcript_blocking_count, 0);
 assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').provider_transport, 'Microsoft Graph change notifications');
+assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').provider_replay_accepted, true);
+assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').provider_replay_coverage.participant_track, true);
+assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').provider_replay_provider_blocks_realtime, false);
 assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').candidate_observation_ready, true);
 assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').candidate_observer_message_type, 'meeting_timeline.observe_candidates');
 assert.equal(manifest.rows.find((row) => row.platform === 'microsoft_teams').candidate_observer_permission, 'tabs');
@@ -138,6 +154,7 @@ assert.equal(manifest.next_actions.includes('export_adapter_route_before_wiring_
 assert.equal(manifest.next_actions.includes('export_adapter_selection_before_wiring_external_host'), true);
 assert.equal(manifest.next_actions.includes('read_adapter_selection_before_wiring_external_host'), true);
 assert.equal(manifest.next_actions.includes('read_adapter_blueprint_before_wiring_external_host'), true);
+assert.equal(manifest.next_actions.includes('verify_provider_replay_before_platform_release'), true);
 
 const acceptance = buildMeetingPlatformRegistryAcceptanceReport(manifest);
 assert.equal(acceptance.schema, MEETING_PLATFORM_REGISTRY_ACCEPTANCE_SCHEMA);
@@ -146,6 +163,8 @@ assert.equal(acceptance.blocking_count, 0);
 assert.equal(acceptance.candidate_observer_count, 5);
 assert.equal(acceptance.adapter_selection_ready_count, 5);
 assert.equal(acceptance.adapter_blueprint_ready_count, 5);
+assert.equal(acceptance.provider_replay_accepted_count, 5);
+assert.equal(acceptance.provider_replay_blocking_count, 0);
 assert.equal(assertMeetingPlatformRegistryManifest(manifest).accepted, true);
 
 const brokenManifest = {
@@ -374,6 +393,34 @@ assert.equal(missingCandidateObservationAcceptance.issues.some((item) => item.co
 assert.equal(missingCandidateObservationAcceptance.issues.some((item) => item.code === 'entry_invalid_candidate_observation_message_type'), true);
 assert.equal(missingCandidateObservationAcceptance.issues.some((item) => item.code === 'entry_invalid_candidate_observation_permission'), true);
 
+const missingProviderReplay = {
+  ...manifest,
+  provider_replay_accepted_count: 4,
+  provider_replay_blocking_count: 1,
+  entries: manifest.entries.map((entry) => entry.platform === 'zoom'
+    ? {
+      ...entry,
+      provider_replay: {
+        ...entry.provider_replay,
+        accepted: false,
+        coverage: {
+          ...entry.provider_replay.coverage,
+          artifact_ready: false,
+        },
+        provider_events_block_realtime: true,
+        issues: ['missing_coverage:artifact_ready'],
+      },
+    }
+    : entry),
+};
+const missingProviderReplayAcceptance = buildMeetingPlatformRegistryAcceptanceReport(missingProviderReplay);
+assert.equal(missingProviderReplayAcceptance.accepted, false);
+assert.equal(missingProviderReplayAcceptance.issues.some((item) => item.code === 'provider_replay_not_accepted'), true);
+assert.equal(missingProviderReplayAcceptance.issues.some((item) => item.code === 'provider_replay_blocks_realtime'), true);
+assert.equal(missingProviderReplayAcceptance.issues.some((item) => item.code === 'entry_provider_replay_not_accepted'), true);
+assert.equal(missingProviderReplayAcceptance.issues.some((item) => item.code === 'entry_provider_replay_blocks_realtime'), true);
+assert.equal(missingProviderReplayAcceptance.issues.some((item) => item.code === 'entry_provider_replay_missing_coverage'), true);
+
 assert.throws(
   () => assertMeetingPlatformRegistryManifest(brokenManifest),
   /Meeting platform registry manifest failed acceptance/,
@@ -392,8 +439,10 @@ assert.equal(kit.platformRegistryEntry('zoom').platform, 'zoom');
 assert.equal(kit.platformRegistryManifest().platform_count, 2);
 assert.equal(kit.platformRegistryAcceptance({ platforms: ['zoom'] }).accepted, true);
 assert.equal(kit.assertPlatformRegistryManifest({ platforms: ['zoom'] }).accepted, true);
-assert.equal(kit.report().platform_registry_manifest.provider_required_for_realtime_count, 0);
-assert.equal(kit.report().platform_registry_manifest.candidate_observer_count, 2);
-assert.equal(kit.report().platform_registry_manifest.adapter_blueprint_ready_count, 2);
+const kitReport = kit.report();
+assert.equal(kitReport.platform_registry_manifest.provider_required_for_realtime_count, 0);
+assert.equal(kitReport.platform_registry_manifest.candidate_observer_count, 2);
+assert.equal(kitReport.platform_registry_manifest.adapter_blueprint_ready_count, 2);
+assert.equal(kitReport.platform_registry_manifest.provider_replay_accepted_count, 2);
 
 console.log('ok meeting platform registry manifest');

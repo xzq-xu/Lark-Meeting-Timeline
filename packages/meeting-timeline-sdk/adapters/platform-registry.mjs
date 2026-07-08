@@ -108,6 +108,10 @@ function issue(severity, code, message, details = {}) {
   return compactObject({ severity, code, message, ...details });
 }
 
+function iso(ms) {
+  return new Date(ms).toISOString();
+}
+
 function selectedPlatforms(options = {}) {
   return unique(asArray(firstNonEmpty(options.platforms, options.platform_keys, DEFAULT_REGISTRY_PLATFORMS))
     .map((platform) => normalizeMeetingPlatform(platform)));
@@ -138,6 +142,420 @@ export function meetingPlatformEventAdapterFor(platform) {
   return adapterByAlias.get(normalized) ?? MEETING_PLATFORM_EVENT_ADAPTERS.find((adapter) => adapter.key === normalized) ?? null;
 }
 
+function replayBaseMs(options = {}) {
+  const value = firstNonEmpty(options.baseReceivedAtMs, options.base_received_at_ms, options.receivedAtMs, options.received_at_ms);
+  return Number.isFinite(Number(value)) ? Number(value) : 1_782_614_400_000;
+}
+
+function replayRecord(id, kind, payload, receivedAtMs, required = true) {
+  return compactObject({
+    id,
+    kind,
+    required,
+    received_at_ms: receivedAtMs,
+    payload,
+  });
+}
+
+function providerReplaySamples(platform, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  if (key === 'local_detector') return [];
+  const baseMs = replayBaseMs(options);
+  if (key === 'google_meet') {
+    const recordName = 'conferenceRecords/google-provider-record-001';
+    return [
+      replayRecord('google-start', 'meeting_start', {
+        id: 'google-start',
+        type: 'google.workspace.meet.conference.v2.started',
+        time: iso(baseMs),
+        data: {
+          conferenceRecord: { name: recordName },
+          meetingUri: 'https://meet.google.com/abc-defg-hij',
+          title: 'Google Meet provider replay',
+        },
+      }, baseMs),
+      replayRecord('google-participant-joined', 'participant_joined', {
+        id: 'google-participant-joined',
+        type: 'google.workspace.meet.participant.v2.joined',
+        time: iso(baseMs + 10_000),
+        data: {
+          participantSession: {
+            name: `${recordName}/participants/google-user-1/participantSessions/session-1`,
+            participant: { displayName: 'Alex' },
+          },
+        },
+      }, baseMs + 10_000, false),
+      replayRecord('google-transcript', 'artifact_ready', {
+        id: 'google-transcript',
+        type: 'google.workspace.meet.transcript.v2.fileGenerated',
+        time: iso(baseMs + 40_000),
+        data: {
+          transcript: {
+            name: `${recordName}/transcripts/transcript-1`,
+            docsDestination: { document: 'https://docs.google.com/document/d/google-transcript-1' },
+          },
+        },
+      }, baseMs + 40_000, false),
+      replayRecord('google-end', 'meeting_end', {
+        id: 'google-end',
+        type: 'google.workspace.meet.conference.v2.ended',
+        time: iso(baseMs + 60_000),
+        data: {
+          conferenceRecord: { name: recordName },
+          meetingUri: 'https://meet.google.com/abc-defg-hij',
+          title: 'Google Meet provider replay',
+        },
+      }, baseMs + 60_000),
+    ];
+  }
+  if (key === 'microsoft_teams') {
+    const meetingId = 'teams-provider-meeting-001';
+    const joinWebUrl = 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_provider_replay';
+    return [
+      replayRecord('teams-start', 'meeting_start', {
+        id: 'teams-start',
+        resource: `communications/onlineMeetings(joinWebUrl='${encodeURIComponent(joinWebUrl)}')`,
+        resourceData: {
+          id: meetingId,
+          onlineMeetingId: meetingId,
+          eventType: 'callStarted',
+          eventDateTime: iso(baseMs),
+          joinWebUrl,
+          subject: 'Teams provider replay',
+        },
+      }, baseMs),
+      replayRecord('teams-roster', 'participant_joined', {
+        id: 'teams-roster',
+        resourceData: {
+          id: meetingId,
+          onlineMeetingId: meetingId,
+          eventType: 'rosterUpdated',
+          eventDateTime: iso(baseMs + 12_000),
+          joinWebUrl,
+          participants: [{
+            id: 'teams-user-1',
+            displayName: 'Alex',
+            joinDateTime: iso(baseMs + 12_000),
+          }],
+        },
+      }, baseMs + 12_000, false),
+      replayRecord('teams-transcript', 'artifact_ready', {
+        id: 'teams-transcript',
+        resourceData: {
+          id: 'teams-transcript-1',
+          onlineMeetingId: meetingId,
+          eventType: 'transcriptCreated',
+          eventDateTime: iso(baseMs + 45_000),
+          joinWebUrl,
+        },
+      }, baseMs + 45_000, false),
+      replayRecord('teams-end', 'meeting_end', {
+        id: 'teams-end',
+        resourceData: {
+          id: meetingId,
+          onlineMeetingId: meetingId,
+          eventType: 'callEnded',
+          eventDateTime: iso(baseMs + 65_000),
+          joinWebUrl,
+          subject: 'Teams provider replay',
+        },
+      }, baseMs + 65_000),
+    ];
+  }
+  if (key === 'zoom') {
+    const uuid = 'zoom-provider-uuid-001';
+    return [
+      replayRecord('zoom-start', 'meeting_start', {
+        event: 'meeting.started',
+        event_ts: baseMs,
+        payload: {
+          object: {
+            uuid,
+            id: 987654321,
+            topic: 'Zoom provider replay',
+            join_url: 'https://zoom.us/j/987654321',
+            start_time: iso(baseMs),
+          },
+        },
+      }, baseMs),
+      replayRecord('zoom-participant-joined', 'participant_joined', {
+        event: 'meeting.participant_joined',
+        event_ts: baseMs + 10_000,
+        payload: {
+          object: {
+            uuid,
+            id: 987654321,
+            participant: {
+              user_id: 'zoom-user-1',
+              user_name: 'Alex',
+              join_time: iso(baseMs + 10_000),
+            },
+          },
+        },
+      }, baseMs + 10_000, false),
+      replayRecord('zoom-recording', 'artifact_ready', {
+        event: 'recording.completed',
+        event_ts: baseMs + 45_000,
+        payload: {
+          object: {
+            uuid,
+            id: 987654321,
+            share_url: 'https://zoom.us/rec/share/provider-replay',
+          },
+        },
+      }, baseMs + 45_000, false),
+      replayRecord('zoom-end', 'meeting_end', {
+        event: 'meeting.ended',
+        event_ts: baseMs + 60_000,
+        payload: {
+          object: {
+            uuid,
+            id: 987654321,
+            topic: 'Zoom provider replay',
+            join_url: 'https://zoom.us/j/987654321',
+            end_time: iso(baseMs + 60_000),
+          },
+        },
+      }, baseMs + 60_000),
+    ];
+  }
+  if (key === 'webex') {
+    const meetingId = 'webex-provider-meeting-001';
+    return [
+      replayRecord('webex-start', 'meeting_start', {
+        id: 'webex-start',
+        resource: 'meetings',
+        event: 'started',
+        data: {
+          id: meetingId,
+          title: 'Webex provider replay',
+          webLink: 'https://example.webex.com/meet/provider-replay',
+          startTime: iso(baseMs),
+        },
+      }, baseMs),
+      replayRecord('webex-participant-joined', 'participant_joined', {
+        id: 'webex-participant-joined',
+        resource: 'meetingParticipants',
+        event: 'joined',
+        data: {
+          meetingId,
+          personId: 'webex-user-1',
+          displayName: 'Alex',
+          joinTime: iso(baseMs + 10_000),
+        },
+      }, baseMs + 10_000, false),
+      replayRecord('webex-transcript', 'artifact_ready', {
+        id: 'webex-transcript',
+        resource: 'meetingTranscripts',
+        event: 'created',
+        data: {
+          meetingId,
+          id: 'webex-transcript-1',
+          txtDownloadLink: 'https://webex.example/provider-replay.vtt',
+          created: iso(baseMs + 45_000),
+        },
+      }, baseMs + 45_000, false),
+      replayRecord('webex-end', 'meeting_end', {
+        id: 'webex-end',
+        resource: 'meetings',
+        event: 'ended',
+        data: {
+          id: meetingId,
+          title: 'Webex provider replay',
+          webLink: 'https://example.webex.com/meet/provider-replay',
+          endTime: iso(baseMs + 60_000),
+        },
+      }, baseMs + 60_000),
+    ];
+  }
+  if (key === 'lark') {
+    const meeting = {
+      id: 'lark-provider-meeting-001',
+      meeting_no: '123456789',
+      topic: 'Lark provider replay',
+      url: 'https://vc.feishu.cn/j/lark-provider-meeting-001',
+      start_time: String(Math.round(baseMs / 1000)),
+    };
+    return [
+      replayRecord('lark-start', 'meeting_start', {
+        header: {
+          event_id: 'lark-start',
+          event_type: 'vc.meeting.all_meeting_started_v1',
+          create_time: String(baseMs),
+        },
+        event: { meeting, minute_token: 'lark-minute-token-001' },
+      }, baseMs),
+      replayRecord('lark-join', 'participant_joined', {
+        header: {
+          event_id: 'lark-join',
+          event_type: 'vc.meeting.join_meeting_v1',
+          create_time: String(baseMs + 10_000),
+        },
+        event: {
+          meeting,
+          user: { open_id: 'lark-user-1', name: 'Alex' },
+        },
+      }, baseMs + 10_000, false),
+      replayRecord('lark-minute', 'artifact_ready', {
+        header: {
+          event_id: 'lark-minute',
+          event_type: 'vc.meeting.minute_created_v1',
+          create_time: String(baseMs + 45_000),
+        },
+        event: {
+          meeting,
+          minute: {
+            token: 'lark-minute-token-001',
+            url: 'https://minutes.feishu.cn/minutes/provider-replay',
+          },
+        },
+      }, baseMs + 45_000, false),
+      replayRecord('lark-end', 'meeting_end', {
+        header: {
+          event_id: 'lark-end',
+          event_type: 'vc.meeting.all_meeting_ended_v1',
+          create_time: String(baseMs + 60_000),
+        },
+        event: {
+          meeting: {
+            ...meeting,
+            end_time: String(Math.round((baseMs + 60_000) / 1000)),
+          },
+        },
+      }, baseMs + 60_000),
+    ];
+  }
+  return [];
+}
+
+function replayCoverage(signalTypes = []) {
+  const set = new Set(signalTypes);
+  return {
+    realtime_axis: set.has('meeting_started') || set.has('meeting_ended'),
+    meeting_start: set.has('meeting_started'),
+    meeting_end: set.has('meeting_ended'),
+    participant_track: set.has('participant_joined') || set.has('participant_left'),
+    speaker_activity: set.has('speaker_started') || set.has('speaker_ended'),
+    artifact_ready: set.has('artifact_ready'),
+    subscription_lifecycle: set.has('subscription_lifecycle'),
+  };
+}
+
+function replayReportFromOptions(platform, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  const reportSources = [
+    options.providerReplayReports,
+    options.provider_replay_reports,
+    options.providerReplayByPlatform,
+    options.provider_replay_by_platform,
+  ].filter(Boolean);
+  for (const source of reportSources) {
+    const report = source[key] ?? source[key.replaceAll('_', '-')] ?? (key === 'microsoft_teams' ? source.teams : undefined);
+    if (report) return report;
+  }
+  const matrix = firstNonEmpty(options.providerReplayMatrix, options.provider_replay_matrix);
+  const report = matrix?.reports?.find?.((item) => normalizeMeetingPlatform(item.platform) === key);
+  if (report) return report;
+  const row = matrix?.rows?.find?.((item) => normalizeMeetingPlatform(item.platform) === key);
+  if (row) return row;
+  return undefined;
+}
+
+function buildProviderReplayEvidence(platform, adapter, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  const injected = replayReportFromOptions(key, options);
+  if (injected) {
+    return compactObject({
+      schema: injected.schema,
+      target: injected.target,
+      accepted: injected.accepted === true,
+      source: injected.source,
+      record_count: injected.record_count,
+      accepted_record_count: injected.accepted_record_count,
+      runtime_event_count: injected.runtime_event_count,
+      signal_count: injected.signal_count,
+      signal_types: injected.signal_types,
+      coverage: injected.coverage,
+      required_coverage: injected.required_coverage,
+      provider_events_block_realtime: injected.runtime_contract?.provider_events_block_realtime ?? injected.provider_events_block_realtime,
+      transcript_blocks_realtime: injected.runtime_contract?.transcript_blocks_realtime ?? injected.transcript_blocks_realtime,
+      issue_count: injected.issue_count,
+      issues: injected.issues,
+    });
+  }
+  if (key === 'local_detector') {
+    return {
+      accepted: true,
+      not_applicable: true,
+      source: adapter?.source,
+      record_count: 0,
+      accepted_record_count: 0,
+      signal_count: 0,
+      signal_types: [],
+      coverage: replayCoverage([]),
+      required_coverage: [],
+      provider_events_block_realtime: false,
+      transcript_blocks_realtime: false,
+      issue_count: 0,
+      issues: [],
+    };
+  }
+  const samples = providerReplaySamples(key, options);
+  const rows = samples.map((record, index) => {
+    try {
+      const signals = adapter?.normalize?.(record.payload, {
+        ...(options.normalizerOptions ?? {}),
+        ...(options.normalizer_options ?? {}),
+        receivedAtMs: record.received_at_ms ?? replayBaseMs(options) + (index * 10_000),
+      }) ?? [];
+      const signalTypes = unique(signals.map((signal) => signal.type));
+      return compactObject({
+        id: record.id,
+        kind: record.kind,
+        required: record.required !== false,
+        accepted: signalTypes.length > 0,
+        signal_count: signals.length,
+        signal_types: signalTypes,
+        coverage: replayCoverage(signalTypes),
+      });
+    } catch (error) {
+      return compactObject({
+        id: record.id,
+        kind: record.kind,
+        required: record.required !== false,
+        accepted: false,
+        signal_count: 0,
+        signal_types: [],
+        coverage: replayCoverage([]),
+        error: error.message ?? String(error),
+      });
+    }
+  });
+  const signalTypes = unique(rows.flatMap((row) => row.signal_types ?? []));
+  const coverage = replayCoverage(signalTypes);
+  const requiredCoverage = ['meeting_start', 'meeting_end', 'participant_track', 'artifact_ready'];
+  const issues = unique([
+    ...(samples.length > 0 ? [] : ['missing_provider_replay_samples']),
+    ...requiredCoverage.filter((keyName) => coverage[keyName] !== true).map((keyName) => `missing_coverage:${keyName}`),
+    ...rows.flatMap((row) => row.accepted === true || row.required === false ? [] : [`${row.id}:not_accepted`]),
+  ]);
+  return compactObject({
+    target: firstNonEmpty(options.target, 'registry'),
+    accepted: issues.length === 0,
+    source: adapter?.source,
+    record_count: samples.length,
+    accepted_record_count: rows.filter((row) => row.accepted === true).length,
+    signal_count: rows.reduce((sum, row) => sum + (row.signal_count ?? 0), 0),
+    signal_types: signalTypes,
+    coverage,
+    required_coverage: requiredCoverage,
+    provider_events_block_realtime: false,
+    transcript_blocks_realtime: false,
+    issue_count: issues.length,
+    issues,
+  });
+}
+
 export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
   const key = normalizeMeetingPlatform(platform);
   const adapter = meetingPlatformEventAdapterFor(key);
@@ -150,6 +568,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
   const adapterRoute = buildMeetingPlatformAdapterRoute(key, options);
   const adapterSelection = buildMeetingPlatformAdapterSelection(key, options);
   const adapterBlueprint = buildMeetingPlatformAdapterBlueprint(key, options);
+  const providerReplay = buildProviderReplayEvidence(key, adapter, options);
   const candidateObservation = runtimeBundle.messaging?.candidate_observation ?? runtimeBundle.browser?.candidate_observation;
   const candidateObservationReady = candidateObservation?.runtime_event_action === 'observe_platform_candidates'
     && runtimeEventPlan.supported_actions?.includes?.('observe_platform_candidates');
@@ -206,6 +625,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
       artifact_events: contract.provider_observer?.events?.artifact_events ?? [],
       lifecycle_events: contract.provider_observer?.events?.lifecycle_events ?? [],
     },
+    provider_replay: providerReplay,
     annotations: {
       insert_endpoint: contract.annotations?.endpoints?.insertMark ?? runtimeBundle.host?.endpoints?.insertMark,
       runtime_event_endpoint: runtimeEventPlan.endpoint,
@@ -337,6 +757,7 @@ export function buildMeetingPlatformRegistryEntry(platform, options = {}) {
       'export_adapter_route_before_wiring_external_host',
       'export_adapter_selection_before_wiring_external_host',
       'export_runtime_event_plan_before_wiring_external_host',
+      'verify_provider_replay_before_platform_release',
       'verify_candidate_observation_before_host_handoff',
     ]),
   });
@@ -359,6 +780,10 @@ export function buildMeetingPlatformRegistryManifest(options = {}) {
     candidate_observer_count: entries.filter((entry) => entry.readiness?.candidate_observation_ready).length,
     adapter_selection_ready_count: entries.filter((entry) => entry.adapter_selection?.selection_ready === true).length,
     adapter_blueprint_ready_count: entries.filter((entry) => entry.adapter_blueprint?.ready === true).length,
+    provider_replay_accepted_count: entries.filter((entry) => entry.provider_replay?.accepted === true).length,
+    provider_replay_record_count: entries.reduce((sum, entry) => sum + (entry.provider_replay?.record_count ?? 0), 0),
+    provider_replay_signal_count: entries.reduce((sum, entry) => sum + (entry.provider_replay?.signal_count ?? 0), 0),
+    provider_replay_blocking_count: entries.filter((entry) => entry.provider_replay?.provider_events_block_realtime === true).length,
     provider_required_for_realtime_count: entries.filter((entry) => entry.readiness?.provider_required_for_realtime).length,
     transcript_blocking_count: entries.filter((entry) => entry.readiness?.transcript_blocks_realtime).length,
     platforms: entries.map((entry) => entry.platform),
@@ -391,6 +816,12 @@ export function buildMeetingPlatformRegistryManifest(options = {}) {
       adapter_blueprint_provider_blocks_realtime: entry.adapter_blueprint?.provider_blocks_realtime,
       adapter_blueprint_transcript_blocks_realtime: entry.adapter_blueprint?.transcript_blocks_realtime,
       adapter_blueprint_first_acceptance_gate: entry.adapter_blueprint?.first_acceptance_gate,
+      provider_replay_accepted: entry.provider_replay?.accepted === true,
+      provider_replay_signal_types: entry.provider_replay?.signal_types ?? [],
+      provider_replay_required_coverage: entry.provider_replay?.required_coverage ?? [],
+      provider_replay_coverage: entry.provider_replay?.coverage,
+      provider_replay_provider_blocks_realtime: entry.provider_replay?.provider_events_block_realtime,
+      provider_replay_issue_count: entry.provider_replay?.issue_count ?? 0,
       provider_transport: entry.provider?.transport,
       provider_ready: entry.provider?.ready === true,
       provider_required_for_realtime: entry.readiness?.provider_required_for_realtime === true,
@@ -417,6 +848,10 @@ function registryManifestFrom(input = {}, options = {}) {
       candidate_observer_count: input.readiness?.candidate_observation_ready === true ? 1 : 0,
       adapter_selection_ready_count: input.adapter_selection?.selection_ready === true ? 1 : 0,
       adapter_blueprint_ready_count: input.adapter_blueprint?.ready === true ? 1 : 0,
+      provider_replay_accepted_count: input.provider_replay?.accepted === true ? 1 : 0,
+      provider_replay_record_count: input.provider_replay?.record_count ?? 0,
+      provider_replay_signal_count: input.provider_replay?.signal_count ?? 0,
+      provider_replay_blocking_count: input.provider_replay?.provider_events_block_realtime === true ? 1 : 0,
       provider_required_for_realtime_count: input.readiness?.provider_required_for_realtime === true ? 1 : 0,
       transcript_blocking_count: input.readiness?.transcript_blocks_realtime === true ? 1 : 0,
       platforms: [input.platform],
@@ -449,6 +884,12 @@ function registryManifestFrom(input = {}, options = {}) {
         adapter_blueprint_provider_blocks_realtime: input.adapter_blueprint?.provider_blocks_realtime,
         adapter_blueprint_transcript_blocks_realtime: input.adapter_blueprint?.transcript_blocks_realtime,
         adapter_blueprint_first_acceptance_gate: input.adapter_blueprint?.first_acceptance_gate,
+        provider_replay_accepted: input.provider_replay?.accepted === true,
+        provider_replay_signal_types: input.provider_replay?.signal_types ?? [],
+        provider_replay_required_coverage: input.provider_replay?.required_coverage ?? [],
+        provider_replay_coverage: input.provider_replay?.coverage,
+        provider_replay_provider_blocks_realtime: input.provider_replay?.provider_events_block_realtime,
+        provider_replay_issue_count: input.provider_replay?.issue_count ?? 0,
         provider_transport: input.provider?.transport,
         provider_ready: input.provider?.ready === true,
         provider_required_for_realtime: input.readiness?.provider_required_for_realtime === true,
@@ -509,6 +950,17 @@ function registryAcceptanceIssues(manifest = {}, options = {}) {
     issues.push(issue('error', 'adapter_blueprint_not_ready', 'Every selected platform must expose a ready adapter blueprint for host wiring.', {
       adapter_blueprint_ready_count: manifest.adapter_blueprint_ready_count,
       platform_count: manifest.platform_count,
+    }));
+  }
+  if (manifest.provider_replay_accepted_count !== manifest.platform_count) {
+    issues.push(issue('error', 'provider_replay_not_accepted', 'Every selected platform must expose accepted provider replay evidence.', {
+      provider_replay_accepted_count: manifest.provider_replay_accepted_count,
+      platform_count: manifest.platform_count,
+    }));
+  }
+  if ((manifest.provider_replay_blocking_count ?? 0) > 0) {
+    issues.push(issue('error', 'provider_replay_blocks_realtime', 'Provider replay evidence must keep provider events non-blocking for realtime annotations.', {
+      provider_replay_blocking_count: manifest.provider_replay_blocking_count,
     }));
   }
   if ((manifest.provider_required_for_realtime_count ?? 0) > 0) {
@@ -637,6 +1089,25 @@ function registryAcceptanceIssues(manifest = {}, options = {}) {
         timestamp_field: entry.adapter_blueprint?.realtime_axis_timestamp_field,
       }));
     }
+    if (entry.provider_replay?.accepted !== true) {
+      issues.push(issue('error', 'entry_provider_replay_not_accepted', 'Registry entry must include accepted provider replay evidence.', {
+        platform,
+        issues: entry.provider_replay?.issues ?? [],
+      }));
+    }
+    if (entry.provider_replay?.provider_events_block_realtime === true) {
+      issues.push(issue('error', 'entry_provider_replay_blocks_realtime', 'Provider replay must keep provider events non-blocking for realtime annotations.', { platform }));
+    }
+    if (platform !== 'local_detector') {
+      const requiredReplayCoverage = entry.provider_replay?.required_coverage ?? ['meeting_start', 'meeting_end', 'participant_track', 'artifact_ready'];
+      const missingReplayCoverage = requiredReplayCoverage.filter((key) => entry.provider_replay?.coverage?.[key] !== true);
+      if (missingReplayCoverage.length > 0) {
+        issues.push(issue('error', 'entry_provider_replay_missing_coverage', 'Provider replay must cover required platform lifecycle and handoff signals.', {
+          platform,
+          missing_coverage: missingReplayCoverage,
+        }));
+      }
+    }
     if (requireProviderReady && entry.provider?.ready !== true) {
       issues.push(issue('error', 'entry_provider_not_ready', 'Provider setup must be ready when requireProviderReady=true.', {
         platform,
@@ -663,6 +1134,10 @@ export function buildMeetingPlatformRegistryAcceptanceReport(manifestOrOptions =
     candidate_observer_count: manifest.candidate_observer_count ?? 0,
     adapter_blueprint_ready_count: manifest.adapter_blueprint_ready_count ?? 0,
     adapter_selection_ready_count: manifest.adapter_selection_ready_count ?? 0,
+    provider_replay_accepted_count: manifest.provider_replay_accepted_count ?? 0,
+    provider_replay_record_count: manifest.provider_replay_record_count ?? 0,
+    provider_replay_signal_count: manifest.provider_replay_signal_count ?? 0,
+    provider_replay_blocking_count: manifest.provider_replay_blocking_count ?? 0,
     provider_required_for_realtime_count: manifest.provider_required_for_realtime_count ?? 0,
     transcript_blocking_count: manifest.transcript_blocking_count ?? 0,
     blocking_count: blocking.length,

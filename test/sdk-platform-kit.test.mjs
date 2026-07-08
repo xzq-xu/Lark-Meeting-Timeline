@@ -95,6 +95,14 @@ assert.equal(googleRegistryEntry.runtime.browser_matches.includes('https://meet.
 const registryManifest = kit.platformRegistryManifest({ platforms: ['google-meet', 'zoom'] });
 assert.equal(registryManifest.platform_count, 2);
 assert.equal(registryManifest.provider_required_for_realtime_count, 0);
+assert.equal(registryManifest.provider_replay_accepted_count, 2);
+assert.equal(registryManifest.rows.find((row) => row.platform === 'google_meet').provider_replay_coverage.artifact_ready, true);
+assert.equal(kit.sampleProviderEvents('google-meet').length, 4);
+assert.equal(kit.platformProviderReplay('google-meet').accepted, true);
+assert.equal(kit.platformProviderReplayMatrix({ platforms: ['google-meet', 'zoom'] }).accepted_count, 2);
+assert.equal(kit.assertPlatformProviderReplayMatrix({ platforms: ['google-meet'] }).accepted, true);
+const googleKitReport = kit.report({ platforms: ['google-meet'] });
+assert.equal(googleKitReport.platform_provider_replay_matrix.accepted_count, 1);
 const googleConnector = kit.platformConnector('google-meet');
 assert.equal(googleConnector.schema, 'meeting_platform_connector');
 assert.equal(googleConnector.platform, 'google_meet');
@@ -108,8 +116,8 @@ assert.equal(connectorMatrix.platform_count, 3);
 assert.equal(connectorMatrix.accepted_count, 3);
 assert.equal(connectorMatrix.realtime_ready_count, 3);
 assert.equal(connectorMatrix.rows.find((row) => row.platform === 'microsoft_teams').browser_observer_enabled, true);
-assert.equal(kit.report({ platforms: ['google-meet'] }).platform_connector_matrix.platform_count, 1);
-assert.equal(kit.report({ platforms: ['google-meet'] }).platform_connector_hub.accepted, true);
+assert.equal(googleKitReport.platform_connector_matrix.platform_count, 1);
+assert.equal(googleKitReport.platform_connector_hub.accepted, true);
 const connectorHub = kit.platformConnectorHub({ platforms: ['google-meet', 'teams', 'zoom'] });
 assert.equal(connectorHub.schema, 'meeting_platform_connector_hub');
 assert.equal(connectorHub.platform_count, 3);
@@ -212,7 +220,7 @@ assert.equal(connectorRuntimeCalls.at(-1).body.platform, 'google_meet');
 assert.equal(connectorRuntimeCalls.at(-1).body.annotation.id, 'kit-bridge-mark-001');
 assert.equal(kit.platformConsumerHandoff({ platforms: ['google-meet'] }).schema, 'meeting_platform_consumer_handoff');
 assert.equal(kit.assertPlatformConsumerHandoff({ platforms: ['google-meet'] }).accepted, true);
-assert.equal(kit.report({ platforms: ['google-meet'] }).platform_consumer_handoff.consumer_ready_count, 1);
+assert.equal(googleKitReport.platform_consumer_handoff.consumer_ready_count, 1);
 
 const fixtureAcceptance = kit.fixtureAcceptance('google-meet', {
   requiredCoverage: ['meeting_start', 'meeting_end', 'participant_track', 'artifact_ready', 'subscription_lifecycle'],
@@ -320,7 +328,7 @@ const appCapabilityMatrix = kit.meetingAppAdapterCapabilityMatrix({
 });
 assert.equal(appCapabilityMatrix.platform_count, 2);
 assert.equal(appCapabilityMatrix.pilot_ready_count, 2);
-assert.equal(kit.report({ platforms: ['google-meet'] }).meeting_app_adapter_capability_matrix.platform_count, 1);
+assert.equal(googleKitReport.meeting_app_adapter_capability_matrix.platform_count, 1);
 const appExecutionPlan = kit.meetingAppAdapterExecutionPlan(appCapability);
 assert.equal(appExecutionPlan.schema, 'meeting_app_adapter_execution_plan');
 assert.equal(appExecutionPlan.realtime_ready, true);
@@ -346,7 +354,7 @@ const appExecutionPlanMatrix = kit.meetingAppAdapterExecutionPlanMatrix({
 });
 assert.equal(appExecutionPlanMatrix.platform_count, 2);
 assert.equal(appExecutionPlanMatrix.realtime_ready_count, 2);
-assert.equal(kit.report({ platforms: ['google-meet'] }).meeting_app_adapter_execution_plan_matrix.platform_count, 1);
+assert.equal(googleKitReport.meeting_app_adapter_execution_plan_matrix.platform_count, 1);
 const appIntegrationPackage = kit.meetingAppAdapterIntegrationPackage(appCapability);
 assert.equal(appIntegrationPackage.schema, 'meeting_app_adapter_integration_package');
 assert.equal(appIntegrationPackage.platform, 'google_meet');
@@ -382,7 +390,7 @@ assert.throws(
   () => kit.assertMeetingAppAdapterIntegrationPackageMatrix(appIntegrationPackageMatrix, { target: 'production' }),
   /Meeting app adapter integration package matrix acceptance failed/,
 );
-assert.equal(kit.report({ platforms: ['google-meet'] }).meeting_app_adapter_integration_package_matrix.platform_count, 1);
+assert.equal(googleKitReport.meeting_app_adapter_integration_package_matrix.platform_count, 1);
 const appObserverPlan = kit.meetingAppRuntimeObserverPlan({
   url: 'https://meet.google.com/abc-defg-hij',
   page: {
@@ -416,7 +424,7 @@ const appObserverPlanMatrix = kit.meetingAppRuntimeObserverPlanMatrix({
 });
 assert.equal(appObserverPlanMatrix.platform_count, 2);
 assert.equal(appObserverPlanMatrix.preflight_accepted_count, 2);
-assert.equal(kit.report({ platforms: ['google-meet'] }).meeting_app_runtime_observer_plan_matrix.platform_count, 1);
+assert.equal(googleKitReport.meeting_app_runtime_observer_plan_matrix.platform_count, 1);
 const platformHostConfig = kit.platformRuntimeHostConfig('google-meet');
 assert.equal(platformHostConfig.schema, 'meeting_platform_runtime_host_config');
 assert.equal(platformHostConfig.readiness.host_ready, true);
@@ -424,13 +432,13 @@ assert.equal(platformHostConfig.driver.change_observer.enabled, true);
 const platformHostConfigMatrix = kit.platformRuntimeHostConfigMatrix({ platforms: ['google-meet', 'zoom'] });
 assert.equal(platformHostConfigMatrix.platform_count, 2);
 assert.equal(platformHostConfigMatrix.host_ready_count, 2);
-assert.equal(kit.report({ platforms: ['google-meet'] }).platform_runtime_host_config_matrix.host_ready_count, 1);
+assert.equal(googleKitReport.platform_runtime_host_config_matrix.host_ready_count, 1);
 const platformHostHandoff = kit.platformRuntimeHostHandoff('google-meet');
 assert.equal(platformHostHandoff.schema, 'meeting_platform_runtime_host_handoff');
 assert.equal(platformHostHandoff.acceptance.accepted, true);
 const platformHostHandoffMatrix = kit.platformRuntimeHostHandoffMatrix({ platforms: ['google-meet', 'zoom'] });
 assert.equal(platformHostHandoffMatrix.accepted_count, 2);
-assert.equal(kit.report({ platforms: ['google-meet'] }).platform_runtime_host_handoff_matrix.accepted_count, 1);
+assert.equal(googleKitReport.platform_runtime_host_handoff_matrix.accepted_count, 1);
 const kitRuntimeHost = kit.createPlatformRuntimeHost({
   inputProvider() {
     return { platform: 'google_meet', url: 'https://meet.google.com/abc-defg-hij' };

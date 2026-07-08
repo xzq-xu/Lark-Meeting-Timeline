@@ -391,7 +391,16 @@ import type {
   MeetingAppObserverSchedulerConfigMatrix,
   MeetingAppObserverSchedulerOptions,
 } from './meeting-app-observer-scheduler.mjs';
-import type { PlatformEventDiagnosticResult, PlatformEventIngestInput, PlatformEventIngestOptions, ReconciledPlatformEventIngestResult } from './platform-ingest.mjs';
+import type {
+  MeetingPlatformProviderReplayAcceptanceReport,
+  MeetingPlatformProviderReplayMatrix,
+  MeetingPlatformProviderReplayRecord,
+  MeetingPlatformProviderReplayReport,
+  PlatformEventDiagnosticResult,
+  PlatformEventIngestInput,
+  PlatformEventIngestOptions,
+  ReconciledPlatformEventIngestResult,
+} from './platform-ingest.mjs';
 import type {
   MeetingAppFixtureDiagnosis,
   MeetingAppFixtureLifecycleDiagnosis,
@@ -929,6 +938,22 @@ export interface MeetingPlatformTimelineKit {
   assertMeetingAppLaunchGate(platform: string, gateOptions?: MeetingAppLaunchGateOptions): MeetingAppLaunchGate;
   assertAllMeetingAppLaunchGates(gateOptions?: MeetingAppLaunchGateOptions): MeetingAppLaunchGateSummary;
   diagnose(platform: string, payload?: unknown, diagnosticOptions?: Record<string, unknown>): PlatformEventDiagnosticResult;
+  sampleProviderEvents(platform: string, sampleOptions?: Record<string, unknown>): MeetingPlatformProviderReplayRecord[];
+  platformProviderReplay(
+    platformOrInput?: string | PlatformEventIngestInput,
+    recordsOrOptions?: MeetingPlatformProviderReplayRecord[] | Record<string, unknown>,
+    replayOptions?: Record<string, unknown>,
+  ): MeetingPlatformProviderReplayReport;
+  platformProviderReplayAcceptance(
+    reportOrInput?: MeetingPlatformProviderReplayReport | string | PlatformEventIngestInput | Record<string, unknown>,
+    replayOptions?: Record<string, unknown>,
+  ): MeetingPlatformProviderReplayAcceptanceReport;
+  assertPlatformProviderReplay(
+    reportOrInput?: MeetingPlatformProviderReplayReport | string | PlatformEventIngestInput | Record<string, unknown>,
+    replayOptions?: Record<string, unknown>,
+  ): MeetingPlatformProviderReplayReport;
+  platformProviderReplayMatrix(replayOptions?: Record<string, unknown>): MeetingPlatformProviderReplayMatrix;
+  assertPlatformProviderReplayMatrix(replayOptions?: Record<string, unknown>): MeetingPlatformProviderReplayMatrix;
   platform(platform: string, platformOptions?: MeetingPlatformTimelineKitOptions): Record<string, unknown>;
   allPlatforms(platformOptions?: MeetingPlatformTimelineKitOptions): Record<string, unknown>[];
   capability(platform: string, platformOptions?: MeetingPlatformTimelineKitOptions): Record<string, unknown>;

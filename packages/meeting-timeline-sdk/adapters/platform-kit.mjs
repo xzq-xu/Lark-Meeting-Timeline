@@ -67,7 +67,15 @@ import {
 import {
   createMeetingAppTrackRuntime,
 } from './meeting-app-track-runtime.mjs';
-import { diagnosePlatformEvent } from './platform-ingest.mjs';
+import {
+  assertMeetingPlatformProviderReplayMatrix,
+  assertMeetingPlatformProviderReplayReport,
+  buildMeetingPlatformProviderReplayAcceptanceReport,
+  buildMeetingPlatformProviderReplayMatrix,
+  buildMeetingPlatformProviderReplayReport,
+  diagnosePlatformEvent,
+  sampleMeetingPlatformProviderEvents,
+} from './platform-ingest.mjs';
 import { buildMeetingPlatformOnboardingReport, buildMeetingPlatformOnboardingSummary } from './platform-onboarding.mjs';
 import {
   MEETING_PLATFORM_KEYS,
@@ -588,10 +596,34 @@ function platformOverview(platform, defaults = {}, options = {}) {
   };
 }
 
+function providerReplayKitOptions(options = {}) {
+  const rawPlatforms = firstNonEmpty(
+    options.providerReplayPlatforms,
+    options.provider_replay_platforms,
+    options.platforms,
+    options.platform_keys,
+    MEETING_PLATFORM_KEYS,
+  );
+  const list = Array.isArray(rawPlatforms)
+    ? rawPlatforms
+    : rawPlatforms && typeof rawPlatforms !== 'string' && typeof rawPlatforms[Symbol.iterator] === 'function'
+      ? Array.from(rawPlatforms)
+      : [rawPlatforms];
+  const platforms = [...new Set(list
+    .filter((platform) => platform != null && platform !== '')
+    .map((platform) => normalizeMeetingPlatform(platform))
+    .filter((platform) => platform !== 'local_detector'))];
+  return {
+    ...options,
+    platforms,
+  };
+}
+
 export function buildMeetingPlatformKitReport(options = {}) {
   const fixtureInput = buildPlatformFixtureAcceptanceInput(options);
   const meetingAppFixtureAcceptance = buildMeetingAppFixtureAcceptanceReport(options);
   const meetingAppLaunchGateSummary = buildMeetingAppLaunchGateSummary(options);
+  const platformProviderReplayMatrix = buildMeetingPlatformProviderReplayMatrix(providerReplayKitOptions(options));
   const platformAdapterExportPackageMatrix = buildMeetingPlatformAdapterExportPackageMatrix(options);
   const platformAdapterImportPlanMatrix = buildMeetingPlatformAdapterImportPlanMatrix({
     packages: platformAdapterExportPackageMatrix.packages,
@@ -604,7 +636,11 @@ export function buildMeetingPlatformKitReport(options = {}) {
     base_path: options.basePath ?? options.base_path ?? '/api/platform-events',
     supported_platforms: MEETING_PLATFORM_KEYS,
     supported_meeting_app_platforms: MEETING_APP_FIXTURE_PLATFORMS,
-    platform_registry_manifest: buildMeetingPlatformRegistryManifest(options),
+    platform_registry_manifest: buildMeetingPlatformRegistryManifest({
+      ...options,
+      providerReplayMatrix: platformProviderReplayMatrix,
+    }),
+    platform_provider_replay_matrix: platformProviderReplayMatrix,
     platform_connector_matrix: buildMeetingPlatformConnectorMatrix(options),
     platform_connector_hub: buildMeetingPlatformConnectorHub(options),
     platform_conformance_report: buildMeetingPlatformConformanceReport(options),
@@ -1654,6 +1690,34 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     diagnose(platform, payload, diagnosticOptions = {}) {
       return diagnosePlatformEvent(platform, payload, diagnosticOptions);
+    },
+    sampleProviderEvents(platform, sampleOptions = {}) {
+      return sampleMeetingPlatformProviderEvents(platform, withDefaults(defaults, sampleOptions));
+    },
+    platformProviderReplay(platformOrInput, recordsOrOptions = undefined, replayOptions = {}) {
+      return buildMeetingPlatformProviderReplayReport(
+        platformOrInput,
+        recordsOrOptions,
+        withDefaults(defaults, replayOptions),
+      );
+    },
+    platformProviderReplayAcceptance(reportOrInput = {}, replayOptions = {}) {
+      return buildMeetingPlatformProviderReplayAcceptanceReport(
+        reportOrInput,
+        withDefaults(defaults, replayOptions),
+      );
+    },
+    assertPlatformProviderReplay(reportOrInput = {}, replayOptions = {}) {
+      return assertMeetingPlatformProviderReplayReport(
+        reportOrInput,
+        withDefaults(defaults, replayOptions),
+      );
+    },
+    platformProviderReplayMatrix(replayOptions = {}) {
+      return buildMeetingPlatformProviderReplayMatrix(providerReplayKitOptions(withDefaults(defaults, replayOptions)));
+    },
+    assertPlatformProviderReplayMatrix(replayOptions = {}) {
+      return assertMeetingPlatformProviderReplayMatrix(providerReplayKitOptions(withDefaults(defaults, replayOptions)));
     },
     platform(platform, platformOptions = {}) {
       return platformOverview(platform, defaults, platformOptions);

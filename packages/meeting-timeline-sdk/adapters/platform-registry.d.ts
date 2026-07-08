@@ -22,8 +22,31 @@ export interface MeetingPlatformRegistryOptions {
   base_path?: string;
   platforms?: Iterable<string> | string[];
   platform_keys?: Iterable<string> | string[];
+  providerReplayMatrix?: Record<string, unknown>;
+  provider_replay_matrix?: Record<string, unknown>;
+  providerReplayReports?: Record<string, unknown>;
+  provider_replay_reports?: Record<string, unknown>;
   env?: Record<string, unknown>;
   [key: string]: unknown;
+}
+
+export interface MeetingPlatformRegistryProviderReplayEvidence {
+  schema?: string;
+  target?: string;
+  accepted: boolean;
+  not_applicable?: boolean;
+  source?: string;
+  record_count: number;
+  accepted_record_count: number;
+  runtime_event_count?: number;
+  signal_count: number;
+  signal_types: string[];
+  coverage: Record<string, boolean>;
+  required_coverage: string[];
+  provider_events_block_realtime: boolean;
+  transcript_blocks_realtime: boolean;
+  issue_count: number;
+  issues: string[];
 }
 
 export interface MeetingPlatformRegistryEntry {
@@ -37,6 +60,7 @@ export interface MeetingPlatformRegistryEntry {
   supported_surfaces?: Record<string, unknown>;
   runtime: Record<string, unknown>;
   provider: Record<string, unknown>;
+  provider_replay: MeetingPlatformRegistryProviderReplayEvidence;
   annotations: Record<string, unknown>;
   adapter_route: Record<string, unknown>;
   adapter_selection: Record<string, unknown>;
@@ -60,6 +84,10 @@ export interface MeetingPlatformRegistryManifest {
   candidate_observer_count: number;
   adapter_selection_ready_count: number;
   adapter_blueprint_ready_count: number;
+  provider_replay_accepted_count: number;
+  provider_replay_record_count: number;
+  provider_replay_signal_count: number;
+  provider_replay_blocking_count: number;
   provider_required_for_realtime_count: number;
   transcript_blocking_count: number;
   platforms: string[];
@@ -80,6 +108,10 @@ export interface MeetingPlatformRegistryAcceptanceReport {
   candidate_observer_count: number;
   adapter_selection_ready_count: number;
   adapter_blueprint_ready_count: number;
+  provider_replay_accepted_count: number;
+  provider_replay_record_count: number;
+  provider_replay_signal_count: number;
+  provider_replay_blocking_count: number;
   provider_required_for_realtime_count: number;
   transcript_blocking_count: number;
   blocking_count: number;

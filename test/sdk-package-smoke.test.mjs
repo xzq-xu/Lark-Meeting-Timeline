@@ -1032,6 +1032,10 @@ assert.equal(createMeetingPlatformTimelineKitFromRoot(client, {
   baseUrl: 'http://localhost:8787',
   verify: false,
 }).platformRegistryManifest({ platforms: ['google-meet'] }).platform_count, 1);
+assert.equal(createMeetingPlatformTimelineKitFromRoot(client, {
+  baseUrl: 'http://localhost:8787',
+  verify: false,
+}).platformProviderReplayMatrix({ platforms: ['google-meet'] }).accepted_count, 1);
 assert.equal(detectMeetingPlatformForBrowserFromRoot({
   url: 'https://meet.google.com/abc-defg-hij',
 }).platform, 'google_meet');
@@ -1659,10 +1663,12 @@ const kit = createMeetingPlatformTimelineKit(client, {
 });
 assert.equal(kit.platformRolloutPlan('google-meet').platform, 'google_meet');
 assert.equal(kit.platformAdaptationRunbook('zoom').platform, 'zoom');
-assert.equal(kit.report({ platforms: ['google-meet'] }).platform_rollout.type, 'meeting_platform_rollout_summary');
-assert.equal(kit.report({ platforms: ['google-meet'] }).platform_registry_manifest.platform_count, 1);
-assert.equal(kit.report({ platforms: ['google-meet'] }).platform_connector_matrix.platform_count, 1);
-assert.equal(kit.report({ platforms: ['google-meet'] }).platform_connector_hub.schema, 'meeting_platform_connector_hub');
+const packagedKitReport = kit.report({ platforms: ['google-meet'] });
+assert.equal(packagedKitReport.platform_rollout.type, 'meeting_platform_rollout_summary');
+assert.equal(packagedKitReport.platform_registry_manifest.platform_count, 1);
+assert.equal(packagedKitReport.platform_provider_replay_matrix.accepted_count, 1);
+assert.equal(packagedKitReport.platform_connector_matrix.platform_count, 1);
+assert.equal(packagedKitReport.platform_connector_hub.schema, 'meeting_platform_connector_hub');
 assert.equal(kit.platformConnector('google-meet').schema, 'meeting_platform_connector');
 assert.equal(kit.platformConnectorMatrix({ platforms: ['google-meet', 'teams'] }).accepted_count, 2);
 assert.equal(kit.platformConnectorHub({ platforms: ['google-meet', 'teams'] }).accepted, true);
