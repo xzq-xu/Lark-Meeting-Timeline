@@ -392,7 +392,10 @@ assert.equal(hostIntegrationBinReport.type, 'meeting_platform_host_integration_s
 assert.equal(hostIntegrationBinReport.ok, true);
 assert.equal(hostIntegrationBinReport.platform_count, 2);
 assert.equal(hostIntegrationBinReport.adapter_runtime_ready, true);
+assert.equal(hostIntegrationBinReport.adapter_startup_ready, true);
+assert.equal(hostIntegrationBinReport.adapter_startup_ready_count, 2);
 assert.equal(hostIntegrationBinReport.generated_files.some((file) => file.path === 'src/platform-adapters/google_meet.mjs'), true);
+assert.equal(hostIntegrationBinReport.generated_files.some((file) => file.path === 'scripts/print-adapter-startup.mjs'), true);
 assert.equal(hostIntegrationBinReport.written_file_count, 0);
 
 const { stdout: providerReplayBinStdout } = await execFileAsync(
