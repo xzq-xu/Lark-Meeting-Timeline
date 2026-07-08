@@ -24,6 +24,21 @@ assert.equal(staticGoogle.accepted, true);
 assert.equal(staticGoogle.summary.blocking_count, 0);
 assert.equal(staticGoogle.checklist.find((item) => item.id === 'captured_at_ms_contract').passed, true);
 assert.equal(staticGoogle.checklist.find((item) => item.id === 'real_local_observer_evidence').status, 'skip');
+assert.equal(staticGoogle.runtime_event_contract.timestamp_field, 'captured_at_ms');
+assert.equal(staticGoogle.runtime_event_contract.observe_before_insert_required, true);
+assert.equal(staticGoogle.runtime_event_contract.provider_events_block_realtime, false);
+assert.equal(staticGoogle.runtime_event_contract.speaker_position_markers.transcript_text_required, false);
+assert.equal(staticGoogle.implementation_sequence[0].id, 'resolve_adapter_checklist');
+assert.equal(
+  staticGoogle.implementation_sequence.some((step) => step.id === 'install_browser_extension_or_webview_preload'),
+  true,
+);
+assert.equal(
+  staticGoogle.implementation_sequence.some((step) => step.id === 'emit_speaker_position_markers_after_filtering'),
+  true,
+);
+assert.equal(staticGoogle.sdk_entrypoints.observe_candidates, 'sdk.observePlatformCandidates(input)');
+assert.equal(staticGoogle.evidence_collection_plan.pilot.includes('insert_annotation_current_axis'), true);
 assert.equal(staticGoogle.next_actions.includes('capture_real_meeting_app_snapshots'), true);
 
 const pilotGoogle = buildMeetingPlatformAdapterAcceptanceChecklist('google-meet', {}, {
@@ -67,8 +82,23 @@ assert.equal(matrix.target, 'static');
 assert.equal(matrix.platform_count, 2);
 assert.equal(matrix.accepted_count, 1);
 assert.equal(matrix.blocked_count, 1);
-assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').accepted, true);
+const googleRow = matrix.rows.find((row) => row.platform === 'google_meet');
+assert.equal(googleRow.accepted, true);
+assert.equal(googleRow.runtime_contract_timestamp_field, 'captured_at_ms');
+assert.equal(googleRow.provider_reconcile_nonblocking, true);
+assert.equal(googleRow.first_implementation_step, 'resolve_adapter_checklist');
+assert.equal(googleRow.local_observer_install_step, 'install_browser_extension_or_webview_preload');
 assert.equal(matrix.rows.find((row) => row.platform === 'acme_rooms').failed_required_ids.includes('adapter_registered_or_authorable'), true);
+
+const zoomStatic = buildMeetingPlatformAdapterAcceptanceChecklist('zoom', {}, {
+  baseUrl,
+  target: 'static',
+});
+assert.equal(
+  zoomStatic.implementation_sequence.some((step) => step.id === 'wire_native_window_or_accessibility_detector'),
+  true,
+);
+assert.equal(zoomStatic.runtime_event_contract.transcript_blocks_realtime, false);
 
 const client = {
   async startMeeting(input) {

@@ -841,7 +841,7 @@ npx meeting-platform-adapter-portfolio \
 
 在当前 demo 仓库内也可以继续用 `npm run meeting-platform:adapter-portfolio`。发布后的 SDK 会把同名 bin 暴露到 `node_modules/.bin/meeting-platform-adapter-portfolio`，所以下游宿主项目不需要复制本仓库的 `scripts/` 目录。
 
-portfolio 解决“该接哪条路”，acceptance checklist 解决“当前能不能过某个目标”。`target=static` 只检查 SDK 静态契约；`target=pilot` 还要求真实本地会议观察证据；`target=production` 还要求 provider reconcile、生产证据和可选 runtime replay：
+portfolio 解决“该接哪条路”，acceptance checklist 解决“当前能不能过某个目标”。`target=static` 只检查 SDK 静态契约；`target=pilot` 还要求真实本地会议观察证据；`target=production` 还要求 provider reconcile、生产证据和可选 runtime replay。单平台 checklist 还会给下游宿主项目直接读取 `runtime_event_contract`、`implementation_sequence`、`sdk_entrypoints` 和 `evidence_collection_plan`，把 Google Meet / Teams / Zoom 等平台从安装 surface、`observe_platform_candidates -> insert_annotation` 顺序、`captured_at_ms` 时间契约、发言人位置滤波到 provider 非阻塞 reconcile 串成同一份接入说明：
 
 ```sh
 npm run meeting-platform:adapter-acceptance-checklist -- \

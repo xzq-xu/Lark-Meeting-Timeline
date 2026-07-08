@@ -248,6 +248,177 @@ function summarize(items = []) {
   };
 }
 
+function surfaceInstallStepId(surface) {
+  if (surface === 'browser_extension' || surface === 'webview_preload') {
+    return 'install_browser_extension_or_webview_preload';
+  }
+  if (surface === 'native_detector') return 'wire_native_window_or_accessibility_detector';
+  if (surface === 'provider_reconcile') return 'wire_provider_reconcile_as_backfill_only';
+  return 'wire_selected_local_observer_surface';
+}
+
+function surfaceInstallExpected(surface) {
+  if (surface === 'browser_extension') return 'content_script_can_observe_current_meeting_window';
+  if (surface === 'webview_preload') return 'preload_bridge_can_observe_embedded_meeting_view';
+  if (surface === 'native_detector') return 'native_window_or_accessibility_detector_can_observe_meeting_state';
+  if (surface === 'provider_reconcile') return 'provider_events_are_backfill_only_and_do_not_block_realtime_marks';
+  return 'local_observer_surface_can_emit_meeting_candidates';
+}
+
+function buildRuntimeEventContract(portfolioItem = {}) {
+  const p0 = portfolioItem.p0_realtime_axis ?? {};
+  const p1 = portfolioItem.p1_provider_reconcile ?? {};
+  return compactObject({
+    first_runtime_action: 'observe_platform_candidates',
+    observe_candidates_message_type: p0.candidate_observation_message_type ?? 'meeting_timeline.observe_candidates',
+    mark_runtime_action: 'insert_annotation',
+    insert_mark_message_type: 'meeting_timeline.insert_mark',
+    observe_before_insert_required: true,
+    timestamp_field: p0.timestamp_field ?? 'captured_at_ms',
+    time_origin: 'local_meeting_axis_start_ms',
+    per_meeting_axis_required: true,
+    provider_reconcile_required_for_realtime: p1.required_for_realtime === true,
+    provider_events_block_realtime: p0.provider_events_block_realtime === true,
+    transcript_blocks_realtime: p0.transcript_blocks_realtime === true,
+    speaker_position_markers: {
+      transcript_text_required: false,
+      filter_policy: 'merge_same_speaker_short_gaps_and_drop_sub_threshold_blips',
+      timeline_role: 'speaker_position_only',
+    },
+    required_payload_fields: ['platform', 'meeting_id', 'captured_at_ms'],
+  });
+}
+
+function buildSdkEntrypoints(platform) {
+  return {
+    checklist: `sdk.platformAdapterAcceptanceChecklist('${platform}')`,
+    matrix_row: `sdk.platformAdapterMatrixRow('${platform}')`,
+    host_config: `sdk.connectorHostAdapterConfig('${platform}')`,
+    bootstrap_plan: 'sdk.connectorHostAdapterBootstrapPlan(input, connectorPackage)',
+    observe_candidates: 'sdk.observePlatformCandidates(input)',
+    insert_annotation: `sdk.insertAnnotation('${platform}', mark)`,
+    speaker_position: `sdk.speakerTrack('${platform}', sample)`,
+    provider_reconcile: `sdk.providerReplayReport('${platform}', providerEvents)`,
+  };
+}
+
+function buildImplementationSequence(platform, portfolioItem = {}) {
+  const p0 = portfolioItem.p0_realtime_axis ?? {};
+  const p1 = portfolioItem.p1_provider_reconcile ?? {};
+  const p2 = portfolioItem.p2_post_meeting_backfill ?? {};
+  const surface = portfolioItem.recommended_first_surface;
+  const browserMatches = asArray(p0.browser_matches);
+  return [
+    compactObject({
+      order: 1,
+      id: 'resolve_adapter_checklist',
+      required: true,
+      owner: 'host_project',
+      sdk_entrypoint: `sdk.platformAdapterAcceptanceChecklist('${platform}')`,
+      output: 'platform_acceptance_and_runtime_contract',
+    }),
+    compactObject({
+      order: 2,
+      id: surfaceInstallStepId(surface),
+      group: 'local_observer_install',
+      required: true,
+      surface,
+      expected: surfaceInstallExpected(surface),
+      browser_matches: browserMatches.length ? browserMatches : undefined,
+    }),
+    compactObject({
+      order: 3,
+      id: 'run_adapter_preflight_before_first_mark',
+      group: 'runtime_gate',
+      required: true,
+      expected: 'current_meeting_candidate_is_observable_before_insert',
+      evidence: 'current_window_or_candidate_snapshot',
+    }),
+    compactObject({
+      order: 4,
+      id: 'observe_platform_candidates_before_insert',
+      group: 'runtime_event',
+      required: true,
+      runtime_action: 'observe_platform_candidates',
+      message_type: p0.candidate_observation_message_type ?? 'meeting_timeline.observe_candidates',
+      output: 'active_meeting_axis_candidate',
+    }),
+    compactObject({
+      order: 5,
+      id: 'insert_annotation_with_captured_at_ms',
+      group: 'runtime_event',
+      required: true,
+      runtime_action: 'insert_annotation',
+      message_type: 'meeting_timeline.insert_mark',
+      timestamp_field: p0.timestamp_field ?? 'captured_at_ms',
+      expected: 'mark_is_written_to_the_current_local_axis',
+    }),
+    compactObject({
+      order: 6,
+      id: 'emit_speaker_position_markers_after_filtering',
+      group: 'runtime_event',
+      required: true,
+      runtime_action: 'speaker_track',
+      transcript_text_required: false,
+      filter_policy: 'merge_same_speaker_short_gaps_and_drop_sub_threshold_blips',
+      expected: 'speaker_position_markers_without_transcript_text_dependency',
+    }),
+    compactObject({
+      order: 7,
+      id: 'ingest_provider_events_for_nonblocking_reconcile',
+      group: 'provider_reconcile',
+      required_for: 'production',
+      required: Boolean(p1.path),
+      provider_path: p1.path,
+      transport: p1.transport,
+      blocks_realtime: false,
+      expected: p1.path
+        ? 'provider_start_end_events_reconcile_after_local_axis_exists'
+        : 'declare_provider_reconcile_path_or_keep_reconcile_unavailable',
+    }),
+    compactObject({
+      order: 8,
+      id: 'import_post_meeting_artifacts_after_meeting',
+      group: 'post_meeting_backfill',
+      required: false,
+      source: p2.source,
+      blocks_realtime: false,
+      expected: 'transcript_or_recording_artifacts_never_gate_realtime_marks',
+    }),
+  ];
+}
+
+function buildEvidenceCollectionPlan(target, portfolioItem = {}) {
+  const platform = portfolioItem.platform;
+  return compactObject({
+    current_target: target,
+    static: [
+      'adapter_registered_or_authorable',
+      'captured_at_ms_contract',
+      'provider_nonblocking_contract',
+      'candidate_observation_contract',
+      'browser_or_native_surface_declared',
+    ],
+    pilot: [
+      'real_meeting_local_observer_snapshot',
+      'candidate_observation_smoke',
+      'insert_annotation_current_axis',
+      'speaker_position_marker_smoke',
+    ],
+    production: [
+      'provider_start_end_reconcile_evidence',
+      'provider_security_env',
+      'runtime_host_replay',
+      'post_meeting_transcript_backfill_sample',
+    ],
+    commands: compactObject({
+      static: `npm run meeting-platform:adapter-acceptance-checklist -- --platforms=${platform} --target=static`,
+      pilot: `npm run meeting-platform:adapter-acceptance-checklist -- --platforms=${platform} --target=pilot`,
+      production: `npm run meeting-platform:adapter-acceptance-checklist -- --platforms=${platform} --target=production`,
+    }),
+  });
+}
+
 export function buildMeetingPlatformAdapterAcceptanceChecklist(platform, input = {}, options = {}) {
   const target = targetFrom(options);
   const portfolioItem = buildMeetingPlatformAdapterPortfolioItem(platform, options);
@@ -269,6 +440,10 @@ export function buildMeetingPlatformAdapterAcceptanceChecklist(platform, input =
     accepted: summary.blocking_count === 0,
     adapter_status: portfolioItem.adapter_status,
     recommended_first_surface: portfolioItem.recommended_first_surface,
+    runtime_event_contract: buildRuntimeEventContract(portfolioItem),
+    implementation_sequence: buildImplementationSequence(portfolioItem.platform, portfolioItem),
+    sdk_entrypoints: buildSdkEntrypoints(portfolioItem.platform),
+    evidence_collection_plan: buildEvidenceCollectionPlan(target, portfolioItem),
     checklist: items,
     summary,
     portfolio_item: portfolioItem,
@@ -329,6 +504,10 @@ export function buildMeetingPlatformAdapterAcceptanceChecklistMatrix(input = {},
       handoff_status: item.handoff_readiness?.status,
       pilot_ready: item.handoff_readiness?.pilot_ready === true,
       production_ready: item.handoff_readiness?.production_ready === true,
+      runtime_contract_timestamp_field: item.runtime_event_contract?.timestamp_field,
+      provider_reconcile_nonblocking: item.runtime_event_contract?.provider_events_block_realtime === false,
+      first_implementation_step: item.implementation_sequence?.[0]?.id,
+      local_observer_install_step: item.implementation_sequence?.find((step) => step.group === 'local_observer_install')?.id,
       first_next_action: item.next_actions?.[0],
     })),
     checklists: items,

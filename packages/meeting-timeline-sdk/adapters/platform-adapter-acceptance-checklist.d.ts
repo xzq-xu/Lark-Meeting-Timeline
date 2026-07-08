@@ -37,6 +37,10 @@ export interface MeetingPlatformAdapterAcceptanceChecklist {
   accepted: boolean;
   adapter_status: string;
   recommended_first_surface: string;
+  runtime_event_contract: Record<string, unknown>;
+  implementation_sequence: Array<Record<string, unknown>>;
+  sdk_entrypoints: Record<string, string>;
+  evidence_collection_plan: Record<string, unknown>;
   checklist: MeetingPlatformAdapterAcceptanceChecklistItem[];
   summary: Record<string, unknown>;
   portfolio_item: Record<string, unknown>;
