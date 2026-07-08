@@ -2441,7 +2441,7 @@ npm run meeting-platform:conformance -- \
   --report-file=data/meeting-platform-conformance-report.json
 ```
 
-如果要把 SDK 交给另一个项目接入，优先导出 `platform-consumer-handoff`。它不是单个平台 demo，而是一份机器可读的 consumer index：包含 Google Meet / Teams / Zoom / Webex / Lark 的 SDK module、kit/host 方法、HTTP endpoints、CLI 命令、启动顺序、硬契约、每个平台的静态 readiness、adapter blueprint、adapter startup plan，以及 production evidence/handoff readiness 是否还缺。默认只把静态 SDK 接入门禁作为硬失败；如果需要正式交付验收，可以打开 `requireHandoffReady` 或 `requireProductionReady`：
+如果要把 SDK 交给另一个项目接入，优先导出 `platform-consumer-handoff`。它不是单个平台 demo，而是一份机器可读的 consumer index：包含 Google Meet / Teams / Zoom / Webex / Lark 的 SDK module、kit/host 方法、HTTP endpoints、CLI 命令、启动顺序、硬契约、每个平台的静态 readiness、adapter blueprint、adapter startup plan、adapter preflight live-evidence gate，以及 production evidence/handoff readiness 是否还缺。默认只把静态 SDK 接入门禁作为硬失败；如果需要正式交付验收，可以打开 `requireHandoffReady` 或 `requireProductionReady`：
 
 ```js
 import {
@@ -2458,6 +2458,7 @@ assertMeetingPlatformConsumerHandoff(handoff);
 // handoff.entrypoints.http_endpoints.consumer_handoff
 // handoff.hard_contracts.timestamp_field === 'captured_at_ms'
 // handoff.adapter_startup_plan_matrix.rows[*].selected_surface 告诉宿主先启动 browser/native/webview 哪个 surface。
+// handoff.adapter_preflight_matrix.rows[*].status === 'needs_live_page_evidence' 表示还没传真实 DOM/native evidence，不能写实时标注。
 // handoff.rows[*].adapter_startup_insert_action === 'insertAnnotation'
 // handoff.rows[*].production_ready 用来提示还缺哪些真实会议证据。
 ```
@@ -2478,7 +2479,7 @@ npx meeting-platform-consumer-handoff \
   --report-file=data/meeting-platform-consumer-handoff-report.json
 ```
 
-`consumer-handoff` 会把 `meeting-platform:adapter-startup` 也列入 `entrypoints.commands` 和 `boot_order`。因此下游项目不需要自己在 `platform-adapter-blueprint`、`platform-adapter-startup`、`platform-host-integration` 之间猜调用顺序：先读 blueprint 确认可接入面，再读 startup plan 启动本地实时 surface，最后按 `observePlatformCandidates` → `insertAnnotation` 的顺序写入 `captured_at_ms` 标注。provider webhook 和转写仍然只做 reconcile/backfill，不作为实时标注前置条件。
+`consumer-handoff` 会把 `meeting-platform:adapter-startup` 和 `meeting-platform:adapter-preflight` 都列入 `entrypoints.commands` 和 `boot_order`。因此下游项目不需要自己在 `platform-adapter-blueprint`、`platform-adapter-startup`、`platform-adapter-preflight`、`platform-host-integration` 之间猜调用顺序：先读 blueprint 确认可接入面，再读 startup plan 启动本地实时 surface，然后用真实 DOM snapshot、当前窗口列表、进程/Accessibility/音频状态跑 preflight；只有 `adapter_preflight_matrix.rows[*].realtime_annotation_ready === true` 后，才按 `observePlatformCandidates` → `insertAnnotation` 的顺序写入 `captured_at_ms` 标注。URL-only preflight 会稳定返回 `needs_live_page_evidence`，不会误报可实时写入。provider webhook 和转写仍然只做 reconcile/backfill，不作为实时标注前置条件。
 
 如果外部项目只想“收到平台 webhook 后直接落到会议轴”，可以用更高层的 `platform-ingest`：
 

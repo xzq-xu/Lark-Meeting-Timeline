@@ -23,6 +23,7 @@ const { stdout } = await execFileAsync(process.execPath, [
 assert.match(stdout, /meeting_platform_consumer_handoff/);
 assert.match(stdout, /accepted=yes/);
 assert.match(stdout, /consumer_ready=3/);
+assert.match(stdout, /preflight=0\/3/);
 assert.match(stdout, /production=0/);
 
 const report = JSON.parse(await readFile(reportFile, 'utf8'));
@@ -32,6 +33,9 @@ assert.equal(report.platform_count, 3);
 assert.equal(report.consumer_ready_count, 3);
 assert.equal(report.lightweight_connector_ready, true);
 assert.equal(report.lightweight_connector_platform_count, 3);
+assert.equal(report.adapter_preflight_platform_count, 3);
+assert.equal(report.adapter_preflight_accepted_count, 0);
+assert.equal(report.adapter_preflight_realtime_ready_count, 0);
 assert.equal(report.candidate_observer_count, 3);
 assert.equal(report.speaker_track_ready_count, 3);
 assert.equal(report.participant_track_ready_count, 3);
@@ -39,19 +43,26 @@ assert.equal(report.production_ready_count, 0);
 assert.equal(report.entrypoints.primary_modules.consumer_handoff, '@ai-annotation/meeting-timeline-sdk/adapters/platform-consumer-handoff');
 assert.equal(report.entrypoints.primary_modules.meeting_platform_connector, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector');
 assert.equal(report.entrypoints.primary_modules.implementation_handoff, '@ai-annotation/meeting-timeline-sdk/adapters/platform-implementation-handoff');
+assert.equal(report.entrypoints.primary_modules.adapter_preflight, '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight');
 assert.equal(report.entrypoints.kit_methods.includes('platformImplementationHandoff'), true);
+assert.equal(report.entrypoints.kit_methods.includes('platformAdapterPreflight'), true);
+assert.equal(report.entrypoints.commands.adapter_preflight.includes('meeting-platform:adapter-preflight'), true);
 assert.equal(report.lightweight_connector_handoff.content_script_bridge.message_types.includes('meeting_timeline.insert_mark'), true);
 assert.equal(report.lightweight_connector_handoff.content_script_bridge.message_types.includes('meeting_timeline.preflight_current_window'), true);
 assert.equal(report.lightweight_connector_handoff.host_requirements.timestamp_field, 'captured_at_ms');
 assert.equal(report.sdk_facade_handoff.create_function, 'createMeetingAppTimelineSdk');
 assert.equal(report.sdk_facade_handoff.required_facade_methods.includes('platformConsumerHandoff'), true);
+assert.equal(report.sdk_facade_handoff.required_facade_methods.includes('platformAdapterPreflight'), true);
 assert.equal(report.sdk_facade_handoff.surface_wiring.browser_extension.content_script_messages.includes('meeting_timeline.observe_candidates'), true);
 assert.equal(report.sdk_facade_handoff.surface_wiring.browser_extension.content_script_messages.includes('meeting_timeline.preflight_current_window'), true);
 assert.equal(report.sdk_facade_handoff.surface_wiring.browser_extension.content_script_messages.includes('meeting_timeline.preflight_candidates'), true);
 assert.equal(report.sdk_facade_handoff.platform_rows.find((row) => row.platform === 'google_meet').provider_path, 'google_workspace_events_pubsub');
+assert.equal(report.sdk_facade_handoff.platform_rows.find((row) => row.platform === 'google_meet').adapter_preflight_status, 'needs_live_page_evidence');
 assert.equal(report.sdk_facade_handoff.platform_rows.find((row) => row.platform === 'zoom').primary_surface, 'native_detector');
 assert.equal(report.surface_coverage_matrix.platform_count, 3);
 assert.equal(report.surface_coverage_matrix.browser_extension_ready_count, 3);
+assert.equal(report.surface_coverage_matrix.adapter_preflight_available_count, 3);
+assert.equal(report.surface_coverage_matrix.adapter_preflight_realtime_ready_count, 0);
 assert.equal(report.surface_coverage_matrix.provider_reconcile_ready_count, 3);
 assert.equal(report.surface_coverage_matrix.rows.find((row) => row.platform === 'google_meet').webview_preload.ready, true);
 assert.equal(report.surface_coverage_matrix.rows.find((row) => row.platform === 'microsoft_teams').provider_reconcile.provider_path, 'microsoft_graph_change_notifications');
@@ -66,6 +77,10 @@ assert.equal(report.adaptation_roadmap.rows.find((row) => row.platform === 'zoom
 assert.equal(report.adaptation_roadmap.rows.find((row) => row.platform === 'microsoft_teams').provider_permission_risk, 'tenant_admin_consent_and_subscription_renewal');
 assert.equal(report.rows.find((row) => row.platform === 'microsoft_teams').consumer_ready, true);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_first_route, 'local_observer_axis');
+assert.equal(report.rows.find((row) => row.platform === 'google_meet').adapter_preflight_status, 'needs_live_page_evidence');
+assert.equal(report.adapter_preflight_matrix.schema, 'meeting_platform_adapter_preflight_matrix');
+assert.equal(report.adapter_preflight_matrix.preflights, undefined);
+assert.equal(report.adapter_preflight_matrix.rows.find((row) => row.platform === 'zoom').selected_surface, 'native_detector');
 
 const { stdout: jsonStdout } = await execFileAsync(process.execPath, [
   'scripts/meeting-platform-consumer-handoff.mjs',
@@ -90,9 +105,13 @@ assert.equal(binReport.schema, 'meeting_platform_consumer_handoff');
 assert.equal(binReport.accepted, true);
 assert.equal(binReport.platform_count, 2);
 assert.equal(binReport.adapter_startup_ready_count, 2);
+assert.equal(binReport.adapter_preflight_platform_count, 2);
+assert.equal(binReport.adapter_preflight_realtime_ready_count, 0);
 assert.equal(binReport.rows.find((row) => row.platform === 'google_meet').adapter_startup_selected_surface, 'browser_extension');
+assert.equal(binReport.rows.find((row) => row.platform === 'google_meet').adapter_preflight_status, 'needs_live_page_evidence');
 assert.equal(binReport.rows.find((row) => row.platform === 'zoom').adapter_startup_selected_surface, 'native_detector');
 assert.equal(binReport.entrypoints.commands.adapter_startup.includes('meeting-platform:adapter-startup'), true);
+assert.equal(binReport.entrypoints.commands.adapter_preflight.includes('meeting-platform:adapter-preflight'), true);
 
 let strictStdout = '';
 let strictCode = 0;
