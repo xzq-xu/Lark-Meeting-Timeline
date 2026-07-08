@@ -854,6 +854,18 @@ import {
   normalizeGoogleMeetEvent,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/google-meet';
 import {
+  normalizeMicrosoftTeamsEvent,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/microsoft-teams';
+import {
+  normalizeZoomEvent,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/zoom';
+import {
+  normalizeWebexEvent,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/webex';
+import {
+  normalizeLarkEvent,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/lark';
+import {
   buildMeetingAppLaunchGate,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-gate';
 import {
@@ -3152,6 +3164,66 @@ const signals = normalizeGoogleMeetEvent({
   },
 });
 assert.equal(signals.some((signal) => signal.type === 'meeting_started'), true);
+
+const teamsSignals = normalizeMicrosoftTeamsEvent({
+  id: 'teams-package-start',
+  resource: "communications/onlineMeetings(joinWebUrl='https%3A%2F%2Fteams.microsoft.com%2Fl%2Fmeetup-join%2Fpackage')/meetingCallEvents",
+  resourceData: {
+    id: 'teams-package-call',
+    eventType: 'callStarted',
+    eventDateTime: '2026-06-26T02:00:00.000Z',
+  },
+});
+assert.equal(teamsSignals.some((signal) => signal.type === 'meeting_started'), true);
+assert.equal(teamsSignals[0].meeting.platform, 'microsoft_teams');
+
+const zoomSignals = normalizeZoomEvent({
+  event: 'meeting.participant_joined',
+  event_ts: 1_782_442_830_000,
+  payload: {
+    object: {
+      uuid: 'zoom-package-uuid',
+      id: 987654321,
+      participant: {
+        user_id: 'zoom-package-user',
+        user_name: 'Package User',
+        join_time: '2026-06-26T02:00:30.000Z',
+      },
+    },
+  },
+});
+assert.equal(zoomSignals.some((signal) => signal.type === 'participant_joined'), true);
+assert.equal(zoomSignals[0].meeting.platform, 'zoom');
+
+const webexSignals = normalizeWebexEvent({
+  id: 'webex-package-transcript',
+  resource: 'meetingTranscripts',
+  event: 'created',
+  data: {
+    meetingId: 'webex-package-meeting',
+    id: 'webex-package-transcript-1',
+    txtDownloadLink: 'https://webex.example/package-transcript.vtt',
+  },
+});
+assert.equal(webexSignals.some((signal) => signal.type === 'artifact_ready'), true);
+assert.equal(webexSignals[0].meeting.platform, 'webex');
+
+const larkSignals = normalizeLarkEvent({
+  header: {
+    event_id: 'lark-package-start',
+    event_type: 'vc.meeting.all_meeting_started_v1',
+    create_time: '1782442800000',
+  },
+  event: {
+    meeting: {
+      id: 'lark-package-meeting',
+      topic: 'Lark package import',
+      start_time: '1782442800',
+    },
+  },
+});
+assert.equal(larkSignals.some((signal) => signal.type === 'meeting_started'), true);
+assert.equal(larkSignals[0].meeting.platform, 'lark');
 
 console.log('ok consumer package imports');
 process.exit(0);
