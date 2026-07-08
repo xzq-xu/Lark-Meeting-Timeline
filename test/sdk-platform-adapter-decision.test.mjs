@@ -38,6 +38,12 @@ assert.equal(google.adaptation_strategy.provider_required_for_realtime, false);
 assert.equal(google.adaptation_strategy.transcript_role, 'post_meeting_nonblocking_backfill');
 assert.equal(google.adaptation_strategy.realtime_dependencies.timestamp_field, 'captured_at_ms');
 assert.equal(google.adaptation_strategy.evidence_to_collect_first[0], 'live_browser_dom_snapshot_active_meeting');
+assert.equal(google.adaptation_strategy.host_integration_checklist.ready_for_realtime_host_wiring, true);
+assert.equal(google.adaptation_strategy.host_integration_checklist.required_step_count, 5);
+assert.equal(google.adaptation_strategy.host_integration_checklist.steps.find((step) => step.id === 'run_adapter_preflight').sdk_method, 'platformAdapterCurrentWindowPreflight');
+assert.equal(google.adaptation_strategy.host_integration_checklist.steps.find((step) => step.id === 'install_local_observer_runtime').runtime_factory, 'createMeetingAppBrowserRuntime');
+assert.equal(google.adaptation_strategy.host_integration_checklist.steps.find((step) => step.id === 'insert_realtime_annotation').timestamp_field, 'captured_at_ms');
+assert.equal(google.adaptation_strategy.host_integration_checklist.steps.find((step) => step.id === 'ingest_provider_reconcile').blocks_realtime_annotation, false);
 assert.equal(google.adaptation_strategy.risk_tags.includes('dom_selectors_can_drift_collect_live_snapshot_corpus'), true);
 assert.equal(google.adapter_blueprint.ready, true);
 assert.equal(google.adapter_blueprint.primary_surface, 'browser_extension');
@@ -96,6 +102,8 @@ assert.equal(larkProvider.adaptation_strategy.selected_observer_mode, 'provider_
 assert.equal(larkProvider.adaptation_strategy.realtime_dependencies.local_observer_required, true);
 assert.equal(larkProvider.adaptation_strategy.realtime_dependencies.selected_surface_provides_local_observer, false);
 assert.equal(larkProvider.adaptation_strategy.evidence_to_collect_first.includes('provider_start_end_delivery_sample'), true);
+assert.equal(larkProvider.adaptation_strategy.host_integration_checklist.ready_for_realtime_host_wiring, false);
+assert.equal(larkProvider.adaptation_strategy.host_integration_checklist.steps.find((step) => step.id === 'add_local_surface_for_realtime_axis').status, 'missing_local_surface_for_realtime');
 assert.equal(larkProvider.adaptation_strategy.risk_tags.includes('provider_only_surface_cannot_prove_low_latency_axis_without_local_observer'), true);
 assert.equal(larkProvider.runtime_actions.some((action) => action.action === 'provider_event'), true);
 assert.equal(larkProvider.contracts.provider_events_block_realtime, false);
@@ -127,6 +135,7 @@ assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').selec
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').recommended_first_surface, 'native_detector');
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').selected_observer_mode, 'native_window_observer');
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').fallback_surfaces.includes('browser_extension'), true);
+assert.equal(matrix.decisions.find((decision) => decision.platform === 'microsoft_teams').adaptation_strategy.host_integration_checklist.steps.find((step) => step.id === 'install_local_observer_runtime').install_target, 'native_detector_or_desktop_accessibility_agent');
 assert.equal(assertMeetingPlatformAdapterDecisionMatrix({}, {
   baseUrl,
   platforms: ['google-meet', 'zoom'],

@@ -385,6 +385,76 @@ function evidenceToCollectFirst(surface) {
   ];
 }
 
+function hostIntegrationStep(order, id, phase, required, fields = {}) {
+  return compactObject({
+    order,
+    id,
+    phase,
+    required,
+    ...fields,
+  });
+}
+
+function hostIntegrationChecklist(platform, selectedSurface, adapterBlueprint = {}, route = {}) {
+  const localSurface = selectedSurface !== 'provider_reconcile';
+  const providerRoute = routeByName(route.routes, 'provider_reconcile');
+  const transcriptRoute = routeByName(route.routes, 'post_meeting_artifact_import');
+  const steps = [
+    hostIntegrationStep(1, 'resolve_adapter_decision', 'startup', true, {
+      sdk_method: 'platformAdapterDecision',
+      output: 'selected_surface_and_adaptation_strategy',
+    }),
+    hostIntegrationStep(2, 'run_adapter_preflight', 'startup', true, {
+      sdk_method: selectedSurface === 'browser_extension'
+        ? 'platformAdapterCurrentWindowPreflight'
+        : 'platformAdapterCandidatePreflight',
+      required_before: 'first_insert_annotation',
+      live_evidence_required: true,
+    }),
+    localSurface ? hostIntegrationStep(3, 'install_local_observer_runtime', 'runtime', true, {
+      observer_mode: observerModeForSurface(selectedSurface),
+      runtime_factory: runtimeFactoryForSurface(selectedSurface),
+      install_target: hostInstallTargetForSurface(selectedSurface),
+    }) : hostIntegrationStep(3, 'add_local_surface_for_realtime_axis', 'runtime', true, {
+      status: 'missing_local_surface_for_realtime',
+      fallback_surfaces: surfaceOrderFromBlueprint(adapterBlueprint).filter((surface) => surface !== 'provider_reconcile'),
+    }),
+    hostIntegrationStep(4, 'bind_current_axis', 'axis', true, {
+      sdk_method: localSurface ? 'observePlatformCandidates' : 'observePlatformCandidates_from_fallback_local_surface',
+      timestamp_field: 'captured_at_ms',
+      must_precede: 'insert_realtime_annotation',
+    }),
+    hostIntegrationStep(5, 'insert_realtime_annotation', 'mark', true, {
+      sdk_method: 'insertAnnotation',
+      timestamp_field: 'captured_at_ms',
+      invariant: 'use_capture_time_not_provider_delivery_time',
+    }),
+    hostIntegrationStep(6, 'emit_speaker_position_markers', 'optional_track', false, {
+      sdk_method: 'speakerTrack',
+      content_policy: 'speaker_position_only_no_transcript_text_required',
+    }),
+    providerRoute ? hostIntegrationStep(7, 'ingest_provider_reconcile', 'post_realtime_reconcile', false, {
+      sdk_method: 'ingestProvider',
+      transport: providerRoute.transport,
+      required_for_production: providerRoute.required_for_production === true,
+      blocks_realtime_annotation: false,
+    }) : undefined,
+    transcriptRoute ? hostIntegrationStep(8, 'import_post_meeting_artifacts', 'post_meeting', false, {
+      import_endpoint: transcriptRoute.import_endpoint,
+      normalizer: transcriptRoute.normalizer,
+      blocks_realtime_annotation: false,
+    }) : undefined,
+  ].filter(Boolean);
+  return {
+    platform,
+    selected_surface: selectedSurface,
+    ready_for_realtime_host_wiring: localSurface,
+    required_step_count: steps.filter((step) => step.required).length,
+    optional_step_count: steps.filter((step) => !step.required).length,
+    steps,
+  };
+}
+
 function adaptationRiskTags(platform, selectedSurface, fallbackSurfaces = []) {
   return unique([
     selectedSurface === 'browser_extension' ? 'dom_selectors_can_drift_collect_live_snapshot_corpus' : undefined,
@@ -434,6 +504,7 @@ function adaptationStrategy(platform, selectedSurface, adapterBlueprint = {}, ro
       timestamp_field: 'captured_at_ms',
     },
     evidence_to_collect_first: evidenceToCollectFirst(selectedSurface),
+    host_integration_checklist: hostIntegrationChecklist(platform, selectedSurface, adapterBlueprint, route),
     production_evidence_gates: adapterBlueprint.acceptance_gates?.production,
     risk_tags: adaptationRiskTags(platform, selectedSurface, fallbackSurfaces),
   });

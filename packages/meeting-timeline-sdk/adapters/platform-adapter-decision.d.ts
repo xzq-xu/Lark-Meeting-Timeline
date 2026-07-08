@@ -110,8 +110,45 @@ export interface MeetingPlatformAdapterAdaptationStrategy {
     [key: string]: unknown;
   };
   evidence_to_collect_first?: string[];
+  host_integration_checklist?: MeetingPlatformAdapterHostIntegrationChecklist;
   production_evidence_gates?: string[];
   risk_tags?: string[];
+  [key: string]: unknown;
+}
+
+export interface MeetingPlatformAdapterHostIntegrationStep {
+  order?: number;
+  id?: string;
+  phase?: string;
+  required?: boolean;
+  sdk_method?: string;
+  output?: string;
+  required_before?: string;
+  live_evidence_required?: boolean;
+  observer_mode?: string;
+  runtime_factory?: string;
+  install_target?: string;
+  status?: string;
+  fallback_surfaces?: string[];
+  timestamp_field?: string;
+  must_precede?: string;
+  invariant?: string;
+  content_policy?: string;
+  transport?: string;
+  required_for_production?: boolean;
+  blocks_realtime_annotation?: boolean;
+  import_endpoint?: string;
+  normalizer?: string;
+  [key: string]: unknown;
+}
+
+export interface MeetingPlatformAdapterHostIntegrationChecklist {
+  platform?: string;
+  selected_surface?: string;
+  ready_for_realtime_host_wiring?: boolean;
+  required_step_count?: number;
+  optional_step_count?: number;
+  steps?: MeetingPlatformAdapterHostIntegrationStep[];
   [key: string]: unknown;
 }
 
