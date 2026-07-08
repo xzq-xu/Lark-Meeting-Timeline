@@ -916,6 +916,18 @@ npx meeting-platform-adapter-startup \
 
 `adapter-startup-report.json` 的关键字段是 `realtime_startup_ready_count`、`rows[*].selected_surface`、`install_target`、`observe_action`、`insert_action` 和 `provider_events_block_realtime=false`。默认报告只保留轻量摘要，完整 per-platform startup plan 写到 `--out-dir`；如果 CI 或调试需要在报告里带压缩版 plan summary，再显式加 `--include-plans=true`。这份计划用于启动本地实时轴；如果 `selected_surface=provider_reconcile`，报告会明确它不能作为实时标注的 primary surface。
 
+如果接入方不是只看“启动哪个 surface”，而是要把 host 代码直接接线，可以用 `platformAdapterRuntimeRecipe()` 或 CLI 导出 runtime recipe。它会在 startup plan 之上补齐 host wiring、runtime event 顺序、raw signal 示例摘要、speaker/participant position marker 策略，以及 provider reconcile 不阻塞实时标注的约束：
+
+```sh
+npx meeting-platform-adapter-runtime-recipe \
+  --platforms=google-meet,teams,zoom,webex,lark \
+  --base-url=https://timeline.example.com \
+  --out-dir=meeting-platform-adapter-runtime-recipes \
+  --report-file=meeting-platform-adapter-runtime-recipe-report.json
+```
+
+`adapter-runtime-recipe-report.json` 的关键字段是 `runtime_ready_count`、`rows[*].bridge_kind`、`first_required_method`、`insert_method`、`speaker_track_sample_ready` 和 `raw_signal_runtime_event_count`。默认写出的 per-platform recipe 是压缩版，不把完整 raw runtime events 和 startup plan 展开；调试时可以加 `--include-examples=true` 或 `--include-recipes=true`。这份 recipe 更适合作为 Google Meet content script、Teams/Zoom native detector、WebView preload 的工程接线输入。
+
 startup plan 只能说明“应该启动哪个 surface”；真正打开会议窗口后，还需要用 `platformAdapterPreflight()` 或 SDK CLI 验证 live DOM/native evidence 是否足够建实时轴。Google Meet 这类 browser surface 可以传 DOM snapshot；Teams/Zoom 这类 native-first surface 可以传窗口、进程、Accessibility 或音频通话状态。URL-only preflight 会返回 `needs_live_page_evidence`，不会误报 realtime ready：
 
 ```sh

@@ -21,6 +21,7 @@
     "meeting-platform-adapter-preflight": "./bin/meeting-platform-adapter-preflight.mjs",
     "meeting-platform-adapter-smoke": "./bin/meeting-platform-adapter-smoke.mjs",
     "meeting-platform-adapter-startup": "./bin/meeting-platform-adapter-startup.mjs",
+    "meeting-platform-adapter-runtime-recipe": "./bin/meeting-platform-adapter-runtime-recipe.mjs",
     "meeting-platform-host-integration": "./bin/meeting-platform-host-integration.mjs",
     "meeting-platform-provider-replay": "./bin/meeting-platform-provider-replay.mjs"
   },
