@@ -77,6 +77,8 @@ assert.equal(packedFiles.includes('adapters/platform-registry.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-registry.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-ingest.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-ingest.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/platform-realtime-axis-readiness.mjs'), true);
+assert.equal(packedFiles.includes('adapters/platform-realtime-axis-readiness.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-conformance.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-conformance.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/platform-consumer-handoff.mjs'), true);
@@ -549,6 +551,8 @@ import {
   buildMeetingAppTimelineConnectorSmokePlanAcceptanceReport as buildMeetingAppTimelineConnectorSmokePlanAcceptanceReportFromRoot,
   buildMeetingPlatformProviderReplayMatrix as buildMeetingPlatformProviderReplayMatrixFromRoot,
   buildMeetingPlatformProviderReplayReport as buildMeetingPlatformProviderReplayReportFromRoot,
+  buildMeetingPlatformRealtimeAxisReadiness as buildMeetingPlatformRealtimeAxisReadinessFromRoot,
+  buildMeetingPlatformRealtimeAxisReadinessMatrix as buildMeetingPlatformRealtimeAxisReadinessMatrixFromRoot,
   sampleMeetingPlatformProviderEvents as sampleMeetingPlatformProviderEventsFromRoot,
   runMeetingAppTimelineConnectorBridgeSmoke as runMeetingAppTimelineConnectorBridgeSmokeFromRoot,
   runMeetingAppTimelineConnectorSmokePlan as runMeetingAppTimelineConnectorSmokePlanFromRoot,
@@ -1304,6 +1308,28 @@ assert.equal(rootMeetingAppSdk.providerReplayMatrix({
 assert.equal(rootMeetingAppSdk.assertProviderReplayMatrix({
   platforms: ['google-meet'],
 }).accepted, true);
+assert.equal(buildMeetingPlatformRealtimeAxisReadinessFromRoot({
+  platform: 'google-meet',
+  snapshots: [rootGoogleActiveSnapshot],
+}).accepted, true);
+assert.equal(buildMeetingPlatformRealtimeAxisReadinessMatrixFromRoot({
+  snapshots: {
+    'google-meet': [rootGoogleActiveSnapshot],
+  },
+}, {
+  platforms: ['google-meet'],
+}).accepted_count, 1);
+assert.equal(rootMeetingAppSdk.realtimeAxisReadiness({
+  platform: 'google-meet',
+  snapshots: [rootGoogleActiveSnapshot],
+}).accepted, true);
+assert.equal(rootMeetingAppSdk.realtimeAxisReadinessMatrix({
+  snapshots: {
+    'google-meet': [rootGoogleActiveSnapshot],
+  },
+}, {
+  platforms: ['google-meet'],
+}).accepted_count, 1);
 assert.equal((await runMeetingAppTimelineConnectorBridgeSmoke(rootConnectorPackage)).schema, 'meeting_app_timeline_connector_bridge_smoke_report');
 assert.equal((await runMeetingAppTimelineConnectorBridgeSmokeFromRoot(rootConnectorPackage)).accepted, true);
 assert.equal((await assertMeetingAppTimelineConnectorBridgeSmoke(rootConnectorPackage)).accepted, true);
@@ -3125,6 +3151,17 @@ assert.equal(kit.platformAdapterPreflightMatrix({}, {
     'google-meet': [rootGoogleActiveSnapshot],
   },
 }).meeting_start_ready_count, 1);
+assert.equal(kit.platformRealtimeAxisReadiness({
+  platform: 'google-meet',
+  snapshots: [rootGoogleActiveSnapshot],
+}).accepted, true);
+assert.equal(kit.platformRealtimeAxisReadinessMatrix({
+  snapshots: {
+    'google-meet': [rootGoogleActiveSnapshot],
+  },
+}, {
+  platforms: ['google-meet'],
+}).accepted_count, 1);
 assert.equal(kit.platformAdapterCandidatePreflight({
   candidates: [{
     document: rootSmokeDocument(),

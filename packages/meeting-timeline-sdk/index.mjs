@@ -1717,6 +1717,40 @@ export function createMeetingAppTimelineSdk(options = {}) {
     assertAdapterCandidatePreflight(input = {}, preflightOptions = {}) {
       return sdk.assertPlatformAdapterCandidatePreflight(input, preflightOptions);
     },
+    platformRealtimeAxisReadiness(platformOrInput = {}, inputOrOptions = {}, maybeOptions = {}) {
+      const objectInput = platformOrInput && typeof platformOrInput === 'object' && !(platformOrInput instanceof URL);
+      return runtime.kit.platformRealtimeAxisReadiness(
+        platformOrInput,
+        objectInput ? sdkPlatformOptions(runtime, inputOrOptions) : inputOrOptions,
+        objectInput ? {} : sdkPlatformOptions(runtime, maybeOptions),
+      );
+    },
+    realtimeAxisReadiness(platformOrInput = {}, inputOrOptions = {}, maybeOptions = {}) {
+      return sdk.platformRealtimeAxisReadiness(platformOrInput, inputOrOptions, maybeOptions);
+    },
+    platformRealtimeAxisReadinessMatrix(input = {}, readinessOptions = {}) {
+      return runtime.kit.platformRealtimeAxisReadinessMatrix(input, sdkPlatformOptions(runtime, readinessOptions));
+    },
+    realtimeAxisReadinessMatrix(input = {}, readinessOptions = {}) {
+      return sdk.platformRealtimeAxisReadinessMatrix(input, readinessOptions);
+    },
+    assertPlatformRealtimeAxisReadiness(platformOrInput = {}, inputOrOptions = {}, maybeOptions = {}) {
+      const objectInput = platformOrInput && typeof platformOrInput === 'object' && !(platformOrInput instanceof URL);
+      return runtime.kit.assertPlatformRealtimeAxisReadiness(
+        platformOrInput,
+        objectInput ? sdkPlatformOptions(runtime, inputOrOptions) : inputOrOptions,
+        objectInput ? {} : sdkPlatformOptions(runtime, maybeOptions),
+      );
+    },
+    assertRealtimeAxisReadiness(platformOrInput = {}, inputOrOptions = {}, maybeOptions = {}) {
+      return sdk.assertPlatformRealtimeAxisReadiness(platformOrInput, inputOrOptions, maybeOptions);
+    },
+    assertPlatformRealtimeAxisReadinessMatrix(input = {}, readinessOptions = {}) {
+      return runtime.kit.assertPlatformRealtimeAxisReadinessMatrix(input, sdkPlatformOptions(runtime, readinessOptions));
+    },
+    assertRealtimeAxisReadinessMatrix(input = {}, readinessOptions = {}) {
+      return sdk.assertPlatformRealtimeAxisReadinessMatrix(input, readinessOptions);
+    },
     platformAdaptationStrategy(platformOrOptions = {}, strategyOptions = {}) {
       const resolved = singlePlatformInput(runtime, platformOrOptions, strategyOptions);
       return runtime.kit.platformAdaptationStrategy(resolved.platform, sdkPlatformOptions(runtime, resolved.options));
@@ -1893,4 +1927,5 @@ export * from './adapters/platform-adapter-blueprint.mjs';
 export * from './adapters/platform-adapter-decision.mjs';
 export * from './adapters/platform-adapter-startup.mjs';
 export * from './adapters/platform-adapter-preflight.mjs';
+export * from './adapters/platform-realtime-axis-readiness.mjs';
 export * from './adapters/platform-strategy.mjs';

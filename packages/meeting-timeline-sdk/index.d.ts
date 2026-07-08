@@ -697,6 +697,28 @@ export interface MeetingAppTimelineSdk {
     options?: import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterPreflightOptions,
   ): import('./adapters/platform-adapter-preflight.mjs').MeetingPlatformAdapterCandidatePreflight;
   assertAdapterCandidatePreflight: MeetingAppTimelineSdk['assertPlatformAdapterCandidatePreflight'];
+  platformRealtimeAxisReadiness(
+    platformOrInput?: string | URL | Record<string, unknown>,
+    inputOrOptions?: Record<string, unknown> | import('./adapters/platform-realtime-axis-readiness.mjs').MeetingPlatformRealtimeAxisReadinessOptions,
+    maybeOptions?: import('./adapters/platform-realtime-axis-readiness.mjs').MeetingPlatformRealtimeAxisReadinessOptions,
+  ): import('./adapters/platform-realtime-axis-readiness.mjs').MeetingPlatformRealtimeAxisReadiness;
+  realtimeAxisReadiness: MeetingAppTimelineSdk['platformRealtimeAxisReadiness'];
+  platformRealtimeAxisReadinessMatrix(
+    input?: Record<string, unknown>,
+    options?: import('./adapters/platform-realtime-axis-readiness.mjs').MeetingPlatformRealtimeAxisReadinessOptions,
+  ): import('./adapters/platform-realtime-axis-readiness.mjs').MeetingPlatformRealtimeAxisReadinessMatrix;
+  realtimeAxisReadinessMatrix: MeetingAppTimelineSdk['platformRealtimeAxisReadinessMatrix'];
+  assertPlatformRealtimeAxisReadiness(
+    platformOrInput?: string | URL | Record<string, unknown> | import('./adapters/platform-realtime-axis-readiness.mjs').MeetingPlatformRealtimeAxisReadiness,
+    inputOrOptions?: Record<string, unknown> | import('./adapters/platform-realtime-axis-readiness.mjs').MeetingPlatformRealtimeAxisReadinessOptions,
+    maybeOptions?: import('./adapters/platform-realtime-axis-readiness.mjs').MeetingPlatformRealtimeAxisReadinessOptions,
+  ): import('./adapters/platform-realtime-axis-readiness.mjs').MeetingPlatformRealtimeAxisReadiness;
+  assertRealtimeAxisReadiness: MeetingAppTimelineSdk['assertPlatformRealtimeAxisReadiness'];
+  assertPlatformRealtimeAxisReadinessMatrix(
+    input?: Record<string, unknown> | import('./adapters/platform-realtime-axis-readiness.mjs').MeetingPlatformRealtimeAxisReadinessMatrix,
+    options?: import('./adapters/platform-realtime-axis-readiness.mjs').MeetingPlatformRealtimeAxisReadinessOptions,
+  ): import('./adapters/platform-realtime-axis-readiness.mjs').MeetingPlatformRealtimeAxisReadinessMatrix;
+  assertRealtimeAxisReadinessMatrix: MeetingAppTimelineSdk['assertPlatformRealtimeAxisReadinessMatrix'];
   platformAdaptationStrategy(
     platformOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
@@ -799,4 +821,5 @@ export * from './adapters/platform-adapter-blueprint.mjs';
 export * from './adapters/platform-adapter-decision.mjs';
 export * from './adapters/platform-adapter-startup.mjs';
 export * from './adapters/platform-adapter-preflight.mjs';
+export * from './adapters/platform-realtime-axis-readiness.mjs';
 export * from './adapters/platform-strategy.mjs';

@@ -98,6 +98,11 @@ import type {
   MeetingPlatformAdapterPreflightOptions,
 } from './platform-adapter-preflight.mjs';
 import type {
+  MeetingPlatformRealtimeAxisReadiness,
+  MeetingPlatformRealtimeAxisReadinessMatrix,
+  MeetingPlatformRealtimeAxisReadinessOptions,
+} from './platform-realtime-axis-readiness.mjs';
+import type {
   MeetingPlatformHostIntegrationOptions,
   MeetingPlatformHostIntegrationPlan,
   MeetingPlatformHostIntegrationScaffold,
@@ -525,6 +530,24 @@ export interface MeetingPlatformTimelineKit {
   assertPlatformAdapterCurrentWindowPreflight(input?: string | URL | MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflight;
   assertPlatformAdapterPreflightMatrix(input?: MeetingPlatformAdapterDecisionInput, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterPreflightMatrix;
   assertPlatformAdapterCandidatePreflight(input?: MeetingPlatformAdapterDecisionInput | MeetingPlatformAdapterDecisionInput[] | Record<string, unknown>, preflightOptions?: MeetingPlatformAdapterPreflightOptions): MeetingPlatformAdapterCandidatePreflight;
+  platformRealtimeAxisReadiness(
+    platformOrInput?: string | URL | Record<string, unknown>,
+    inputOrOptions?: Record<string, unknown> | MeetingPlatformRealtimeAxisReadinessOptions,
+    maybeOptions?: MeetingPlatformRealtimeAxisReadinessOptions,
+  ): MeetingPlatformRealtimeAxisReadiness;
+  platformRealtimeAxisReadinessMatrix(
+    input?: Record<string, unknown>,
+    readinessOptions?: MeetingPlatformRealtimeAxisReadinessOptions,
+  ): MeetingPlatformRealtimeAxisReadinessMatrix;
+  assertPlatformRealtimeAxisReadiness(
+    platformOrInput?: string | URL | Record<string, unknown> | MeetingPlatformRealtimeAxisReadiness,
+    inputOrOptions?: Record<string, unknown> | MeetingPlatformRealtimeAxisReadinessOptions,
+    maybeOptions?: MeetingPlatformRealtimeAxisReadinessOptions,
+  ): MeetingPlatformRealtimeAxisReadiness;
+  assertPlatformRealtimeAxisReadinessMatrix(
+    input?: Record<string, unknown> | MeetingPlatformRealtimeAxisReadinessMatrix,
+    readinessOptions?: MeetingPlatformRealtimeAxisReadinessOptions,
+  ): MeetingPlatformRealtimeAxisReadinessMatrix;
   platformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
   assertPlatformConformance(conformanceOptions?: MeetingPlatformConformanceOptions): MeetingPlatformConformanceReport;
   platformConsumerHandoff(handoffOptions?: MeetingPlatformConsumerHandoffOptions): MeetingPlatformConsumerHandoff;

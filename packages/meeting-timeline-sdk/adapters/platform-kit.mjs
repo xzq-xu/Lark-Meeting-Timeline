@@ -215,6 +215,12 @@ import {
   buildMeetingPlatformAdapterPreflightMatrix,
 } from './platform-adapter-preflight.mjs';
 import {
+  assertMeetingPlatformRealtimeAxisReadiness,
+  assertMeetingPlatformRealtimeAxisReadinessMatrix,
+  buildMeetingPlatformRealtimeAxisReadiness,
+  buildMeetingPlatformRealtimeAxisReadinessMatrix,
+} from './platform-realtime-axis-readiness.mjs';
+import {
   assertMeetingPlatformHostIntegrationScaffold,
   buildMeetingPlatformHostIntegrationPlan,
   buildMeetingPlatformHostIntegrationScaffold,
@@ -624,6 +630,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
   const meetingAppFixtureAcceptance = buildMeetingAppFixtureAcceptanceReport(options);
   const meetingAppLaunchGateSummary = buildMeetingAppLaunchGateSummary(options);
   const platformProviderReplayMatrix = buildMeetingPlatformProviderReplayMatrix(providerReplayKitOptions(options));
+  const platformRealtimeAxisReadinessMatrix = buildMeetingPlatformRealtimeAxisReadinessMatrix(options, options);
   const platformAdapterExportPackageMatrix = buildMeetingPlatformAdapterExportPackageMatrix(options);
   const platformAdapterImportPlanMatrix = buildMeetingPlatformAdapterImportPlanMatrix({
     packages: platformAdapterExportPackageMatrix.packages,
@@ -641,6 +648,7 @@ export function buildMeetingPlatformKitReport(options = {}) {
       providerReplayMatrix: platformProviderReplayMatrix,
     }),
     platform_provider_replay_matrix: platformProviderReplayMatrix,
+    platform_realtime_axis_readiness_matrix: platformRealtimeAxisReadinessMatrix,
     platform_connector_matrix: buildMeetingPlatformConnectorMatrix(options),
     platform_connector_hub: buildMeetingPlatformConnectorHub(options),
     platform_conformance_report: buildMeetingPlatformConformanceReport(options),
@@ -914,6 +922,28 @@ export function createMeetingPlatformTimelineKit(clientOrOptions, options = {}) 
     },
     assertPlatformAdapterCandidatePreflight(input = {}, preflightOptions = {}) {
       return assertMeetingPlatformAdapterCandidatePreflight(input, withDefaults(defaults, preflightOptions));
+    },
+    platformRealtimeAxisReadiness(platformOrInput = {}, inputOrOptions = {}, maybeOptions = {}) {
+      const objectInput = platformOrInput && typeof platformOrInput === 'object' && !(platformOrInput instanceof URL);
+      return buildMeetingPlatformRealtimeAxisReadiness(
+        platformOrInput,
+        objectInput ? withDefaults(defaults, inputOrOptions) : inputOrOptions,
+        objectInput ? {} : withDefaults(defaults, maybeOptions),
+      );
+    },
+    platformRealtimeAxisReadinessMatrix(input = {}, readinessOptions = {}) {
+      return buildMeetingPlatformRealtimeAxisReadinessMatrix(input, withDefaults(defaults, readinessOptions));
+    },
+    assertPlatformRealtimeAxisReadiness(platformOrInput = {}, inputOrOptions = {}, maybeOptions = {}) {
+      const objectInput = platformOrInput && typeof platformOrInput === 'object' && !(platformOrInput instanceof URL);
+      return assertMeetingPlatformRealtimeAxisReadiness(
+        platformOrInput,
+        objectInput ? withDefaults(defaults, inputOrOptions) : inputOrOptions,
+        objectInput ? {} : withDefaults(defaults, maybeOptions),
+      );
+    },
+    assertPlatformRealtimeAxisReadinessMatrix(input = {}, readinessOptions = {}) {
+      return assertMeetingPlatformRealtimeAxisReadinessMatrix(input, withDefaults(defaults, readinessOptions));
     },
     platformConformance(conformanceOptions = {}) {
       return buildMeetingPlatformConformanceReport(withDefaults(defaults, conformanceOptions));
