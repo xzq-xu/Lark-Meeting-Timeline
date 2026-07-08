@@ -169,6 +169,7 @@ const connectorAdoptionIndex = JSON.parse(await readFile(join(outDir, 'connector
 assert.equal(connectorAdoptionIndex.schema, 'meeting_app_timeline_connector_adoption_index');
 assert.equal(connectorAdoptionIndex.accepted, true);
 assert.equal(connectorAdoptionIndex.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
+assert.equal(connectorAdoptionIndex.rows.find((row) => row.platform === 'google_meet').adapter_preflight.url_only_status, 'needs_live_page_evidence');
 assert.equal(connectorAdoptionIndex.rows.find((row) => row.platform === 'zoom').status, 'pilot_ready_needs_live_evidence');
 assert.equal(connectorAdoptionIndex.rows.every((row) => row.production_evidence_required.includes('runtime_host_replay')), true);
 assert.equal(connectorAdoptionIndex.rows.find((row) => row.platform === 'google_meet').field_intake.field_evidence_input.endsWith('/meeting-platform-field-evidence/google_meet.json'), true);
@@ -206,6 +207,8 @@ assert.equal(connectorAdapterMatrix.recommended_first_platform, 'google_meet');
 assert.equal(connectorAdapterMatrix.runtime_invariants.mark_timestamp_field, 'captured_at_ms');
 assert.equal(connectorAdapterMatrix.runtime_invariants.provider_replay_blocks_realtime, false);
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').selected_surface, 'browser_extension');
+assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').evidence_contract.adapter_preflight.evidence_kind, 'live_dom_snapshot');
+assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').evidence_contract.pilot_required.includes('adapter_preflight_live_evidence'), true);
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').runtime_sequence[1].required_field, 'captured_at_ms');
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').provider_replay.accepted, true);
 assert.equal(connectorAdapterMatrix.rows.find((row) => row.platform === 'google_meet').provider_replay.file, 'provider-replay-matrix.json');
@@ -239,12 +242,15 @@ assert.equal(googleHostAdapterConfig.schema, 'meeting_app_timeline_host_adapter_
 assert.equal(googleHostAdapterConfig.platform, 'google_meet');
 assert.equal(googleHostAdapterConfig.selected_surface, 'browser_extension');
 assert.equal(googleHostAdapterConfig.realtime_contract.mark_timestamp_field, 'captured_at_ms');
+assert.equal(googleHostAdapterConfig.evidence_contract.adapter_preflight.required, true);
+assert.equal(googleHostAdapterConfig.evidence_contract.adapter_preflight.bridge_messages.includes('meeting_timeline.preflight_current_window'), true);
 assert.equal(googleHostAdapterConfig.provider_replay.accepted, true);
 assert.equal(googleHostAdapterConfig.runtime_sequence[0].action, 'observe_platform_candidates');
 
 const zoomHostAdapterConfig = JSON.parse(await readFile(join(outDir, 'host-adapter-configs', 'zoom.json'), 'utf8'));
 assert.equal(zoomHostAdapterConfig.platform, 'zoom');
 assert.equal(zoomHostAdapterConfig.selected_surface, 'native_detector');
+assert.equal(zoomHostAdapterConfig.evidence_contract.adapter_preflight.evidence_kind, 'native_window_or_process_state');
 assert.equal(zoomHostAdapterConfig.provider_replay.provider_events_block_realtime, false);
 
 const connectorAdapterMatrixAcceptance = JSON.parse(await readFile(join(outDir, 'connector-adapter-matrix-acceptance.json'), 'utf8'));

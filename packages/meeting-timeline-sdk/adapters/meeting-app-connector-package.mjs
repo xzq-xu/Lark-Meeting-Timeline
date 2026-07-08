@@ -151,6 +151,51 @@ function runtimeActionByName(rows = [], action) {
   return rows.find((row) => row.action === action);
 }
 
+function adapterPreflightEvidenceContract(row = {}) {
+  const surface = normalizeKey(row.selected_surface);
+  const browserLike = surface === 'browser_extension'
+    || surface === 'webview_preload'
+    || surface === 'electron_webview';
+  const nativeLike = surface === 'native_detector'
+    || surface === 'native_host';
+  const evidenceKind = browserLike ? 'live_dom_snapshot' : nativeLike ? 'native_window_or_process_state' : 'live_surface_evidence';
+  return compactObject({
+    required: true,
+    required_before: 'observe_platform_candidates_or_insert_annotation',
+    url_only_status: 'needs_live_page_evidence',
+    accepted_status: 'ready_for_realtime_annotations',
+    selected_surface: surface,
+    evidence_kind: evidenceKind,
+    candidate_mode_supported: true,
+    current_window_mode_supported: browserLike,
+    sdk_methods: [
+      browserLike ? 'platformAdapterCurrentWindowPreflight' : undefined,
+      'platformAdapterCandidatePreflight',
+      'platformAdapterPreflight',
+    ].filter(Boolean),
+    bridge_messages: [
+      browserLike ? 'meeting_timeline.preflight_current_window' : undefined,
+      'meeting_timeline.preflight_candidates',
+    ].filter(Boolean),
+    required_live_inputs: browserLike
+      ? ['current_window_document_or_live_dom_snapshot', 'candidate_tabs_or_windows', 'active_speaker_or_participant_dom_signal']
+      : nativeLike
+        ? ['candidate_windows', 'process_or_bundle_identity', 'accessibility_or_audio_call_state']
+        : ['candidate_surface_snapshot'],
+    blocks_realtime_if_missing: true,
+    output_fields: [
+      'status',
+      'accepted',
+      'selected_candidate_index',
+      'selected_candidate_score',
+      'selected_candidate_reason',
+      'rows[].selection_rank',
+      'rows[].selection_score',
+      'rows[].selection_reason',
+    ],
+  });
+}
+
 function sampleUrlForPlatform(platform) {
   return {
     google_meet: 'https://meet.google.com/abc-defg-hij',
@@ -766,7 +811,7 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, o
     const insertAnnotation = runtimeActionByName(actions, 'insert_annotation');
     const speakerTrack = runtimeActionByName(actions, 'speaker_track');
     const participantTrack = runtimeActionByName(actions, 'participant_track');
-    return compactObject({
+    const row = compactObject({
       platform,
       display_name: startup.display_name ?? blueprint.display_name,
       selected_surface: startup.selected_surface,
@@ -791,6 +836,7 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, o
       },
       required_host_steps: [
         'install_selected_surface_runtime',
+        'run_adapter_preflight_with_live_evidence_before_first_annotation',
         'observe_platform_candidates_before_first_annotation',
         'insert_annotation_with_captured_at_ms',
         'keep_provider_events_nonblocking',
@@ -800,6 +846,10 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, o
         speakerTrack ? 'emit_speaker_track_markers' : undefined,
         participantTrack ? 'emit_participant_track_markers' : undefined,
       ].filter(Boolean),
+    });
+    return compactObject({
+      ...row,
+      adapter_preflight: adapterPreflightEvidenceContract(row),
     });
   });
   const readyCount = rows.filter((row) => row.realtime_startup_ready === true && row.adapter_blueprint_ready === true).length;
@@ -833,6 +883,7 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklist(pkg = {}, o
       transcript_blocks_realtime: pkg.contracts?.transcript_blocks_realtime,
       startup_plan_required_before_runtime_install: pkg.contracts?.startup_plan_required_before_runtime_install,
       adapter_blueprint_required_before_host_wiring: pkg.contracts?.adapter_blueprint_required_before_host_wiring,
+      adapter_preflight_required_before_realtime_insert: true,
     },
     files_to_read_first: [
       'connector-handoff.json',
@@ -880,6 +931,9 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceRe
   if (checklist.contracts?.adapter_blueprint_required_before_host_wiring !== true) {
     addIssue(issues, 'adapter_blueprint_not_required', 'Adapter blueprint must be required before host wiring');
   }
+  if (checklist.contracts?.adapter_preflight_required_before_realtime_insert !== true) {
+    addIssue(issues, 'adapter_preflight_not_required', 'Adapter preflight must be required before realtime annotation insertion');
+  }
   if ((checklist.platform_count ?? 0) <= 0) addIssue(issues, 'missing_platforms', 'Host install checklist must include at least one platform');
   if (rows.length !== checklist.platform_count) {
     addIssue(issues, 'row_count_mismatch', 'Host install checklist row count must equal platform_count', {
@@ -912,6 +966,21 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceRe
     if (!requiredSteps.includes('insert_annotation_with_captured_at_ms')) {
       addIssue(issues, 'row_missing_captured_at_ms_step', 'Checklist row must require insert_annotation_with_captured_at_ms', { platform });
     }
+    if (!requiredSteps.includes('run_adapter_preflight_with_live_evidence_before_first_annotation')) {
+      addIssue(issues, 'row_missing_adapter_preflight_step', 'Checklist row must require adapter preflight before realtime annotation insertion', { platform });
+    }
+    if (row.adapter_preflight?.required !== true) {
+      addIssue(issues, 'row_missing_adapter_preflight_contract', 'Checklist row must include adapter preflight contract', { platform });
+    }
+    if (row.adapter_preflight?.url_only_status !== 'needs_live_page_evidence') {
+      addIssue(issues, 'row_invalid_adapter_preflight_url_only_status', 'URL-only adapter preflight must not be realtime-ready', {
+        platform,
+        url_only_status: row.adapter_preflight?.url_only_status,
+      });
+    }
+    if (row.adapter_preflight?.blocks_realtime_if_missing !== true) {
+      addIssue(issues, 'row_adapter_preflight_must_block_realtime_when_missing', 'Missing adapter preflight must block realtime annotation insertion', { platform });
+    }
     if (row.provider_events_block_realtime !== false) {
       addIssue(issues, 'row_provider_events_block_realtime', 'Provider events must not block realtime annotations for row', { platform });
     }
@@ -942,6 +1011,8 @@ export function buildMeetingAppTimelineConnectorHostInstallChecklistAcceptanceRe
       realtime_startup_ready: row.realtime_startup_ready,
       adapter_blueprint_ready: row.adapter_blueprint_ready,
       insert_annotation_client_method: row.client_methods?.insert_annotation,
+      adapter_preflight_required: row.adapter_preflight?.required,
+      adapter_preflight_url_only_status: row.adapter_preflight?.url_only_status,
     })),
     next_actions: issues.length > 0
       ? unique([
@@ -1173,6 +1244,7 @@ export function buildMeetingAppTimelineConnectorAdoptionIndex(checklistOrPackage
         must_precede: 'insert_annotation',
         timestamp_field: checklist.timestamp_field,
       },
+      adapter_preflight: row.adapter_preflight,
       p0_annotation_intake: {
         action: row.insert_action ?? 'insertAnnotation',
         required_field: 'captured_at_ms',
@@ -2728,6 +2800,7 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
       },
       evidence_contract: {
         pilot_required: [
+          'adapter_preflight_live_evidence',
           'candidate_observation',
           'annotation_insert_current_axis',
           'captured_at_ms_preserved',
@@ -2739,6 +2812,7 @@ export function buildMeetingAppTimelineConnectorAdapterMatrix(checklistOrPackage
         ],
         field_evidence_input: fieldRow.field_evidence_input,
         evidence_package: fieldRow.evidence_package,
+        adapter_preflight: row.adapter_preflight,
       },
       validation_files: [
         'connector-adapter-matrix.json',
@@ -2989,6 +3063,15 @@ function hostAdapterConfigIssues(config = {}) {
   }
   if (config.provider_replay?.provider_events_block_realtime !== false) {
     addIssue(issues, 'provider_replay_not_nonblocking', 'Host adapter provider replay must be non-blocking', { platform: config.platform });
+  }
+  if (config.evidence_contract?.adapter_preflight?.required !== true) {
+    addIssue(issues, 'missing_adapter_preflight_contract', 'Host adapter config must include adapter preflight contract', { platform: config.platform });
+  }
+  if (config.evidence_contract?.adapter_preflight?.url_only_status !== 'needs_live_page_evidence') {
+    addIssue(issues, 'invalid_adapter_preflight_url_only_status', 'Host adapter config must keep URL-only preflight out of realtime-ready state', {
+      platform: config.platform,
+      url_only_status: config.evidence_contract?.adapter_preflight?.url_only_status,
+    });
   }
   const sequence = config.runtime_sequence ?? [];
   if (sequence[0]?.action !== 'observe_platform_candidates') {
