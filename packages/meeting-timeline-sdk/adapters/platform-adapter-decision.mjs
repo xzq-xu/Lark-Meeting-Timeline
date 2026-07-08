@@ -319,6 +319,126 @@ function startupSurfaceFromBlueprint(blueprint = {}) {
   return primary;
 }
 
+function expandedSurface(value) {
+  const surface = normalizeSurface(value);
+  if (!surface) return [];
+  if (surface === 'desktop_observer') return ['native_detector'];
+  if (surface === 'desktop_or_browser_observer') return ['native_detector', 'browser_extension'];
+  if (surface === 'browser_extension_or_native_detector') return ['browser_extension', 'native_detector'];
+  if (surface === 'browser_extension_or_desktop_observer') return ['browser_extension', 'native_detector'];
+  return [surface];
+}
+
+function surfaceOrderFromBlueprint(blueprint = {}) {
+  return unique([
+    ...asArray(blueprint.surface_order).flatMap((surface) => expandedSurface(surface)),
+    ...expandedSurface(blueprint.primary_surface),
+    ...Object.keys(blueprint.surfaces ?? {}).flatMap((surface) => expandedSurface(surface)),
+  ]).filter((surface) => surface !== 'post_meeting_artifact');
+}
+
+function observerModeForSurface(surface) {
+  if (surface === 'browser_extension') return 'browser_dom_observer';
+  if (surface === 'native_detector') return 'native_window_observer';
+  if (surface === 'provider_reconcile') return 'provider_reconcile_only';
+  return 'host_surface_observer';
+}
+
+function runtimeFactoryForSurface(surface) {
+  if (surface === 'browser_extension') return 'createMeetingAppBrowserRuntime';
+  if (surface === 'native_detector') return 'createMeetingAppTrackRuntime';
+  return undefined;
+}
+
+function hostInstallTargetForSurface(surface) {
+  if (surface === 'browser_extension') return 'browser_extension_or_webview_preload';
+  if (surface === 'native_detector') return 'native_detector_or_desktop_accessibility_agent';
+  if (surface === 'provider_reconcile') return 'provider_webhook_or_long_connection';
+  return 'host_surface_observer';
+}
+
+function evidenceToCollectFirst(surface) {
+  if (surface === 'browser_extension') {
+    return [
+      'live_browser_dom_snapshot_active_meeting',
+      'adapter_preflight_current_window_accepts_active_meeting',
+      'annotation_insert_current_axis_with_captured_at_ms',
+    ];
+  }
+  if (surface === 'native_detector') {
+    return [
+      'native_window_or_accessibility_snapshot_active_meeting',
+      'adapter_preflight_candidate_window_accepts_active_meeting',
+      'annotation_insert_current_axis_with_captured_at_ms',
+    ];
+  }
+  if (surface === 'provider_reconcile') {
+    return [
+      'provider_start_end_delivery_sample',
+      'local_observer_or_manual_axis_fallback_sample',
+      'annotation_insert_uses_capture_time_not_provider_delivery_time',
+    ];
+  }
+  return [
+    'host_surface_snapshot_active_meeting',
+    'annotation_insert_current_axis_with_captured_at_ms',
+  ];
+}
+
+function adaptationRiskTags(platform, selectedSurface, fallbackSurfaces = []) {
+  return unique([
+    selectedSurface === 'browser_extension' ? 'dom_selectors_can_drift_collect_live_snapshot_corpus' : undefined,
+    selectedSurface === 'native_detector' ? 'native_detection_needs_window_or_accessibility_permission' : undefined,
+    selectedSurface === 'provider_reconcile' ? 'provider_only_surface_cannot_prove_low_latency_axis_without_local_observer' : undefined,
+    fallbackSurfaces.length > 0 ? 'multi_surface_fallback_required' : undefined,
+    platform === 'microsoft_teams' ? 'teams_users_may_switch_between_desktop_and_browser_surfaces' : undefined,
+    'provider_events_may_lag_and_must_not_block_realtime_marks',
+    'transcript_or_recording_artifacts_are_post_meeting_only',
+  ]);
+}
+
+function adaptationStrategy(platform, selectedSurface, adapterBlueprint = {}, route = {}) {
+  const surfaceOrder = surfaceOrderFromBlueprint(adapterBlueprint);
+  const recommendedFirstSurface = startupSurfaceFromBlueprint(adapterBlueprint) ?? surfaceOrder[0] ?? selectedSurface;
+  const fallbackSurfaces = surfaceOrder.filter((surface) => surface !== selectedSurface);
+  const providerRoute = routeByName(route.routes, 'provider_reconcile');
+  const transcriptRoute = routeByName(route.routes, 'post_meeting_artifact_import');
+  const selectedSurfaceConfig = adapterBlueprint.surfaces?.[selectedSurface] ?? {};
+  return compactObject({
+    platform,
+    selected_surface: selectedSurface,
+    recommended_first_surface: recommendedFirstSurface,
+    fallback_surfaces: fallbackSurfaces,
+    selected_observer_mode: observerModeForSurface(selectedSurface),
+    selected_surface_role: selectedSurfaceConfig.role,
+    selected_surface_priority: selectedSurfaceConfig.priority,
+    selected_surface_evidence_kind: selectedSurfaceConfig.evidence?.evidence_kind,
+    runtime_factory: runtimeFactoryForSurface(selectedSurface),
+    host_install_target: hostInstallTargetForSurface(selectedSurface),
+    primary_axis_source: adapterBlueprint.realtime_axis_contract?.primary_source ?? 'local_observer',
+    provider_reconcile_role: providerRoute
+      ? 'nonblocking_production_reconcile'
+      : undefined,
+    provider_required_for_realtime: providerRoute?.required_for_realtime === true,
+    provider_blocks_realtime_if_missing: providerRoute?.blocks_realtime_if_missing === true,
+    transcript_role: transcriptRoute
+      ? 'post_meeting_nonblocking_backfill'
+      : undefined,
+    transcript_required_for_realtime: transcriptRoute?.required_for_realtime === true,
+    realtime_dependencies: {
+      local_observer_required: true,
+      selected_surface_provides_local_observer: selectedSurface !== 'provider_reconcile',
+      adapter_preflight_required_before_first_annotation: true,
+      provider_event_required: false,
+      transcript_required: false,
+      timestamp_field: 'captured_at_ms',
+    },
+    evidence_to_collect_first: evidenceToCollectFirst(selectedSurface),
+    production_evidence_gates: adapterBlueprint.acceptance_gates?.production,
+    risk_tags: adaptationRiskTags(platform, selectedSurface, fallbackSurfaces),
+  });
+}
+
 export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
   const objectInput = typeof input === 'string' || input instanceof URL
     ? { url: String(input) }
@@ -391,6 +511,7 @@ export function buildMeetingPlatformAdapterDecision(input = {}, options = {}) {
     surface_source: surface.source,
     selected_route: firstRoute?.route,
     recommended_mode: route.recommended_mode,
+    adaptation_strategy: adaptationStrategy(platform, surface.surface, adapterBlueprint, route),
     adapter_blueprint: blueprintSummary(adapterBlueprint, surface.surface),
     first_blocked_step: executionPlan.first_blocked_step,
     contracts: {
@@ -471,6 +592,10 @@ export function buildMeetingPlatformAdapterDecisionMatrix(input = {}, options = 
       adapter_blueprint_ready: decision.adapter_blueprint?.ready === true,
       adapter_blueprint_primary_surface: decision.adapter_blueprint?.primary_surface,
       adapter_blueprint_first_acceptance_gate: decision.adapter_blueprint?.first_acceptance_gate,
+      recommended_first_surface: decision.adaptation_strategy?.recommended_first_surface,
+      selected_observer_mode: decision.adaptation_strategy?.selected_observer_mode,
+      fallback_surfaces: decision.adaptation_strategy?.fallback_surfaces,
+      first_evidence_to_collect: decision.adaptation_strategy?.evidence_to_collect_first?.[0],
       first_blocked_step: decision.first_blocked_step,
       provider_events_block_realtime: decision.contracts?.provider_events_block_realtime,
       transcript_blocks_realtime: decision.contracts?.transcript_blocks_realtime,

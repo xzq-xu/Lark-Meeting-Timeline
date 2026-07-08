@@ -83,6 +83,61 @@ export interface MeetingPlatformAdapterDecisionInput {
   [key: string]: unknown;
 }
 
+export interface MeetingPlatformAdapterAdaptationStrategy {
+  platform?: string;
+  selected_surface?: string;
+  recommended_first_surface?: string;
+  fallback_surfaces?: string[];
+  selected_observer_mode?: 'browser_dom_observer' | 'native_window_observer' | 'provider_reconcile_only' | 'host_surface_observer' | string;
+  selected_surface_role?: string;
+  selected_surface_priority?: number;
+  selected_surface_evidence_kind?: string;
+  runtime_factory?: 'createMeetingAppBrowserRuntime' | 'createMeetingAppTrackRuntime' | string;
+  host_install_target?: string;
+  primary_axis_source?: string;
+  provider_reconcile_role?: string;
+  provider_required_for_realtime?: boolean;
+  provider_blocks_realtime_if_missing?: boolean;
+  transcript_role?: string;
+  transcript_required_for_realtime?: boolean;
+  realtime_dependencies?: {
+    local_observer_required?: boolean;
+    selected_surface_provides_local_observer?: boolean;
+    adapter_preflight_required_before_first_annotation?: boolean;
+    provider_event_required?: boolean;
+    transcript_required?: boolean;
+    timestamp_field?: string;
+    [key: string]: unknown;
+  };
+  evidence_to_collect_first?: string[];
+  production_evidence_gates?: string[];
+  risk_tags?: string[];
+  [key: string]: unknown;
+}
+
+export interface MeetingPlatformAdapterDecisionMatrixRow {
+  platform?: string;
+  display_name?: string;
+  accepted?: boolean;
+  realtime_ready?: boolean;
+  status?: string;
+  selected_surface?: string;
+  selected_route?: string;
+  recommended_mode?: string;
+  adapter_blueprint_ready?: boolean;
+  adapter_blueprint_primary_surface?: string;
+  adapter_blueprint_first_acceptance_gate?: string;
+  recommended_first_surface?: string;
+  selected_observer_mode?: string;
+  fallback_surfaces?: string[];
+  first_evidence_to_collect?: string;
+  first_blocked_step?: string;
+  provider_events_block_realtime?: boolean;
+  transcript_blocks_realtime?: boolean;
+  first_next_action?: string;
+  [key: string]: unknown;
+}
+
 export interface MeetingPlatformAdapterDecision {
   type: 'meeting_platform_adapter_decision';
   schema: 'meeting_platform_adapter_decision';
@@ -98,6 +153,7 @@ export interface MeetingPlatformAdapterDecision {
   surface_source?: string;
   selected_route?: string;
   recommended_mode?: string;
+  adaptation_strategy?: MeetingPlatformAdapterAdaptationStrategy;
   adapter_blueprint?: Record<string, unknown>;
   first_blocked_step?: string;
   contracts?: Record<string, unknown>;
@@ -128,7 +184,7 @@ export interface MeetingPlatformAdapterDecisionMatrix {
   native_surface_count: number;
   provider_reconcile_surface_count: number;
   platforms: string[];
-  rows: Array<Record<string, unknown>>;
+  rows: MeetingPlatformAdapterDecisionMatrixRow[];
   decisions: MeetingPlatformAdapterDecision[];
   next_actions: string[];
 }
