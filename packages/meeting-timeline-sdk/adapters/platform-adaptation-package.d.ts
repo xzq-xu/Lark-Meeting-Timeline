@@ -42,6 +42,7 @@ export interface MeetingPlatformAdaptationPackage {
   adaptation_strategy: MeetingPlatformAdaptationStrategy;
   adaptation_playbook: MeetingPlatformAdaptationStrategy['adaptation_playbook'];
   annotation_pipeline: Record<string, unknown>;
+  adapter_selection: Record<string, unknown>;
   runtime_event_plan: MeetingPlatformRuntimeEventPlan;
   speaker_markers?: Record<string, unknown>;
   transcript: Record<string, unknown>;
@@ -84,6 +85,7 @@ export interface MeetingPlatformAdaptationPackageMatrix {
   sdk_wiring_ready_count: number;
   browser_observer_count: number;
   candidate_observer_count: number;
+  adapter_selection_ready_count: number;
   provider_observer_count: number;
   production_ready_count: number;
   realtime_ready_count: number;

@@ -10,6 +10,9 @@ import {
   buildMeetingPlatformAdaptationStrategy,
 } from './platform-strategy.mjs';
 import {
+  buildMeetingPlatformAdapterSelection,
+} from './platform-adapter-selection.mjs';
+import {
   normalizeMeetingPlatform,
 } from './platform-setup.mjs';
 
@@ -90,6 +93,15 @@ function flowSteps(platform, surface, bundle = {}, options = {}) {
     },
     {
       step: 3,
+      id: 'select_adapter_path',
+      action: 'lock_local_axis_annotation_and_reconcile_sources',
+      sdk_method: "sdk.platformAdapterSelection(platform, { meetingAppRecordSet/providerRecords? })",
+      output: 'meeting_platform_adapter_selection',
+      required_before: 'install_surface_runtime_or_run_preflight',
+      timestamp_field: 'captured_at_ms',
+    },
+    {
+      step: 4,
       id: 'run_adapter_preflight',
       action: 'prove_current_meeting_window_with_live_dom_or_native_evidence',
       sdk_method: "sdk.platformAdapterPreflight({ platform, snapshots/nativeEvidence })",
@@ -102,7 +114,7 @@ function flowSteps(platform, surface, bundle = {}, options = {}) {
       url_only_status: 'needs_live_page_evidence',
     },
     {
-      step: 4,
+      step: 5,
       id: 'bind_current_axis',
       action: 'observe_platform_candidates_before_the_first_mark',
       message_type: bundle.messaging?.candidate_observation?.message_type,
@@ -110,7 +122,7 @@ function flowSteps(platform, surface, bundle = {}, options = {}) {
       required_before: 'insert_annotation',
     },
     {
-      step: 5,
+      step: 6,
       id: 'insert_realtime_annotations',
       action: 'write_marks_with_device_capture_time',
       sdk_method: "sdk.insertAnnotation(platform, { captured_at_ms, ...mark })",
@@ -118,26 +130,27 @@ function flowSteps(platform, surface, bundle = {}, options = {}) {
       required_field: 'captured_at_ms',
     },
     {
-      step: 6,
+      step: 7,
       id: 'emit_speaker_positions',
       action: 'optionally_emit_speaker_or_participant_track_markers_without_transcript_text',
       sdk_method: 'sdk.speakerTrack(platform, sample) / sdk.participantTrack(platform, sample)',
       output: 'speaker_or_participant_position_markers',
     },
     {
-      step: 7,
+      step: 8,
       id: 'provider_reconcile',
       action: 'ingest_provider_events_only_as_reconcile_or_backfill',
       sdk_method: 'sdk.ingestProvider(platform, providerEvent)',
       realtime_blocking: false,
     },
     {
-      step: 8,
+      step: 9,
       id: 'verify_handoff',
       action: 'run_static_handoff_runtime_bundle_and_adapter_preflight_checks',
       commands: [
         commandWithBase('meeting-platform:consumer-handoff', options, `--platforms=${platform}`),
         commandWithBase('meeting-platform:runtime-bundle', options, `--platforms=${platform}`),
+        commandWithBase('meeting-platform:adapter-selection', options, `--platforms=${platform}`),
         commandWithBase('meeting-platform:adapter-preflight', options, `--platforms=${platform}`),
       ],
     },
@@ -150,6 +163,7 @@ function acceptanceCommands(platform, options = {}) {
     consumer_handoff: commandWithBase('meeting-platform:consumer-handoff', options, `--platforms=${platform}`),
     runtime_bundle: commandWithBase('meeting-platform:runtime-bundle', options, `--platforms=${platform}`),
     adapter_route: commandWithBase('meeting-platform:adapter-route', options, `--platforms=${platform}`),
+    adapter_selection: commandWithBase('meeting-platform:adapter-selection', options, `--platforms=${platform}`),
     adapter_preflight: commandWithBase('meeting-platform:adapter-preflight', options, `--platforms=${platform}`),
     handoff_readiness: commandWithBase('meeting-platform:handoff-readiness', options, `--platforms=${platform}`),
     runtime_host_verify: `npm run meeting-platform:runtime-host-verify -- --platforms=${platform}`,
@@ -209,6 +223,7 @@ function buildSingleHandoff(platform, inputs = {}) {
   const key = normalizeMeetingPlatform(platform);
   const runtimeBundle = bundle ?? buildMeetingPlatformRuntimeBundle(key, options);
   const strategy = buildMeetingPlatformAdaptationStrategy(key, options);
+  const adapterSelection = buildMeetingPlatformAdapterSelection(key, {}, options);
   const surface = recommendedSurface(roadmapRow, runtimeBundle);
   const provider = runtimeBundle.provider_reconcile ?? {};
   const preflight = adapterPreflightHandoff(preflightRow, consumerRow);
@@ -244,6 +259,7 @@ function buildSingleHandoff(platform, inputs = {}) {
       kit_create_function: 'createMeetingPlatformTimelineKit',
       runtime_bundle_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
       implementation_handoff_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-implementation-handoff',
+      adapter_selection_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-selection',
       adapter_preflight_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight',
     },
     install_surface: {
@@ -275,6 +291,20 @@ function buildSingleHandoff(platform, inputs = {}) {
       required_for_realtime: provider.required_for_realtime === true,
       realtime_blocking: false,
     },
+    adapter_selection: {
+      schema: adapterSelection.schema,
+      ready: adapterSelection.readiness?.selection_ready === true,
+      axis_source: adapterSelection.selection?.axis_source,
+      axis_surface: adapterSelection.selection?.axis_surface,
+      annotation_source: adapterSelection.selection?.annotation_source,
+      timestamp_field: adapterSelection.selection?.timestamp_field,
+      provider_reconcile_source: adapterSelection.selection?.provider_reconcile_source,
+      provider_reconcile_required_for_production: adapterSelection.selection?.provider_reconcile_required_for_production,
+      provider_events_block_realtime: adapterSelection.runtime_policy?.provider_events_block_realtime,
+      transcript_blocks_realtime: adapterSelection.runtime_policy?.transcript_blocks_realtime,
+      startup_order: adapterSelection.runtime_policy?.startup_order,
+      next_actions: adapterSelection.next_actions,
+    },
     adapter_preflight: preflight,
     contracts: {
       timestamp_field: 'captured_at_ms',
@@ -282,6 +312,8 @@ function buildSingleHandoff(platform, inputs = {}) {
       provider_events_block_realtime: false,
       transcript_blocks_realtime: false,
       per_meeting_annotation_isolation_required: true,
+      adapter_selection_required_before_runtime_surface_install: true,
+      adapter_selection_timestamp_field: 'captured_at_ms',
       adapter_preflight_required_before_realtime_insert: true,
       adapter_preflight_live_evidence_required: true,
       adapter_preflight_url_only_status: 'needs_live_page_evidence',
@@ -304,6 +336,7 @@ function buildSingleHandoff(platform, inputs = {}) {
       observer_scheduler_ready: runtimeBundle.readiness?.observer_scheduler_ready === true,
       runtime_host_ready: runtimeBundle.readiness?.runtime_host_ready === true,
       lightweight_connector_ready: runtimeBundle.readiness?.lightweight_connector_ready === true,
+      adapter_selection_ready: adapterSelection.readiness?.selection_ready === true,
       adapter_preflight_startup_ready: preflight.startup_ready === true,
       adapter_preflight_live_evidence_ready: preflight.live_evidence_ready === true,
       adapter_preflight_realtime_ready: preflight.realtime_annotation_ready === true,
@@ -377,6 +410,7 @@ export function buildMeetingPlatformImplementationHandoffMatrix(options = {}) {
     production_ready_count: handoffs.filter((handoff) => handoff.production_ready).length,
     adapter_preflight_startup_ready_count: handoffs.filter((handoff) => handoff.adapter_preflight?.startup_ready).length,
     adapter_preflight_realtime_ready_count: handoffs.filter((handoff) => handoff.adapter_preflight?.realtime_annotation_ready).length,
+    adapter_selection_ready_count: handoffs.filter((handoff) => handoff.adapter_selection?.ready).length,
     recommended_first_platform: handoffs[0]?.platform,
     recommended_first_surface: handoffs[0]?.recommended_first_surface,
     priority_order: order,
@@ -393,6 +427,10 @@ export function buildMeetingPlatformImplementationHandoffMatrix(options = {}) {
       provider_path: handoff.provider_reconcile?.path,
       provider_permission_risk: handoff.provider_reconcile?.permission_risk,
       runtime_event_endpoint: handoff.runtime_events?.endpoint,
+      adapter_selection_ready: handoff.adapter_selection?.ready === true,
+      adapter_selection_axis_source: handoff.adapter_selection?.axis_source,
+      adapter_selection_axis_surface: handoff.adapter_selection?.axis_surface,
+      adapter_selection_timestamp_field: handoff.adapter_selection?.timestamp_field,
       adapter_preflight_status: handoff.adapter_preflight?.status,
       adapter_preflight_selected_surface: handoff.adapter_preflight?.selected_surface,
       adapter_preflight_startup_ready: handoff.adapter_preflight?.startup_ready === true,

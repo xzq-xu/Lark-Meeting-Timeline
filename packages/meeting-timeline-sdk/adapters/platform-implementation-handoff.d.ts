@@ -28,6 +28,7 @@ export interface MeetingPlatformImplementationHandoff {
   install_surface: Record<string, unknown>;
   runtime_events: Record<string, unknown>;
   provider_reconcile: Record<string, unknown>;
+  adapter_selection: Record<string, unknown>;
   adapter_preflight: Record<string, unknown>;
   contracts: Record<string, unknown>;
   implementation_flow: Array<Record<string, unknown>>;
@@ -48,6 +49,7 @@ export interface MeetingPlatformImplementationHandoffMatrix {
   production_ready_count: number;
   adapter_preflight_startup_ready_count: number;
   adapter_preflight_realtime_ready_count: number;
+  adapter_selection_ready_count: number;
   recommended_first_platform?: string;
   recommended_first_surface?: string;
   priority_order: string[];

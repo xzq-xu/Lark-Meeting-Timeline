@@ -38,6 +38,9 @@ import {
 import {
   buildMeetingPlatformAdaptationStrategy,
 } from './platform-strategy.mjs';
+import {
+  buildMeetingPlatformAdapterSelection,
+} from './platform-adapter-selection.mjs';
 
 export const MEETING_PLATFORM_ADAPTATION_PACKAGE_SCHEMA = 'meeting_platform_adaptation_package';
 export const MEETING_PLATFORM_ADAPTATION_PACKAGE_MATRIX_SCHEMA = 'meeting_platform_adaptation_package_matrix';
@@ -75,6 +78,7 @@ function commandSet(platform, options = {}) {
   const baseUrlArg = baseUrl ? ` --base-url=${baseUrl}` : '';
   return {
     print_package: `npm run meeting-platform:adaptation-package -- --platforms=${platform}${baseUrlArg}`,
+    print_adapter_selection: `npm run meeting-platform:adapter-selection -- --platforms=${platform}${baseUrlArg}`,
     print_runtime_event_plan: `npm run meeting-platform:runtime-event-plan -- --platforms=${platform}${baseUrlArg}`,
     verify_contract: `npm run meeting-platform:adapter-contract -- --platforms=${platform}${baseUrlArg} --fail-on-rejected=true`,
     collect_field_evidence: `npm run meeting-platform:field-evidence -- --platforms=${platform}${baseUrlArg}`,
@@ -167,12 +171,15 @@ function implementationSummary(capabilities = {}, contract = {}, runtimeAdapter 
       live_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/platform-live-adapter',
       adaptation_package: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adaptation-package',
       runtime_event: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event',
+      adapter_selection: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-selection',
       platform_events: capabilities.sdk_modules?.events,
       runtime_adapter: runtimeAdapter.sdk_module,
       extension: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-extension',
     }),
     kit_methods: unique([
       'platformAdaptationPackage',
+      'platformAdapterSelection',
+      'platformAdapterSelectionMatrix',
       'platformLiveAdapter',
       'platformRuntimeProfile',
       'platformRuntimeEventPlan',
@@ -295,6 +302,7 @@ export function buildMeetingPlatformAdaptationPackage(platform, options = {}) {
   const contract = buildMeetingPlatformAdapterContract(key, options);
   const contractAcceptance = buildMeetingPlatformAdapterContractAcceptanceReport(contract, options);
   const runtimeEventPlan = buildMeetingPlatformRuntimeEventPlan(key, options);
+  const adapterSelection = buildMeetingPlatformAdapterSelection(key, {}, options);
   const runtimeAdapter = safeRuntimeAdapterConfig(key, options);
   const extensionMatches = safeExtensionMatches(key, options);
   const extensionPlan = safeExtensionInstallPlan(key, options);
@@ -323,6 +331,21 @@ export function buildMeetingPlatformAdaptationPackage(platform, options = {}) {
     adaptation_strategy: strategy,
     adaptation_playbook: strategy.adaptation_playbook,
     annotation_pipeline: annotationSummary(contract, collector, runtimeEventPlan),
+    adapter_selection: {
+      schema: adapterSelection.schema,
+      ready: adapterSelection.readiness?.selection_ready === true,
+      axis_source: adapterSelection.selection?.axis_source,
+      axis_surface: adapterSelection.selection?.axis_surface,
+      annotation_source: adapterSelection.selection?.annotation_source,
+      timestamp_field: adapterSelection.selection?.timestamp_field,
+      provider_reconcile_source: adapterSelection.selection?.provider_reconcile_source,
+      provider_reconcile_required_for_production: adapterSelection.selection?.provider_reconcile_required_for_production,
+      provider_events_block_realtime: adapterSelection.runtime_policy?.provider_events_block_realtime,
+      transcript_blocks_realtime: adapterSelection.runtime_policy?.transcript_blocks_realtime,
+      startup_order: adapterSelection.runtime_policy?.startup_order,
+      current_evidence: adapterSelection.current_evidence,
+      next_actions: adapterSelection.next_actions,
+    },
     candidate_observation: candidateObservation,
     runtime_event_plan: runtimeEventPlan,
     speaker_markers: runtime.speaker_markers,
@@ -372,6 +395,7 @@ export function buildMeetingPlatformAdaptationPackageMatrix(options = {}) {
     sdk_wiring_ready_count: packages.filter((item) => item.readiness.sdk_wiring_ready).length,
     browser_observer_count: packages.filter((item) => (item.local_observer?.browser_matches ?? []).length > 0).length,
     candidate_observer_count: packages.filter((item) => item.candidate_observation?.runtime_event_action === 'observe_platform_candidates').length,
+    adapter_selection_ready_count: packages.filter((item) => item.adapter_selection?.ready).length,
     provider_observer_count: packages.filter((item) => item.provider_observer?.transport).length,
     production_ready_count: packages.filter((item) => item.readiness.production_ready).length,
     realtime_ready_count: packages.filter((item) => item.readiness.ready_for_realtime_annotations).length,
@@ -404,6 +428,12 @@ export function buildMeetingPlatformAdaptationPackageMatrix(options = {}) {
       provider_start_event_count: item.provider_observer?.start_events?.length ?? 0,
       provider_end_event_count: item.provider_observer?.end_events?.length ?? 0,
       runtime_event_action_count: item.annotation_pipeline?.runtime_event_actions?.length ?? 0,
+      adapter_selection_ready: item.adapter_selection?.ready === true,
+      adapter_selection_axis_source: item.adapter_selection?.axis_source,
+      adapter_selection_axis_surface: item.adapter_selection?.axis_surface,
+      adapter_selection_timestamp_field: item.adapter_selection?.timestamp_field,
+      adapter_selection_provider_blocks_realtime: item.adapter_selection?.provider_events_block_realtime === true,
+      adapter_selection_transcript_blocks_realtime: item.adapter_selection?.transcript_blocks_realtime === true,
       speaker_min_stable_ms: item.speaker_markers?.filter?.min_stable_ms,
       transcript_blocks_realtime: item.transcript?.blocks_realtime_annotation === true,
       missing_item_count: item.readiness.missing_items?.length ?? 0,
