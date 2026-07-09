@@ -2146,7 +2146,7 @@ const candidatePreflight = buildMeetingPlatformAdapterCandidatePreflight({
 // candidatePreflight.accepted === true 表示至少一个候选已经可实时插入 captured_at_ms 标注。
 ```
 
-如果已经有 `platformAdapterInstallManifest()`，可以进一步用 `platformAdapterCandidateLaunchPlan()` 把“候选窗口验收”和“启动 runtime surface”合成一步。这个对象的 `accepted` 同时要求候选 preflight 通过、install manifest 可用、平台已注册、surface 可启动；通过后把内部的 `launch_plan` 交给 `platformAdapterSession()` 或 runner 即可。
+如果已经有 `platformAdapterInstallManifest()`，可以进一步用 `platformAdapterCandidateLaunchPlan()` 把“候选窗口验收”和“启动 runtime surface”合成一步。这个对象的 `accepted` 同时要求候选 preflight 通过、install manifest 可用、平台已注册、surface 可启动；通过后可以直接交给 `platformAdapterSession()` 或 runner。SDK 会保留 `selected_evidence` / `preflight_evidence`，把 current-window DOM interaction、`semantic_signal_types`、active speaker candidate 和候选选择原因带到 `observeAxis()` / `insertAnnotation()` 的 payload 里，宿主项目不需要自己拆 `launch.launch_plan` 后再拼回证据。
 
 ```js
 const launch = sdk.platformAdapterCandidateLaunchPlan(installManifest, {
@@ -2159,9 +2159,11 @@ const launch = sdk.platformAdapterCandidateLaunchPlan(installManifest, {
 });
 
 if (launch.accepted) {
-  const session = sdk.platformAdapterSession(launch.launch_plan);
-  await session.observeAxis({
-    candidates: [launch.selected_candidate],
+  const session = sdk.platformAdapterSession(launch);
+  await session.observeAxis({ captured_at_ms: Date.now() });
+  await session.insertAnnotation({
+    label: 'why?',
+    kind: 'handwriting',
     captured_at_ms: Date.now(),
   });
 }

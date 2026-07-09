@@ -27,6 +27,65 @@ import {
 } from '../packages/meeting-timeline-sdk/index.mjs';
 
 const baseUrl = 'https://timeline.example.com';
+
+function node(tagName, attrs = {}, text = '') {
+  return {
+    tagName: tagName.toUpperCase(),
+    attributes: attrs,
+    dataset: Object.fromEntries(Object.entries(attrs)
+      .filter(([key]) => key.startsWith('data-'))
+      .map(([key, value]) => [
+        key.slice(5).replace(/-([a-z])/g, (_, char) => char.toUpperCase()),
+        value,
+      ])),
+    innerText: text,
+    textContent: text,
+    getAttribute(name) {
+      return attrs[name] ?? null;
+    },
+  };
+}
+
+function selectorAttrMatches(item, selector) {
+  if (selector === 'button') return item.tagName === 'BUTTON';
+  const attrParts = [...String(selector).matchAll(/\[([a-zA-Z0-9_-]+)([*]?=)?(?:"([^"]*)"|'([^']*)'|([^\]\s]+))?(?:\s+i)?\]/g)];
+  if (!attrParts.length) return false;
+  return attrParts.every((match) => {
+    const [, attrName, operator, doubleQuoted, singleQuoted, bare] = match;
+    const actual = item.attributes[attrName];
+    if (operator == null) return actual != null;
+    if (actual == null) return false;
+    const expected = doubleQuoted ?? singleQuoted ?? bare ?? '';
+    if (operator === '*=') return String(actual).toLowerCase().includes(String(expected).toLowerCase());
+    return String(actual) === String(expected);
+  });
+}
+
+function queryNodes(nodes, selector) {
+  const text = String(selector);
+  if (text === '*') return nodes;
+  const generic = nodes.filter((item) => selectorAttrMatches(item, text));
+  if (generic.length) return generic;
+  if (text.includes('speaking')) {
+    return nodes.filter((item) => /speaking|active speaker|正在发言|正在讲话|正在说话/i.test(item.attributes['aria-label'] ?? ''));
+  }
+  if (text.includes('aria-live')) return nodes.filter((item) => item.attributes['aria-live']);
+  if (text.includes('role="status"')) return nodes.filter((item) => item.attributes.role === 'status');
+  return [];
+}
+
+function fakeDocument({ url, title, nodes = [] }) {
+  return {
+    nodeType: 9,
+    title,
+    hidden: false,
+    location: { href: url },
+    querySelectorAll(selector) {
+      return queryNodes(nodes, selector);
+    },
+  };
+}
+
 const exportMatrix = buildMeetingPlatformAdapterExportPackageMatrix({
   platforms: ['google-meet', 'zoom'],
 }, {
@@ -109,6 +168,8 @@ assert.equal(candidateLaunchPlan.selected_candidate_rank, 1);
 assert.equal(candidateLaunchPlan.selected_candidate_score > 0, true);
 assert.equal(candidateLaunchPlan.selected_candidate_reason, 'accepted_live_candidate');
 assert.equal(candidateLaunchPlan.candidate_preflight.accepted_count, 1);
+assert.equal(candidateLaunchPlan.selected_evidence.accepted, true);
+assert.equal(candidateLaunchPlan.selected_evidence.live_evidence_ready, true);
 assert.equal(candidateLaunchPlan.launch_plan.accepted, true);
 assert.equal(candidateLaunchPlan.launch_plan.platform, 'google_meet');
 assert.equal(candidateLaunchPlan.adapter_selection.axis_surface, 'browser_extension');
@@ -117,7 +178,39 @@ assert.equal(candidateLaunchPlan.raw_signal_validation.status, 'ready');
 assert.equal(candidateLaunchPlan.runtime_actions.find((action) => action.id === 'read_adapter_selection').axis_surface, 'browser_extension');
 assert.equal(candidateLaunchPlan.runtime_actions.find((action) => action.id === 'validate_raw_signal').sdk_method, 'platformRawSignalBatch');
 assert.equal(candidateLaunchPlan.runtime_actions.find((action) => action.id === 'observe_platform_candidates').id, 'observe_platform_candidates');
+assert.equal(candidateLaunchPlan.launch_input.preflight_evidence.selected_candidate, undefined);
+assert.equal(candidateLaunchPlan.mark_template.preflight_evidence.accepted, true);
 assert.equal(assertMeetingPlatformAdapterCandidateLaunchPlan(candidateLaunchPlan), candidateLaunchPlan);
+
+const currentWindowCandidateLaunchPlan = buildMeetingPlatformAdapterCandidateLaunchPlan(manifest, {
+  candidates: [{
+    active: true,
+    document: fakeDocument({
+      url: 'https://meet.google.com/abc-defg-hij',
+      title: 'Current Google Meet',
+      nodes: [
+        node('button', { 'aria-label': 'Leave call' }),
+        node('button', { 'aria-label': 'Turn off microphone' }),
+        node('div', {
+          'data-participant-id': 'ada',
+          'aria-label': 'Ada Lovelace is speaking',
+        }),
+      ],
+    }),
+  }],
+}, {
+  requireSpeakerTrack: true,
+  capturedAtMs: 1_782_614_400_000,
+});
+assert.equal(currentWindowCandidateLaunchPlan.accepted, true);
+assert.equal(currentWindowCandidateLaunchPlan.selected_candidate_reason, 'accepted_current_window_live_candidate');
+assert.equal(currentWindowCandidateLaunchPlan.selected_evidence.current_window_captured, true);
+assert.equal(currentWindowCandidateLaunchPlan.selected_evidence.interaction.in_call, true);
+assert.equal(currentWindowCandidateLaunchPlan.selected_evidence.interaction_can_leave, true);
+assert.equal(currentWindowCandidateLaunchPlan.selected_evidence.semantic_signal_types.includes('meeting_leave_available'), true);
+assert.equal(currentWindowCandidateLaunchPlan.selected_evidence.active_speaker_candidate.name, 'Ada Lovelace');
+assert.equal(currentWindowCandidateLaunchPlan.launch_input.preflight_evidence.active_speaker_candidate.name, 'Ada Lovelace');
+assert.equal(currentWindowCandidateLaunchPlan.mark_template.preflight_evidence.interaction_can_leave, true);
 
 const urlOnlyCandidateLaunchPlan = buildMeetingPlatformAdapterCandidateLaunchPlan(manifest, {
   tabs: [{

@@ -1,4 +1,7 @@
 import type { MeetingPlatformAdapterInstallManifest } from './platform-adapter-install-manifest.mjs';
+import type {
+  MeetingAppDomInteractionState,
+} from './meeting-app-capture.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_LAUNCH_PLAN_SCHEMA: 'meeting_platform_adapter_launch_plan';
 export const MEETING_PLATFORM_ADAPTER_CANDIDATE_LAUNCH_PLAN_SCHEMA: 'meeting_platform_adapter_candidate_launch_plan';
@@ -44,6 +47,41 @@ export interface MeetingPlatformAdapterLaunchPlan {
   next_actions: string[];
 }
 
+export interface MeetingPlatformAdapterLaunchEvidence {
+  source?: string;
+  status?: string;
+  accepted?: boolean;
+  realtime_annotation_ready?: boolean;
+  live_evidence_ready?: boolean;
+  current_window_captured?: boolean;
+  interaction?: MeetingAppDomInteractionState;
+  interaction_in_call?: boolean;
+  interaction_can_leave?: boolean;
+  interaction_pre_join?: boolean;
+  semantic_signal_types?: string[];
+  active_speaker_candidate?: {
+    id?: string;
+    name?: string;
+    display_name?: string;
+    speaking?: boolean;
+    audioLevel?: number;
+    [key: string]: unknown;
+  };
+  candidate?: {
+    index?: number;
+    selection_rank?: number;
+    selection_score?: number;
+    selection_reason?: string;
+    window_id?: string | number;
+    tab_id?: string | number;
+    active?: boolean;
+    url?: string;
+    title?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
 export interface MeetingPlatformAdapterCandidateLaunchPlan {
   type: 'meeting_platform_adapter_candidate_launch_plan';
   schema: 'meeting_platform_adapter_candidate_launch_plan';
@@ -59,6 +97,7 @@ export interface MeetingPlatformAdapterCandidateLaunchPlan {
   selected_candidate_rank?: number;
   selected_candidate_reason?: string;
   selected_candidate?: Record<string, unknown>;
+  selected_evidence?: MeetingPlatformAdapterLaunchEvidence;
   install_manifest_schema?: string;
   install_manifest_accepted: boolean;
   candidate_preflight: import('./platform-adapter-preflight.mjs').MeetingPlatformAdapterCandidatePreflight;

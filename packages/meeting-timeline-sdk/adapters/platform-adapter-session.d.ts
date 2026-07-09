@@ -1,4 +1,8 @@
-import type { MeetingPlatformAdapterLaunchPlan } from './platform-adapter-launch-plan.mjs';
+import type {
+  MeetingPlatformAdapterCandidateLaunchPlan,
+  MeetingPlatformAdapterLaunchEvidence,
+  MeetingPlatformAdapterLaunchPlan,
+} from './platform-adapter-launch-plan.mjs';
 import type { MeetingPlatformAdapterRuntimeTarget } from './platform-adapter-runtime-recipe.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_SESSION_SCHEMA: 'meeting_platform_adapter_session';
@@ -26,6 +30,8 @@ export interface MeetingPlatformAdapterSessionOptions {
   sdk?: MeetingPlatformAdapterSessionClient;
   launchPlan?: MeetingPlatformAdapterLaunchPlan;
   launch_plan?: MeetingPlatformAdapterLaunchPlan;
+  candidateLaunchPlan?: MeetingPlatformAdapterCandidateLaunchPlan;
+  candidate_launch_plan?: MeetingPlatformAdapterCandidateLaunchPlan;
   runtimeTarget?: MeetingPlatformAdapterRuntimeTarget;
   runtime_target?: MeetingPlatformAdapterRuntimeTarget;
   sessionId?: string;
@@ -68,14 +74,16 @@ export interface MeetingPlatformAdapterSession {
   schema: 'meeting_platform_adapter_session';
   schema_version: 1;
   id: string;
-  plan_kind: 'launch_plan' | 'runtime_target' | 'unknown';
+  plan_kind: 'launch_plan' | 'candidate_launch_plan' | 'runtime_target' | 'unknown';
   platform?: string;
   selected_surface?: string;
   host_kind?: string;
   bridge_kind?: string;
   adapter_module?: string;
   adapter_selection?: Record<string, unknown>;
+  selected_evidence?: MeetingPlatformAdapterLaunchEvidence;
   launch_plan?: MeetingPlatformAdapterLaunchPlan;
+  candidate_launch_plan?: MeetingPlatformAdapterCandidateLaunchPlan;
   runtime_target?: MeetingPlatformAdapterRuntimeTarget;
   axis_contract: Record<string, unknown>;
   runtime_actions: Array<Record<string, unknown>>;
@@ -96,7 +104,7 @@ export interface MeetingPlatformAdapterSessionHandoff {
   schema_version: 1;
   platform?: string;
   selected_surface?: string;
-  plan_kind: 'launch_plan' | 'runtime_target' | 'unknown';
+  plan_kind: 'launch_plan' | 'candidate_launch_plan' | 'runtime_target' | 'unknown';
   host_kind?: string;
   bridge_kind?: string;
   session_factory: 'createMeetingPlatformAdapterSession';
@@ -104,19 +112,21 @@ export interface MeetingPlatformAdapterSessionHandoff {
   optional_client_methods: string[];
   input_schema: string;
   launch_plan_schema?: string;
+  candidate_launch_plan_schema?: string;
   runtime_target_schema?: string;
+  selected_evidence?: MeetingPlatformAdapterLaunchEvidence;
   runtime_actions: Array<Record<string, unknown>>;
   axis_contract: Record<string, unknown>;
   next_actions: string[];
 }
 
 export function createMeetingPlatformAdapterSession(
-  launchPlanOrInput?: MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterRuntimeTarget | Record<string, unknown>,
+  launchPlanOrInput?: MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterCandidateLaunchPlan | MeetingPlatformAdapterRuntimeTarget | Record<string, unknown>,
   clientOrOptions?: MeetingPlatformAdapterSessionClient | MeetingPlatformAdapterSessionOptions,
   options?: MeetingPlatformAdapterSessionOptions,
 ): MeetingPlatformAdapterSession;
 
 export function buildMeetingPlatformAdapterSessionHandoff(
-  launchPlanOrInput?: MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterRuntimeTarget | Record<string, unknown>,
+  launchPlanOrInput?: MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterCandidateLaunchPlan | MeetingPlatformAdapterRuntimeTarget | Record<string, unknown>,
   options?: MeetingPlatformAdapterSessionOptions,
 ): MeetingPlatformAdapterSessionHandoff;

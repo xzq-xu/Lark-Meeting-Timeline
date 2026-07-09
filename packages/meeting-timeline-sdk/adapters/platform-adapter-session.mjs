@@ -1,6 +1,8 @@
 import { MeetingTimelineSdkError, compactObject } from '../index.mjs';
 import {
+  MEETING_PLATFORM_ADAPTER_CANDIDATE_LAUNCH_PLAN_SCHEMA,
   MEETING_PLATFORM_ADAPTER_LAUNCH_PLAN_SCHEMA,
+  assertMeetingPlatformAdapterCandidateLaunchPlan,
   assertMeetingPlatformAdapterLaunchPlan,
 } from './platform-adapter-launch-plan.mjs';
 import {
@@ -32,34 +34,62 @@ function isLaunchPlan(value = {}) {
   return value?.schema === MEETING_PLATFORM_ADAPTER_LAUNCH_PLAN_SCHEMA;
 }
 
+function isCandidateLaunchPlan(value = {}) {
+  return value?.schema === MEETING_PLATFORM_ADAPTER_CANDIDATE_LAUNCH_PLAN_SCHEMA;
+}
+
 function isRuntimeTarget(value = {}) {
   return value?.schema === MEETING_PLATFORM_ADAPTER_RUNTIME_TARGET_SCHEMA;
 }
 
 function planKind(plan = {}) {
+  if (isCandidateLaunchPlan(plan)) return 'candidate_launch_plan';
   if (isRuntimeTarget(plan)) return 'runtime_target';
   if (isLaunchPlan(plan)) return 'launch_plan';
   return 'unknown';
 }
 
 function sessionPlanFrom(input = {}, options = {}) {
-  const plan = isLaunchPlan(input) || isRuntimeTarget(input)
-    ? input
-    : firstNonEmpty(
-      options.runtimeTarget,
-      options.runtime_target,
-      options.launchPlan,
-      options.launch_plan,
-      input.runtimeTarget,
-      input.runtime_target,
-      input.launchPlan,
-      input.launch_plan,
-      input.target,
-      input.plan,
-    );
-  const candidate = plan ?? input;
+  if (isRuntimeTarget(input)) return assertMeetingPlatformAdapterRuntimeTarget(input);
+  if (isCandidateLaunchPlan(input)) return assertMeetingPlatformAdapterCandidateLaunchPlan(input);
+  if (isLaunchPlan(input)) return assertMeetingPlatformAdapterLaunchPlan(input);
+  const candidate = firstNonEmpty(
+    options.runtimeTarget,
+    options.runtime_target,
+    options.candidateLaunchPlan,
+    options.candidate_launch_plan,
+    options.launchPlan,
+    options.launch_plan,
+    input.runtimeTarget,
+    input.runtime_target,
+    input.candidateLaunchPlan,
+    input.candidate_launch_plan,
+    input.launchPlan,
+    input.launch_plan,
+    input.target,
+    input.plan,
+    input,
+  );
   if (isRuntimeTarget(candidate)) return assertMeetingPlatformAdapterRuntimeTarget(candidate);
+  if (isCandidateLaunchPlan(candidate)) return assertMeetingPlatformAdapterCandidateLaunchPlan(candidate);
+  if (isLaunchPlan(candidate)) return assertMeetingPlatformAdapterLaunchPlan(candidate);
   return assertMeetingPlatformAdapterLaunchPlan(candidate);
+}
+
+function nestedLaunchPlan(plan = {}) {
+  return isCandidateLaunchPlan(plan) ? plan.launch_plan ?? {} : plan;
+}
+
+function detectedMeetingFrom(plan = {}) {
+  return plan.detected_meeting ?? nestedLaunchPlan(plan).detected_meeting;
+}
+
+function currentUrlFrom(plan = {}) {
+  return plan.current_url ?? plan.launch_input?.url ?? nestedLaunchPlan(plan).current_url;
+}
+
+function selectedEvidenceFrom(plan = {}) {
+  return plan.selected_evidence ?? plan.launch_input?.preflight_evidence;
 }
 
 function axisContractFrom(plan = {}) {
@@ -79,25 +109,31 @@ function axisContractFrom(plan = {}) {
 }
 
 function sessionId(plan = {}, options = {}) {
+  const detectedMeeting = detectedMeetingFrom(plan) ?? {};
   return String(firstNonEmpty(
     options.sessionId,
     options.session_id,
-    plan.detected_meeting?.meeting_id,
-    plan.detected_meeting?.external_meeting_id,
+    detectedMeeting.meeting_id,
+    detectedMeeting.external_meeting_id,
     `${plan.platform || 'meeting'}-${plan.selected_surface || 'surface'}`,
   ));
 }
 
 function observePayload(plan = {}, input = {}, options = {}) {
+  const evidence = selectedEvidenceFrom(plan);
+  const detectedMeeting = detectedMeetingFrom(plan);
   const candidate = compactObject({
     platform: plan.platform,
-    url: firstNonEmpty(input.url, input.href, plan.current_url),
-    title: firstNonEmpty(input.title, plan.detected_meeting?.title),
+    url: firstNonEmpty(input.url, input.href, currentUrlFrom(plan)),
+    title: firstNonEmpty(input.title, detectedMeeting?.title),
     active: firstNonEmpty(input.active, true),
-    in_meeting: firstNonEmpty(input.in_meeting, input.inMeeting, true),
+    in_meeting: firstNonEmpty(input.in_meeting, input.inMeeting, evidence?.interaction_in_call, evidence?.interaction?.in_call, true),
     surface: plan.selected_surface,
     source: firstNonEmpty(options.source, input.source, 'meeting_platform_adapter_session'),
     captured_at_ms: firstNonEmpty(input.captured_at_ms, input.capturedAtMs, options.captured_at_ms, options.capturedAtMs, nowMs(options)),
+    interaction: evidence?.interaction,
+    semantic_signal_types: evidence?.semantic_signal_types,
+    active_speaker_candidate: evidence?.active_speaker_candidate,
   });
   return compactObject({
     platform: plan.platform,
@@ -105,23 +141,28 @@ function observePayload(plan = {}, input = {}, options = {}) {
     captured_at_ms: candidate.captured_at_ms,
     current_url: candidate.url,
     surface: plan.selected_surface,
-    detected_meeting: plan.detected_meeting,
+    detected_meeting: detectedMeeting,
+    preflight_evidence: evidence,
     candidates: asArray(firstNonEmpty(input.candidates, input.tabs, input.windows, [candidate])),
   });
 }
 
 function rawSignalValidationPayload(plan = {}, input = {}, options = {}) {
   const capturedAtMs = firstNonEmpty(input.captured_at_ms, input.capturedAtMs, options.captured_at_ms, options.capturedAtMs, nowMs(options));
+  const evidence = selectedEvidenceFrom(plan);
+  const detectedMeeting = detectedMeetingFrom(plan);
   const snapshot = compactObject({
     kind: 'meeting_app_snapshot',
     platform: plan.platform,
     source: firstNonEmpty(input.source, options.source, 'meeting_platform_adapter_session'),
-    url: firstNonEmpty(input.url, input.href, plan.current_url),
-    title: firstNonEmpty(input.title, plan.detected_meeting?.title),
+    url: firstNonEmpty(input.url, input.href, currentUrlFrom(plan)),
+    title: firstNonEmpty(input.title, detectedMeeting?.title),
     observed_at_ms: capturedAtMs,
-    in_meeting: firstNonEmpty(input.in_meeting, input.inMeeting, true),
-    active_speaker: firstNonEmpty(input.active_speaker, input.activeSpeaker, input.speaker),
-    current_meeting: plan.detected_meeting,
+    in_meeting: firstNonEmpty(input.in_meeting, input.inMeeting, evidence?.interaction_in_call, evidence?.interaction?.in_call, true),
+    active_speaker: firstNonEmpty(input.active_speaker, input.activeSpeaker, input.speaker, evidence?.active_speaker_candidate),
+    interaction: evidence?.interaction,
+    semantic_signal_types: evidence?.semantic_signal_types,
+    current_meeting: detectedMeeting,
   });
   return compactObject({
     platform: plan.platform,
@@ -130,6 +171,7 @@ function rawSignalValidationPayload(plan = {}, input = {}, options = {}) {
     validation: plan.raw_signal_validation,
     raw_signal_validation_path: plan.raw_signal_validation?.path,
     expected_runtime_actions: plan.raw_signal_validation?.runtime_actions,
+    preflight_evidence: evidence,
     raw_signals: asArray(firstNonEmpty(
       input.raw_signals,
       input.rawSignals,
@@ -159,12 +201,14 @@ function adapterSelectionPayload(plan = {}, input = {}, options = {}) {
 }
 
 function markPayload(plan = {}, input = {}, options = {}) {
+  const evidence = selectedEvidenceFrom(plan);
   return {
     ...input,
     platform: firstNonEmpty(input.platform, plan.platform),
     captured_at_ms: firstNonEmpty(input.captured_at_ms, input.capturedAtMs, options.captured_at_ms, options.capturedAtMs, nowMs(options)),
     source: firstNonEmpty(input.source, options.source, 'meeting_platform_adapter_session'),
     surface: firstNonEmpty(input.surface, plan.selected_surface),
+    preflight_evidence: firstNonEmpty(input.preflight_evidence, input.preflightEvidence, evidence),
   };
 }
 
@@ -267,6 +311,7 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
     ...(clientOrOptions.options ?? {}),
   };
   const plan = sessionPlanFrom(launchPlanOrInput, defaults);
+  const launchPlan = nestedLaunchPlan(plan);
   const axisContract = axisContractFrom(plan);
   const kind = planKind(plan);
   const state = {
@@ -286,14 +331,16 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
     plan_kind: kind,
     platform: plan.platform,
     selected_surface: plan.selected_surface,
-    host_kind: plan.host_kind,
-    bridge_kind: plan.bridge_kind,
-    adapter_module: plan.adapter_module,
-    adapter_selection: plan.adapter_selection,
-    launch_plan: isLaunchPlan(plan) ? plan : undefined,
+    host_kind: plan.host_kind ?? launchPlan.host_kind,
+    bridge_kind: plan.bridge_kind ?? launchPlan.bridge_kind,
+    adapter_module: plan.adapter_module ?? launchPlan.adapter_module,
+    adapter_selection: plan.adapter_selection ?? launchPlan.adapter_selection,
+    selected_evidence: selectedEvidenceFrom(plan),
+    launch_plan: isLaunchPlan(plan) ? plan : isCandidateLaunchPlan(plan) ? launchPlan : undefined,
+    candidate_launch_plan: isCandidateLaunchPlan(plan) ? plan : undefined,
     runtime_target: isRuntimeTarget(plan) ? plan : undefined,
     axis_contract: axisContract,
-    runtime_actions: plan.runtime_actions,
+    runtime_actions: plan.runtime_actions ?? launchPlan.runtime_actions,
     getState() {
       return {
         ...state,
@@ -304,6 +351,7 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
         host_kind: session.host_kind,
         bridge_kind: session.bridge_kind,
         adapter_selection: session.adapter_selection,
+        selected_evidence: session.selected_evidence,
       };
     },
     async readAdapterSelection(input = {}, selectionOptions = {}) {
@@ -401,6 +449,7 @@ export function createMeetingPlatformAdapterSession(launchPlanOrInput = {}, clie
 
 export function buildMeetingPlatformAdapterSessionHandoff(launchPlanOrInput = {}, options = {}) {
   const plan = sessionPlanFrom(launchPlanOrInput, options);
+  const launchPlan = nestedLaunchPlan(plan);
   const kind = planKind(plan);
   const axisContract = axisContractFrom(plan);
   return {
@@ -410,18 +459,24 @@ export function buildMeetingPlatformAdapterSessionHandoff(launchPlanOrInput = {}
     platform: plan.platform,
     selected_surface: plan.selected_surface,
     plan_kind: kind,
-    host_kind: plan.host_kind,
-    bridge_kind: plan.bridge_kind,
+    host_kind: plan.host_kind ?? launchPlan.host_kind,
+    bridge_kind: plan.bridge_kind ?? launchPlan.bridge_kind,
     session_factory: 'createMeetingPlatformAdapterSession',
     required_client_methods: ['observePlatformCandidates', 'insertAnnotation'],
     optional_client_methods: ['platformAdapterSelection', 'adapterSelection', 'platformRawSignalBatch', 'rawSignalBatch', 'speakerTrack', 'participantTrack', 'ingestProvider'],
     input_schema: plan.schema,
     launch_plan_schema: isLaunchPlan(plan) ? plan.schema : undefined,
+    candidate_launch_plan_schema: isCandidateLaunchPlan(plan) ? plan.schema : undefined,
     runtime_target_schema: isRuntimeTarget(plan) ? plan.schema : undefined,
-    runtime_actions: plan.runtime_actions,
+    selected_evidence: selectedEvidenceFrom(plan),
+    runtime_actions: plan.runtime_actions ?? launchPlan.runtime_actions,
     axis_contract: axisContract,
     next_actions: [
-      kind === 'runtime_target' ? 'create_session_from_runtime_target' : 'create_session_from_launch_plan',
+      kind === 'runtime_target'
+        ? 'create_session_from_runtime_target'
+        : kind === 'candidate_launch_plan'
+          ? 'create_session_from_candidate_launch_plan'
+          : 'create_session_from_launch_plan',
       'call_session_readAdapterSelection_before_runtime_wiring',
       'call_session_validateRawSignal_before_adapter_preflight',
       'call_session_observeAxis_before_first_mark',

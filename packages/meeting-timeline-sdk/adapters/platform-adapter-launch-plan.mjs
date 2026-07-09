@@ -374,8 +374,66 @@ function selectedCandidateRow(candidatePreflight = {}) {
     ?? {};
 }
 
+function selectedPreflight(candidatePreflight = {}) {
+  const index = Number(candidatePreflight.selected_candidate_index);
+  return Number.isInteger(index) && index >= 0
+    ? asArray(candidatePreflight.preflights)[index]
+    : undefined;
+}
+
+function selectedEvidence(candidatePreflight = {}) {
+  const row = selectedCandidateRow(candidatePreflight);
+  const preflight = selectedPreflight(candidatePreflight) ?? {};
+  const capture = preflight.capture ?? {};
+  const currentWindow = preflight.current_window ?? {};
+  const interaction = capture.interaction ?? currentWindow.interaction;
+  const activeSpeaker = capture.active_speaker_candidate ?? currentWindow.active_speaker_candidate;
+  const semanticSignalTypes = unique([
+    ...(capture.semantic_signal_types ?? []),
+    ...(currentWindow.semantic_signal_types ?? []),
+    ...(row.semantic_signal_types ?? []),
+  ]);
+  return compactObject({
+    source: 'adapter_candidate_preflight',
+    status: preflight.status ?? row.status,
+    accepted: preflight.accepted === true || row.accepted === true,
+    realtime_annotation_ready: preflight.readiness?.realtime_annotation_ready === true || row.realtime_annotation_ready === true,
+    live_evidence_ready: preflight.readiness?.live_evidence_ready === true || row.live_evidence_ready === true,
+    current_window_captured: preflight.current_window?.captured === true || row.current_window_captured === true,
+    interaction,
+    interaction_in_call: row.interaction_in_call ?? interaction?.in_call,
+    interaction_can_leave: row.interaction_can_leave ?? interaction?.can_leave,
+    interaction_pre_join: row.interaction_pre_join ?? interaction?.pre_join,
+    semantic_signal_types: semanticSignalTypes.length ? semanticSignalTypes : undefined,
+    active_speaker_candidate: activeSpeaker ? compactObject({
+      id: activeSpeaker.id ?? row.active_speaker_candidate_id,
+      name: activeSpeaker.name ?? row.active_speaker_candidate_name,
+      display_name: activeSpeaker.display_name ?? activeSpeaker.name ?? row.active_speaker_candidate_name,
+      speaking: activeSpeaker.speaking ?? true,
+      audioLevel: activeSpeaker.audioLevel ?? activeSpeaker.audio_level,
+    }) : (row.active_speaker_candidate_id || row.active_speaker_candidate_name ? compactObject({
+      id: row.active_speaker_candidate_id,
+      name: row.active_speaker_candidate_name,
+      display_name: row.active_speaker_candidate_name,
+      speaking: true,
+    }) : undefined),
+    candidate: {
+      index: row.candidate_index,
+      selection_rank: row.selection_rank,
+      selection_score: row.selection_score,
+      selection_reason: row.selection_reason,
+      window_id: row.window_id,
+      tab_id: row.tab_id,
+      active: row.active,
+      url: row.url,
+      title: row.title,
+    },
+  });
+}
+
 function candidateLaunchInput(candidatePreflight = {}, input = {}, options = {}) {
   const row = selectedCandidateRow(candidatePreflight);
+  const evidence = selectedEvidence(candidatePreflight);
   return compactObject({
     platform: firstNonEmpty(options.platform, input.platform, input.provider, row.platform, candidatePreflight.selected_platform),
     url: firstNonEmpty(options.url, options.href, input.url, input.href, row.url),
@@ -387,6 +445,10 @@ function candidateLaunchInput(candidatePreflight = {}, input = {}, options = {})
     window_id: row.window_id,
     tab_id: row.tab_id,
     active: row.active,
+    interaction: evidence.interaction,
+    semantic_signal_types: evidence.semantic_signal_types,
+    active_speaker_candidate: evidence.active_speaker_candidate,
+    preflight_evidence: evidence,
   });
 }
 
@@ -486,6 +548,7 @@ export function buildMeetingPlatformAdapterCandidateLaunchPlan(manifestOrInput =
   const manifest = manifestFrom(manifestOrInput, input, options);
   const candidatePreflight = buildMeetingPlatformAdapterCandidatePreflight(input, options);
   const selectedCandidate = selectedCandidateRow(candidatePreflight);
+  const evidence = selectedEvidence(candidatePreflight);
   const launchInput = candidateLaunchInput(candidatePreflight, input, options);
   const launchPlan = buildMeetingPlatformAdapterLaunchPlan(manifest, launchInput, options);
   const ready = candidateLaunchReadiness(candidatePreflight, launchPlan);
@@ -504,6 +567,7 @@ export function buildMeetingPlatformAdapterCandidateLaunchPlan(manifestOrInput =
     selected_candidate_rank: selectedCandidate.selection_rank,
     selected_candidate_reason: selectedCandidate.selection_reason,
     selected_candidate: selectedCandidate,
+    selected_evidence: evidence,
     install_manifest_schema: launchPlan.install_manifest_schema,
     install_manifest_accepted: launchPlan.install_manifest_accepted,
     candidate_preflight: candidatePreflight,
@@ -514,7 +578,10 @@ export function buildMeetingPlatformAdapterCandidateLaunchPlan(manifestOrInput =
     adapter_blueprint: launchPlan.adapter_blueprint,
     raw_signal_validation: launchPlan.raw_signal_validation,
     runtime_actions: launchPlan.runtime_actions,
-    mark_template: launchPlan.mark_template,
+    mark_template: launchPlan.mark_template ? {
+      ...launchPlan.mark_template,
+      preflight_evidence: evidence,
+    } : undefined,
     readiness: ready,
     next_actions: candidateLaunchNextActions(candidatePreflight, launchPlan, ready),
   });
