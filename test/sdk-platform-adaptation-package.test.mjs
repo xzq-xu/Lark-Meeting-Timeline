@@ -97,6 +97,10 @@ assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').candidate
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 assert.equal(matrix.rows.find((row) => row.platform === 'webex').transcript_blocks_realtime, false);
 assert.equal(matrix.rows.find((row) => row.platform === 'lark').sdk_wiring_ready, true);
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').provider_participant_event_count > 0, true);
+assert.equal(matrix.rows.find((row) => row.platform === 'google_meet').provider_reconcilable_participants, true);
+assert.equal(matrix.rows.find((row) => row.platform === 'lark').provider_reconcilable_artifacts, false);
+assert.equal(matrix.provider_axis_reconcile_count >= 0, true);
 assert.equal(matrix.next_actions.includes('wire_host_to_platform_live_adapter'), true);
 
 const client = {

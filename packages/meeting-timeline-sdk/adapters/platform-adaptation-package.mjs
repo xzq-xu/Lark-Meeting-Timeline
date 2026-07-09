@@ -136,6 +136,34 @@ function candidateObservationSummary(runtimeAdapter = {}, runtimeEventPlan = {},
   });
 }
 
+function providerSignalCoverage(providerPack = {}, runtime = {}) {
+  const mappings = asArray(providerPack.event_mapping);
+  const normalizedSignals = unique(mappings.map((item) => item.normalized_signal).filter((value) => value));
+  const timelineRoles = unique(mappings.map((item) => item.timeline_role).filter((value) => value));
+  const hasSignal = (value) => normalizedSignals.includes(value);
+  return compactObject({
+    provider_event_mapping_count: mappings.length,
+    normalized_signals: normalizedSignals,
+    timeline_roles: timelineRoles,
+    can_reconcile_axis_start: hasSignal('meeting_started'),
+    can_reconcile_axis_end: hasSignal('meeting_ended'),
+    can_reconcile_participants: hasSignal('participant_joined')
+      || hasSignal('participant_left')
+      || hasSignal('participant_joined_or_left'),
+    can_mark_speaker: timelineRoles.includes('speaker_marker') || hasSignal('speaker_started') || hasSignal('speaker_ended'),
+    can_reconcile_transcript_artifact: hasSignal('artifact_ready') || hasSignal('post_meeting_transcript') || hasSignal('transcript_ready'),
+    can_reconcile_recording_artifact: hasSignal('recording_completed')
+      || hasSignal('recording_created')
+      || hasSignal('recordings.created')
+      || hasSignal('recording'),
+    runtime_start_events: runtime?.provider_events?.start_events ?? [],
+    runtime_end_events: runtime?.provider_events?.end_events ?? [],
+    runtime_participant_events: runtime?.provider_events?.participant_events ?? [],
+    runtime_artifact_events: runtime?.provider_events?.artifact_events ?? [],
+    runtime_lifecycle_events: runtime?.provider_events?.lifecycle_events ?? [],
+  });
+}
+
 function annotationSummary(contract = {}, collector = {}, runtimeEventPlan = {}) {
   return compactObject({
     insert_endpoint: contract.annotations?.endpoints?.insertMark ?? collector.timeline_ingest?.endpoints?.insertMark,
@@ -310,6 +338,7 @@ export function buildMeetingPlatformAdaptationPackage(platform, options = {}) {
   const handoffReadiness = safeHandoffReadiness(key, options);
   const strategy = buildMeetingPlatformAdaptationStrategy(key, options);
   const candidateObservation = candidateObservationSummary(runtimeAdapter, runtimeEventPlan, extensionPlan);
+  const providerSignalCoverageSummary = providerSignalCoverage(provider, runtime);
 
   const base = compactObject({
     type: 'meeting_platform_adaptation_package',
@@ -328,6 +357,7 @@ export function buildMeetingPlatformAdaptationPackage(platform, options = {}) {
     fallback_policy: runtime.fallback_policy,
     local_observer: localObserverSummary(collector, runtimeAdapter, runtimeEventPlan, extensionPlan),
     provider_observer: providerEventSummary(provider, runtime),
+    provider_signal_coverage: providerSignalCoverageSummary,
     adaptation_strategy: strategy,
     adaptation_playbook: strategy.adaptation_playbook,
     annotation_pipeline: annotationSummary(contract, collector, runtimeEventPlan),
@@ -397,6 +427,9 @@ export function buildMeetingPlatformAdaptationPackageMatrix(options = {}) {
     candidate_observer_count: packages.filter((item) => item.candidate_observation?.runtime_event_action === 'observe_platform_candidates').length,
     adapter_selection_ready_count: packages.filter((item) => item.adapter_selection?.ready).length,
     provider_observer_count: packages.filter((item) => item.provider_observer?.transport).length,
+    provider_axis_reconcile_count: packages.filter((item) => item.provider_signal_coverage?.can_reconcile_axis_start === true).length,
+    provider_participant_reconcile_count: packages.filter((item) => item.provider_signal_coverage?.can_reconcile_participants === true).length,
+    provider_artifact_reconcile_count: packages.filter((item) => item.provider_signal_coverage?.can_reconcile_transcript_artifact === true).length,
     production_ready_count: packages.filter((item) => item.readiness.production_ready).length,
     realtime_ready_count: packages.filter((item) => item.readiness.ready_for_realtime_annotations).length,
     platforms: packages.map((item) => item.platform),
@@ -427,6 +460,15 @@ export function buildMeetingPlatformAdaptationPackageMatrix(options = {}) {
       provider_transport: item.provider_observer?.transport,
       provider_start_event_count: item.provider_observer?.start_events?.length ?? 0,
       provider_end_event_count: item.provider_observer?.end_events?.length ?? 0,
+      provider_participant_event_count: item.provider_signal_coverage?.runtime_participant_events?.length ?? 0,
+      provider_artifact_event_count: item.provider_signal_coverage?.runtime_artifact_events?.length ?? 0,
+      provider_lifecycle_event_count: item.provider_signal_coverage?.runtime_lifecycle_events?.length ?? 0,
+      provider_reconcilable_start_axis: item.provider_signal_coverage?.can_reconcile_axis_start === true,
+      provider_reconcilable_end_axis: item.provider_signal_coverage?.can_reconcile_axis_end === true,
+      provider_reconcilable_participants: item.provider_signal_coverage?.can_reconcile_participants === true,
+      provider_reconcilable_speaker_markers: item.provider_signal_coverage?.can_mark_speaker === true,
+      provider_reconcilable_artifacts: item.provider_signal_coverage?.can_reconcile_transcript_artifact === true,
+      provider_reconcilable_recording: item.provider_signal_coverage?.can_reconcile_recording_artifact === true,
       runtime_event_action_count: item.annotation_pipeline?.runtime_event_actions?.length ?? 0,
       adapter_selection_ready: item.adapter_selection?.ready === true,
       adapter_selection_axis_source: item.adapter_selection?.axis_source,
