@@ -416,6 +416,23 @@ SDK 侧如果要把 provider 订阅创建交给另一个项目执行，优先用
 
 两类 matrix 都有候选观察看板字段：adaptation package matrix 暴露 `candidate_observer_count` 和每行的 `candidate_observation_ready` / `candidate_observer_message_type` / `candidate_observer_permission`；runtime bundle matrix 也暴露 `candidate_observer_count` 与同名行级状态。下游可以先看这两个 matrix，确认 Google Meet、Teams、Zoom、Webex、Lark 是否都能用同一条候选会议观察链路建轴。
 
+如果产品端/PM 只要快速判断“多平台当前能不能推进到 P0”，可以跑 `platform-adapter-crosswalk`。它基于 adaptation package 汇总 `sdk_wiring_ready`、`ready_for_realtime_annotations`、`candidate_observation_ready`、provider start/end/participant/artifact 可对齐程度，输出固定字段的压缩表：
+
+- `rows[*].compatibility_score`：可复用接入评分；
+- `rows[*].readiness`：`ready_for_rollout / ready_for_pilot / pre_pilot / bootstrap_required`；
+- `rows[*].provider_path`：provider 主链路标识；
+- `rows[*].axis_events`/`participant_events`/`artifact_events`：关键事件的可回填能力；
+- `rows[*].speaker_support`：是否具备发言人位置能力；
+- `rows[*].first_next_action`：下一个最小执行动作。
+
+仓库命令：
+
+```bash
+npm run meeting-platform:adapter-crosswalk -- --platforms=google-meet,teams,zoom,webex,lark --base-url=http://localhost:8787
+```
+
+加 `--json=true` 时输出完整 JSON；不加默认打印可读文本。这个输出会用在接入决策面板做“同级产品同台对比”。
+
 下游开始选平台或做接入面板时，先读 `@ai-annotation/meeting-timeline-sdk/adapters/platform-registry` 的 `buildMeetingPlatformRegistryManifest()`。这张 manifest 汇总 normalizer、runtime bundle、runtime event plan、candidate observation、provider security verifier、insert endpoint、`captured_at_ms`、provider/transcript 非阻塞状态和 host endpoints；`assertMeetingPlatformRegistryManifest()` 可作为 CI gate，确保这些平台都满足 SDK 接入契约，且至少包含 `insert_annotation` 和 `observe_platform_candidates` 这类外部动作。`candidate_observer_count` 必须等于 `platform_count`，否则说明某个平台还不能用统一候选窗口观察链路做实时建轴。仓库命令 `npm run meeting-platform:registry` 会输出同一份报告。它适合放在配置页或 CI 里作为“当前 Google Meet / Teams / Zoom / Webex / Lark 是否具备 SDK 接入面”的第一层总览。
 
 如果配置页需要给单个平台显示“现在卡在哪一步”，用 `@ai-annotation/meeting-timeline-sdk/adapters/platform-onboarding`。它会把 provider 权限/安全环境变量、integration plan、candidate observation gate、真实样本 acceptance 和会后 artifact plan 合成一个 `status`：`blocked_by_setup` 表示权限或 webhook 安全配置未就绪，`blocked_by_runtime_contract` 表示 `meeting_timeline.observe_candidates` / `observe_platform_candidates` 这类实时建轴契约不满足，`needs_real_samples` 或 `needs_more_coverage` 表示还缺真实 provider/DOM 样本。这样 Google Meet、Teams、Zoom、Webex、Lark 的接入向导可以用同一套状态和 `next_actions`，而不是每个平台写一套流程。

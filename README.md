@@ -157,6 +157,21 @@ npm run meeting-platform:live-readiness
 
 它会写出 `data/meeting-platform-live-readiness-report.json`，把每个平台的 live adapter 方法、`captured_at_ms` 时间戳约束、provider/transcript 非阻塞策略和 evidence package 复验合成一个 CI/配置页可直接消费的 readiness matrix。默认按 production 验收；只看 pilot 能否实时落标注时用 `-- --require-production-ready=false`。
 
+如果你只想看“哪些平台今天能上一个统一接入页”，先跑 crosswalk 快速对比命令：
+
+```bash
+npm run meeting-platform:adapter-crosswalk -- --base-url=http://localhost:8787 --platforms=google-meet,teams,zoom,webex,lark
+```
+
+它会输出每个平台的：
+
+- `compatibility_score`：sdk 接线、实时标注、候选观察、provider 可回填能力的加权评分；
+- `readiness`：按阈值映射为 `ready_for_rollout / ready_for_pilot / pre_pilot / bootstrap_required`；
+- `provider_path`：provider 事件主路径（例如 Google Meet 的 `google_workspace_events_pubsub`）；
+- `first_next_action`：下个最小采样动作（如“先补本地活体快照”或“补 provider start/end 回填样本”）。
+
+加 `--json=true` 可拿到结构化 JSON，默认会直接打印文本版便于人工巡检。
+
 ```bash
 npm run meeting-platform:evidence-package
 ```
