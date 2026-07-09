@@ -372,6 +372,7 @@ const candidateObserved = await candidateSession.observeAxis();
 assert.equal(candidateObserved.payload.preflight_evidence.accepted, true);
 assert.equal(candidateObserved.payload.candidates[0].semantic_signal_types.includes('meeting_leave_available'), true);
 assert.equal(candidateObserved.payload.candidates[0].control_signal_summary.leave_available, true);
+assert.equal(candidateObserved.payload.candidates[0].control_signal_gap_summary.gap_count, 0);
 assert.equal(candidateCalls[0][0], 'platformRawSignalBatch');
 assert.equal(candidateCalls[1][0], 'observePlatformCandidates');
 

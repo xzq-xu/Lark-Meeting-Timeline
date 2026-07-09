@@ -188,6 +188,128 @@ function requireCompleteLifecycle(options = {}) {
   return options.requireCompleteLifecycle === true || options.require_complete_lifecycle === true;
 }
 
+function signalGap(severity, code, signal, message, details = {}) {
+  return compactObject({
+    severity,
+    code,
+    signal,
+    message,
+    ...details,
+  });
+}
+
+function controlSignalGapsFromSummary(summary, options = {}) {
+  if (!looksLikeControlSignalSummary(summary)) return [];
+  const speakerRequired = requireSpeakerTrack(options);
+  const completeLifecycleRequired = requireCompleteLifecycle(options);
+  const gaps = [
+    summary.leave_available === true ? undefined : signalGap(
+      'warning',
+      'missing_leave_control_signal',
+      'meeting_leave_available',
+      'Current meeting evidence did not expose a leave/end control; end-axis capture may need provider or native fallback.',
+    ),
+    summary.participants_available === true && summary.participant_roster_observed === true ? undefined : signalGap(
+      'info',
+      'missing_participant_roster_signal',
+      'participant_roster_observed',
+      'Current meeting evidence did not expose a stable participant roster; participant markers may be partial.',
+    ),
+    summary.active_speaker_observed === true ? undefined : signalGap(
+      speakerRequired ? 'error' : 'warning',
+      'missing_active_speaker_signal',
+      'active_speaker_candidate',
+      speakerRequired
+        ? 'Speaker tracking is required but current meeting evidence did not expose an active-speaker signal.'
+        : 'Current meeting evidence did not expose an active-speaker signal; speaker markers may need audio/native fallback.',
+    ),
+    completeLifecycleRequired && summary.leave_available !== true ? signalGap(
+      'error',
+      'missing_lifecycle_end_control_signal',
+      'meeting_leave_available',
+      'Complete lifecycle validation is required but current evidence does not expose a leave/end control.',
+    ) : undefined,
+  ].filter(Boolean);
+  return uniqueSignalGaps(gaps);
+}
+
+function controlSignalGapSummary(gaps = []) {
+  const normalized = asArray(gaps).filter(Boolean);
+  if (!normalized.length) {
+    return {
+      gap_count: 0,
+      blocking_count: 0,
+      warning_count: 0,
+      info_count: 0,
+      codes: [],
+    };
+  }
+  return {
+    gap_count: normalized.length,
+    blocking_count: normalized.filter((gap) => gap.severity === 'error').length,
+    warning_count: normalized.filter((gap) => gap.severity === 'warning').length,
+    info_count: normalized.filter((gap) => gap.severity === 'info').length,
+    codes: unique(normalized.map((gap) => gap.code)),
+  };
+}
+
+function uniqueSignalGaps(gaps = []) {
+  const seen = new Set();
+  return gaps.filter((gap) => {
+    const key = `${gap.severity}:${gap.code}:${gap.signal}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function looksLikeControlSignalSummary(value = {}) {
+  if (!isPlainObject(value)) return false;
+  return [
+    'signal_types',
+    'signal_count',
+    'join_available',
+    'waiting_room',
+    'leave_available',
+    'microphone_available',
+    'camera_available',
+    'screen_share_available',
+    'screen_share_active',
+    'captions_available',
+    'recording_observed',
+    'participants_available',
+    'chat_available',
+    'ai_summary_available',
+    'active_speaker_observed',
+    'participant_roster_observed',
+  ].some((key) => value[key] != null);
+}
+
+export function buildMeetingPlatformAdapterControlSignalGaps(input = {}, options = {}) {
+  const candidate = firstNonEmpty(
+    input.control_signal_summary,
+    input.controlSignalSummary,
+    input.capture?.control_signal_summary,
+    input.capture?.controlSignalSummary,
+    input.current_window?.control_signal_summary,
+    input.currentWindow?.controlSignalSummary,
+    input.page?.control_signal_summary,
+    input.page?.controlSignalSummary,
+    input.dom?.control_signal_summary,
+    input.dom?.controlSignalSummary,
+    looksLikeControlSignalSummary(input) ? input : undefined,
+  );
+  const summary = looksLikeControlSignalSummary(candidate) ? candidate : undefined;
+  const gaps = controlSignalGapsFromSummary(summary, options);
+  return compactObject({
+    type: 'meeting_platform_adapter_control_signal_gaps',
+    schema: 'meeting_platform_adapter_control_signal_gaps',
+    gap_count: gaps.length,
+    summary: controlSignalGapSummary(gaps),
+    gaps,
+  });
+}
+
 function buildDomDiagnosis(platform, input = {}, options = {}) {
   if (!MEETING_APP_FIXTURE_PLATFORMS.includes(platform)) {
     return {
@@ -865,6 +987,8 @@ function rankedCandidateEntries(candidates = [], preflights = []) {
 }
 
 function candidateRow(candidate = {}, preflight = {}, selected = false, selection = {}) {
+  const controlSignalGaps = preflight.capture?.control_signal_gaps ?? preflight.current_window?.control_signal_gaps;
+  const controlSignalGapSummary = preflight.capture?.control_signal_gap_summary ?? preflight.current_window?.control_signal_gap_summary;
   return compactObject({
     candidate_index: candidate.candidate_index,
     selection_rank: selection.rank,
@@ -895,6 +1019,10 @@ function candidateRow(candidate = {}, preflight = {}, selected = false, selectio
     interaction_pre_join: preflight.capture?.interaction?.pre_join ?? preflight.current_window?.interaction?.pre_join,
     semantic_signal_types: preflight.capture?.semantic_signal_types ?? preflight.current_window?.semantic_signal_types,
     control_signal_summary: preflight.capture?.control_signal_summary ?? preflight.current_window?.control_signal_summary,
+    control_signal_gaps: controlSignalGaps,
+    control_signal_gap_summary: controlSignalGapSummary,
+    control_signal_gap_count: controlSignalGapSummary?.gap_count,
+    control_signal_gap_codes: controlSignalGapSummary?.codes,
     active_speaker_candidate_id: preflight.capture?.active_speaker_candidate?.id ?? preflight.current_window?.active_speaker_candidate?.id,
     active_speaker_candidate_name: preflight.capture?.active_speaker_candidate?.name ?? preflight.current_window?.active_speaker_candidate?.name,
     issue_codes: (preflight.issues ?? []).map((issue) => issue.code),
@@ -952,6 +1080,8 @@ export function buildMeetingPlatformAdapterCurrentWindowPreflight(input = {}, op
   const objectInput = normalizeInput(input);
   const capturedSnapshot = captureMeetingAppDomSnapshot(objectInput, currentWindowCaptureOptions(options));
   const captureSummary = capturedSnapshotSummary(capturedSnapshot);
+  const controlSignalGaps = controlSignalGapsFromSummary(captureSummary.control_signal_summary, options);
+  const controlSignalGapSummaryValue = controlSignalGapSummary(controlSignalGaps);
   const preflight = buildMeetingPlatformAdapterPreflight(
     currentWindowInput(objectInput, capturedSnapshot, options),
     withoutEvidenceOptions(options),
@@ -970,6 +1100,8 @@ export function buildMeetingPlatformAdapterCurrentWindowPreflight(input = {}, op
       interaction: captureSummary.interaction,
       semantic_signal_types: captureSummary.semantic_signal_types,
       control_signal_summary: captureSummary.control_signal_summary,
+      control_signal_gaps: controlSignalGaps.length ? controlSignalGaps : undefined,
+      control_signal_gap_summary: controlSignalGapSummaryValue,
       active_speaker_candidate: captureSummary.active_speaker_candidate,
     },
     summary: {
@@ -978,9 +1110,15 @@ export function buildMeetingPlatformAdapterCurrentWindowPreflight(input = {}, op
       current_window_interaction: captureSummary.interaction,
       current_window_semantic_signal_types: captureSummary.semantic_signal_types,
       current_window_control_signal_summary: captureSummary.control_signal_summary,
+      current_window_control_signal_gaps: controlSignalGaps.length ? controlSignalGaps : undefined,
+      current_window_control_signal_gap_summary: controlSignalGapSummaryValue,
       current_window_active_speaker_candidate: captureSummary.active_speaker_candidate,
     },
-    capture: captureSummary,
+    capture: {
+      ...captureSummary,
+      control_signal_gaps: controlSignalGaps.length ? controlSignalGaps : undefined,
+      control_signal_gap_summary: controlSignalGapSummaryValue,
+    },
     captured_snapshot: options.includeCapturedSnapshot === true || options.include_captured_snapshot === true
       ? capturedSnapshot
       : undefined,
@@ -1024,6 +1162,8 @@ export function buildMeetingPlatformAdapterPreflightMatrix(input = {}, options =
       meeting_start_ready: preflight.readiness?.meeting_start_ready === true,
       meeting_end_ready: preflight.readiness?.meeting_end_ready === true,
       speaker_track_ready: preflight.readiness?.speaker_track_ready === true,
+      control_signal_gap_count: preflight.summary?.current_window_control_signal_gap_summary?.gap_count,
+      control_signal_gap_codes: preflight.summary?.current_window_control_signal_gap_summary?.codes,
       issue_codes: (preflight.issues ?? []).map((issue) => issue.code),
       first_next_action: preflight.next_actions?.[0],
     })),

@@ -389,6 +389,8 @@ function selectedEvidence(candidatePreflight = {}) {
   const interaction = capture.interaction ?? currentWindow.interaction;
   const activeSpeaker = capture.active_speaker_candidate ?? currentWindow.active_speaker_candidate;
   const controlSignalSummary = capture.control_signal_summary ?? currentWindow.control_signal_summary ?? row.control_signal_summary;
+  const controlSignalGaps = capture.control_signal_gaps ?? currentWindow.control_signal_gaps ?? row.control_signal_gaps;
+  const controlSignalGapSummary = capture.control_signal_gap_summary ?? currentWindow.control_signal_gap_summary ?? row.control_signal_gap_summary;
   const semanticSignalTypes = unique([
     ...(capture.semantic_signal_types ?? []),
     ...(currentWindow.semantic_signal_types ?? []),
@@ -407,6 +409,8 @@ function selectedEvidence(candidatePreflight = {}) {
     interaction_pre_join: row.interaction_pre_join ?? interaction?.pre_join,
     semantic_signal_types: semanticSignalTypes.length ? semanticSignalTypes : undefined,
     control_signal_summary: controlSignalSummary,
+    control_signal_gaps: controlSignalGaps,
+    control_signal_gap_summary: controlSignalGapSummary,
     active_speaker_candidate: activeSpeaker ? compactObject({
       id: activeSpeaker.id ?? row.active_speaker_candidate_id,
       name: activeSpeaker.name ?? row.active_speaker_candidate_name,
@@ -450,6 +454,8 @@ function candidateLaunchInput(candidatePreflight = {}, input = {}, options = {})
     interaction: evidence.interaction,
     semantic_signal_types: evidence.semantic_signal_types,
     control_signal_summary: evidence.control_signal_summary,
+    control_signal_gaps: evidence.control_signal_gaps,
+    control_signal_gap_summary: evidence.control_signal_gap_summary,
     active_speaker_candidate: evidence.active_speaker_candidate,
     preflight_evidence: evidence,
   });

@@ -181,6 +181,8 @@ function observeInputFor(input = {}) {
     interaction: evidence?.interaction,
     semantic_signal_types: evidence?.semantic_signal_types,
     control_signal_summary: evidence?.control_signal_summary,
+    control_signal_gaps: evidence?.control_signal_gaps,
+    control_signal_gap_summary: evidence?.control_signal_gap_summary,
     active_speaker_candidate: evidence?.active_speaker_candidate,
     preflight_evidence: evidence,
   }) : undefined;

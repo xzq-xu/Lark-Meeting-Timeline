@@ -61,6 +61,23 @@ export interface MeetingPlatformAdapterPreflightActiveSpeakerCandidate {
   [key: string]: unknown;
 }
 
+export interface MeetingPlatformAdapterControlSignalGap {
+  severity: 'error' | 'warning' | 'info' | string;
+  code: string;
+  signal: string;
+  message: string;
+  [key: string]: unknown;
+}
+
+export interface MeetingPlatformAdapterControlSignalGapSummary {
+  gap_count: number;
+  blocking_count: number;
+  warning_count: number;
+  info_count: number;
+  codes: string[];
+  [key: string]: unknown;
+}
+
 export interface MeetingPlatformAdapterCurrentWindowSummary {
   captured?: boolean;
   capture_schema?: string;
@@ -73,6 +90,8 @@ export interface MeetingPlatformAdapterCurrentWindowSummary {
   interaction?: MeetingAppDomInteractionState;
   semantic_signal_types?: string[];
   control_signal_summary?: MeetingAppDomControlSignalSummary;
+  control_signal_gaps?: MeetingPlatformAdapterControlSignalGap[];
+  control_signal_gap_summary?: MeetingPlatformAdapterControlSignalGapSummary;
   active_speaker_candidate?: MeetingPlatformAdapterPreflightActiveSpeakerCandidate;
   [key: string]: unknown;
 }
@@ -92,9 +111,19 @@ export interface MeetingPlatformAdapterPreflightCaptureSummary {
   semantic_signal_count?: number;
   semantic_signal_types?: string[];
   control_signal_summary?: MeetingAppDomControlSignalSummary;
+  control_signal_gaps?: MeetingPlatformAdapterControlSignalGap[];
+  control_signal_gap_summary?: MeetingPlatformAdapterControlSignalGapSummary;
   interaction?: MeetingAppDomInteractionState;
   active_speaker_candidate?: MeetingPlatformAdapterPreflightActiveSpeakerCandidate;
   [key: string]: unknown;
+}
+
+export interface MeetingPlatformAdapterControlSignalGapReport {
+  type: 'meeting_platform_adapter_control_signal_gaps';
+  schema: 'meeting_platform_adapter_control_signal_gaps';
+  gap_count: number;
+  summary: MeetingPlatformAdapterControlSignalGapSummary;
+  gaps: MeetingPlatformAdapterControlSignalGap[];
 }
 
 export interface MeetingPlatformAdapterPreflight {
@@ -180,6 +209,11 @@ export function buildMeetingPlatformAdapterCandidatePreflight(
   input?: MeetingPlatformAdapterDecisionInput | MeetingPlatformAdapterDecisionInput[] | Record<string, unknown>,
   options?: MeetingPlatformAdapterPreflightOptions,
 ): MeetingPlatformAdapterCandidatePreflight;
+
+export function buildMeetingPlatformAdapterControlSignalGaps(
+  input?: MeetingAppDomControlSignalSummary | Record<string, unknown>,
+  options?: MeetingPlatformAdapterPreflightOptions,
+): MeetingPlatformAdapterControlSignalGapReport;
 
 export function assertMeetingPlatformAdapterCurrentWindowPreflight(
   input?: MeetingAppDomCaptureInput | Document | MeetingPlatformAdapterDecisionInput,

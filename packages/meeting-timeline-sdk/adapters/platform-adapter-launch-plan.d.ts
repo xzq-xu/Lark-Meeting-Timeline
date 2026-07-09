@@ -3,6 +3,10 @@ import type {
   MeetingAppDomControlSignalSummary,
   MeetingAppDomInteractionState,
 } from './meeting-app-capture.mjs';
+import type {
+  MeetingPlatformAdapterControlSignalGap,
+  MeetingPlatformAdapterControlSignalGapSummary,
+} from './platform-adapter-preflight.mjs';
 
 export const MEETING_PLATFORM_ADAPTER_LAUNCH_PLAN_SCHEMA: 'meeting_platform_adapter_launch_plan';
 export const MEETING_PLATFORM_ADAPTER_CANDIDATE_LAUNCH_PLAN_SCHEMA: 'meeting_platform_adapter_candidate_launch_plan';
@@ -61,6 +65,8 @@ export interface MeetingPlatformAdapterLaunchEvidence {
   interaction_pre_join?: boolean;
   semantic_signal_types?: string[];
   control_signal_summary?: MeetingAppDomControlSignalSummary;
+  control_signal_gaps?: MeetingPlatformAdapterControlSignalGap[];
+  control_signal_gap_summary?: MeetingPlatformAdapterControlSignalGapSummary;
   active_speaker_candidate?: {
     id?: string;
     name?: string;

@@ -8,6 +8,7 @@ import {
   assertMeetingPlatformAdapterCurrentWindowPreflight,
   assertMeetingPlatformAdapterPreflight,
   assertMeetingPlatformAdapterPreflightMatrix,
+  buildMeetingPlatformAdapterControlSignalGaps,
   buildMeetingPlatformAdapterCandidatePreflight,
   buildMeetingPlatformAdapterCurrentWindowPreflight,
   buildMeetingPlatformAdapterPreflight,
@@ -169,6 +170,8 @@ assert.equal(googleCurrentWindow.capture.control_signal_summary.leave_available,
 assert.equal(googleCurrentWindow.current_window.control_signal_summary.screen_share_active, true);
 assert.equal(googleCurrentWindow.summary.current_window_interaction.screen_share_active, true);
 assert.equal(googleCurrentWindow.summary.current_window_control_signal_summary.active_speaker_observed, true);
+assert.equal(googleCurrentWindow.current_window.control_signal_gap_summary.gap_count, 0);
+assert.deepEqual(googleCurrentWindow.summary.current_window_control_signal_gap_summary.codes, []);
 assert.equal(googleCurrentWindow.current_window.semantic_signal_types.includes('meeting_leave_available'), true);
 assert.equal(googleCurrentWindow.current_window.semantic_signal_types.includes('active_speaker_candidate'), true);
 assert.equal(googleCurrentWindow.readiness.realtime_annotation_ready, true);
@@ -189,6 +192,35 @@ assert.equal(assertMeetingPlatformAdapterCurrentWindowPreflight({
   baseUrl,
   requireSpeakerTrack: true,
 }).accepted, true);
+
+const missingSpeakerGapReport = buildMeetingPlatformAdapterControlSignalGaps({
+  leave_available: true,
+  participants_available: true,
+}, {
+  requireSpeakerTrack: true,
+});
+assert.equal(missingSpeakerGapReport.gap_count, 2);
+assert.equal(missingSpeakerGapReport.summary.blocking_count, 1);
+assert.equal(missingSpeakerGapReport.gaps.some((gap) => gap.code === 'missing_active_speaker_signal'), true);
+assert.equal(buildMeetingPlatformAdapterControlSignalGaps({}).gap_count, 0);
+
+const partialCurrentWindow = buildMeetingPlatformAdapterCurrentWindowPreflight({
+  document: fakeDocument({
+    url: 'https://meet.google.com/abc-defg-hij',
+    title: 'Partial Google Meet',
+    nodes: [
+      node('button', { 'aria-label': 'Leave call' }),
+      node('button', { 'aria-label': 'Turn off microphone' }),
+    ],
+  }),
+}, {
+  baseUrl,
+  requireSpeakerTrack: true,
+});
+assert.equal(partialCurrentWindow.accepted, false);
+assert.equal(partialCurrentWindow.current_window.control_signal_gap_summary.blocking_count, 1);
+assert.equal(partialCurrentWindow.current_window.control_signal_gaps.some((gap) => gap.code === 'missing_active_speaker_signal'), true);
+assert.equal(partialCurrentWindow.summary.current_window_control_signal_gap_summary.codes.includes('missing_active_speaker_signal'), true);
 
 const googleLifecycle = buildMeetingPlatformAdapterPreflight({
   platform: 'google-meet',
@@ -407,6 +439,8 @@ assert.equal(candidatePreflight.rows[2].interaction_in_call, true);
 assert.equal(candidatePreflight.rows[2].interaction_can_leave, true);
 assert.equal(candidatePreflight.rows[2].semantic_signal_types.includes('participants_control'), true);
 assert.equal(candidatePreflight.rows[2].control_signal_summary.participants_available, true);
+assert.equal(candidatePreflight.rows[2].control_signal_gap_summary.gap_count, 0);
+assert.deepEqual(candidatePreflight.rows[2].control_signal_gap_codes, []);
 assert.equal(candidatePreflight.rows[2].active_speaker_candidate_name, 'Mira Patel');
 assert.equal(candidatePreflight.rows[2].selected, true);
 assert.equal(candidatePreflight.rows[2].selection_rank, 1);

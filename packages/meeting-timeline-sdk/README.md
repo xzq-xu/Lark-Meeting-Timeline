@@ -238,7 +238,7 @@ const viewModel = runtime.timelineView('google-meet', {
 
 浏览器扩展或 WebView preload 可以再包一层 `createMeetingPlatformIntegrationBrowserRuntime()`。它会从当前 `window.location`/DOM capture profile 自动识别 Google Meet、Teams、Zoom、Webex、Lark，然后把 content-script sample、provider event 和手写标注路由到同一个 integration runtime：
 
-`meeting-app-capture` 的 DOM snapshot 不只是保存按钮和参会人节点列表，也会输出低成本语义层：`semanticSignals`、`semanticSignalTypes`、`controlSignalSummary` 和 `interaction`。它会从控件、状态文本、参与人 tile 或 aria-label 里识别 `meeting_join_available`、`meeting_leave_available`、`active_speaker_candidate`、`screen_share_active`、`captions_control`、`recording_indicator` 等信号，并同步给出 `page.inMeeting`、`page.interaction.can_leave`、`page.interaction.pre_join`、`page.interaction.active_speaker_candidate`。`controlSignalSummary` 会把 join/leave/mic/camera/share/participants/chat/AI/speaker 等命中压成布尔摘要，方便扩展 popup、接入日志和 preflight 排查直接展示。provider webhook 与会后 transcript 仍然只做校准或回填。
+`meeting-app-capture` 的 DOM snapshot 不只是保存按钮和参会人节点列表，也会输出低成本语义层：`semanticSignals`、`semanticSignalTypes`、`controlSignalSummary` 和 `interaction`。它会从控件、状态文本、参与人 tile 或 aria-label 里识别 `meeting_join_available`、`meeting_leave_available`、`active_speaker_candidate`、`screen_share_active`、`captions_control`、`recording_indicator` 等信号，并同步给出 `page.inMeeting`、`page.interaction.can_leave`、`page.interaction.pre_join`、`page.interaction.active_speaker_candidate`。`controlSignalSummary` 会把 join/leave/mic/camera/share/participants/chat/AI/speaker 等命中压成布尔摘要，方便扩展 popup、接入日志和 preflight 排查直接展示。`platform-adapter-preflight` 会进一步把摘要转成 `control_signal_gaps` / `control_signal_gap_summary`，例如 `missing_leave_control_signal`、`missing_active_speaker_signal`、`missing_participant_roster_signal`。这些缺口是诊断字段，不会替代实时 gate：Google Meet、Teams、Zoom、Webex、Lark 的本地轴可以继续按 `captured_at_ms` 插标，同时接入面板能明确显示“当前平台还缺哪类真实 DOM/native 证据”。provider webhook 与会后 transcript 仍然只做校准或回填。
 
 ```js
 import {
@@ -262,6 +262,20 @@ await browserRuntime.handleMessage({
     },
   },
 });
+```
+
+如果下游已经有一份 DOM capture 或压缩后的 `controlSignalSummary`，不需要重跑完整 preflight，也可以直接算缺口：
+
+```js
+import {
+  buildMeetingPlatformAdapterControlSignalGaps,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight';
+
+const gaps = buildMeetingPlatformAdapterControlSignalGaps(capture, {
+  requireSpeakerTrack: true,
+});
+
+// gaps.summary.codes 可以直接渲染到多会议平台适配面板。
 ```
 
 如果注入点就是浏览器扩展 content script，可以直接安装平台版 bridge。它会创建 browser runtime、监听 extension message，并保留平台检测状态，background 或 native host 只需要发送统一的 `meeting_timeline.insert_mark` / `meeting_timeline.sample` 消息：
