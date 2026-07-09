@@ -56,18 +56,20 @@ export interface MeetingPlatformAdapterOpenSessionEvent {
   action: 'open_session' | string;
   platform?: string;
   selected_surface?: string;
-  plan_kind?: 'launch_plan' | 'runtime_target';
+  plan_kind?: 'launch_plan' | 'candidate_launch_plan' | 'runtime_target';
   payload: {
     launch_plan?: MeetingPlatformAdapterLaunchPlan;
+    candidate_launch_plan?: MeetingPlatformAdapterCandidateLaunchPlan;
     runtime_target?: MeetingPlatformAdapterRuntimeTarget;
     session: {
       schema: 'meeting_platform_adapter_session';
       id: string;
-      plan_kind?: 'launch_plan' | 'runtime_target' | 'unknown';
+      plan_kind?: 'launch_plan' | 'candidate_launch_plan' | 'runtime_target' | 'unknown';
       platform?: string;
       selected_surface?: string;
       host_kind?: string;
       bridge_kind?: string;
+      selected_evidence?: Record<string, unknown>;
     };
     adapter_selection_event?: MeetingPlatformAdapterSessionEvent;
     raw_signal_event?: MeetingPlatformAdapterSessionEvent;
@@ -119,7 +121,7 @@ export interface MeetingPlatformAdapterRunnerHandoff {
 }
 
 export function createMeetingPlatformAdapterRunner(
-  manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterRuntimeManifest | MeetingPlatformAdapterRuntimeTarget | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>,
+  manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterRuntimeManifest | MeetingPlatformAdapterRuntimeTarget | MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterCandidateLaunchPlan | Record<string, unknown>,
   clientOrOptions?: MeetingPlatformAdapterSessionClient | MeetingPlatformAdapterRunnerOptions,
   options?: MeetingPlatformAdapterRunnerOptions,
 ): MeetingPlatformAdapterRunner;
@@ -139,6 +141,6 @@ export function openMeetingPlatformAdapterRuntimeSession(
 ): Promise<MeetingPlatformAdapterOpenSessionEvent>;
 
 export function buildMeetingPlatformAdapterRunnerHandoff(
-  manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterRuntimeManifest | MeetingPlatformAdapterRuntimeTarget | MeetingPlatformAdapterLaunchPlan | Record<string, unknown>,
+  manifestOrInput?: MeetingPlatformAdapterInstallManifest | MeetingPlatformAdapterRuntimeManifest | MeetingPlatformAdapterRuntimeTarget | MeetingPlatformAdapterLaunchPlan | MeetingPlatformAdapterCandidateLaunchPlan | Record<string, unknown>,
   options?: MeetingPlatformAdapterRunnerOptions,
 ): MeetingPlatformAdapterRunnerHandoff;

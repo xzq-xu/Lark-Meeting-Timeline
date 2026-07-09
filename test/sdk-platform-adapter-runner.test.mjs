@@ -10,6 +10,7 @@ import {
   buildMeetingPlatformAdapterInstallManifest,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-install-manifest.mjs';
 import {
+  buildMeetingPlatformAdapterCandidateLaunchPlan,
   buildMeetingPlatformAdapterLaunchPlan,
 } from '../packages/meeting-timeline-sdk/adapters/platform-adapter-launch-plan.mjs';
 import {
@@ -30,6 +31,83 @@ import {
 } from '../packages/meeting-timeline-sdk/index.mjs';
 
 const baseUrl = 'https://timeline.example.com';
+
+function node(tagName, attrs = {}, text = '') {
+  return {
+    tagName: tagName.toUpperCase(),
+    attributes: attrs,
+    dataset: Object.fromEntries(Object.entries(attrs)
+      .filter(([key]) => key.startsWith('data-'))
+      .map(([key, value]) => [
+        key.slice(5).replace(/-([a-z])/g, (_, char) => char.toUpperCase()),
+        value,
+      ])),
+    innerText: text,
+    textContent: text,
+    getAttribute(name) {
+      return attrs[name] ?? null;
+    },
+  };
+}
+
+function selectorAttrMatches(item, selector) {
+  if (selector === 'button') return item.tagName === 'BUTTON';
+  const attrParts = [...String(selector).matchAll(/\[([a-zA-Z0-9_-]+)([*]?=)?(?:"([^"]*)"|'([^']*)'|([^\]\s]+))?(?:\s+i)?\]/g)];
+  if (!attrParts.length) return false;
+  return attrParts.every((match) => {
+    const [, attrName, operator, doubleQuoted, singleQuoted, bare] = match;
+    const actual = item.attributes[attrName];
+    if (operator == null) return actual != null;
+    if (actual == null) return false;
+    const expected = doubleQuoted ?? singleQuoted ?? bare ?? '';
+    if (operator === '*=') return String(actual).toLowerCase().includes(String(expected).toLowerCase());
+    return String(actual) === String(expected);
+  });
+}
+
+function queryNodes(nodes, selector) {
+  const text = String(selector);
+  if (text === '*') return nodes;
+  const generic = nodes.filter((item) => selectorAttrMatches(item, text));
+  if (generic.length) return generic;
+  if (text.includes('speaking')) {
+    return nodes.filter((item) => /speaking|active speaker|正在发言|正在讲话|正在说话/i.test(item.attributes['aria-label'] ?? ''));
+  }
+  if (text.includes('aria-live')) return nodes.filter((item) => item.attributes['aria-live']);
+  if (text.includes('role="status"')) return nodes.filter((item) => item.attributes.role === 'status');
+  return [];
+}
+
+function fakeDocument({ url, title, nodes = [] }) {
+  return {
+    nodeType: 9,
+    title,
+    hidden: false,
+    location: { href: url },
+    querySelectorAll(selector) {
+      return queryNodes(nodes, selector);
+    },
+  };
+}
+
+function liveMeetCandidate(title = 'Candidate runner review') {
+  return {
+    active: true,
+    document: fakeDocument({
+      url: 'https://meet.google.com/abc-defg-hij',
+      title,
+      nodes: [
+        node('button', { 'aria-label': 'Leave call' }),
+        node('button', { 'aria-label': 'Turn off microphone' }),
+        node('div', {
+          'data-participant-id': 'ada',
+          'aria-label': 'Ada Lovelace is speaking',
+        }),
+      ],
+    }),
+  };
+}
+
 const exportMatrix = buildMeetingPlatformAdapterExportPackageMatrix({
   platforms: ['google-meet', 'zoom'],
 }, {
@@ -151,6 +229,56 @@ await assert.rejects(
 );
 await runner.observeAxis({ platform: 'zoom' });
 assert.equal((await runner.insertAnnotation({ label: 'after manual observe' })).payload.platform, 'zoom');
+
+const candidateCalls = [];
+const candidateClient = {
+  async platformRawSignalBatch(payload) {
+    candidateCalls.push(['platformRawSignalBatch', payload]);
+    return { ok: true };
+  },
+  async observePlatformCandidates(payload) {
+    candidateCalls.push(['observePlatformCandidates', payload]);
+    return { ok: true };
+  },
+  async insertAnnotation(platform, payload) {
+    candidateCalls.push(['insertAnnotation', platform, payload]);
+    return { ok: true };
+  },
+};
+const candidateRunner = createMeetingPlatformAdapterRunner(manifest, candidateClient, {
+  clock: () => 1_782_700_000_456,
+});
+const candidateOpened = await candidateRunner.openCandidate({
+  candidates: [liveMeetCandidate()],
+}, {
+  requireSpeakerTrack: true,
+});
+assert.equal(candidateOpened.plan_kind, 'candidate_launch_plan');
+assert.equal(candidateOpened.payload.candidate_launch_plan.schema, 'meeting_platform_adapter_candidate_launch_plan');
+assert.equal(candidateOpened.payload.session.plan_kind, 'candidate_launch_plan');
+assert.equal(candidateOpened.payload.session.selected_evidence.interaction_can_leave, true);
+assert.equal(candidateOpened.payload.observe_event.payload.preflight_evidence.active_speaker_candidate.name, 'Ada Lovelace');
+assert.equal(candidateOpened.payload.observe_event.payload.candidates[0].semantic_signal_types.includes('meeting_leave_available'), true);
+assert.equal(candidateRunner.getState().current_session.plan_kind, 'candidate_launch_plan');
+assert.equal(candidateCalls[0][0], 'platformRawSignalBatch');
+assert.equal(candidateCalls[1][0], 'observePlatformCandidates');
+const candidateInserted = await candidateRunner.insertAnnotation({ label: 'candidate runner mark' });
+assert.equal(candidateInserted.payload.preflight_evidence.interaction_can_leave, true);
+assert.equal(candidateCalls[2][0], 'insertAnnotation');
+
+const initialCandidateLaunchPlan = buildMeetingPlatformAdapterCandidateLaunchPlan(manifest, {
+  candidates: [liveMeetCandidate('Initial candidate runner review')],
+}, {
+  requireSpeakerTrack: true,
+  capturedAtMs: 1_782_700_000_789,
+});
+const initializedCandidateRunner = createMeetingPlatformAdapterRunner(initialCandidateLaunchPlan, candidateClient, {
+  clock: () => 1_782_700_000_790,
+});
+const initializedCandidateOpened = await initializedCandidateRunner.open();
+assert.equal(initializedCandidateOpened.plan_kind, 'candidate_launch_plan');
+assert.equal(initializedCandidateOpened.payload.session.plan_kind, 'candidate_launch_plan');
+assert.equal(initializedCandidateOpened.payload.observe_event.payload.preflight_evidence.accepted, true);
 
 const directOpened = await openMeetingPlatformAdapterSession(manifest, adapterClient, {
   url: 'https://meet.google.com/abc-defg-hij',

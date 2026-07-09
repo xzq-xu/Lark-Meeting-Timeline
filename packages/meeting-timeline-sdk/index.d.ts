@@ -541,30 +541,30 @@ export interface MeetingAppTimelineSdk {
   ): import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterCandidateLaunchPlan;
   assertAdapterCandidateLaunchPlan: MeetingAppTimelineSdk['assertPlatformAdapterCandidateLaunchPlan'];
   platformAdapterSession(
-    launchPlanOrInput?: import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | Record<string, unknown>,
+    launchPlanOrInput?: import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterCandidateLaunchPlan | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | Record<string, unknown>,
     clientOrOptions?: import('./adapters/platform-adapter-session.mjs').MeetingPlatformAdapterSessionClient | import('./adapters/platform-adapter-session.mjs').MeetingPlatformAdapterSessionOptions,
     options?: import('./adapters/platform-adapter-session.mjs').MeetingPlatformAdapterSessionOptions,
   ): import('./adapters/platform-adapter-session.mjs').MeetingPlatformAdapterSession;
   adapterSession: MeetingAppTimelineSdk['platformAdapterSession'];
   platformAdapterSessionHandoff(
-    launchPlanOrInput?: import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | Record<string, unknown>,
+    launchPlanOrInput?: import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterCandidateLaunchPlan | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | Record<string, unknown>,
     options?: import('./adapters/platform-adapter-session.mjs').MeetingPlatformAdapterSessionOptions,
   ): import('./adapters/platform-adapter-session.mjs').MeetingPlatformAdapterSessionHandoff;
   adapterSessionHandoff: MeetingAppTimelineSdk['platformAdapterSessionHandoff'];
   platformAdapterRunner(
-    manifestOrInput?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | Record<string, unknown>,
+    manifestOrInput?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterCandidateLaunchPlan | Record<string, unknown>,
     clientOrOptions?: import('./adapters/platform-adapter-session.mjs').MeetingPlatformAdapterSessionClient | import('./adapters/platform-adapter-runner.mjs').MeetingPlatformAdapterRunnerOptions,
     options?: import('./adapters/platform-adapter-runner.mjs').MeetingPlatformAdapterRunnerOptions,
   ): import('./adapters/platform-adapter-runner.mjs').MeetingPlatformAdapterRunner;
   adapterRunner: MeetingAppTimelineSdk['platformAdapterRunner'];
   openPlatformAdapterSession(
-    manifestOrInput?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | Record<string, unknown>,
-    launchInput?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | Record<string, unknown> | string | URL,
+    manifestOrInput?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterCandidateLaunchPlan | Record<string, unknown>,
+    launchInput?: import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterCandidateLaunchPlan | Record<string, unknown> | string | URL,
     options?: import('./adapters/platform-adapter-runner.mjs').MeetingPlatformAdapterRunnerOptions,
   ): Promise<import('./adapters/platform-adapter-runner.mjs').MeetingPlatformAdapterOpenSessionEvent>;
   openAdapterSession: MeetingAppTimelineSdk['openPlatformAdapterSession'];
   platformAdapterRunnerHandoff(
-    manifestOrInput?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | Record<string, unknown>,
+    manifestOrInput?: import('./adapters/platform-adapter-install-manifest.mjs').MeetingPlatformAdapterInstallManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeManifest | import('./adapters/platform-adapter-runtime-recipe.mjs').MeetingPlatformAdapterRuntimeTarget | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterLaunchPlan | import('./adapters/platform-adapter-launch-plan.mjs').MeetingPlatformAdapterCandidateLaunchPlan | Record<string, unknown>,
     options?: import('./adapters/platform-adapter-runner.mjs').MeetingPlatformAdapterRunnerOptions,
   ): import('./adapters/platform-adapter-runner.mjs').MeetingPlatformAdapterRunnerHandoff;
   adapterRunnerHandoff: MeetingAppTimelineSdk['platformAdapterRunnerHandoff'];

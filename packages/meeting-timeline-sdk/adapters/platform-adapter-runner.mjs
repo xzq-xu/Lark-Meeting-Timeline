@@ -174,32 +174,49 @@ function observeInputFor(input = {}) {
     });
   }
   if (!isCandidateLaunchPlan(input)) return input;
+  const evidence = input.selected_evidence ?? input.launch_input?.preflight_evidence;
+  const selectedCandidate = input.selected_candidate ? compactObject({
+    ...input.selected_candidate,
+    in_meeting: evidence?.interaction_in_call ?? evidence?.interaction?.in_call,
+    interaction: evidence?.interaction,
+    semantic_signal_types: evidence?.semantic_signal_types,
+    active_speaker_candidate: evidence?.active_speaker_candidate,
+    preflight_evidence: evidence,
+  }) : undefined;
   return compactObject({
     platform: input.platform,
     url: input.selected_candidate?.url,
     title: input.selected_candidate?.title,
     active: input.selected_candidate?.active,
-    candidates: input.selected_candidate ? [input.selected_candidate] : undefined,
+    candidates: selectedCandidate ? [selectedCandidate] : undefined,
+    preflight_evidence: evidence,
     captured_at_ms: input.launch_input?.captured_at_ms ?? input.launch_input?.capturedAtMs,
   });
 }
 
 function event(action, runner, payload = {}, result) {
+  const plan = payload.candidate_launch_plan ?? payload.runtime_target ?? payload.launch_plan;
+  const planKind = payload.candidate_launch_plan
+    ? 'candidate_launch_plan'
+    : payload.runtime_target
+      ? 'runtime_target'
+      : 'launch_plan';
   return compactObject({
     type: 'meeting_platform_adapter_open_session_event',
     schema: MEETING_PLATFORM_ADAPTER_OPEN_SESSION_EVENT_SCHEMA,
     schema_version: MEETING_PLATFORM_ADAPTER_RUNNER_SCHEMA_VERSION,
     runner_id: runner.id,
     action,
-    platform: payload.runtime_target?.platform ?? payload.launch_plan?.platform,
-    selected_surface: payload.runtime_target?.selected_surface ?? payload.launch_plan?.selected_surface,
-    plan_kind: payload.runtime_target ? 'runtime_target' : 'launch_plan',
+    platform: plan?.platform,
+    selected_surface: plan?.selected_surface,
+    plan_kind: planKind,
     payload,
     result,
     captured_at_ms: payload.observe_event?.captured_at_ms
       ?? payload.raw_signal_event?.captured_at_ms
       ?? payload.adapter_selection_event?.captured_at_ms
       ?? runtimeTargetCapturedAtMs(payload.runtime_target)
+      ?? payload.candidate_launch_plan?.launch_plan?.mark_template?.captured_at_ms
       ?? payload.launch_plan?.mark_template?.captured_at_ms,
   });
 }
@@ -301,6 +318,8 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
       const mergedOptions = { ...defaults, ...openOptions };
       const candidateLaunchPlan = isCandidateLaunchPlan(input)
         ? assertMeetingPlatformAdapterCandidateLaunchPlan(input)
+        : state.current_candidate_launch_plan && isEmptyInput(input)
+          ? state.current_candidate_launch_plan
         : undefined;
       const runtimeTarget = isRuntimeTarget(input)
         ? assertMeetingPlatformAdapterRuntimeTarget(input)
@@ -318,9 +337,13 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
         : state.current_launch_plan && isEmptyInput(input)
           ? state.current_launch_plan
         : assertMeetingPlatformAdapterLaunchPlan(runner.launchPlan(input, mergedOptions));
-      const sessionPlan = runtimeTarget ?? launchPlan;
+      const sessionPlan = runtimeTarget ?? candidateLaunchPlan ?? launchPlan;
       const session = createMeetingPlatformAdapterSession(sessionPlan, client, mergedOptions);
-      const validationInput = runtimeTarget ? observeInputFor(runtimeTarget) : observeInputFor(input);
+      const validationInput = runtimeTarget
+        ? observeInputFor(runtimeTarget)
+        : candidateLaunchPlan
+          ? observeInputFor(candidateLaunchPlan)
+          : observeInputFor(input);
       const adapterSelectionEvent = shouldReadAdapterSelection(mergedOptions)
         ? await session.readAdapterSelection(validationInput, mergedOptions)
         : undefined;
@@ -338,6 +361,7 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
       state.last_session_event = observeEvent;
       state.last_open_event = event('open_session', runner, {
         launch_plan: launchPlan,
+        candidate_launch_plan: candidateLaunchPlan,
         runtime_target: runtimeTarget,
         session: {
           schema: MEETING_PLATFORM_ADAPTER_SESSION_SCHEMA,
@@ -347,6 +371,7 @@ export function createMeetingPlatformAdapterRunner(manifestOrInput = {}, clientO
           selected_surface: session.selected_surface,
           host_kind: session.host_kind,
           bridge_kind: session.bridge_kind,
+          selected_evidence: session.selected_evidence,
         },
         adapter_selection_event: adapterSelectionEvent,
         raw_signal_event: rawSignalEvent,
