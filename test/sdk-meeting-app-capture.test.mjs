@@ -142,6 +142,11 @@ assert.equal(captured.page.interaction.can_leave, true);
 assert.equal(captured.page.interaction.microphone_control_available, true);
 assert.equal(captured.page.interaction.screen_share_active, true);
 assert.equal(captured.page.interaction.active_speaker_candidate.id, 'ada');
+assert.equal(captured.semanticSignalTypes.includes('meeting_leave_available'), true);
+assert.equal(captured.controlSignalSummary.leave_available, true);
+assert.equal(captured.controlSignalSummary.microphone_available, true);
+assert.equal(captured.controlSignalSummary.screen_share_active, true);
+assert.equal(captured.capture.control_signal_summary.active_speaker_observed, true);
 assert.ok(captured.page.semanticSignals.some((signal) => signal.type === 'meeting_leave_available'));
 assert.ok(captured.page.semanticSignals.some((signal) => signal.type === 'screen_share_active'));
 
@@ -233,6 +238,7 @@ assert.equal(teamsPrejoin.platform, 'microsoft_teams');
 assert.equal(teamsPrejoin.inMeeting, false);
 assert.equal(teamsPrejoin.page.interaction.pre_join, true);
 assert.equal(teamsPrejoin.page.interaction.can_join, true);
+assert.equal(teamsPrejoin.page.controlSignalSummary.join_available, true);
 assert.ok(teamsPrejoin.page.semanticSignals.some((signal) => signal.type === 'meeting_join_available'));
 
 const zoomCaptured = captureMeetingAppDomSnapshot({
@@ -259,6 +265,7 @@ assert.equal(observed.signals[0].meeting.platform, 'zoom');
 assert.equal(observed.signals[1].speaker_name, 'Mira Patel');
 assert.equal(zoomCaptured.page.interaction.can_leave, true);
 assert.equal(zoomCaptured.page.interaction.participant_roster_observed, true);
+assert.equal(zoomCaptured.page.controlSignalSummary.participants_available, true);
 assert.ok(zoomCaptured.page.semanticSignals.some((signal) => signal.type === 'participants_control'));
 
 const larkCaptured = captureMeetingAppDomSnapshot({
@@ -290,6 +297,7 @@ assert.deepEqual(observed.signals.map((item) => item.type), ['meeting_started', 
 assert.equal(observed.signals[0].meeting.platform, 'lark');
 assert.equal(observed.signals[1].speaker_name, '徐智强');
 assert.equal(larkCaptured.page.interaction.ai_summary_available, true);
+assert.equal(larkCaptured.page.controlSignalSummary.ai_summary_available, true);
 
 const webexCaptured = normalizeCapturedMeetingAppDomSnapshot({
   document: fakeDocument({
@@ -314,6 +322,7 @@ assert.equal(webexCaptured.inMeeting, true);
 assert.equal(webexCaptured.activeSpeaker.id, 'maya');
 assert.equal(webexCaptured.activeSpeaker.name, 'Maya Chen');
 assert.equal(webexCaptured.page.interaction.can_leave, true);
+assert.equal(webexCaptured.page.controlSignalSummary.microphone_available, true);
 
 const calls = [];
 const source = createMeetingSourceAggregator({

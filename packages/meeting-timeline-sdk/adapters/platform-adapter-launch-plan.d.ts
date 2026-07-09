@@ -1,5 +1,6 @@
 import type { MeetingPlatformAdapterInstallManifest } from './platform-adapter-install-manifest.mjs';
 import type {
+  MeetingAppDomControlSignalSummary,
   MeetingAppDomInteractionState,
 } from './meeting-app-capture.mjs';
 
@@ -59,6 +60,7 @@ export interface MeetingPlatformAdapterLaunchEvidence {
   interaction_can_leave?: boolean;
   interaction_pre_join?: boolean;
   semantic_signal_types?: string[];
+  control_signal_summary?: MeetingAppDomControlSignalSummary;
   active_speaker_candidate?: {
     id?: string;
     name?: string;

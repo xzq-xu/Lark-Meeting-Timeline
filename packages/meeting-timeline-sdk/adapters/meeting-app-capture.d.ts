@@ -54,6 +54,26 @@ export interface MeetingAppDomInteractionState {
   [key: string]: unknown;
 }
 
+export interface MeetingAppDomControlSignalSummary {
+  signal_types?: string[];
+  signal_count?: number;
+  join_available?: boolean;
+  waiting_room?: boolean;
+  leave_available?: boolean;
+  microphone_available?: boolean;
+  camera_available?: boolean;
+  screen_share_available?: boolean;
+  screen_share_active?: boolean;
+  captions_available?: boolean;
+  recording_observed?: boolean;
+  participants_available?: boolean;
+  chat_available?: boolean;
+  ai_summary_available?: boolean;
+  active_speaker_observed?: boolean;
+  participant_roster_observed?: boolean;
+  [key: string]: unknown;
+}
+
 export interface MeetingAppDomCaptureOptions extends MeetingAppObserverOptions {
   observedAtMs?: number | string | Date;
   observed_at_ms?: number | string | Date;
@@ -117,10 +137,14 @@ export interface MeetingAppDomCaptureSnapshot extends MeetingAppSnapshot {
   inMeeting?: boolean;
   interaction?: MeetingAppDomInteractionState;
   semanticSignals?: MeetingAppDomSemanticSignal[];
+  semanticSignalTypes?: string[];
+  controlSignalSummary?: MeetingAppDomControlSignalSummary;
   page?: Record<string, unknown> & {
     inMeeting?: boolean;
     interaction?: MeetingAppDomInteractionState;
     semanticSignals?: MeetingAppDomSemanticSignal[];
+    semanticSignalTypes?: string[];
+    controlSignalSummary?: MeetingAppDomControlSignalSummary;
     buttons?: Record<string, unknown>[];
     controls?: Record<string, unknown>[];
     tiles?: Record<string, unknown>[];
@@ -131,6 +155,8 @@ export interface MeetingAppDomCaptureSnapshot extends MeetingAppSnapshot {
     inMeeting?: boolean;
     interaction?: MeetingAppDomInteractionState;
     semanticSignals?: MeetingAppDomSemanticSignal[];
+    semanticSignalTypes?: string[];
+    controlSignalSummary?: MeetingAppDomControlSignalSummary;
   };
   capture?: {
     profile?: MeetingAppDomCaptureProfilePlatform;
@@ -140,6 +166,8 @@ export interface MeetingAppDomCaptureSnapshot extends MeetingAppSnapshot {
     participant_count?: number;
     text_count?: number;
     semantic_signal_count?: number;
+    semantic_signal_types?: string[];
+    control_signal_summary?: MeetingAppDomControlSignalSummary;
   };
 }
 

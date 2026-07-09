@@ -238,7 +238,7 @@ const viewModel = runtime.timelineView('google-meet', {
 
 浏览器扩展或 WebView preload 可以再包一层 `createMeetingPlatformIntegrationBrowserRuntime()`。它会从当前 `window.location`/DOM capture profile 自动识别 Google Meet、Teams、Zoom、Webex、Lark，然后把 content-script sample、provider event 和手写标注路由到同一个 integration runtime：
 
-`meeting-app-capture` 的 DOM snapshot 不只是保存按钮和参会人节点列表，也会输出低成本语义层：`semanticSignals` 和 `interaction`。它会从控件、状态文本、参与人 tile 或 aria-label 里识别 `meeting_join_available`、`meeting_leave_available`、`active_speaker_candidate`、`screen_share_active`、`captions_control`、`recording_indicator` 等信号，并同步给出 `page.inMeeting`、`page.interaction.can_leave`、`page.interaction.pre_join`、`page.interaction.active_speaker_candidate`。这些字段用于本地观察器实时建轴、发言人位置轨和标注落轴；provider webhook 与会后 transcript 仍然只做校准或回填。
+`meeting-app-capture` 的 DOM snapshot 不只是保存按钮和参会人节点列表，也会输出低成本语义层：`semanticSignals`、`semanticSignalTypes`、`controlSignalSummary` 和 `interaction`。它会从控件、状态文本、参与人 tile 或 aria-label 里识别 `meeting_join_available`、`meeting_leave_available`、`active_speaker_candidate`、`screen_share_active`、`captions_control`、`recording_indicator` 等信号，并同步给出 `page.inMeeting`、`page.interaction.can_leave`、`page.interaction.pre_join`、`page.interaction.active_speaker_candidate`。`controlSignalSummary` 会把 join/leave/mic/camera/share/participants/chat/AI/speaker 等命中压成布尔摘要，方便扩展 popup、接入日志和 preflight 排查直接展示。provider webhook 与会后 transcript 仍然只做校准或回填。
 
 ```js
 import {
@@ -2114,6 +2114,7 @@ const currentWindowPreflight = buildMeetingPlatformAdapterCurrentWindowPreflight
 // currentWindowPreflight.capture.interaction.in_call === true 表示当前窗口已经像真实会议中页面。
 // currentWindowPreflight.capture.interaction.can_leave / active_speaker_candidate
 // 分别来自 Leave/Hang up 控件和 active speaker tile；semantic_signal_types 会列出原始语义命中。
+// control_signal_summary 会把 join/leave/mic/share/participants/chat/AI/speaker 命中压成布尔摘要。
 
 // 如果已经安装 connector bridge，也可以通过消息触发同一件事：
 const response = await bridge.dispatchMessage({
@@ -2125,7 +2126,7 @@ const response = await bridge.dispatchMessage({
 
 如果宿主拿到的是浏览器扩展 background、Electron preload 或桌面观察器的一批候选窗口/标签，用 `buildMeetingPlatformAdapterCandidatePreflight()` 一次性展开 `windows[].tabs[]` / `tabs[]` / `candidates[]`。URL-only 候选只会验证 startup plan 并返回 `needs_live_page_evidence`；浏览器候选需要明确携带当前 `document` 或 live snapshot，native 候选需要携带 platform/process/window/call state，才会被判定为 `ready_for_realtime_annotations`，避免误把静态 URL 匹配当成可实时建轴。候选不是简单按输入顺序选择：SDK 会按已通过实时预检、当前窗口/live DOM/native evidence、活跃标签或焦点窗口、meeting start 和 speaker track 证据打分排序，并在 `rows[*].selection_score`、`rows[*].selection_rank`、`rows[*].selection_reason` 里保留原因，方便 popup、native helper 或接入面板解释为什么选择某一个 Google Meet / Teams / Zoom / Webex / Lark 窗口。
 
-候选行也会带 `rows[*].interaction_in_call`、`rows[*].interaction_can_leave`、`rows[*].interaction_pre_join`、`rows[*].semantic_signal_types` 和 `rows[*].active_speaker_candidate_name`。这几个字段是给扩展 popup、桌面 helper 和接入日志看的轻量解释层：它们说明 SDK 为什么认为某个 Google Meet / Teams / Zoom / Webex / Lark 窗口已经是可实时标注的会议窗口，而不是仅凭 URL 匹配。
+候选行也会带 `rows[*].interaction_in_call`、`rows[*].interaction_can_leave`、`rows[*].interaction_pre_join`、`rows[*].semantic_signal_types`、`rows[*].control_signal_summary` 和 `rows[*].active_speaker_candidate_name`。这几个字段是给扩展 popup、桌面 helper 和接入日志看的轻量解释层：它们说明 SDK 为什么认为某个 Google Meet / Teams / Zoom / Webex / Lark 窗口已经是可实时标注的会议窗口，而不是仅凭 URL 匹配。
 
 ```js
 const candidatePreflight = buildMeetingPlatformAdapterCandidatePreflight({

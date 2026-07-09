@@ -133,6 +133,7 @@ function observePayload(plan = {}, input = {}, options = {}) {
     captured_at_ms: firstNonEmpty(input.captured_at_ms, input.capturedAtMs, options.captured_at_ms, options.capturedAtMs, nowMs(options)),
     interaction: evidence?.interaction,
     semantic_signal_types: evidence?.semantic_signal_types,
+    control_signal_summary: evidence?.control_signal_summary,
     active_speaker_candidate: evidence?.active_speaker_candidate,
   });
   return compactObject({
@@ -162,6 +163,7 @@ function rawSignalValidationPayload(plan = {}, input = {}, options = {}) {
     active_speaker: firstNonEmpty(input.active_speaker, input.activeSpeaker, input.speaker, evidence?.active_speaker_candidate),
     interaction: evidence?.interaction,
     semantic_signal_types: evidence?.semantic_signal_types,
+    control_signal_summary: evidence?.control_signal_summary,
     current_meeting: detectedMeeting,
   });
   return compactObject({

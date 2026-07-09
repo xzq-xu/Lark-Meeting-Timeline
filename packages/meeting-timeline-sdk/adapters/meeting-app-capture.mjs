@@ -865,6 +865,33 @@ function signalTypes(signals = []) {
   return new Set(signals.map((signal) => signal.type).filter(Boolean));
 }
 
+function semanticSignalTypeList(signals = []) {
+  return uniqueStrings(signals.map((signal) => signal.type));
+}
+
+function buildControlSignalSummary(signals = []) {
+  const types = signalTypes(signals);
+  const signalTypeList = semanticSignalTypeList(signals);
+  return compactObject({
+    signal_types: signalTypeList.length ? signalTypeList : undefined,
+    signal_count: signals.length || undefined,
+    join_available: types.has('meeting_join_available') || undefined,
+    waiting_room: types.has('meeting_waiting_room') || undefined,
+    leave_available: types.has('meeting_leave_available') || undefined,
+    microphone_available: types.has('microphone_control') || undefined,
+    camera_available: types.has('camera_control') || undefined,
+    screen_share_available: types.has('screen_share_control') || undefined,
+    screen_share_active: types.has('screen_share_active') || undefined,
+    captions_available: types.has('captions_control') || types.has('captions_status') || undefined,
+    recording_observed: types.has('recording_indicator') || types.has('recording_control') || undefined,
+    participants_available: types.has('participants_control') || types.has('participant_roster_observed') || undefined,
+    chat_available: types.has('chat_control') || undefined,
+    ai_summary_available: types.has('ai_summary_control') || types.has('ai_summary_status') || undefined,
+    active_speaker_observed: types.has('active_speaker_candidate') || undefined,
+    participant_roster_observed: types.has('participant_roster_observed') || undefined,
+  });
+}
+
 function buildInteractionState(signals = [], participants = []) {
   const types = signalTypes(signals);
   const activeParticipant = firstActiveParticipant(participants);
@@ -946,6 +973,8 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
     texts,
     profile,
   });
+  const semanticSignalTypes = semanticSignalTypeList(semanticSignals);
+  const controlSignalSummary = buildControlSignalSummary(semanticSignals);
   const interaction = buildInteractionState(semanticSignals, participants);
   const activeSpeaker = interaction.active_speaker_candidate;
   const inferredInMeeting = interaction.in_call === true ? true : interaction.pre_join === true ? false : undefined;
@@ -961,6 +990,8 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
     activeSpeaker,
     interaction,
     semanticSignals,
+    semanticSignalTypes,
+    controlSignalSummary,
     browser: {
       name: browserName(win, options),
     },
@@ -972,6 +1003,8 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
       activeSpeaker,
       interaction,
       semanticSignals,
+      semanticSignalTypes,
+      controlSignalSummary,
       buttons: controls,
       controls,
       tiles: participants,
@@ -985,6 +1018,8 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
       activeSpeaker,
       interaction,
       semanticSignals,
+      semanticSignalTypes,
+      controlSignalSummary,
       controls,
       participants,
       texts,
@@ -997,6 +1032,8 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
       participant_count: participants.length,
       text_count: texts.length,
       semantic_signal_count: semanticSignals.length,
+      semantic_signal_types: semanticSignalTypes,
+      control_signal_summary: controlSignalSummary,
     },
   });
 }

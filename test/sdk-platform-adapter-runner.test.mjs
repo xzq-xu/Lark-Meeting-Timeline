@@ -259,6 +259,7 @@ assert.equal(candidateOpened.payload.session.plan_kind, 'candidate_launch_plan')
 assert.equal(candidateOpened.payload.session.selected_evidence.interaction_can_leave, true);
 assert.equal(candidateOpened.payload.observe_event.payload.preflight_evidence.active_speaker_candidate.name, 'Ada Lovelace');
 assert.equal(candidateOpened.payload.observe_event.payload.candidates[0].semantic_signal_types.includes('meeting_leave_available'), true);
+assert.equal(candidateOpened.payload.observe_event.payload.candidates[0].control_signal_summary.leave_available, true);
 assert.equal(candidateRunner.getState().current_session.plan_kind, 'candidate_launch_plan');
 assert.equal(candidateCalls[0][0], 'platformRawSignalBatch');
 assert.equal(candidateCalls[1][0], 'observePlatformCandidates');

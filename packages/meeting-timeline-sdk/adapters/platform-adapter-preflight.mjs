@@ -528,11 +528,29 @@ function capturedSnapshotSummary(capturedSnapshot = {}) {
     ...(capturedSnapshot.page?.semanticSignals ?? []),
     ...(capturedSnapshot.dom?.semanticSignals ?? []),
   ];
-  const semanticSignalTypes = unique(semanticSignals.map((signal) => signal?.type));
+  const semanticSignalTypes = unique([
+    ...(capturedSnapshot.semanticSignalTypes ?? []),
+    ...(capturedSnapshot.semantic_signal_types ?? []),
+    ...(capturedSnapshot.page?.semanticSignalTypes ?? []),
+    ...(capturedSnapshot.page?.semantic_signal_types ?? []),
+    ...(capturedSnapshot.dom?.semanticSignalTypes ?? []),
+    ...(capturedSnapshot.dom?.semantic_signal_types ?? []),
+    ...(capturedSnapshot.capture?.semantic_signal_types ?? []),
+    ...semanticSignals.map((signal) => signal?.type),
+  ]);
   const interaction = firstNonEmpty(
     capturedSnapshot.interaction,
     capturedSnapshot.page?.interaction,
     capturedSnapshot.dom?.interaction,
+  );
+  const controlSignalSummary = firstNonEmpty(
+    capturedSnapshot.controlSignalSummary,
+    capturedSnapshot.control_signal_summary,
+    capturedSnapshot.page?.controlSignalSummary,
+    capturedSnapshot.page?.control_signal_summary,
+    capturedSnapshot.dom?.controlSignalSummary,
+    capturedSnapshot.dom?.control_signal_summary,
+    capturedSnapshot.capture?.control_signal_summary,
   );
   const activeSpeaker = firstNonEmpty(
     capturedSnapshot.activeSpeaker,
@@ -555,6 +573,7 @@ function capturedSnapshotSummary(capturedSnapshot = {}) {
     shadow_root_count: capturedSnapshot.capture?.shadow_root_count,
     semantic_signal_count: firstNonEmpty(capturedSnapshot.capture?.semantic_signal_count, semanticSignalTypes.length || undefined),
     semantic_signal_types: semanticSignalTypes.length ? semanticSignalTypes : undefined,
+    control_signal_summary: controlSignalSummary,
     interaction,
     active_speaker_candidate: activeSpeaker ? compactObject({
       id: activeSpeaker.id,
@@ -875,6 +894,7 @@ function candidateRow(candidate = {}, preflight = {}, selected = false, selectio
     interaction_can_leave: preflight.capture?.interaction?.can_leave ?? preflight.current_window?.interaction?.can_leave,
     interaction_pre_join: preflight.capture?.interaction?.pre_join ?? preflight.current_window?.interaction?.pre_join,
     semantic_signal_types: preflight.capture?.semantic_signal_types ?? preflight.current_window?.semantic_signal_types,
+    control_signal_summary: preflight.capture?.control_signal_summary ?? preflight.current_window?.control_signal_summary,
     active_speaker_candidate_id: preflight.capture?.active_speaker_candidate?.id ?? preflight.current_window?.active_speaker_candidate?.id,
     active_speaker_candidate_name: preflight.capture?.active_speaker_candidate?.name ?? preflight.current_window?.active_speaker_candidate?.name,
     issue_codes: (preflight.issues ?? []).map((issue) => issue.code),
@@ -949,6 +969,7 @@ export function buildMeetingPlatformAdapterCurrentWindowPreflight(input = {}, op
       in_meeting: captureSummary.in_meeting,
       interaction: captureSummary.interaction,
       semantic_signal_types: captureSummary.semantic_signal_types,
+      control_signal_summary: captureSummary.control_signal_summary,
       active_speaker_candidate: captureSummary.active_speaker_candidate,
     },
     summary: {
@@ -956,6 +977,7 @@ export function buildMeetingPlatformAdapterCurrentWindowPreflight(input = {}, op
       current_window_in_meeting: captureSummary.in_meeting,
       current_window_interaction: captureSummary.interaction,
       current_window_semantic_signal_types: captureSummary.semantic_signal_types,
+      current_window_control_signal_summary: captureSummary.control_signal_summary,
       current_window_active_speaker_candidate: captureSummary.active_speaker_candidate,
     },
     capture: captureSummary,

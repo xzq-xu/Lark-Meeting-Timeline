@@ -10,6 +10,7 @@ import type {
 } from './meeting-app-profile.mjs';
 import type {
   MeetingAppDomCaptureInput,
+  MeetingAppDomControlSignalSummary,
   MeetingAppDomInteractionState,
   MeetingAppDomCaptureSnapshot,
 } from './meeting-app-capture.mjs';
@@ -71,6 +72,7 @@ export interface MeetingPlatformAdapterCurrentWindowSummary {
   in_meeting?: boolean;
   interaction?: MeetingAppDomInteractionState;
   semantic_signal_types?: string[];
+  control_signal_summary?: MeetingAppDomControlSignalSummary;
   active_speaker_candidate?: MeetingPlatformAdapterPreflightActiveSpeakerCandidate;
   [key: string]: unknown;
 }
@@ -89,6 +91,7 @@ export interface MeetingPlatformAdapterPreflightCaptureSummary {
   shadow_root_count?: number;
   semantic_signal_count?: number;
   semantic_signal_types?: string[];
+  control_signal_summary?: MeetingAppDomControlSignalSummary;
   interaction?: MeetingAppDomInteractionState;
   active_speaker_candidate?: MeetingPlatformAdapterPreflightActiveSpeakerCandidate;
   [key: string]: unknown;

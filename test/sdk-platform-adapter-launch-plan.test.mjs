@@ -208,8 +208,10 @@ assert.equal(currentWindowCandidateLaunchPlan.selected_evidence.current_window_c
 assert.equal(currentWindowCandidateLaunchPlan.selected_evidence.interaction.in_call, true);
 assert.equal(currentWindowCandidateLaunchPlan.selected_evidence.interaction_can_leave, true);
 assert.equal(currentWindowCandidateLaunchPlan.selected_evidence.semantic_signal_types.includes('meeting_leave_available'), true);
+assert.equal(currentWindowCandidateLaunchPlan.selected_evidence.control_signal_summary.leave_available, true);
 assert.equal(currentWindowCandidateLaunchPlan.selected_evidence.active_speaker_candidate.name, 'Ada Lovelace');
 assert.equal(currentWindowCandidateLaunchPlan.launch_input.preflight_evidence.active_speaker_candidate.name, 'Ada Lovelace');
+assert.equal(currentWindowCandidateLaunchPlan.launch_input.control_signal_summary.active_speaker_observed, true);
 assert.equal(currentWindowCandidateLaunchPlan.mark_template.preflight_evidence.interaction_can_leave, true);
 
 const urlOnlyCandidateLaunchPlan = buildMeetingPlatformAdapterCandidateLaunchPlan(manifest, {
