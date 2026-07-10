@@ -28,6 +28,7 @@ export const MEETING_APP_EXTENSION_STATUS_STORAGE_KEY = 'meeting_timeline_extens
 export const MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS = Object.freeze({
   startMeeting: '/api/meeting-session/start',
   endMeeting: '/api/meeting-session/end',
+  recordP0Reference: '/api/meeting-platform/p0-reference',
   insertMark: '/api/annotations',
   insertMarks: '/api/annotations/batch',
   importTranscript: '/api/import/transcript',
@@ -636,7 +637,8 @@ export function buildMeetingAppExtensionInstallPlan(options = {}) {
     host_permissions: patterns.host_permissions,
     content_scripts: patterns.content_scripts,
     manifest,
-    content_script_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime',
+    content_script_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-local-content-runtime',
+    local_content_runtime_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-local-content-runtime',
     meeting_app_content_script_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script',
     platform_integration_runtime_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime',
     browser_runtime_adapter: '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime',
@@ -662,7 +664,7 @@ export function buildMeetingAppExtensionInstallPlan(options = {}) {
       timestamp_field: 'captured_at_ms',
     },
     next_steps: [
-      'Bundle platform-integration-runtime content script bridge into the js file declared in content_scripts.',
+      'Bundle the browser-safe meeting-app-local-content-runtime into the js file declared in content_scripts.',
       'Install the generated manifest as a Chrome/Edge compatible MV3 extension or map the same matches into an Electron WebView preload bridge.',
       'Use window.__meetingTimelineLiveCapture.captureActive(), captureEnded(), and diagnose() to collect and validate live DOM evidence for the launch gate.',
       'Record real meeting app snapshots with meeting-app-snapshot-recorder and validate them with meeting-app-gate before production rollout.',
@@ -687,7 +689,8 @@ export function buildMeetingAppExtensionContentScriptSource(options = {}) {
     MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call,
   );
   return [
-    "import { installMeetingPlatformIntegrationContentScriptBridge } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime';",
+    "import { installMeetingAppLocalContentRuntime } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-local-content-runtime';",
+    "import { captureMeetingAppDomSnapshot } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-capture';",
     '',
     `const PLATFORM_HOSTS = ${json(platformMap)};`,
     `const CLIENT_CALL_TYPE = ${JSON.stringify(messagePrefix)};`,
@@ -703,6 +706,46 @@ export function buildMeetingAppExtensionContentScriptSource(options = {}) {
     '    if (hosts.some((item) => host === item || host.endsWith(`.${item}`))) return platform;',
     '  }',
     '  return "unknown";',
+    '}',
+    '',
+    'function meetingAppEvidenceRecord(phase, input = {}) {',
+    '  const platform = inferPlatform();',
+    '  const capturedAtMs = input.start_time_ms ?? input.end_time_ms ?? input.captured_at_ms ?? Date.now();',
+    '  const snapshot = captureMeetingAppDomSnapshot({',
+    '    window: globalThis,',
+    '    document: globalThis.document,',
+    '    location: globalThis.location,',
+    '    platform,',
+    '    url: globalThis.location?.href,',
+    '    title: globalThis.document?.title,',
+    '  }, {',
+    '    platform,',
+    '    captureProfile: platform,',
+    '    source: "meeting_app_extension_auto_evidence",',
+    '    observedAtMs: capturedAtMs,',
+    '    phase,',
+    '  });',
+    '  return {',
+    '    schema: "meeting_app_snapshot_record",',
+    '    schema_version: 1,',
+    '    id: `${platform}:${phase}:${capturedAtMs}`,',
+    '    platform,',
+    '    phase,',
+    '    label: phase === "ended" ? "meeting_ended" : "active_speaker",',
+    '    captured_at_ms: capturedAtMs,',
+    '    source: "meeting_app_extension_auto_evidence",',
+    '    observer_surface: "browser_extension",',
+    '    snapshot,',
+    '  };',
+    '}',
+    '',
+    'function withMeetingAppEvidence(input = {}, phase) {',
+    '  return {',
+    '    ...input,',
+    '    observer_surface: "browser_extension",',
+    '    suppress_auto_annotations: true,',
+    '    meeting_app_record: meetingAppEvidenceRecord(phase, input),',
+    '  };',
     '}',
     '',
     'function callTimeline(method, input = {}) {',
@@ -725,16 +768,53 @@ export function buildMeetingAppExtensionContentScriptSource(options = {}) {
     '  });',
     '}',
     '',
+    'function operatorReferenceAction(event = {}) {',
+    '  const target = event.target?.closest?.("button,[role=\\"button\\"]") ?? event.target;',
+    '  if (!target) return null;',
+    '  const label = [',
+    '    target.getAttribute?.("aria-label"),',
+    '    target.getAttribute?.("data-tooltip"),',
+    '    target.getAttribute?.("title"),',
+    '    target.textContent,',
+    '  ].filter(Boolean).join(" ").replace(/\\s+/g, " ").trim();',
+    '  if (/\\bjoin now\\b|\\bask to join\\b|\\bjoin meeting\\b|立即加入|加入会议|进入会议|开始会议/i.test(label)) return "join";',
+    '  if (/\\bleave call\\b|\\bleave meeting\\b|\\bend call\\b|\\bend meeting\\b|\\bhang up\\b|离开通话|离开会议|结束通话|结束会议|挂断/i.test(label)) return "leave";',
+    '  return null;',
+    '}',
+    '',
+    'function bindOperatorReferenceCapture(bridge) {',
+    '  const document = globalThis.document;',
+    '  if (!document?.addEventListener) return { installed: false, reason: "missing_document_event_target" };',
+    '  const lastCapturedAt = new Map();',
+    '  const listener = (event) => {',
+    '    const action = operatorReferenceAction(event);',
+    '    if (!action) return;',
+    '    const atMs = Date.now();',
+    '    if (atMs - (lastCapturedAt.get(action) ?? 0) < 1_200) return;',
+    '    const meetingId = bridge.preflight?.().meeting_id;',
+    '    if (!meetingId) return;',
+    '    lastCapturedAt.set(action, atMs);',
+    '    callTimeline("recordP0Reference", {',
+    '      action,',
+    '      at_ms: atMs,',
+    '      meeting_id: meetingId,',
+    '      observer_surface: "browser_extension",',
+    '    }).catch(() => {});',
+    '  };',
+    '  document.addEventListener("click", listener, true);',
+    '  return { installed: true, event: "click", listener };',
+    '}',
+    '',
     'const client = {',
-    '  startMeeting: (input) => callTimeline("startMeeting", input),',
-    '  endMeeting: (input) => callTimeline("endMeeting", input),',
+    '  startMeeting: (input) => callTimeline("startMeeting", withMeetingAppEvidence(input, "active")),',
+    '  endMeeting: (input) => callTimeline("endMeeting", withMeetingAppEvidence(input, "ended")),',
     '  insertMark: (input) => callTimeline("insertMark", input),',
     '  insertMarks: (input) => callTimeline("insertMarks", input),',
     '  importTranscript: (input) => callTimeline("importTranscript", input),',
     '};',
     '',
     'const detectedPlatform = inferPlatform();',
-    'const bridge = installMeetingPlatformIntegrationContentScriptBridge(client, {',
+    'const bridge = installMeetingAppLocalContentRuntime(client, {',
     '  platform: detectedPlatform === "unknown" ? undefined : detectedPlatform,',
     '  platforms: Object.keys(PLATFORM_HOSTS),',
     '  runtimePreset: detectedPlatform === "unknown" ? undefined : detectedPlatform,',
@@ -743,10 +823,13 @@ export function buildMeetingAppExtensionContentScriptSource(options = {}) {
     '  extensionMessaging: true,',
     '  windowMessaging: true,',
     '  startRuntime: true,',
+    '  applyOptions: { speakerAsAnnotation: true, participantAsAnnotation: false },',
+    '  speakerOptions: { minStableMs: 650, switchStableMs: 700, endIdleMs: 1500 },',
     '  startOptions: { startRuntime: true },',
     '});',
     '',
     'globalThis.__meetingTimelineBridge = bridge;',
+    'globalThis.__meetingTimelineOperatorReferenceCapture = bindOperatorReferenceCapture(bridge);',
     'extensionRuntime()?.sendMessage?.({',
     '  type: ATTACHED_TYPE,',
     '  platform: inferPlatform(),',
@@ -770,7 +853,6 @@ export function buildMeetingAppExtensionLiveCaptureSource(options = {}) {
   return [
     "import { captureMeetingAppDomSnapshot } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-capture';",
     "import { createMeetingAppSnapshotRecorder } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder';",
-    "import { buildMeetingAppDomAdaptationDiagnosis, buildMeetingAppLiveEvidencePackage } from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-profile';",
     '',
     `const PLATFORM_HOSTS = ${json(platformMap)};`,
     `const LIVE_CAPTURE_GLOBAL = ${JSON.stringify(globalName)};`,
@@ -846,20 +928,42 @@ export function buildMeetingAppExtensionLiveCaptureSource(options = {}) {
     '',
     'function evidencePackage(options = {}) {',
     '  const recordSet = exportRecords(options);',
-    '  return buildMeetingAppLiveEvidencePackage({',
-    '    ...options,',
-    '    platforms: options.platforms ?? [inferPlatform()],',
-    '    recordSet,',
-    '  });',
+    '  const platforms = options.platforms ?? [inferPlatform()];',
+    '  const phases = new Set(recordSet.records.map((record) => record.phase));',
+    '  const accepted = phases.has("active") && phases.has("ended");',
+    '  return {',
+    '    type: "meeting_app_live_evidence_package",',
+    '    schema: "meeting_app_live_evidence_package",',
+    '    schema_version: 1,',
+    '    id: options.packageId ?? options.package_id ?? options.id ?? `live-${nowMs()}`,',
+    '    platforms,',
+    '    record_set: recordSet,',
+    '    record_count: recordSet.record_count,',
+    '    accepted,',
+    '    production_ready: accepted,',
+    '  };',
     '}',
     '',
     'function diagnose(options = {}) {',
     '  const recordSet = exportRecords(options);',
-    '  return buildMeetingAppDomAdaptationDiagnosis({',
-    '    ...options,',
-    '    platform: options.platform ?? inferPlatform(),',
-    '    recordSet,',
-    '  });',
+    '  const platform = options.platform ?? inferPlatform();',
+    '  const phases = new Set(recordSet.records.map((record) => record.phase));',
+    '  const active = recordSet.records.find((record) => record.phase === "active")?.snapshot;',
+    '  const controls = active?.page?.controls ?? active?.page?.buttons ?? [];',
+    '  const participants = active?.page?.participants ?? active?.page?.tiles ?? [];',
+    '  const accepted = phases.has("active") && phases.has("ended") && controls.length > 0;',
+    '  return {',
+    '    type: "meeting_app_dom_adaptation_diagnosis",',
+    '    schema: "meeting_app_dom_adaptation_diagnosis",',
+    '    schema_version: 1,',
+    '    platform,',
+    '    accepted,',
+    '    production_ready: accepted,',
+    '    record_count: recordSet.record_count,',
+    '    selector_probe: { matched: { controls: controls.length > 0, participants: participants.length > 0, active_speaker: participants.some((row) => row.speaking || row.active_speaker) } },',
+    '    observer_probe: { signal_types: [phases.has("active") ? "meeting_started" : null, participants.some((row) => row.speaking || row.active_speaker) ? "speaker_started" : null, phases.has("ended") ? "meeting_ended" : null].filter(Boolean) },',
+    '    missing_required_coverage: [!phases.has("active") ? "active_speaker" : null, !phases.has("ended") ? "meeting_ended" : null].filter(Boolean),',
+    '  };',
     '}',
     '',
     'const api = {',
@@ -891,8 +995,6 @@ export function buildMeetingAppExtensionBackgroundSource(options = {}) {
   );
   const endpoints = { ...MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS };
   return [
-    "import { createMeetingPlatformRuntimeEventClient } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-event';",
-    '',
     `const BASE_URL = ${JSON.stringify(baseUrl)};`,
     `const CLIENT_CALL_TYPE = ${JSON.stringify(messagePrefix)};`,
     `const ATTACHED_TYPE = ${JSON.stringify(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached)};`,
@@ -902,10 +1004,7 @@ export function buildMeetingAppExtensionBackgroundSource(options = {}) {
     `const PREFLIGHT_CANDIDATES_TYPE = ${JSON.stringify(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates)};`,
     `const STATUS_STORAGE_KEY = ${JSON.stringify(MEETING_APP_EXTENSION_STATUS_STORAGE_KEY)};`,
     `const ENDPOINTS = ${json(endpoints)};`,
-    'const runtimeEvents = createMeetingPlatformRuntimeEventClient({',
-    '  baseUrl: BASE_URL,',
-    '  source: "meeting_app_extension_background",',
-    '});',
+    'const RUNTIME_EVENT_ENDPOINT = "/api/meeting-platform/runtime-events";',
     'let lastAttached = null;',
     '',
     'function runtimeApi() {',
@@ -1126,6 +1225,17 @@ export function buildMeetingAppExtensionBackgroundSource(options = {}) {
     '  return { ok: response.ok, status: response.status, body };',
     '}',
     '',
+    'function postRuntimeEvent(action, input = {}) {',
+    '  return postJson(RUNTIME_EVENT_ENDPOINT, {',
+    '    schema: "meeting_platform_runtime_event",',
+    '    schema_version: 1,',
+    '    action,',
+    '    source: input.source ?? "meeting_app_extension_background",',
+    '    sent_at_ms: Date.now(),',
+    '    ...input,',
+    '  });',
+    '}',
+    '',
     'runtimeApi()?.onMessage?.addListener?.((message, sender, sendResponse) => {',
     '  if (message?.type === ATTACHED_TYPE) {',
     '    lastAttached = {',
@@ -1152,7 +1262,7 @@ export function buildMeetingAppExtensionBackgroundSource(options = {}) {
     '  if (message?.type === OBSERVE_CANDIDATES_TYPE) {',
     '    observedTabsFor(message).then((tabs) => {',
     '      const input = candidateObservationInput(message, sender, tabs);',
-    '      return runtimeEvents.observePlatformCandidates(input, message.send_options ?? message.sendOptions ?? {});',
+    '      return postRuntimeEvent("observe_platform_candidates", input);',
     '    }).then((body) => {',
     '      sendResponse({ ok: true, type: OBSERVE_CANDIDATES_TYPE, body });',
     '    }).catch((error) => {',
@@ -1599,11 +1709,14 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
   }
 
   const contentEntryContent = contentEntry?.content ?? '';
-  if (!contentEntryContent.includes('installMeetingPlatformIntegrationContentScriptBridge')) {
+  if (!contentEntryContent.includes('installMeetingAppLocalContentRuntime')) {
     issues.push(issue('error', 'content_entry_missing_bridge', 'Content script entry does not install the SDK bridge.'));
   }
   if (!contentEntryContent.includes('startRuntime: true')) {
     issues.push(issue('error', 'content_entry_not_starting_runtime', 'Content script entry does not start the browser runtime.'));
+  }
+  if (!contentEntryContent.includes('bindOperatorReferenceCapture')) {
+    issues.push(issue('error', 'content_entry_missing_operator_reference_capture', 'Content script entry does not capture join/leave operator reference timestamps.'));
   }
   const liveCaptureContent = liveCaptureEntry?.content ?? '';
   if (scaffold.bundle?.live_capture_input && !liveCaptureContent.includes('__meetingTimelineLiveCapture')) {
@@ -1612,10 +1725,10 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
   if (scaffold.bundle?.live_capture_input && !liveCaptureContent.includes('captureMeetingAppDomSnapshot')) {
     issues.push(issue('error', 'live_capture_missing_dom_capture', 'Live capture entry does not capture meeting app DOM snapshots.'));
   }
-  if (scaffold.bundle?.live_capture_input && !liveCaptureContent.includes('buildMeetingAppLiveEvidencePackage')) {
+  if (scaffold.bundle?.live_capture_input && !liveCaptureContent.includes('meeting_app_live_evidence_package')) {
     issues.push(issue('error', 'live_capture_missing_evidence_package', 'Live capture entry does not build live evidence packages.'));
   }
-  if (scaffold.bundle?.live_capture_input && !liveCaptureContent.includes('buildMeetingAppDomAdaptationDiagnosis')) {
+  if (scaffold.bundle?.live_capture_input && !liveCaptureContent.includes('meeting_app_dom_adaptation_diagnosis')) {
     issues.push(issue('error', 'live_capture_missing_dom_diagnosis', 'Live capture entry does not build DOM adaptation diagnostics.'));
   }
   const backgroundContent = backgroundEntry?.content ?? '';
@@ -1628,13 +1741,13 @@ export function buildMeetingAppExtensionScaffoldAcceptanceReport(scaffoldOrOptio
   if (!backgroundContent.includes('meeting_timeline.observe_candidates')) {
     issues.push(issue('error', 'background_missing_candidate_observer', 'Background entry does not handle observe_candidates runtime events.'));
   }
-  if (!backgroundContent.includes('createMeetingPlatformRuntimeEventClient')) {
-    issues.push(issue('error', 'background_missing_runtime_event_client', 'Background entry does not use the platform runtime event client.'));
+  if (!backgroundContent.includes('postRuntimeEvent')) {
+    issues.push(issue('error', 'background_missing_runtime_event_client', 'Background entry does not post the platform runtime event envelope.'));
   }
   if (!backgroundContent.includes('setStorageValue')) {
     issues.push(issue('error', 'background_missing_diagnostic_storage', 'Background entry does not persist extension diagnostics.'));
   }
-  for (const endpoint of ['/api/meeting-session/start', '/api/meeting-session/end', '/api/annotations', '/api/annotations/batch']) {
+  for (const endpoint of ['/api/meeting-session/start', '/api/meeting-session/end', '/api/meeting-platform/p0-reference', '/api/annotations', '/api/annotations/batch']) {
     if (!backgroundContent.includes(endpoint)) {
       issues.push(issue('error', 'background_missing_timeline_endpoint', `Background entry is missing ${endpoint}.`, { endpoint }));
     }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -9,6 +9,7 @@ const execFileAsync = promisify(execFile);
 const repoRoot = new URL('..', import.meta.url);
 const tmpDir = await mkdtemp(join(tmpdir(), 'meeting-platform-adapter-acceptance-checklist-script-'));
 const outDir = join(tmpDir, 'checklists');
+const packageDir = join(tmpDir, 'evidence-packages');
 const reportFile = join(tmpDir, 'acceptance-checklist-report.json');
 const baseUrl = 'https://timeline.example.com';
 
@@ -18,6 +19,7 @@ const { stdout } = await execFileAsync(process.execPath, [
   '--platforms=google-meet',
   '--target=static',
   `--out-dir=${outDir}`,
+  `--package-dir=${packageDir}`,
   `--report-file=${reportFile}`,
   '--json=true',
 ], {
@@ -31,6 +33,8 @@ assert.equal(report.target, 'static');
 assert.equal(report.platform_count, 1);
 assert.equal(report.accepted_count, 1);
 assert.equal(report.blocked_count, 0);
+assert.equal(report.loaded_package_count, 0);
+assert.equal(report.package_evidence_dir, packageDir);
 assert.equal(report.written_files.length, 1);
 assert.equal(report.rows[0].checklist_file, join(outDir, 'google_meet.json'));
 assert.equal(report.rows[0].accepted, true);
@@ -46,16 +50,25 @@ assert.equal(googleChecklist.target, 'static');
 assert.equal(googleChecklist.accepted, true);
 assert.equal(googleChecklist.checklist.find((item) => item.id === 'provider_nonblocking_contract').passed, true);
 
+await mkdir(packageDir, { recursive: true });
+await writeFile(join(packageDir, 'webex.json'), `${JSON.stringify({
+  schema: 'meeting_platform_evidence_package',
+  platform: 'webex',
+}, null, 2)}\n`, 'utf8');
+
 const { stdout: textStdout } = await execFileAsync(process.execPath, [
   'scripts/meeting-platform-adapter-acceptance-checklist.mjs',
   '--platforms=webex',
   '--target=pilot',
   `--out-dir=${join(tmpDir, 'pilot-checklists')}`,
+  `--package-dir=${packageDir}`,
 ], {
   cwd: repoRoot,
 });
 assert.match(textStdout, /meeting_platform_adapter_acceptance_checklist_report/);
 assert.match(textStdout, /target=pilot/);
+assert.match(textStdout, /packages=1/);
+assert.match(textStdout, /package=.*webex\.json/);
 assert.match(textStdout, /webex: accepted=no/);
 
 console.log('ok meeting platform adapter acceptance checklist script');

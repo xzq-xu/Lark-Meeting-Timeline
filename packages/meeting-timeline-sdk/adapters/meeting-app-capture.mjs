@@ -1,4 +1,4 @@
-import { compactObject, normalizeAbsoluteMs } from '../index.mjs';
+import { compactObject, normalizeAbsoluteMs } from './internal-utils.mjs';
 import { normalizeMeetingAppSnapshot, normalizeMeetingAppSnapshots } from './meeting-apps.mjs';
 import { detectMeetingApplication } from './meeting-session-discovery.mjs';
 import { normalizeMeetingPlatform } from './platform-setup.mjs';

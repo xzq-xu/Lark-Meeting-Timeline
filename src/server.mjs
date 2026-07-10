@@ -53,6 +53,10 @@ const autoAcceptancePath = process.env.AUTO_ACCEPTANCE_PATH || join(dataDir, 'au
 const deviceSimulatorPath = process.env.DEVICE_SIMULATOR_PATH || join(dataDir, 'device-simulator.json');
 const passiveMeetingScanPath = process.env.PASSIVE_MEETING_SCAN_PATH || join(dataDir, 'passive-meeting-scan.json');
 const realDemoSessionPath = process.env.REAL_DEMO_SESSION_PATH || join(dataDir, 'real-demo-session.json');
+const meetingPlatformFieldEvidenceDir = process.env.MEETING_PLATFORM_FIELD_EVIDENCE_DIR
+  || join(dataDir, 'meeting-platform-field-evidence');
+const pendingMeetingPlatformP0References = new Map();
+const meetingPlatformP0ReferenceTtlMs = 30 * 60 * 1000;
 const store = new TimelineStore();
 const streamClients = new Set();
 const streamTelemetry = {
@@ -1628,6 +1632,13 @@ async function appendAnnotation(input) {
   const current = await store.load();
   const result = appendAnnotationToState(current, input);
   const saved = await saveAndBroadcast(result.state, 'state');
+  const annotationEvidence = persistMeetingPlatformAnnotationEvidence(
+    input,
+    result.item,
+    saved.meeting,
+    Date.now(),
+    result.options,
+  );
   return {
     ack: annotationAck(result.item, saved, result.options),
     meeting_session_binding: meetingSessionBinding,
@@ -1635,6 +1646,7 @@ async function appendAnnotation(input) {
     auto_open_session_binding: autoOpenSessionBinding,
     item: result.item,
     state: saved,
+    annotation_evidence: annotationEvidence,
   };
 }
 
@@ -1677,15 +1689,27 @@ async function appendAnnotationBatch(inputs = []) {
     results.push(result);
   }
   const saved = await saveAndBroadcast(working, 'state');
-  const rows = results.map((result) => ({
-    ack: annotationAck(result.item, saved, result.options),
-    item: result.item,
-  }));
+  const visibleAtMs = Date.now();
+  const rows = results.map((result, index) => {
+    const annotationEvidence = persistMeetingPlatformAnnotationEvidence(
+      inputs[index],
+      result.item,
+      saved.meeting,
+      visibleAtMs,
+      result.options,
+    );
+    return {
+      ack: annotationAck(result.item, saved, result.options),
+      item: result.item,
+      annotation_evidence: annotationEvidence,
+    };
+  });
   return {
     accepted: true,
     count: rows.length,
     acks: rows.map((row) => row.ack),
     items: rows.map((row) => row.item),
+    annotation_evidence: rows.map((row) => row.annotation_evidence),
     meeting_session_binding: meetingSessionBinding,
     passive_binding: passiveBinding,
     auto_open_session_binding: autoOpenSessionBinding,
@@ -2391,6 +2415,7 @@ async function startOpenMeetingSession(body = {}) {
     sequence: carriedSequenceForNewRealAxis(current, meeting),
   });
   const saved = await saveAndBroadcast(next, 'state');
+  const sessionEvidence = persistMeetingAppSessionEvidence(body, saved.meeting, saved, 'active', Date.now());
   if (realDemoSession.active && isRealMeetingAxis(saved.meeting)) {
     saveRealDemoSessionState({
       ...realDemoSession,
@@ -2411,6 +2436,7 @@ async function startOpenMeetingSession(body = {}) {
     state: deviceAnnotation.state,
     auto_acceptance_annotation: autoAnnotation.annotation,
     device_simulator_annotation: deviceAnnotation.annotation,
+    session_evidence: sessionEvidence,
     contract: {
       source: axisSource,
       strict_lark_event_axis: false,
@@ -2460,9 +2486,12 @@ async function endOpenMeetingSession(body = {}) {
     },
     events: [...eventMap.values()],
   });
+  const saved = await saveAndBroadcast(next, 'state');
+  const sessionEvidence = persistMeetingAppSessionEvidence(body, saved.meeting, saved, 'ended', Date.now());
   return {
     ok: true,
-    state: await saveAndBroadcast(next, 'state'),
+    state: saved,
+    session_evidence: sessionEvidence,
   };
 }
 
@@ -2620,6 +2649,271 @@ function secondsOrMsToIso(value, fallback = null) {
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '') ?? null;
+}
+
+function evidenceFileKey(value) {
+  return String(value ?? 'unknown').trim().replace(/[^a-zA-Z0-9_.-]+/g, '_').slice(0, 160) || 'unknown';
+}
+
+function meetingPlatformEvidencePath(meeting = {}) {
+  const platform = evidenceFileKey(meeting.platform ?? 'unknown');
+  const meetingId = evidenceFileKey(meeting.meeting_id ?? meeting.external_meeting_id ?? meeting.meeting_url ?? 'unknown');
+  return join(meetingPlatformFieldEvidenceDir, `${platform}-${meetingId}.json`);
+}
+
+function meetingPlatformP0ReferenceKey(meeting = {}) {
+  return `${evidenceFileKey(meeting.platform ?? 'unknown')}:${evidenceFileKey(meeting.meeting_id ?? meeting.external_meeting_id ?? meeting.meeting_url ?? 'unknown')}`;
+}
+
+function pendingMeetingPlatformP0Reference(meeting = {}, action) {
+  const key = meetingPlatformP0ReferenceKey(meeting);
+  const current = pendingMeetingPlatformP0References.get(key);
+  if (current?.queued_at_ms != null && Date.now() - current.queued_at_ms > meetingPlatformP0ReferenceTtlMs) {
+    pendingMeetingPlatformP0References.delete(key);
+    return null;
+  }
+  return current?.[action] ?? null;
+}
+
+function consumePendingMeetingPlatformP0Reference(meeting = {}, action) {
+  const key = meetingPlatformP0ReferenceKey(meeting);
+  const current = pendingMeetingPlatformP0References.get(key);
+  if (!current || current[action] == null) return;
+  const next = { ...current };
+  delete next[action];
+  if (next.join != null || next.leave != null) pendingMeetingPlatformP0References.set(key, next);
+  else pendingMeetingPlatformP0References.delete(key);
+}
+
+function loadMeetingPlatformEvidence(meeting = {}) {
+  const path = meetingPlatformEvidencePath(meeting);
+  try {
+    return { path, value: JSON.parse(readFileSync(path, 'utf8')) };
+  } catch {
+    return {
+      path,
+      value: {
+        schema: 'meeting_platform_field_evidence_input',
+        schema_version: 1,
+        platform: meeting.platform ?? 'unknown',
+        meeting_id: meeting.meeting_id ?? null,
+        run_id: meeting.meeting_id ? `${meeting.platform ?? 'unknown'}:${meeting.meeting_id}` : null,
+        meeting: {
+          platform: meeting.platform ?? 'unknown',
+          meeting_id: meeting.meeting_id ?? null,
+          meeting_url: meeting.meeting_url ?? null,
+          title: meeting.title ?? null,
+          start_time: meeting.start_time ?? null,
+          end_time: meeting.end_time ?? null,
+          source: meeting.source ?? null,
+        },
+        meetingAppRecords: [],
+        annotations: [],
+        speaker_markers: [],
+        participant_markers: [],
+        measurements: {},
+      },
+    };
+  }
+}
+
+function saveMeetingPlatformEvidence(path, value) {
+  mkdirSync(dirname(path), { recursive: true });
+  const saved = {
+    ...value,
+    updated_at: new Date().toISOString(),
+  };
+  writeFileSync(path, JSON.stringify(saved, null, 2));
+  return saved;
+}
+
+function normalizeEvidenceObserverSurface(value, source = '') {
+  const explicit = String(value ?? '').trim().toLowerCase().replace(/[-\s]+/g, '_');
+  if (['native', 'native_detector', 'desktop', 'desktop_observer', 'accessibility'].includes(explicit)) {
+    return 'native_detector';
+  }
+  if (['browser', 'browser_extension', 'content_script', 'web'].includes(explicit)) {
+    return 'browser_extension';
+  }
+  const sourceText = String(source ?? '').toLowerCase();
+  if (/extension|content[_ -]?script|browser/.test(sourceText)) return 'browser_extension';
+  if (/native|desktop|accessibility|window[_ -]?observer/.test(sourceText)) return 'native_detector';
+  return null;
+}
+
+function meetingAppRecordFromSessionBody(body = {}, meeting = {}, phase = 'active', visibleAtMs = Date.now()) {
+  const supplied = body.meeting_app_record ?? body.meetingAppRecord;
+  const snapshot = supplied?.snapshot ?? body.meeting_app_snapshot ?? body.meetingAppSnapshot;
+  if (!snapshot) return null;
+  const capturedAtMs = parseAbsoluteMs(firstNonEmpty(
+    supplied?.captured_at_ms,
+    supplied?.capturedAtMs,
+    phase === 'ended' ? body.end_time_ms : body.start_time_ms,
+    body.captured_at_ms,
+    snapshot.observedAtMs,
+    snapshot.observed_at_ms,
+    visibleAtMs,
+  )) ?? visibleAtMs;
+  return {
+    ...supplied,
+    schema: supplied?.schema ?? 'meeting_app_snapshot_record',
+    schema_version: supplied?.schema_version ?? 1,
+    id: supplied?.id ?? `${meeting.platform}:${meeting.meeting_id}:${phase}:${capturedAtMs}`,
+    platform: meeting.platform,
+    meeting_id: meeting.meeting_id,
+    run_id: firstNonEmpty(supplied?.run_id, supplied?.runId, body.run_id, body.runId, `${meeting.platform}:${meeting.meeting_id}`),
+    phase,
+    label: supplied?.label ?? (phase === 'ended' ? 'meeting_ended' : 'active_speaker'),
+    captured_at_ms: capturedAtMs,
+    visible_at_ms: visibleAtMs,
+    source: supplied?.source ?? 'meeting_app_extension_auto_evidence',
+    observer_surface: normalizeEvidenceObserverSurface(
+      firstNonEmpty(supplied?.observer_surface, supplied?.observerSurface, body.observer_surface, body.observerSurface),
+      supplied?.source ?? body.detector_source,
+    ),
+    snapshot,
+  };
+}
+
+function uniqueById(rows = []) {
+  const map = new Map();
+  for (const row of rows) map.set(String(row.id ?? `${row.phase}:${row.captured_at_ms}`), row);
+  return [...map.values()];
+}
+
+function persistMeetingAppSessionEvidence(body = {}, meeting = {}, state = {}, phase = 'active', visibleAtMs = Date.now()) {
+  const record = meetingAppRecordFromSessionBody(body, meeting, phase, visibleAtMs);
+  if (!record) return { recorded: false, reason: 'missing_meeting_app_snapshot' };
+  const loaded = loadMeetingPlatformEvidence(meeting);
+  const value = loaded.value;
+  const startMs = parseAbsoluteMs(meeting.start_time);
+  const observedAtMs = record.captured_at_ms;
+  const observerSurface = record.observer_surface
+    ?? value.observer_surface
+    ?? normalizeEvidenceObserverSurface(body.observer_surface ?? body.observerSurface, body.detector_source);
+  const referenceAction = phase === 'active' ? 'join' : 'leave';
+  const referenceAtMs = parseAbsoluteMs(firstNonEmpty(
+    phase === 'active'
+      ? value.measurements?.operator_join_at_ms
+      : value.measurements?.operator_leave_at_ms,
+    pendingMeetingPlatformP0Reference(meeting, referenceAction),
+  ));
+  const detectionLatencyField = phase === 'active'
+    ? 'start_detection_latency_ms'
+    : 'end_detection_latency_ms';
+  const next = {
+    ...value,
+    platform: meeting.platform,
+    meeting_id: meeting.meeting_id,
+    run_id: firstNonEmpty(value.run_id, record.run_id, body.run_id, body.runId, `${meeting.platform}:${meeting.meeting_id}`),
+    observer_surface: observerSurface,
+    meeting: {
+      ...(value.meeting ?? {}),
+      platform: meeting.platform,
+      meeting_id: meeting.meeting_id,
+      meeting_url: meeting.meeting_url ?? null,
+      title: meeting.title ?? null,
+      start_time: meeting.start_time ?? null,
+      end_time: meeting.end_time ?? null,
+      source: meeting.source ?? null,
+    },
+    meetingAppRecords: uniqueById([...(value.meetingAppRecords ?? []), record]),
+    measurements: {
+      ...(value.measurements ?? {}),
+      observer_surface: observerSurface,
+      ...(referenceAtMs != null ? { [`operator_${referenceAction}_at_ms`]: referenceAtMs } : {}),
+      [`${phase}_observer_captured_at_ms`]: observedAtMs,
+      [`${phase}_axis_visible_at_ms`]: visibleAtMs,
+      [`axis_${phase === 'active' ? 'started' : 'ended'}_at_ms`]: visibleAtMs,
+      [`${phase}_observer_to_axis_latency_ms`]: Math.max(0, visibleAtMs - observedAtMs),
+      ...(referenceAtMs != null ? {
+        [detectionLatencyField]: Math.max(0, visibleAtMs - referenceAtMs),
+      } : {}),
+      ...(phase === 'active' ? {
+        axis_start_ms: startMs,
+        previous_meeting_annotation_count_on_new_axis: (state.sequence ?? []).filter((item) => !['speaker_track', 'participant_track'].includes(item.intent)).length,
+      } : {}),
+    },
+  };
+  const saved = saveMeetingPlatformEvidence(loaded.path, next);
+  if (referenceAtMs != null) consumePendingMeetingPlatformP0Reference(meeting, referenceAction);
+  return {
+    recorded: true,
+    path: loaded.path,
+    record_count: saved.meetingAppRecords.length,
+    record,
+  };
+}
+
+function annotationEvidenceRow(input = {}, item = {}, meeting = {}, visibleAtMs = Date.now(), options = {}) {
+  const capturedAtMs = annotationCapturedAbsoluteMsStrict(input) ?? annotationCapturedAbsoluteMs(input, visibleAtMs);
+  const axisStartMs = parseAbsoluteMs(meeting.start_time);
+  const expectedPositionMs = axisStartMs == null ? null : Math.max(0, capturedAtMs - axisStartMs);
+  const actualPositionMs = Number.isFinite(Number(item.time_ms)) ? Number(item.time_ms) : null;
+  return {
+    id: item.id,
+    source: item.source ?? input.source ?? null,
+    kind: item.kind ?? input.kind ?? null,
+    intent: item.intent ?? input.intent ?? null,
+    label: item.label ?? input.label ?? null,
+    speaker_id: firstNonEmpty(input.speaker_id, input.payload?.speaker_id, item.payload?.speaker_id),
+    speaker_name: firstNonEmpty(input.speaker_name, input.payload?.speaker_name, item.payload?.speaker_name),
+    participant_id: firstNonEmpty(input.participant_id, input.payload?.participant_id, item.payload?.participant_id),
+    participant_name: firstNonEmpty(input.participant_name, input.payload?.participant_name, item.payload?.participant_name),
+    captured_at_ms: capturedAtMs,
+    visible_at_ms: visibleAtMs,
+    visible_latency_ms: visibleAtMs - capturedAtMs,
+    expected_position_ms: expectedPositionMs,
+    actual_position_ms: actualPositionMs,
+    timeline_error_ms: expectedPositionMs == null || actualPositionMs == null ? null : actualPositionMs - expectedPositionMs,
+    duplicate_delivery: options.replaced_existing === true,
+  };
+}
+
+function persistMeetingPlatformAnnotationEvidence(input = {}, item = {}, meeting = {}, visibleAtMs = Date.now(), options = {}) {
+  const loaded = loadMeetingPlatformEvidence(meeting);
+  if (!existsSync(loaded.path)) return { recorded: false, reason: 'meeting_session_evidence_not_started' };
+  const value = loaded.value;
+  const row = annotationEvidenceRow(input, item, meeting, visibleAtMs, options);
+  const isSpeaker = row.intent === 'speaker_track' || ['speaker_started', 'speaker_ended'].includes(row.kind);
+  const isParticipant = row.intent === 'participant_track' || ['participant_joined', 'participant_left'].includes(row.kind);
+  const collection = isSpeaker ? 'speaker_markers' : isParticipant ? 'participant_markers' : 'annotations';
+  const next = {
+    ...value,
+    [collection]: [...(value[collection] ?? []), row],
+  };
+  const saved = saveMeetingPlatformEvidence(loaded.path, next);
+  return { recorded: true, path: loaded.path, collection, count: saved[collection].length, row };
+}
+
+function updateMeetingPlatformP0Reference(meeting = {}, input = {}) {
+  const loaded = loadMeetingPlatformEvidence(meeting);
+  const action = String(input.action ?? input.kind ?? '').trim().toLowerCase();
+  if (!['join', 'leave'].includes(action)) return { updated: false, reason: 'action_must_be_join_or_leave', path: loaded.path };
+  const atMs = parseAbsoluteMs(firstNonEmpty(input.at_ms, input.captured_at_ms, input.timestamp_ms, input.at, Date.now())) ?? Date.now();
+  if (!existsSync(loaded.path)) {
+    const key = meetingPlatformP0ReferenceKey(meeting);
+    pendingMeetingPlatformP0References.set(key, {
+      ...(pendingMeetingPlatformP0References.get(key) ?? {}),
+      [action]: atMs,
+      queued_at_ms: Date.now(),
+    });
+    return { updated: false, queued: true, reason: 'meeting_evidence_not_started', path: loaded.path, action, at_ms: atMs };
+  }
+  const value = loaded.value;
+  const visibleAtMs = action === 'join'
+    ? value.measurements?.active_axis_visible_at_ms
+    : value.measurements?.ended_axis_visible_at_ms;
+  const next = {
+    ...value,
+    measurements: {
+      ...(value.measurements ?? {}),
+      [`operator_${action}_at_ms`]: atMs,
+      ...(visibleAtMs != null ? { [`${action === 'join' ? 'start' : 'end'}_detection_latency_ms`]: Math.max(0, Number(visibleAtMs) - atMs) } : {}),
+    },
+  };
+  const saved = saveMeetingPlatformEvidence(loaded.path, next);
+  return { updated: true, path: loaded.path, action, at_ms: atMs, measurements: saved.measurements };
 }
 
 function meetingRecordTimeRaw(record = {}, kind = 'start') {
@@ -5724,6 +6018,37 @@ function localUrlFor(req, pathname) {
   return new URL(pathname, `${proto}://${host}`).toString();
 }
 
+function meetingPlatformFromCandidate(candidate = {}) {
+  const explicit = firstNonEmpty(candidate.platform, candidate.provider, candidate.adapter);
+  if (explicit) return String(explicit).trim().toLowerCase().replaceAll('-', '_');
+  const rawUrl = firstNonEmpty(candidate.url, candidate.meeting_url, candidate.href);
+  if (!rawUrl) return null;
+  try {
+    const host = new URL(String(rawUrl)).hostname.toLowerCase();
+    if (host === 'meet.google.com') return 'google_meet';
+    if (host === 'teams.microsoft.com' || host.endsWith('.teams.microsoft.com')) return 'microsoft_teams';
+    if (host === 'zoom.us' || host.endsWith('.zoom.us') || host.endsWith('.zoom.com')) return 'zoom';
+    if (host.endsWith('.webex.com') || host.endsWith('.webex.com.cn')) return 'webex';
+    if (host === 'vc.feishu.cn' || host.endsWith('.feishu.cn') || host.endsWith('.larksuite.com') || host.endsWith('.larkoffice.com')) return 'lark';
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function observedMeetingCandidates(input = {}) {
+  const rows = [
+    ...(Array.isArray(input.tabs) ? input.tabs : []),
+    ...(Array.isArray(input.windows) ? input.windows : []),
+    ...(Array.isArray(input.candidates) ? input.candidates : []),
+    ...(Array.isArray(input.applications) ? input.applications : []),
+  ];
+  return rows.map((candidate) => ({
+    ...candidate,
+    platform: meetingPlatformFromCandidate(candidate),
+  })).filter((candidate) => candidate.platform);
+}
+
 function publicWebhookStatus(callbackUrl) {
   let parsed = null;
   try {
@@ -6896,6 +7221,58 @@ async function handleApi(req, res, url) {
         note: 'Call start when a real meeting session starts; use annotation endpoints for live marks; import transcript after the meeting.',
       },
     });
+  }
+
+  if (req.method === 'POST' && [
+    '/api/meeting-platform/runtime-events',
+    '/api/meeting-platform/observe-candidates',
+  ].includes(url.pathname)) {
+    const body = await readJson(req);
+    const action = url.pathname.endsWith('/observe-candidates')
+      ? 'observe_platform_candidates'
+      : String(body.action ?? body.type ?? '').trim();
+    if (action === 'observe_platform_candidates') {
+      const candidates = observedMeetingCandidates(body.payload ?? body.input ?? body);
+      const current = await store.load();
+      return sendJson(res, 200, {
+        ok: true,
+        action,
+        observed_at_ms: Date.now(),
+        candidate_count: candidates.length,
+        candidates,
+        selected_candidate: candidates.find((candidate) => candidate.active) ?? candidates[0] ?? null,
+        current_meeting: current.meeting ?? null,
+        mutates_timeline: false,
+        note: 'Candidate observation is a local discovery signal; the page DOM observer owns start/end axis events.',
+      });
+    }
+    if (['insert_annotation', 'speaker_track', 'participant_track'].includes(action)) {
+      const input = body.payload ?? body.input ?? body.mark ?? body.annotation ?? body;
+      return sendJson(res, 200, {
+        ok: true,
+        action,
+        result: await appendAnnotation(input),
+      });
+    }
+    return sendJson(res, 400, {
+      error: `Unsupported meeting platform runtime action: ${action || '(empty)'}`,
+      supported_actions: ['observe_platform_candidates', 'insert_annotation', 'speaker_track', 'participant_track'],
+    });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/meeting-platform/p0-reference') {
+    const body = await readJson(req);
+    const current = await store.load();
+    const requestedMeetingId = firstNonEmpty(body.meeting_id, body.meetingId, current.meeting?.meeting_id);
+    const meeting = requestedMeetingId === current.meeting?.meeting_id
+      ? current.meeting
+      : {
+        platform: firstNonEmpty(body.platform, current.meeting?.platform, 'unknown'),
+        meeting_id: requestedMeetingId,
+      };
+    if (!meeting?.meeting_id) return sendJson(res, 400, { error: 'meeting_id is required' });
+    const result = updateMeetingPlatformP0Reference(meeting, body);
+    return sendJson(res, result.updated ? 200 : result.queued ? 202 : 400, result);
   }
 
   if (req.method === 'POST' && url.pathname === '/api/meeting-session/start') {

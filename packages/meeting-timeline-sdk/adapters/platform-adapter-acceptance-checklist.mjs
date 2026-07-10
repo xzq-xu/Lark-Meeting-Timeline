@@ -419,6 +419,90 @@ function buildEvidenceCollectionPlan(target, portfolioItem = {}) {
   });
 }
 
+function buildPilotMeasurementContract(portfolioItem = {}, options = {}) {
+  const requestedSurface = String(
+    options.observerSurface
+      ?? options.observer_surface
+      ?? options.surface
+      ?? portfolioItem.recommended_first_surface
+      ?? 'browser_extension',
+  ).trim().toLowerCase().replace(/[-\s]+/g, '_');
+  const observerSurface = ['native', 'native_detector', 'desktop', 'desktop_observer', 'accessibility'].includes(requestedSurface)
+    ? 'native_detector'
+    : 'browser_extension';
+  const nativeFirst = observerSurface === 'native_detector';
+  return {
+    scope: 'local_realtime_axis_only',
+    observer_surface: observerSurface,
+    required_consecutive_real_meetings: 3,
+    annotations_per_meeting: 5,
+    speaker_switches_per_meeting: 2,
+    provider_events_required: false,
+    transcript_required: false,
+    thresholds: {
+      meeting_start_detection_latency_ms: {
+        aggregation: 'max',
+        lte: nativeFirst ? 2_500 : 1_500,
+      },
+      annotation_visible_latency_ms: {
+        aggregation: 'p95',
+        lte: 300,
+        hard_max_lte: 800,
+      },
+      annotation_timeline_error_ms: {
+        aggregation: 'max_absolute',
+        lte: 500,
+      },
+      speaker_marker_visible_latency_ms: {
+        aggregation: 'max_after_stability_window',
+        lte: 1_500,
+      },
+      meeting_end_detection_latency_ms: {
+        aggregation: 'max',
+        lte: nativeFirst ? 7_500 : 6_500,
+      },
+      lost_annotation_count: { equals: 0 },
+      duplicate_annotation_count: { equals: 0 },
+      previous_meeting_annotation_count_on_new_axis: { equals: 0 },
+    },
+    operator_run_sequence: [
+      'open_real_meeting_and_record_operator_join_at_ms',
+      'observe_or_create_current_local_axis_without_waiting_for_provider',
+      'insert_five_annotations_with_captured_at_ms',
+      'hold_two_distinct_active_speakers_for_at_least_three_seconds_each',
+      'leave_or_end_meeting_and_record_operator_leave_at_ms',
+      'verify_axis_closed_after_local_end_grace_window',
+      'open_next_real_meeting_and_verify_previous_annotations_are_absent',
+      'repeat_until_three_consecutive_meetings_pass',
+    ],
+    required_measurement_fields: [
+      'platform',
+      'meeting_id',
+      'run_id',
+      'operator_join_at_ms',
+      'axis_started_at_ms',
+      'annotation_captured_at_ms',
+      'annotation_visible_at_ms',
+      'annotation_position_ms',
+      'speaker_candidate_at_ms',
+      'speaker_marker_visible_at_ms',
+      'operator_leave_at_ms',
+      'axis_ended_at_ms',
+    ],
+    pass_condition: 'all_thresholds_pass_for_three_consecutive_real_meetings_on_the_same_platform',
+  };
+}
+
+export function buildMeetingPlatformPilotMeasurementContract(platform, options = {}) {
+  const portfolioItem = buildMeetingPlatformAdapterPortfolioItem(platform, options);
+  return {
+    platform: portfolioItem.platform,
+    display_name: portfolioItem.display_name,
+    recommended_first_surface: portfolioItem.recommended_first_surface,
+    ...buildPilotMeasurementContract(portfolioItem, options),
+  };
+}
+
 export function buildMeetingPlatformAdapterAcceptanceChecklist(platform, input = {}, options = {}) {
   const target = targetFrom(options);
   const portfolioItem = buildMeetingPlatformAdapterPortfolioItem(platform, options);
@@ -444,6 +528,7 @@ export function buildMeetingPlatformAdapterAcceptanceChecklist(platform, input =
     implementation_sequence: buildImplementationSequence(portfolioItem.platform, portfolioItem),
     sdk_entrypoints: buildSdkEntrypoints(portfolioItem.platform),
     evidence_collection_plan: buildEvidenceCollectionPlan(target, portfolioItem),
+    pilot_measurement_contract: buildPilotMeasurementContract(portfolioItem, options),
     checklist: items,
     summary,
     portfolio_item: portfolioItem,
@@ -506,6 +591,10 @@ export function buildMeetingPlatformAdapterAcceptanceChecklistMatrix(input = {},
       production_ready: item.handoff_readiness?.production_ready === true,
       runtime_contract_timestamp_field: item.runtime_event_contract?.timestamp_field,
       provider_reconcile_nonblocking: item.runtime_event_contract?.provider_events_block_realtime === false,
+      pilot_required_real_meetings: item.pilot_measurement_contract?.required_consecutive_real_meetings,
+      annotation_visible_p95_lte_ms: item.pilot_measurement_contract?.thresholds?.annotation_visible_latency_ms?.lte,
+      meeting_start_max_lte_ms: item.pilot_measurement_contract?.thresholds?.meeting_start_detection_latency_ms?.lte,
+      meeting_end_max_lte_ms: item.pilot_measurement_contract?.thresholds?.meeting_end_detection_latency_ms?.lte,
       first_implementation_step: item.implementation_sequence?.[0]?.id,
       local_observer_install_step: item.implementation_sequence?.find((step) => step.group === 'local_observer_install')?.id,
       first_next_action: item.next_actions?.[0],

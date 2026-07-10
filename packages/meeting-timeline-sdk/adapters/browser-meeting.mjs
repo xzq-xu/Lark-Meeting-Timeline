@@ -1,4 +1,4 @@
-import { compactObject, normalizeAbsoluteMs } from '../index.mjs';
+import { compactObject, normalizeAbsoluteMs } from './internal-utils.mjs';
 import { createActiveSpeakerObserver, createActiveSpeakerTimelineObserver, normalizeActiveSpeakerSample } from './active-speaker.mjs';
 import { selectMeetingSnapshot } from './local-observer.mjs';
 import {

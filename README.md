@@ -28,6 +28,9 @@
 - 在浏览器中可视化 transcript、meeting events、external sequence 的对齐结果
 
 SDK 后续跨 Google Meet、Microsoft Teams、Zoom 等会议软件的适配方案见 [多会议平台时间轴适配方案](docs/meeting-platform-adapters.md)。
+多软件接入执行清单（Google Meet / Teams / Zoom / Webex / Lark）：[会议软件适配快照（多软件）](docs/meeting-platform-multi-software-adaptation.md)。
+五个平台可直接照做的现场通过标准见：[多会议平台 P0 现场验收单](docs/meeting-platform-p0-field-acceptance.md)。
+最新执行进度与未完成项对齐见：[会议时间轴 SDK 进度快照（2026-07-09）](docs/meeting-platform-progress-checkpoint-2026-07-09.md)。
 
 如果要在真实 Google Meet / Microsoft Teams / Zoom / Webex / Lark 网页上采样 DOM 证据，先导出会议应用浏览器扩展：
 

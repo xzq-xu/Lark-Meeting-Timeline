@@ -1,4 +1,4 @@
-import { MeetingTimelineSdkError, compactObject, normalizeAbsoluteMs } from '../index.mjs';
+import { MeetingTimelineSdkError, compactObject, normalizeAbsoluteMs } from './internal-utils.mjs';
 import { applyMeetingSignals } from './core.mjs';
 import { detectMeetingFromUrl } from './meeting-url.mjs';
 

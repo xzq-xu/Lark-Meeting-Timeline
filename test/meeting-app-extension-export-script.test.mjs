@@ -64,7 +64,7 @@ const liveCaptureSource = await readFile(join(outDir, 'src/live-capture.entry.mj
 assert.match(liveCaptureSource, /__meetingTimelineLiveCapture/);
 assert.match(liveCaptureSource, /captureActive/);
 assert.match(liveCaptureSource, /captureEnded/);
-assert.match(liveCaptureSource, /buildMeetingAppDomAdaptationDiagnosis/);
+assert.match(liveCaptureSource, /meeting_app_dom_adaptation_diagnosis/);
 assert.match(liveCaptureSource, /diagnose/);
 
 const readme = await readFile(join(outDir, 'README.md'), 'utf8');

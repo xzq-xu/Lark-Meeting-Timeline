@@ -113,6 +113,33 @@ const webviewPlan = buildMeetingPlatformAdapterImportPlan(googleExport, {
 assert.equal(webviewPlan.selected_surface, 'webview_preload');
 assert.equal(webviewPlan.accepted, true);
 
+const teamsExport = buildMeetingPlatformAdapterExportPackage('teams', {}, {
+  baseUrl,
+  target: 'static',
+});
+const teamsPlan = buildMeetingPlatformAdapterImportPlan(teamsExport, {
+  availableFiles: teamsExport.host_files.map((file) => file.path),
+  target: 'static',
+});
+assert.equal(teamsPlan.adapter_selection.axis_surface, 'desktop_or_browser_observer');
+assert.equal(teamsPlan.selected_surface, 'native_detector');
+assert.equal(teamsPlan.readiness.selected_surface_ready, true);
+assert.equal(teamsPlan.accepted, true);
+
+for (const platform of ['webex', 'lark']) {
+  const exportPackage = buildMeetingPlatformAdapterExportPackage(platform, {}, {
+    baseUrl,
+    target: 'static',
+  });
+  const importPlan = buildMeetingPlatformAdapterImportPlan(exportPackage, {
+    availableFiles: exportPackage.host_files.map((file) => file.path),
+    target: 'static',
+  });
+  assert.equal(importPlan.selected_surface, 'browser_extension');
+  assert.equal(importPlan.readiness.selected_surface_ready, true);
+  assert.equal(importPlan.accepted, true);
+}
+
 const customExport = buildMeetingPlatformAdapterExportPackage('Acme Rooms', {}, {
   baseUrl,
   target: 'static',

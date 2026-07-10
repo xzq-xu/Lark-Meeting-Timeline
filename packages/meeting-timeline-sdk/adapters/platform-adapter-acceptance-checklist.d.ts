@@ -41,6 +41,7 @@ export interface MeetingPlatformAdapterAcceptanceChecklist {
   implementation_sequence: Array<Record<string, unknown>>;
   sdk_entrypoints: Record<string, string>;
   evidence_collection_plan: Record<string, unknown>;
+  pilot_measurement_contract: Record<string, unknown>;
   checklist: MeetingPlatformAdapterAcceptanceChecklistItem[];
   summary: Record<string, unknown>;
   portfolio_item: Record<string, unknown>;
@@ -71,6 +72,11 @@ export function buildMeetingPlatformAdapterAcceptanceChecklist(
   input?: MeetingPlatformAdapterAcceptanceChecklistOptions,
   options?: MeetingPlatformAdapterAcceptanceChecklistOptions,
 ): MeetingPlatformAdapterAcceptanceChecklist;
+
+export function buildMeetingPlatformPilotMeasurementContract(
+  platform: string,
+  options?: MeetingPlatformAdapterAcceptanceChecklistOptions,
+): Record<string, unknown>;
 
 export function buildMeetingPlatformAdapterAcceptanceChecklistMatrix(
   input?: MeetingPlatformAdapterAcceptanceChecklistOptions,

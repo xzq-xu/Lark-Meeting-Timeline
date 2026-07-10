@@ -1,4 +1,4 @@
-import { compactObject } from '../index.mjs';
+import { compactObject } from './internal-utils.mjs';
 import { normalizeMeetingSignal } from './core.mjs';
 
 const LOCAL_SOURCE_RE = /(^|_)(local|observer|desktop|browser|manual|device)(_|$)/i;

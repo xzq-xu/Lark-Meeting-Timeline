@@ -1,4 +1,4 @@
-import { compactObject, normalizeAbsoluteMs } from '../index.mjs';
+import { compactObject, normalizeAbsoluteMs } from './internal-utils.mjs';
 import {
   MEETING_APP_DOM_CAPTURE_SCHEMA,
   captureMeetingAppDomSnapshot,

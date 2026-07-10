@@ -200,12 +200,24 @@ function installGeneratedBackground(source) {
 function installGeneratedContentScript(source, options = {}) {
   const originalChrome = globalThis.chrome;
   const originalLocation = globalThis.location;
+  const originalDocument = globalThis.document;
   const originalBridge = globalThis.__meetingTimelineBridge;
+  const originalOperatorCapture = globalThis.__meetingTimelineOperatorReferenceCapture;
   const sentMessages = [];
   const bridgeInstalls = [];
+  const documentListeners = new Map();
   globalThis.location = {
     hostname: options.hostname ?? 'meet.google.com',
     href: options.href ?? 'https://meet.google.com/abc-defg-hij',
+  };
+  globalThis.document = {
+    title: options.title ?? 'Design review - Google Meet',
+    addEventListener(type, listener) {
+      documentListeners.set(type, listener);
+    },
+    removeEventListener(type) {
+      documentListeners.delete(type);
+    },
   };
   globalThis.chrome = {
     runtime: {
@@ -216,33 +228,71 @@ function installGeneratedContentScript(source, options = {}) {
       lastError: undefined,
     },
   };
-  const runnableSource = source.replace(/^import .+;\n\n?/, '');
-  const installMeetingPlatformIntegrationContentScriptBridge = (client, bridgeOptions) => {
-    const bridge = { client, options: bridgeOptions, installed: true };
+  const captureMeetingAppDomSnapshot = (input = {}, captureOptions = {}) => ({
+    schema: 'meeting_app_dom_capture',
+    schema_version: 1,
+    source: captureOptions.source,
+    observedAtMs: captureOptions.observedAtMs,
+    platform: captureOptions.platform,
+    meeting_id: 'abc-defg-hij',
+    url: input.url,
+    title: input.title,
+    page: {
+      controls: captureOptions.phase === 'ended' ? [{ label: 'Join now' }] : [{ label: 'Leave call' }],
+      participants: captureOptions.phase === 'ended' ? [] : [{ id: 'ada', name: 'Ada Lovelace', speaking: true }],
+    },
+  });
+  const runnableSource = source.replace(/^(import .+\n)+\n?/, '');
+  const installMeetingAppLocalContentRuntime = (client, bridgeOptions) => {
+    const bridge = {
+      client,
+      options: bridgeOptions,
+      installed: true,
+      preflight() {
+        return { accepted: true, meeting_id: 'abc-defg-hij', platform: 'google_meet' };
+      },
+    };
     bridgeInstalls.push(bridge);
     return bridge;
   };
   try {
     Function(
-      'installMeetingPlatformIntegrationContentScriptBridge',
+      'installMeetingAppLocalContentRuntime',
+      'captureMeetingAppDomSnapshot',
       runnableSource,
-    )(installMeetingPlatformIntegrationContentScriptBridge);
+    )(installMeetingAppLocalContentRuntime, captureMeetingAppDomSnapshot);
   } catch (error) {
     globalThis.chrome = originalChrome;
     globalThis.location = originalLocation;
+    globalThis.document = originalDocument;
     if (originalBridge === undefined) delete globalThis.__meetingTimelineBridge;
     else globalThis.__meetingTimelineBridge = originalBridge;
+    if (originalOperatorCapture === undefined) delete globalThis.__meetingTimelineOperatorReferenceCapture;
+    else globalThis.__meetingTimelineOperatorReferenceCapture = originalOperatorCapture;
     throw error;
   }
   assert.equal(bridgeInstalls.length, 1);
   return {
     sentMessages,
     bridge: bridgeInstalls[0],
+    async click(label) {
+      const control = {
+        textContent: label,
+        getAttribute(name) {
+          return name === 'aria-label' ? label : null;
+        },
+      };
+      documentListeners.get('click')?.({ target: { closest: () => control } });
+      await new Promise((resolve) => queueMicrotask(resolve));
+    },
     restore() {
       globalThis.chrome = originalChrome;
       globalThis.location = originalLocation;
+      globalThis.document = originalDocument;
       if (originalBridge === undefined) delete globalThis.__meetingTimelineBridge;
       else globalThis.__meetingTimelineBridge = originalBridge;
+      if (originalOperatorCapture === undefined) delete globalThis.__meetingTimelineOperatorReferenceCapture;
+      else globalThis.__meetingTimelineOperatorReferenceCapture = originalOperatorCapture;
     },
   };
 }
@@ -357,6 +407,7 @@ assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan, 'meeting
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session, 'meeting_timeline.open_candidate_session');
 assert.equal(MEETING_APP_EXTENSION_STATUS_STORAGE_KEY, 'meeting_timeline_extension_status');
 assert.equal(MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS.insertMarks, '/api/annotations/batch');
+assert.equal(MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS.recordP0Reference, '/api/meeting-platform/p0-reference');
 assert.equal(normalizeMeetingAppExtensionMessageType('client_call'), MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call);
 assert.equal(normalizeMeetingAppExtensionMessageType('attached'), MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached);
 assert.equal(normalizeMeetingAppExtensionMessageType('extension-status'), MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status);
@@ -368,6 +419,7 @@ assert.equal(normalizeMeetingAppExtensionMessageType('open-adapter-session'), ME
 assert.equal(normalizeMeetingAppExtensionMessageType('candidate-launch-plan'), MEETING_APP_EXTENSION_MESSAGE_TYPES.candidate_launch_plan);
 assert.equal(normalizeMeetingAppExtensionMessageType('open-candidates'), MEETING_APP_EXTENSION_MESSAGE_TYPES.open_candidate_session);
 assert.equal(meetingAppExtensionTimelineEndpoint('insertMarks'), '/api/annotations/batch');
+assert.equal(meetingAppExtensionTimelineEndpoint('recordP0Reference'), '/api/meeting-platform/p0-reference');
 assert.throws(
   () => meetingAppExtensionTimelineEndpoint('deleteEverything'),
   /Unsupported meeting app extension client call method/,
@@ -572,7 +624,8 @@ const plan = buildMeetingAppExtensionInstallPlan({
 });
 assert.equal(plan.type, 'meeting_app_extension_install_plan');
 assert.deepEqual(plan.platforms, ['google_meet', 'microsoft_teams']);
-assert.equal(plan.content_script_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime');
+assert.equal(plan.content_script_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-local-content-runtime');
+assert.equal(plan.local_content_runtime_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-local-content-runtime');
 assert.equal(plan.meeting_app_content_script_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-content-script');
 assert.equal(plan.platform_integration_runtime_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/platform-integration-runtime');
 assert.equal(plan.browser_runtime_adapter, '@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-browser-runtime');
@@ -611,12 +664,14 @@ assert.deepEqual(plan.manifest.content_scripts[0].js, ['content.js']);
 const contentScriptSource = buildMeetingAppExtensionContentScriptSource({
   platforms: ['google_meet', 'microsoft_teams'],
 });
-assert.match(contentScriptSource, /installMeetingPlatformIntegrationContentScriptBridge/);
-assert.match(contentScriptSource, /platform-integration-runtime/);
+assert.match(contentScriptSource, /installMeetingAppLocalContentRuntime/);
+assert.doesNotMatch(contentScriptSource, /platform-integration-runtime|node:crypto/);
 assert.match(contentScriptSource, /meet\.google\.com/);
 assert.match(contentScriptSource, /teams\.microsoft\.com/);
 assert.match(contentScriptSource, /startRuntime: true/);
 assert.match(contentScriptSource, /startOptions: \{ startRuntime: true \}/);
+assert.match(contentScriptSource, /bindOperatorReferenceCapture/);
+assert.match(contentScriptSource, /recordP0Reference/);
 
 const contentScriptRuntime = installGeneratedContentScript(contentScriptSource);
 try {
@@ -626,6 +681,9 @@ try {
   assert.equal(contentScriptRuntime.bridge.options.browser_runtime_preset, 'google_meet');
   assert.equal(contentScriptRuntime.bridge.options.source, 'meeting_app_extension');
   assert.equal(contentScriptRuntime.bridge.options.startRuntime, true);
+  assert.equal(contentScriptRuntime.bridge.options.applyOptions.speakerAsAnnotation, true);
+  assert.equal(contentScriptRuntime.bridge.options.applyOptions.participantAsAnnotation, false);
+  assert.equal(contentScriptRuntime.bridge.options.speakerOptions.minStableMs, 650);
   assert.deepEqual(contentScriptRuntime.bridge.options.startOptions, { startRuntime: true });
   assert.equal(globalThis.__meetingTimelineBridge, contentScriptRuntime.bridge);
   assert.equal(contentScriptRuntime.sentMessages.length, 1);
@@ -641,6 +699,18 @@ try {
   assert.equal(contentScriptRuntime.sentMessages[1].method, 'startMeeting');
   assert.equal(contentScriptRuntime.sentMessages[1].platform, 'google_meet');
   assert.equal(contentScriptRuntime.sentMessages[1].input.meeting_id, 'meet-001');
+  assert.equal(contentScriptRuntime.sentMessages[1].input.observer_surface, 'browser_extension');
+  assert.equal(contentScriptRuntime.sentMessages[1].input.suppress_auto_annotations, true);
+  assert.equal(contentScriptRuntime.sentMessages[1].input.meeting_app_record.phase, 'active');
+  assert.equal(contentScriptRuntime.sentMessages[1].input.meeting_app_record.observer_surface, 'browser_extension');
+  assert.equal(contentScriptRuntime.sentMessages[1].input.meeting_app_record.snapshot.platform, 'google_meet');
+
+  await contentScriptRuntime.click('Join now');
+  assert.equal(contentScriptRuntime.sentMessages.length, 3);
+  assert.equal(contentScriptRuntime.sentMessages[2].method, 'recordP0Reference');
+  assert.equal(contentScriptRuntime.sentMessages[2].input.action, 'join');
+  assert.equal(contentScriptRuntime.sentMessages[2].input.meeting_id, 'abc-defg-hij');
+  assert.equal(contentScriptRuntime.sentMessages[2].input.observer_surface, 'browser_extension');
 } finally {
   contentScriptRuntime.restore();
 }
@@ -663,8 +733,8 @@ const liveCaptureSource = buildMeetingAppExtensionLiveCaptureSource({
 });
 assert.match(liveCaptureSource, /captureMeetingAppDomSnapshot/);
 assert.match(liveCaptureSource, /createMeetingAppSnapshotRecorder/);
-assert.match(liveCaptureSource, /buildMeetingAppLiveEvidencePackage/);
-assert.match(liveCaptureSource, /buildMeetingAppDomAdaptationDiagnosis/);
+assert.match(liveCaptureSource, /meeting_app_live_evidence_package/);
+assert.match(liveCaptureSource, /meeting_app_dom_adaptation_diagnosis/);
 assert.match(liveCaptureSource, /__meetingTimelineLiveCapture/);
 assert.match(liveCaptureSource, /captureActive/);
 assert.match(liveCaptureSource, /captureEnded/);
@@ -724,8 +794,8 @@ assert.match(backgroundSource, /meeting_timeline\.observe_candidates/);
 assert.match(backgroundSource, /meeting_timeline\.preflight_current_window/);
 assert.match(backgroundSource, /meeting_timeline\.preflight_candidates/);
 assert.match(backgroundSource, /tabs\.sendMessage/);
-assert.match(backgroundSource, /createMeetingPlatformRuntimeEventClient/);
-assert.match(backgroundSource, /observePlatformCandidates/);
+assert.match(backgroundSource, /meeting_platform_runtime_event/);
+assert.match(backgroundSource, /postRuntimeEvent/);
 assert.match(backgroundSource, /STATUS_STORAGE_KEY/);
 assert.match(backgroundSource, /setStorageValue/);
 assert.match(backgroundSource, /\/api\/meeting-session\/start/);
@@ -900,15 +970,15 @@ assert.match(scaffold.files.find((file) => file.path === 'package.json').content
 assert.match(scaffold.files.find((file) => file.path === 'build.mjs').content, /content-script\.js/);
 assert.match(scaffold.files.find((file) => file.path === 'build.mjs').content, /live-capture\.js/);
 assert.equal(scaffold.files.find((file) => file.path === 'manifest.json').mime, 'application/json');
-assert.match(scaffold.files.find((file) => file.path === 'src/content-script.entry.mjs').content, /platform-integration-runtime/);
-assert.match(scaffold.files.find((file) => file.path === 'src/content-script.entry.mjs').content, /installMeetingPlatformIntegrationContentScriptBridge/);
+assert.doesNotMatch(scaffold.files.find((file) => file.path === 'src/content-script.entry.mjs').content, /platform-integration-runtime|node:crypto/);
+assert.match(scaffold.files.find((file) => file.path === 'src/content-script.entry.mjs').content, /installMeetingAppLocalContentRuntime/);
 assert.match(scaffold.files.find((file) => file.path === 'src/live-capture.entry.mjs').content, /__meetingTimelineLiveCapture/);
 assert.match(scaffold.files.find((file) => file.path === 'src/live-capture.entry.mjs').content, /evidencePackage/);
 assert.match(scaffold.files.find((file) => file.path === 'src/live-capture.entry.mjs').content, /diagnose/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /runtimeApi\(\)\?\.onMessage/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /extension_status/);
-assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /createMeetingPlatformRuntimeEventClient/);
-assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /observePlatformCandidates/);
+assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /postRuntimeEvent/);
+assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /observe_platform_candidates/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /meeting_timeline\.observe_candidates/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /meeting_timeline\.preflight_current_window/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /meeting_timeline\.preflight_candidates/);

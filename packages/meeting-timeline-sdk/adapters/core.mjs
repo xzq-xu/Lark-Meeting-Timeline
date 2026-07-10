@@ -2,7 +2,7 @@ import {
   MeetingTimelineSdkError,
   compactObject,
   normalizeAbsoluteMs,
-} from '../index.mjs';
+} from './internal-utils.mjs';
 
 export const MEETING_SIGNAL_TYPES = Object.freeze([
   'meeting_started',

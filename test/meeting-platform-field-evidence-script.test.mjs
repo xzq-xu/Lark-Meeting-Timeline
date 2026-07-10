@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { buildMeetingAppFixtureSnapshot } from '../packages/meeting-timeline-sdk/adapters/meeting-app-fixtures.mjs';
+import { buildMeetingAppLiveEvidencePackage } from '../packages/meeting-timeline-sdk/adapters/meeting-app-profile.mjs';
 import { buildMeetingAppSnapshotRecordSet } from '../packages/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder.mjs';
 import { capturePlatformWebhookEvent } from '../packages/meeting-timeline-sdk/adapters/platform-capture.mjs';
 import { buildPlatformFixtureEvent } from '../packages/meeting-timeline-sdk/adapters/platform-fixtures.mjs';
@@ -68,10 +69,10 @@ function providerRecords(platform) {
   ];
 }
 
-await writeFile(join(inputDir, 'zoom-dom.json'), `${JSON.stringify({
-  platform: 'zoom',
-  meetingAppRecordSet: meetingAppRecordSet('zoom'),
-}, null, 2)}\n`, 'utf8');
+await writeFile(join(inputDir, 'zoom-dom.json'), `${JSON.stringify(buildMeetingAppLiveEvidencePackage({
+  platforms: ['zoom'],
+  recordSet: meetingAppRecordSet('zoom'),
+}), null, 2)}\n`, 'utf8');
 
 await writeFile(join(inputDir, 'webex-field.json'), `${JSON.stringify({
   platform: 'webex',
@@ -109,6 +110,7 @@ assert.equal(report.rows.find((row) => row.platform === 'webex').verified, true)
 assert.equal(report.rows.find((row) => row.platform === 'webex').source_files.length, 1);
 assert.equal(report.rows.find((row) => row.platform === 'zoom').status, 'pilot_ready_provider_pending');
 assert.equal(report.rows.find((row) => row.platform === 'zoom').missing_items.includes('capture_real_provider_start_end_events'), true);
+assert.equal(report.rows.find((row) => row.platform === 'zoom').source_kinds.includes('meeting_app_live_evidence_package'), true);
 assert.equal(report.written_files.some((file) => file.endsWith('/webex.json')), true);
 
 const writtenReport = JSON.parse(await readFile(reportFile, 'utf8'));

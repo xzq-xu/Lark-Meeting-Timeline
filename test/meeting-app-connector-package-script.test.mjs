@@ -392,7 +392,7 @@ assert.equal(manifest.host_permissions.includes('https://zoom.us/*'), true);
 assert.equal(manifest.host_permissions.includes('https://timeline.example.com/*'), true);
 
 const contentEntry = await readFile(join(outDir, 'extension', 'src', 'content-script.entry.mjs'), 'utf8');
-assert.match(contentEntry, /installMeetingPlatformIntegrationContentScriptBridge/);
+assert.match(contentEntry, /installMeetingAppLocalContentRuntime/);
 
 const { stdout: jsonStdout } = await execFileAsync(process.execPath, [
   'scripts/meeting-app-connector-package.mjs',

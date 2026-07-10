@@ -1,4 +1,4 @@
-import { compactObject, normalizeAbsoluteMs } from '../index.mjs';
+import { compactObject, normalizeAbsoluteMs } from './internal-utils.mjs';
 import { createLocalMeetingObserver, createLocalMeetingTimelineObserver, selectMeetingSnapshot } from './local-observer.mjs';
 import { detectMeetingFromUrl } from './meeting-url.mjs';
 import { normalizeMeetingPlatform } from './platform-setup.mjs';

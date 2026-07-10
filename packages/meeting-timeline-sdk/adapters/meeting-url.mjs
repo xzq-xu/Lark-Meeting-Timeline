@@ -1,4 +1,4 @@
-import { compactObject } from '../index.mjs';
+import { compactObject } from './internal-utils.mjs';
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');

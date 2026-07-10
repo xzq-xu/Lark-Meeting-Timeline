@@ -6,6 +6,9 @@ import {
   meetingAppSnapshotRecords,
 } from '../packages/meeting-timeline-sdk/adapters/meeting-app-snapshot-recorder.mjs';
 import {
+  MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA,
+} from '../packages/meeting-timeline-sdk/adapters/meeting-app-profile.mjs';
+import {
   buildMeetingPlatformFieldEvidenceBundle,
 } from '../packages/meeting-timeline-sdk/adapters/platform-field-capture.mjs';
 import {
@@ -126,6 +129,22 @@ function candidateInputsForPlatform(platform, source = {}) {
       file: source.file,
       input,
       source_kind: 'evidence_package',
+    }] : [];
+  }
+  if (input.schema === MEETING_APP_LIVE_EVIDENCE_PACKAGE_SCHEMA) {
+    const packagePlatforms = unique([
+      ...asArray(input.platforms),
+      ...asArray(input.platform),
+      ...asArray(input.record_set?.platforms),
+      ...asArray(input.recordSet?.platforms),
+    ].map((item) => normalizePlatformKey(item)));
+    return packagePlatforms.includes(platform) ? [{
+      file: source.file,
+      input: {
+        platform,
+        meetingAppRecordSet: input.record_set ?? input.recordSet,
+      },
+      source_kind: 'meeting_app_live_evidence_package',
     }] : [];
   }
   const explicitPlatform = platformFromInput(input, source.file);
