@@ -27,6 +27,9 @@ assert.equal(packInfo.name, '@ai-annotation/meeting-timeline-sdk');
 const packedFiles = packInfo.files.map((item) => item.path).sort();
 assert.equal(packedFiles.includes('index.mjs'), true);
 assert.equal(packedFiles.includes('index.d.ts'), true);
+assert.equal(packedFiles.includes('producer.mjs'), true);
+assert.equal(packedFiles.includes('producer.d.ts'), true);
+assert.equal(packedFiles.includes('errors.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-app-connector-package.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-consumer-handoff.mjs'), true);
@@ -680,10 +683,14 @@ import {
   openMeetingPlatformAdapterSession as openMeetingPlatformAdapterSessionFromRoot,
   openMeetingPlatformAdapterRuntimeSession as openMeetingPlatformAdapterRuntimeSessionFromRoot,
   runMeetingPlatformAdapterSmoke as runMeetingPlatformAdapterSmokeFromRoot,
+  createMeetingTimelineAnnotationProducer,
   createMeetingTimelineClient,
   createMeetingPlatformTimelineKit as createMeetingPlatformTimelineKitFromRoot,
   detectMeetingPlatformForBrowser as detectMeetingPlatformForBrowserFromRoot,
 } from '@ai-annotation/meeting-timeline-sdk';
+import {
+  createMeetingTimelineAnnotationProducer as createMeetingTimelineAnnotationProducerFromSubpath,
+} from '@ai-annotation/meeting-timeline-sdk/producer';
 import {
   createMeetingPlatformTimelineKit,
 } from '@ai-annotation/meeting-timeline-sdk/adapters/platform-kit';
@@ -3586,6 +3593,17 @@ const larkSignals = normalizeLarkEvent({
 });
 assert.equal(larkSignals.some((signal) => signal.type === 'meeting_started'), true);
 assert.equal(larkSignals[0].meeting.platform, 'lark');
+
+assert.equal(createMeetingTimelineAnnotationProducerFromSubpath, createMeetingTimelineAnnotationProducer);
+const packageProducer = createMeetingTimelineAnnotationProducer({
+  client: { insertMark: async () => ({ accepted: true }) },
+  clock: () => 1_783_900_000_000,
+  idFactory: () => 'package-producer-mark',
+});
+const packageMark = packageProducer.capture({ label: 'package mark' });
+assert.equal(packageMark.id, 'package-producer-mark');
+assert.equal(packageMark.source, 'sdk_annotation_producer');
+assert.equal(packageMark.device_id, undefined);
 
 console.log('ok consumer package imports');
 process.exit(0);

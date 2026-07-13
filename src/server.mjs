@@ -45,6 +45,10 @@ import { TimelineStore } from './store.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const publicDir = join(root, 'public');
+const sdkBrowserModules = new Map([
+  ['/sdk/producer.mjs', join(root, 'packages/meeting-timeline-sdk/producer.mjs')],
+  ['/sdk/errors.mjs', join(root, 'packages/meeting-timeline-sdk/errors.mjs')],
+]);
 const dataDir = process.env.TIMELINE_DATA_DIR || join(root, 'data');
 const authPath = process.env.LARK_AUTH_PATH || join(dataDir, 'lark-auth.json');
 const realMeetingProbePath = process.env.REAL_MEETING_PROBE_PATH || join(dataDir, 'real-meeting-probe.json');
@@ -1637,7 +1641,10 @@ async function appendAnnotation(input) {
     result.item,
     saved.meeting,
     Date.now(),
-    result.options,
+    {
+      ...result.options,
+      visible_instance_count: (saved.sequence ?? []).filter((row) => row.id === result.item.id).length,
+    },
   );
   return {
     ack: annotationAck(result.item, saved, result.options),
@@ -1696,7 +1703,10 @@ async function appendAnnotationBatch(inputs = []) {
       result.item,
       saved.meeting,
       visibleAtMs,
-      result.options,
+      {
+        ...result.options,
+        visible_instance_count: (saved.sequence ?? []).filter((item) => item.id === result.item.id).length,
+      },
     );
     return {
       ack: annotationAck(result.item, saved, result.options),
@@ -2867,7 +2877,36 @@ function annotationEvidenceRow(input = {}, item = {}, meeting = {}, visibleAtMs 
     actual_position_ms: actualPositionMs,
     timeline_error_ms: expectedPositionMs == null || actualPositionMs == null ? null : actualPositionMs - expectedPositionMs,
     duplicate_delivery: options.replaced_existing === true,
+    visible_instance_count: Number(options.visible_instance_count ?? 1),
+    duplicate_visible: Number(options.visible_instance_count ?? 1) > 1,
   };
+}
+
+function upsertAnnotationEvidenceRow(rows = [], row = {}) {
+  const index = rows.findIndex((item) => String(item.id) === String(row.id));
+  if (index < 0) {
+    return [...rows, {
+      ...row,
+      delivery_attempt_count: 1,
+      duplicate_delivery_count: row.duplicate_delivery ? 1 : 0,
+    }];
+  }
+  const existing = rows[index];
+  const next = [...rows];
+  next[index] = {
+    ...existing,
+    delivery_attempt_count: Number(existing.delivery_attempt_count ?? 1) + 1,
+    duplicate_delivery_count: Number(existing.duplicate_delivery_count ?? 0) + 1,
+    duplicate_delivery: true,
+    duplicate_visible: Boolean(existing.duplicate_visible || row.duplicate_visible),
+    visible_instance_count: Math.max(
+      Number(existing.visible_instance_count ?? 1),
+      Number(row.visible_instance_count ?? 1),
+    ),
+    last_delivery_visible_at_ms: row.visible_at_ms,
+    last_delivery_visible_latency_ms: row.visible_latency_ms,
+  };
+  return next;
 }
 
 function persistMeetingPlatformAnnotationEvidence(input = {}, item = {}, meeting = {}, visibleAtMs = Date.now(), options = {}) {
@@ -2880,7 +2919,7 @@ function persistMeetingPlatformAnnotationEvidence(input = {}, item = {}, meeting
   const collection = isSpeaker ? 'speaker_markers' : isParticipant ? 'participant_markers' : 'annotations';
   const next = {
     ...value,
-    [collection]: [...(value[collection] ?? []), row],
+    [collection]: upsertAnnotationEvidenceRow(value[collection] ?? [], row),
   };
   const saved = saveMeetingPlatformEvidence(loaded.path, next);
   return { recorded: true, path: loaded.path, collection, count: saved[collection].length, row };
@@ -8199,6 +8238,16 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
+
+    const sdkModulePath = req.method === 'GET' ? sdkBrowserModules.get(url.pathname) : null;
+    if (sdkModulePath) {
+      res.writeHead(200, corsHeaders({
+        'content-type': 'text/javascript; charset=utf-8',
+        'cache-control': 'no-cache',
+      }));
+      createReadStream(sdkModulePath).pipe(res);
+      return;
+    }
 
     const filePath = safePublicPath(req.url ?? '/');
     if (!filePath || !existsSync(filePath)) return sendText(res, 404, 'Not found');

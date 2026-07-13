@@ -131,6 +131,11 @@ try {
   const inserted = await postJson(baseUrl, '/api/annotations/batch', { annotations: marks });
   assert.equal(inserted.annotation_evidence.every((row) => row.recorded), true);
 
+  const retried = await postJson(baseUrl, '/api/annotations', marks[0]);
+  assert.equal(retried.annotation_evidence.recorded, true);
+  assert.equal(retried.annotation_evidence.row.duplicate_delivery, true);
+  assert.equal(retried.annotation_evidence.row.duplicate_visible, false);
+
   for (const [index, speaker] of ['speaker-a', 'speaker-b'].entries()) {
     await postJson(baseUrl, '/api/annotations', {
       id: `p0-speaker-${index}`,
@@ -168,6 +173,8 @@ try {
   assert.equal(evidence.measurements.observer_surface, 'browser_extension');
   assert.equal(evidence.meetingAppRecords.length, 2);
   assert.equal(evidence.annotations.length, 5);
+  assert.equal(evidence.annotations.find((row) => row.id === marks[0].id).delivery_attempt_count, 2);
+  assert.equal(evidence.annotations.find((row) => row.id === marks[0].id).visible_instance_count, 1);
   assert.equal(evidence.speaker_markers.length, 2);
   assert.equal(evidence.measurements.previous_meeting_annotation_count_on_new_axis, 0);
   assert.equal(evidence.measurements.start_detection_latency_ms >= 0, true);

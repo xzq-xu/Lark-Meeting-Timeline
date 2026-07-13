@@ -22,6 +22,12 @@ export interface MeetingStartInput {
   startTime?: number | string | Date;
   detector_source?: string;
   detectorSource?: string;
+  observer_surface?: string;
+  observerSurface?: string;
+  run_id?: string;
+  runId?: string;
+  meeting_app_record?: Record<string, unknown>;
+  meetingAppRecord?: Record<string, unknown>;
   force?: boolean;
   [key: string]: unknown;
 }
@@ -37,6 +43,12 @@ export interface MeetingEndInput {
   timeMs?: number;
   detector_source?: string;
   detectorSource?: string;
+  observer_surface?: string;
+  observerSurface?: string;
+  run_id?: string;
+  runId?: string;
+  meeting_app_record?: Record<string, unknown>;
+  meetingAppRecord?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -192,6 +204,79 @@ export class MeetingTimelineClient {
 
 export function createMeetingTimelineClient(options: MeetingTimelineClientOptions): MeetingTimelineClient;
 export const createMeetingTimelineSdk: typeof createMeetingTimelineClient;
+
+export interface AnnotationProducerIdFactoryContext {
+  input: TimelineMarkInput;
+  capturedAtMs: number;
+  sequence: number;
+  producerId: string;
+}
+
+export interface MeetingTimelineAnnotationProducerCommonOptions extends Omit<Partial<MeetingTimelineClientOptions>, 'baseUrl'> {
+  producerId?: string;
+  producer_id?: string;
+  clock?: () => number;
+  idFactory?: (context: AnnotationProducerIdFactoryContext) => string;
+  id_factory?: (context: AnnotationProducerIdFactoryContext) => string;
+  maxAttempts?: number;
+  max_attempts?: number;
+  retryDelayMs?: number;
+  retry_delay_ms?: number;
+  maxRetryDelayMs?: number;
+  max_retry_delay_ms?: number;
+  sleep?: (delayMs: number) => Promise<void>;
+}
+
+export type MeetingTimelineAnnotationProducerOptions = MeetingTimelineAnnotationProducerCommonOptions & (
+  | { client: Pick<MeetingTimelineClient, 'insertMark'>; baseUrl?: string }
+  | { client?: undefined; baseUrl: string }
+);
+
+export interface AnnotationProducerDelivery {
+  accepted: true;
+  annotation: Record<string, unknown> & { id: string; captured_at_ms: number };
+  response: unknown;
+  attempts: number;
+  captured_at_ms: number;
+  visible_at_ms: number;
+  delivery_latency_ms: number;
+}
+
+export interface AnnotationProducerFlushReport {
+  accepted: boolean;
+  attempted_count: number;
+  delivered_count: number;
+  failed_count: number;
+  pending_count: number;
+  deliveries: AnnotationProducerDelivery[];
+  failures: Array<{ annotation_id: string; error: string; attempts: number }>;
+}
+
+export class MeetingTimelineAnnotationProducer {
+  constructor(options: MeetingTimelineAnnotationProducerOptions);
+  readonly source: string;
+  readonly producerId: string;
+  readonly client: Pick<MeetingTimelineClient, 'insertMark'>;
+  readonly pendingCount: number;
+  capture(input?: TimelineMarkInput): Record<string, unknown> & { id: string; captured_at_ms: number };
+  enqueue(input?: TimelineMarkInput): Record<string, unknown> & { id: string; captured_at_ms: number };
+  pendingAnnotations(): Array<Record<string, unknown> & { id: string; captured_at_ms: number }>;
+  discard(id: string): boolean;
+  deliverPending(id: string, options?: Record<string, unknown>): Promise<AnnotationProducerDelivery>;
+  publish(input?: TimelineMarkInput, options?: Record<string, unknown>): Promise<AnnotationProducerDelivery>;
+  publishBatch(
+    inputs?: TimelineMarkInput[] | { annotations?: TimelineMarkInput[]; items?: TimelineMarkInput[] },
+    options?: Record<string, unknown>,
+  ): Promise<AnnotationProducerFlushReport & {
+    requested_count: number;
+    requested_ids: string[];
+  }>;
+  flush(options?: Record<string, unknown>): Promise<AnnotationProducerFlushReport>;
+}
+
+export function createMeetingTimelineAnnotationProducer(
+  options: MeetingTimelineAnnotationProducerOptions,
+): MeetingTimelineAnnotationProducer;
 
 export interface MeetingAppTimelineSdkOptions extends Partial<MeetingTimelineClientOptions> {
   client?: MeetingTimelineClient;

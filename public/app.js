@@ -3,6 +3,9 @@ import {
   shouldHideDemoTimelineForProbe as shouldHideDemoTimelineForProbeState,
   sourceLabelForMeeting,
 } from './uiState.mjs';
+import {
+  createMeetingTimelineAnnotationProducer,
+} from '/sdk/producer.mjs';
 
 let state = null;
 let stream = null;
@@ -29,6 +32,11 @@ let timelineView = {
   durationMs: null,
   fullDurationMs: null,
 };
+const standardAnnotationProducer = createMeetingTimelineAnnotationProducer({
+  baseUrl: window.location.origin,
+  source: 'sdk_reference_producer',
+  producerId: 'timeline-demo',
+});
 
 const $ = (id) => document.getElementById(id);
 const MIN_TIMELINE_VIEW_MS = 30_000;
@@ -2350,7 +2358,7 @@ async function wire() {
     const capturedAt = $('liveCapturedAtInput').value.trim();
     const label = $('liveLabelInput').value.trim() || '实时标注';
     const body = {
-      source: 'browser_demo',
+      source: 'sdk_reference_producer',
       kind: 'live_mark',
       label,
       realtime: true,
@@ -2368,16 +2376,14 @@ async function wire() {
       body.captured_at_ms = Date.now();
     }
     if (offset != null) body.time_ms = offset;
-    const result = await api('/api/annotations', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
+    const delivery = await standardAnnotationProducer.publish(body);
+    const result = delivery.response;
     state = result.state;
     if (offset == null) $('liveOffsetInput').value = '';
     $('liveCapturedAtInput').value = '';
     renderAll();
     const source = timeSourceInfo(result.item);
-    $('streamStatus').textContent = `实时标注已写入：${result.item.label} @ ${fmtTime(result.item.time_ms)} · ${source.label}`;
+    $('streamStatus').textContent = `实时标注已写入：${result.item.label} @ ${fmtTime(result.item.time_ms)} · ${source.label} · ${delivery.delivery_latency_ms}ms`;
   });
   $('liveCapturedAtInput').addEventListener('input', renderDebugInputControls);
 

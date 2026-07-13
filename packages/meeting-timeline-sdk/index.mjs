@@ -1,4 +1,12 @@
 import {
+  MeetingTimelineApiError,
+  MeetingTimelineSdkError,
+} from './errors.mjs';
+import {
+  MeetingTimelineAnnotationProducer,
+  createMeetingTimelineAnnotationProducer,
+} from './producer.mjs';
+import {
   buildMeetingAppAdapterIntegrationPackage,
   buildMeetingAppAdapterIntegrationPackageMatrix,
 } from './adapters/meeting-app-adapter-integration-package.mjs';
@@ -38,6 +46,13 @@ import {
   resolveMeetingAppTimelineHostAdapterConfig,
 } from './adapters/meeting-app-connector-package.mjs';
 
+export {
+  MeetingTimelineAnnotationProducer,
+  MeetingTimelineApiError,
+  MeetingTimelineSdkError,
+  createMeetingTimelineAnnotationProducer,
+};
+
 export const SDK_VERSION = '0.1.0';
 
 export const DEFAULT_ENDPOINTS = Object.freeze({
@@ -60,23 +75,6 @@ export const DEFAULT_MEETING_APP_TIMELINE_SDK_PLATFORMS = Object.freeze([
   'webex',
   'lark',
 ]);
-
-export class MeetingTimelineSdkError extends Error {
-  constructor(message, details = {}) {
-    super(message);
-    this.name = 'MeetingTimelineSdkError';
-    this.details = details;
-  }
-}
-
-export class MeetingTimelineApiError extends MeetingTimelineSdkError {
-  constructor(message, details = {}) {
-    super(message, details);
-    this.name = 'MeetingTimelineApiError';
-    this.status = details.status ?? null;
-    this.body = details.body ?? null;
-  }
-}
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '');
@@ -181,6 +179,9 @@ export function buildMeetingStartPayload(input = {}, defaults = {}) {
     keep_segments: input.keep_segments ?? input.keepSegments,
     suppress_auto_annotations: input.suppress_auto_annotations ?? input.suppressAutoAnnotations,
     suppress_demo_annotations: input.suppress_demo_annotations ?? input.suppressDemoAnnotations,
+    observer_surface: input.observer_surface ?? input.observerSurface,
+    run_id: input.run_id ?? input.runId,
+    meeting_app_record: input.meeting_app_record ?? input.meetingAppRecord,
   });
 }
 
@@ -200,6 +201,9 @@ export function buildMeetingEndPayload(input = {}, defaults = {}) {
     end_time_ms: endTimeMs,
     time_ms: input.time_ms ?? input.timeMs,
     detector_source: input.detector_source ?? input.detectorSource ?? input.source ?? defaults.detectorSource,
+    observer_surface: input.observer_surface ?? input.observerSurface,
+    run_id: input.run_id ?? input.runId,
+    meeting_app_record: input.meeting_app_record ?? input.meetingAppRecord,
   });
 }
 

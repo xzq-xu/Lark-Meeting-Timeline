@@ -1,6 +1,6 @@
 # Meeting Timeline SDK
 
-把外部项目里的会议检测、电子纸手写标记、桌面观察器事件，插入到统一会议时间轴。
+把外部项目里的会议检测、手写标记、网页操作或桌面观察器事件插入统一会议时间轴。SDK 本身不依赖电子纸、Android 或 ADB；设备应用只是众多标注生产者中的一种。
 
 这个 SDK 只依赖当前服务暴露的稳定协议，不依赖飞书 SDK：
 
@@ -37,6 +37,39 @@ npm run sdk:package-smoke
 
 这个检查会先 `npm pack`，再创建一个临时 consumer 项目，通过 `@ai-annotation/meeting-timeline-sdk` 和 `@ai-annotation/meeting-timeline-sdk/adapters/*` 导入公开入口，避免 SDK 只在 monorepo 相对路径下可用。
 
+完整 SDK 发布门禁：
+
+```bash
+npm run sdk:release-acceptance
+```
+
+该命令使用设备无关的标准生产者执行 5 平台、每平台 3 场、每场 5 条标注的隔离链路，并验证稳定 ID 重试、延迟和轴位置。它是可重复的 SDK 契约验收，不冒充真实会议页面的现场 selector 验收。
+
+## 标准标注生产者
+
+标注源不需要运行在电子纸上。网页、桌面程序、自动化工具和设备应用都可以使用同一生产者：
+
+```js
+import {
+  createMeetingTimelineAnnotationProducer,
+} from '@ai-annotation/meeting-timeline-sdk/producer';
+
+const producer = createMeetingTimelineAnnotationProducer({
+  baseUrl: 'http://localhost:8787',
+  source: 'my_notes_app',
+  producerId: 'notes-window-1',
+});
+
+await producer.publish({
+  label: 'why?',
+  intent: 'question',
+});
+```
+
+`publish()` 在调用时立即生成 `captured_at_ms` 和稳定 ID。网络错误会用同一 ID 重试；最终仍失败的标注保留在内存队列，可在链路恢复后调用 `flush()`。服务端按 ID 幂等更新，因此传输重试不会制造第二个可见标注。
+
+`/producer` 是独立的浏览器安全入口，只加载 `producer.mjs` 和共享错误类型，不会转入完整平台 adapter，也不依赖任何 `node:` 内置模块。
+
 ## 基本用法
 
 ```js
@@ -44,8 +77,7 @@ import { createMeetingTimelineClient } from '@ai-annotation/meeting-timeline-sdk
 
 const timeline = createMeetingTimelineClient({
   baseUrl: 'http://localhost:8787',
-  source: 'hanwang_epaper',
-  deviceId: 'hanwang-device-001',
+  source: 'notes_app',
 });
 
 await timeline.startMeeting({

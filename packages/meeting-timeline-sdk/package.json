@@ -32,6 +32,10 @@
       "types": "./index.d.ts",
       "import": "./index.mjs"
     },
+    "./producer": {
+      "types": "./producer.d.ts",
+      "import": "./producer.mjs"
+    },
     "./adapters/*": {
       "types": "./adapters/*.d.ts",
       "import": "./adapters/*.mjs"
@@ -44,6 +48,9 @@
   "files": [
     "index.mjs",
     "index.d.ts",
+    "producer.mjs",
+    "producer.d.ts",
+    "errors.mjs",
     "bin",
     "cli",
     "adapters",

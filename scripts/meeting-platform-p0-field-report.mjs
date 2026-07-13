@@ -126,8 +126,9 @@ function evaluateRun(input = {}, file, contract = {}) {
   const annotationMax = max(annotationLatencies);
   const timelineErrorMax = absoluteMax(annotationTimelineErrors);
   const speakerMarkerMax = max(speakerMarkerLatencies);
-  const duplicateCount = annotations.filter((row) => row.duplicate_delivery === true).length
-    + Math.max(0, annotations.length - uniqueAnnotationIds.size);
+  const duplicateCount = annotations.reduce((count, row) => (
+    count + Math.max(0, Number(row.visible_instance_count ?? (row.duplicate_visible ? 2 : 1)) - 1)
+  ), 0);
   const expectedAnnotations = Number(contract.annotations_per_meeting ?? 5);
   const lostCount = Math.max(0, expectedAnnotations - uniqueAnnotationIds.size);
   const leakageCount = numeric(input.measurements?.previous_meeting_annotation_count_on_new_axis);

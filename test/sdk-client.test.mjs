@@ -34,6 +34,17 @@ assert.deepEqual(startPayload, {
   detector_source: 'sdk-test',
 });
 
+const observedStartPayload = buildMeetingStartPayload({
+  meetingId: 'sdk-observed-001',
+  startTimeMs: startMs,
+  observerSurface: 'browser_extension',
+  runId: 'google_meet:sdk-observed-001',
+  meetingAppRecord: { phase: 'active', captured_at_ms: startMs },
+});
+assert.equal(observedStartPayload.observer_surface, 'browser_extension');
+assert.equal(observedStartPayload.run_id, 'google_meet:sdk-observed-001');
+assert.equal(observedStartPayload.meeting_app_record.phase, 'active');
+
 const markPayload = buildTimelineMark({
   id: 'sdk-mark-001',
   capturedAtMs: startMs + 12_000,
@@ -74,6 +85,16 @@ assert.deepEqual(endPayload, {
   end_time_ms: startMs + 60_000,
   detector_source: 'sdk-test',
 });
+
+const observedEndPayload = buildMeetingEndPayload({
+  meetingId: 'sdk-observed-001',
+  endTimeMs: startMs + 60_000,
+  observerSurface: 'browser_extension',
+  runId: 'google_meet:sdk-observed-001',
+  meetingAppRecord: { phase: 'ended', captured_at_ms: startMs + 60_000 },
+});
+assert.equal(observedEndPayload.observer_surface, 'browser_extension');
+assert.equal(observedEndPayload.meeting_app_record.phase, 'ended');
 
 const transcriptPayload = buildTranscriptImportPayload({
   meeting: {

@@ -29,8 +29,17 @@
 
 SDK 后续跨 Google Meet、Microsoft Teams、Zoom 等会议软件的适配方案见 [多会议平台时间轴适配方案](docs/meeting-platform-adapters.md)。
 多软件接入执行清单（Google Meet / Teams / Zoom / Webex / Lark）：[会议软件适配快照（多软件）](docs/meeting-platform-multi-software-adaptation.md)。
+SDK 包的设备无关发布标准见：[会议时间轴 SDK 发布验收单](docs/meeting-timeline-sdk-release-acceptance.md)。
 五个平台可直接照做的现场通过标准见：[多会议平台 P0 现场验收单](docs/meeting-platform-p0-field-acceptance.md)。
 最新执行进度与未完成项对齐见：[会议时间轴 SDK 进度快照（2026-07-09）](docs/meeting-platform-progress-checkpoint-2026-07-09.md)。
+
+交付 SDK 前执行：
+
+```bash
+npm run sdk:release-acceptance
+```
+
+该门禁不连接电子纸或 Android 设备；它通过标准标注生产者验证包导入、稳定 ID 重试、五平台统一协议、时间轴位置和跨会议隔离。真实会议网页兼容性由后面的现场验收单单独判断。
 
 如果要在真实 Google Meet / Microsoft Teams / Zoom / Webex / Lark 网页上采样 DOM 证据，先导出会议应用浏览器扩展：
 

@@ -119,6 +119,23 @@ assert.equal(report.platforms[0].latest_runs[0].observer_surface, 'browser_exten
 const written = JSON.parse(await readFile(reportFile, 'utf8'));
 assert.equal(written.accepted, true);
 
+const retriedEvidence = runEvidence(4);
+retriedEvidence.annotations[0].duplicate_delivery = true;
+retriedEvidence.annotations[0].delivery_attempt_count = 2;
+retriedEvidence.annotations[0].visible_instance_count = 1;
+retriedEvidence.annotations[0].duplicate_visible = false;
+await writeFile(join(inputDir, 'run-4.json'), `${JSON.stringify(retriedEvidence, null, 2)}\n`, 'utf8');
+const { stdout: retriedStdout } = await execFileAsync(process.execPath, [
+  'scripts/meeting-platform-p0-field-report.mjs',
+  '--platforms=google-meet',
+  `--dir=${inputDir}`,
+  `--report-file=${reportFile}`,
+  '--json=true',
+], { cwd: repoRoot });
+const retried = JSON.parse(retriedStdout);
+assert.equal(retried.accepted, true);
+assert.equal(retried.platforms[0].latest_runs.at(-1).duplicate_annotation_count, 0);
+
 await writeFile(join(inputDir, 'run-4.json'), `${JSON.stringify(runEvidence(4, {
   speaker_markers: [],
 }), null, 2)}\n`, 'utf8');
