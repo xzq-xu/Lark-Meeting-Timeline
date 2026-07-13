@@ -65,11 +65,16 @@ assert.match(app, /会后补传标注必须填写真实采集时间/);
 assert.match(app, /查询这条标注是否 pending/);
 assert.match(app, /curl -N/);
 assert.match(app, /openAuthPopup/);
-assert.match(app, /likelyNeedsAuth/);
 assert.match(app, /vc:meeting\.search:read/);
 assert.match(app, /recent_event_restore/);
 assert.match(app, /刚刚投递的飞书会议开始事件恢复时间轴/);
 assert.match(app, /实时建轴主路径不是这里登录拿权限/);
 assert.match(app, /最近真实开始事件早于本次等待/);
+
+const prepareHandler = app.match(/\$\('prepareRealDemoBtn'\)\.addEventListener\('click',[\s\S]*?\n  \}\);\n  \$\('monitorRealDemoBtn'\)/)?.[0] ?? '';
+assert.ok(prepareHandler, 'prepare real demo click handler should exist');
+assert.doesNotMatch(prepareHandler, /window\.open|openAuthPopup/);
+assert.match(prepareHandler, /启动不会自动打开飞书页面/);
+assert.match(prepareHandler, /主动点击“授权会议扫描”/);
 
 console.log('ok real demo monitor UI control');

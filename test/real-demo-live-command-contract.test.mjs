@@ -9,15 +9,18 @@ const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
 const command = packageJson.scripts['demo:live'];
 assert.equal(
   command,
-  'node scripts/monitor-real-demo.mjs --prepare --open-auth --wait-auth --scan-after-auth --auto-mark --timeout-ms=900000 --auth-timeout-ms=300000 --report-file=data/live-demo-report.json',
+  'node scripts/monitor-real-demo.mjs --prepare --auto-mark --timeout-ms=900000 --report-file=data/live-demo-report.json',
 );
 assert.match(command, /--prepare/);
-assert.match(command, /--open-auth/);
-assert.match(command, /--wait-auth/);
-assert.match(command, /--scan-after-auth/);
+assert.doesNotMatch(command, /--open-auth|--wait-auth|--scan-after-auth/);
 assert.match(command, /--auto-mark/);
 assert.match(command, /data\/live-demo-report\.json/);
+const authCommand = packageJson.scripts['demo:live:auth'];
+assert.match(authCommand, /--open-auth/);
+assert.match(authCommand, /--wait-auth/);
+assert.match(authCommand, /--scan-after-auth/);
 assert.match(readme, /npm run demo:live/);
+assert.match(readme, /npm run demo:live:auth/);
 assert.match(readme, /data\/live-demo-report\.json/);
 assert.match(readme, /直接开启飞书会议/);
 assert.match(readme, /开放标注接口/);

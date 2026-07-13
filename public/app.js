@@ -1869,11 +1869,6 @@ async function wire() {
     await loadReadiness();
   });
   $('prepareRealDemoBtn').addEventListener('click', async () => {
-    const likelyNeedsAuth = Boolean(realDemoStatus?.auth_start?.redirect_url)
-      || meetingSearchFallbackStatus().needsReauth;
-    const authPopup = likelyNeedsAuth
-      ? window.open('about:blank', 'lark_real_demo_oauth', 'popup,width=960,height=760')
-      : null;
     try {
       const result = await api('/api/lark/real-demo/prepare', {
         method: 'POST',
@@ -1894,17 +1889,12 @@ async function wire() {
         $('streamStatus').textContent = `真实等待状态已开启，并已通过扫描绑定会议：${result.trigger.meeting_title || result.trigger.selected_meeting_id}`;
         await load();
       } else if (result.auth_required && (result.auth_start?.redirect_url || result.auth_start?.auth_url)) {
-        const authUrl = result.auth_start.redirect_url || result.auth_start.auth_url;
-        openAuthPopup(authUrl, 'lark_real_demo_oauth', authPopup);
-        const scopes = result.auth_start.scopes?.join(' ') || 'vc:meeting.search:read';
-        $('streamStatus').textContent = `真实等待状态已开启但尚未建轴，已打开飞书授权窗口：scope=${scopes}`;
+        $('streamStatus').textContent = '真实等待状态已开启；启动不会自动打开飞书页面。实时事件可直接建轴，如需账号会议扫描兜底，请主动点击“授权会议扫描”。';
       } else {
-        if (authPopup) authPopup.close();
         $('streamStatus').textContent = result.next_step || '真实等待状态已开启但尚未建轴：现在可以直接开启飞书会议。扫描兜底需要单独点击“扫描我的真实会议”或打开“被动扫描建轴”。';
       }
       await loadReadiness();
     } catch (error) {
-      if (authPopup) authPopup.close();
       $('streamStatus').textContent = `进入真实等待状态失败：${error.message}`;
     }
   });

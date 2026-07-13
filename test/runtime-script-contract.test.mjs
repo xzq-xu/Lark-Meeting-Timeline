@@ -7,6 +7,7 @@ const packageJson = JSON.parse(
 const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
 
 assert.equal(packageJson.scripts.start, 'REAL_DEMO_AUTO_ARM=1 REAL_DEMO_AUTO_ANNOTATION=0 REAL_DEMO_DEVICE_SIMULATOR=0 REAL_DEMO_DEVICE_STREAM=0 node src/server.mjs');
+assert.doesNotMatch(packageJson.scripts.start, /open-auth|auth:open|auth:meeting-scan/);
 assert.equal(packageJson.scripts['start:plain'], 'node src/server.mjs');
 assert.equal(
   packageJson.scripts['auth:meeting-scan'],
@@ -18,6 +19,11 @@ assert.equal(packageJson.scripts['auth:status'], 'node scripts/auth-meeting-scan
 assert.equal(packageJson.scripts['auth:open'], 'node scripts/auth-meeting-scan-status.mjs --open=true --wait=true --report-file=data/auth-meeting-scan-status-report.json');
 assert.equal(
   packageJson.scripts['demo:live'],
+  'node scripts/monitor-real-demo.mjs --prepare --auto-mark --timeout-ms=900000 --report-file=data/live-demo-report.json',
+);
+assert.doesNotMatch(packageJson.scripts['demo:live'], /--open-auth|--wait-auth|--scan-after-auth/);
+assert.equal(
+  packageJson.scripts['demo:live:auth'],
   'node scripts/monitor-real-demo.mjs --prepare --open-auth --wait-auth --scan-after-auth --auto-mark --timeout-ms=900000 --auth-timeout-ms=300000 --report-file=data/live-demo-report.json',
 );
 assert.equal(
@@ -56,6 +62,7 @@ assert.equal(packageJson.scripts['meeting-platform:evidence-package'], 'node scr
 assert.equal(packageJson.scripts['sdk:package-smoke'], 'node test/sdk-package-smoke.test.mjs');
 
 assert.match(readme, /`npm run start` 会设置 `REAL_DEMO_AUTO_ARM=1`/);
+assert.match(readme, /启动服务和进入真实等待状态都不会自动打开飞书页面/);
 assert.match(readme, /默认不会自动写入验收标注、虚拟墨水屏标注或设备流标注/);
 assert.match(readme, /npm run start:plain/);
 assert.match(readme, /npm run auth:meeting-scan/);
@@ -64,6 +71,7 @@ assert.match(readme, /npm run onsite:status/);
 assert.match(readme, /npm run auth:status/);
 assert.match(readme, /npm run auth:open/);
 assert.match(readme, /npm run demo:live/);
+assert.match(readme, /npm run demo:live:auth/);
 assert.match(readme, /npm run accept:real-meeting/);
 assert.match(readme, /npm run accept:real-meeting:auth/);
 assert.match(readme, /npm run accept:onsite/);
