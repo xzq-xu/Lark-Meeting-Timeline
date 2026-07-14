@@ -58,6 +58,15 @@ npm run meeting-platform:live-acceptance:verify
 
 测试人员只负责在启动的浏览器中登录、加入/创建会议并离会，不需要实现或手动调用 adapter；Zoom 默认打开官方 `zoom.us/test` 测试会议入口。加上 `--synthetic-audio=true` 后，macOS 验收器会生成并循环注入固定英文语音，自动制造可重复的稳定发言段；其他系统可传 `--fake-audio-file=/absolute/path/to/mono.wav`。不传这两个参数时才需要人工发言至少两秒。旧的手工 DOM 采样流程仅保留给 Webex、Lark 或新增自定义平台调试：
 
+显式允许验收器改变外部会议状态时，可以把浏览器入会、电脑音频和离会也自动化。Zoom 官方测试会可直接运行；Google Meet/Teams 还需传真实 `--meeting-url`，账号登录和等候室放行仍由平台控制：
+
+```bash
+npm run meeting-platform:live-acceptance -- --platform=zoom --synthetic-audio=true --auto-join=true --auto-leave=true --allow-external-actions=true
+```
+
+缺少 `--allow-external-actions=true` 时，验收器会拒绝执行自动入会/离会，避免普通启动命令意外创建或加入会议。
+要先确认真实页面会选择哪个控件而不执行点击，可运行 `--startup-only=true --preview-browser-automation=true`；启动报告只记录候选动作和可见控件数量。
+
 ```bash
 npm run meeting-app:extension
 cd data/meeting-app-extension

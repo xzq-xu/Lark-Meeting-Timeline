@@ -9,6 +9,10 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeMeetingPlatform } from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
 import { hasStrongInCallEvidence } from './three-platform-live-acceptance-core.mjs';
+import {
+  buildThreePlatformBrowserActionExpression,
+  chooseThreePlatformBrowserAutomationAction,
+} from './three-platform-live-browser-automation.mjs';
 import { verifyThreePlatformLiveAcceptance } from './verify-three-platform-live-acceptance.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -235,6 +239,46 @@ async function cdpEvaluate(target, expression) {
   }
 }
 
+async function browserPageSnapshots(port) {
+  const targets = await fetchJson(`http://127.0.0.1:${port}/json/list`).catch(() => []);
+  const pages = [];
+  for (const target of targets.filter((item) => item.type === 'page')) {
+    const snapshot = await cdpEvaluate(target, `(() => {
+      const isVisible = (node) => {
+        const rect = node.getBoundingClientRect();
+        const style = getComputedStyle(node);
+        return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+      };
+      const controls = Array.from(document.querySelectorAll('button, a, input')).filter(isVisible).slice(0, 400).map((node) => {
+        return {
+          tag: node.tagName.toLowerCase(),
+          id: node.id || undefined,
+          text: (node.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 160) || undefined,
+          aria: node.getAttribute('aria-label') || undefined,
+          title: node.getAttribute('title') || undefined,
+          placeholder: node.getAttribute('placeholder') || undefined,
+          type: node.getAttribute('type') || undefined,
+          value_present: Boolean(node.value),
+          href: node.href || undefined,
+          disabled: Boolean(node.disabled),
+          visible: true,
+          in_dialog: Boolean(node.closest('[role="dialog"], dialog')),
+        };
+      });
+      return { title: document.title, url: location.href, controls };
+    })()`).catch(() => null);
+    if (snapshot) pages.push({ ...snapshot, target_id: target.id });
+  }
+  return pages;
+}
+
+async function performBrowserAutomationAction(port, action) {
+  const targets = await fetchJson(`http://127.0.0.1:${port}/json/list`).catch(() => []);
+  const target = targets.find((item) => item.type === 'page' && item.id === action.target_id);
+  if (!target) return { ok: false, reason: 'page_target_missing', phase: action.phase };
+  return cdpEvaluate(target, buildThreePlatformBrowserActionExpression(action));
+}
+
 async function waitForExtensionAttachment(port, platform, sinceMs, timeoutMs = 20_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -324,6 +368,13 @@ async function main() {
   const meetingUrl = String(args.get('meeting-url') ?? DEFAULT_URLS[platform]);
   const startupProbeUrl = String(args.get('probe-url') ?? STARTUP_PROBE_URLS[platform]);
   const timeoutMs = Math.max(60_000, Number(args.get('timeout-ms') ?? 30 * 60_000));
+  const autoJoin = args.get('auto-join') === 'true';
+  const autoLeave = args.get('auto-leave') === 'true';
+  const automationPreview = args.get('preview-browser-automation') === 'true';
+  const allowExternalActions = args.get('allow-external-actions') === 'true';
+  if ((autoJoin || autoLeave) && !allowExternalActions) {
+    throw new Error('Browser meeting automation requires --allow-external-actions=true because joining or leaving changes external meeting state.');
+  }
   const launchedAtMs = Date.now();
   await Promise.all([mkdir(outputDir, { recursive: true }), mkdir(profileDir, { recursive: true })]);
   const fakeAudio = await prepareFakeAudio(args, outputDir, platform);
@@ -389,6 +440,10 @@ async function main() {
     console.log(`The acceptance annotation will be inserted automatically after real in-call evidence appears. Extension worker=${worker.url} attached=${attached.url}`);
     if (fakeAudio) console.log(`Synthetic speaker stimulus is enabled with ${fakeAudio.file}`);
     if (args.get('startup-only') === 'true') {
+      const previewPages = automationPreview ? await browserPageSnapshots(debugPort) : [];
+      const previewAction = automationPreview
+        ? chooseThreePlatformBrowserAutomationAction({ platform, pages: previewPages, autoJoin: true })
+        : null;
       const startupReport = {
         type: 'three_platform_live_acceptance_startup',
         schema: 'three_platform_live_acceptance_startup',
@@ -406,6 +461,19 @@ async function main() {
         extension_attachment: attached,
         fake_audio_file: fakeAudio?.file ?? null,
         synthetic_audio_generated: fakeAudio?.generated === true,
+        browser_automation: {
+          auto_join: autoJoin,
+          auto_leave: autoLeave,
+          allow_external_actions: allowExternalActions,
+          preview_only: automationPreview,
+          preview_action: previewAction,
+          pages: previewPages.map((page) => ({
+            target_id: page.target_id,
+            title: page.title,
+            url: page.url,
+            visible_control_count: page.controls?.length ?? 0,
+          })),
+        },
       };
       const startupReportFile = join(outputDir, `${platform}-startup.json`);
       await writeFile(startupReportFile, `${JSON.stringify(startupReport, null, 2)}\n`, 'utf8');
@@ -418,6 +486,9 @@ async function main() {
     let evidence = null;
     let annotation = null;
     let speakerSeen = false;
+    let speakerSeenAtMs = null;
+    const completedAutomationActions = new Set();
+    const browserAutomationEvents = [];
     while (Date.now() < deadline) {
       const status = await fetchJson(`${baseUrl}/api/meeting-session/status`).catch(() => null);
       const current = status?.current_meeting;
@@ -453,7 +524,39 @@ async function main() {
             row.kind === 'speaker_started' || row.intent === 'speaker_track'
           ));
           if (nextSpeakerSeen && !speakerSeen) console.log(`SPEAKER_EVIDENCE_DETECTED meeting=${current.meeting_id}`);
+          if (nextSpeakerSeen && !speakerSeenAtMs) speakerSeenAtMs = Date.now();
           speakerSeen = nextSpeakerSeen;
+        }
+      }
+
+      if (autoJoin || autoLeave) {
+        const pages = await browserPageSnapshots(debugPort);
+        const action = chooseThreePlatformBrowserAutomationAction({
+          platform,
+          pages,
+          autoJoin,
+          autoLeave,
+          activeMeeting: Boolean(meeting && current?.meeting_id === meeting.meeting_id && !current.end_time),
+          speakerSeen,
+          leaveReady: speakerSeenAtMs != null && Date.now() - speakerSeenAtMs >= 2_500,
+          completedActionKeys: [...completedAutomationActions],
+        });
+        if (action) {
+          const actionAtMs = Date.now();
+          const result = await performBrowserAutomationAction(debugPort, action).catch((error) => ({
+            ok: false,
+            reason: String(error?.message ?? error),
+            phase: action.phase,
+          }));
+          browserAutomationEvents.push({
+            captured_at_ms: actionAtMs,
+            action,
+            result,
+          });
+          if (result?.ok === true) {
+            completedAutomationActions.add(action.key);
+            console.log(`BROWSER_AUTOMATION_ACTION phase=${action.phase} target=${action.target_id}`);
+          }
         }
       }
 
@@ -472,6 +575,12 @@ async function main() {
           extension_dir: extensionDir,
           fake_audio_file: fakeAudio?.file ?? null,
           synthetic_audio_generated: fakeAudio?.generated === true,
+          browser_automation: {
+            auto_join: autoJoin,
+            auto_leave: autoLeave,
+            allow_external_actions: allowExternalActions,
+            events: browserAutomationEvents,
+          },
         }, null, 2)}\n`, 'utf8');
         console.log(`LIVE_ACCEPTANCE_COMPLETE accepted=${report.accepted ? 'yes' : 'no'} report=${reportFile}`);
         if (!report.accepted) process.exitCode = 2;
@@ -479,6 +588,26 @@ async function main() {
       }
       await sleep(500);
     }
+    const timeoutReportFile = join(outputDir, `${platform}-${launchedAtMs}-timeout.json`);
+    await writeFile(timeoutReportFile, `${JSON.stringify({
+      type: 'three_platform_live_acceptance_timeout',
+      schema: 'three_platform_live_acceptance_timeout',
+      schema_version: 1,
+      generated_at: new Date().toISOString(),
+      platform,
+      launched_at_ms: launchedAtMs,
+      meeting_url: meetingUrl,
+      meeting,
+      speaker_seen: speakerSeen,
+      annotation_inserted: Boolean(annotation),
+      browser_automation: {
+        auto_join: autoJoin,
+        auto_leave: autoLeave,
+        allow_external_actions: allowExternalActions,
+        events: browserAutomationEvents,
+      },
+      pages: await browserPageSnapshots(debugPort).catch(() => []),
+    }, null, 2)}\n`, 'utf8');
     throw new Error(`Live acceptance timed out after ${timeoutMs} ms`);
   } finally {
     await finish();

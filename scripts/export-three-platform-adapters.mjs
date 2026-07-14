@@ -124,7 +124,7 @@ async function writeReadme(tarballName) {
     '',
     '构建、安装启动和合成状态机测试通过不等于真实会议生产验收。以 `release-manifest.json` 为准：只有真实会议中的开始、发言人、标注、结束四类证据齐全后，单个平台的 `production_ready` 才能变为 `true`。',
     '',
-    '在源码仓库中可运行自动验收器：`npm run meeting-platform:live-acceptance -- --platform=google-meet --synthetic-audio=true`，平台也可传 `teams` 或 `zoom`；Zoom 默认打开官方 `zoom.us/test` 测试会议入口。测试人员只需在启动的隔离浏览器中登录、加入会议并离会，不需要实现 adapter；macOS 的 `--synthetic-audio=true` 会注入固定语音并自动产生稳定发言段，其他系统可传 `--fake-audio-file=/absolute/path/to/mono.wav`。三平台完成后运行 `npm run meeting-platform:live-acceptance:verify`。',
+    '在源码仓库中可运行自动验收器：`npm run meeting-platform:live-acceptance -- --platform=google-meet --synthetic-audio=true`，平台也可传 `teams` 或 `zoom`；Zoom 默认打开官方 `zoom.us/test` 测试会议入口。测试人员只需在启动的隔离浏览器中登录、加入会议并离会，不需要实现 adapter；macOS 的 `--synthetic-audio=true` 会注入固定语音并自动产生稳定发言段，其他系统可传 `--fake-audio-file=/absolute/path/to/mono.wav`。显式授权测试程序改变外部会议状态时，可加 `--auto-join=true --auto-leave=true --allow-external-actions=true` 自动处理可见的入会、电脑音频和离会控件。三平台完成后运行 `npm run meeting-platform:live-acceptance:verify`。',
     '',
   ].join('\n'), 'utf8');
   return path;
