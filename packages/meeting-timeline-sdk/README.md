@@ -119,6 +119,52 @@ const signals = normalizeGoogleMeetEvent(req.body);
 await applyMeetingSignals(timeline, signals);
 ```
 
+## Google Meet、Zoom、Teams 快速接入
+
+三个平台共用同一条实时标注链路：宿主程序先观察本地会议窗口并建立时间轴，电子纸或其他标注端只负责发送带真实采集时间的标记。官方平台事件用于校准和审计，转写在会后导入；二者都不阻塞用户边写边标注。
+
+| 平台 | 推荐的第一接入面 | 本地实时观察 | 官方事件校准 |
+| --- | --- | --- | --- |
+| Google Meet | Chrome 扩展 content script | Meet URL、会议控件、参与者 tile 和 active speaker DOM | Google Workspace Events / Pub/Sub |
+| Microsoft Teams | 桌面观察器或 WebView preload；网页版可用浏览器扩展 | Teams 窗口、会议控件、Accessibility/DOM 和发言状态 | Microsoft Graph `meetingCallEvents` |
+| Zoom | Native desktop helper；网页版可用浏览器扩展 | Zoom 进程、会议窗口、离会控件和发言状态 | Zoom Meeting Webhooks |
+
+单个平台的宿主可以使用轻量 connector。`platform` 分别传 `google-meet`、`microsoft-teams` 或 `zoom`：
+
+```js
+import {
+  buildMeetingPlatformConnector,
+  createMeetingPlatformConnectorRuntime,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector';
+
+const connector = buildMeetingPlatformConnector('google-meet', {
+  baseUrl: 'https://timeline.example.com',
+});
+const runtime = createMeetingPlatformConnectorRuntime(connector, { fetch });
+
+await runtime.observeMeetingApp(localMeetingSnapshot);
+await runtime.insertAnnotation({
+  id: crypto.randomUUID(),
+  label: 'why?',
+  captured_at_ms: Date.now(),
+});
+```
+
+浏览器扩展、Electron WebView preload 或内嵌 WebView 可以直接安装 content-script bridge，由 SDK 识别当前会议 URL、采样 DOM，并把统一的 `meeting_timeline.*` 消息投递到时间轴服务：
+
+```js
+import {
+  installMeetingPlatformConnectorContentScriptBridge,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector';
+
+installMeetingPlatformConnectorContentScriptBridge({
+  baseUrl: 'https://timeline.example.com',
+  fetch,
+});
+```
+
+当前包提供统一协议、平台 adapter、浏览器 bridge 和桌面宿主接入契约，不等同于已经完成发布的 Google Meet、Teams 或 Zoom 插件。接入方仍需把观察器装入目标宿主，并用真实会议页面或真实桌面窗口完成 selector、窗口识别、开始/结束和发言人滤波验收。
+
 当前内置归一化器：
 
 - `@ai-annotation/meeting-timeline-sdk/adapters/local-detector`
