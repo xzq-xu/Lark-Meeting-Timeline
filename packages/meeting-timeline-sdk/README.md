@@ -3890,11 +3890,12 @@ node scripts/verify-three-platform-browser-extension.mjs \
 npm run meeting-platform:live-acceptance -- --platform=google-meet
 npm run meeting-platform:live-acceptance -- --platform=teams
 npm run meeting-platform:live-acceptance -- --platform=zoom
+npm run meeting-platform:live-acceptance -- --platform=zoom --meeting-url='https://zoom.us/j/<meeting-id>?pwd=<token>' --speaker-peer=true --auto-join=true --auto-leave=true --allow-external-actions=true
 
 npm run meeting-platform:live-acceptance:verify
 ```
 
-验收器会拒绝登录页、预加入页、错误页、fixture 和 URL-only 候选；还会检查标注延迟、时间轴误差、重复写入以及跨会议残留。账号登录和真实会议交互无法由 SDK 伪造，但不需要使用方编写任何 adapter 代码。
+验收器会拒绝登录页、预加入页、错误页、fixture 和 URL-only 候选；还会检查标注延迟、时间轴误差、重复写入以及跨会议残留。对共享会议启用 `--speaker-peer=true` 会启动独立合成发言参会者，避免把本机自发言误当成远端 speaker 验收；该模式不能使用 `zoom.us/test`。账号登录和真实会议交互无法由 SDK 伪造，但不需要使用方编写任何 adapter 代码。
 
 ## Webhook 验证工具
 

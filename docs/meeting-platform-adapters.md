@@ -25,10 +25,11 @@ npm run meeting-platform:adapters:release -- --offline=true
 npm run meeting-platform:live-acceptance -- --platform=google-meet --synthetic-audio=true
 npm run meeting-platform:live-acceptance -- --platform=teams --synthetic-audio=true
 npm run meeting-platform:live-acceptance -- --platform=zoom --synthetic-audio=true
+npm run meeting-platform:live-acceptance -- --platform=zoom --meeting-url='https://zoom.us/j/<meeting-id>?pwd=<token>' --speaker-peer=true --auto-join=true --auto-leave=true --allow-external-actions=true
 npm run meeting-platform:live-acceptance:verify
 ```
 
-账号登录、创建/加入会议和离会仍是平台账号动作；这些不是 SDK 使用方需要实现的代码。只有真实会议中的开始、稳定发言人、实时标注和结束证据全部通过，发布清单才会把对应平台标为 `production_ready`。
+账号登录、创建/加入会议和离会仍是平台账号动作；这些不是 SDK 使用方需要实现的代码。`--speaker-peer=true` 会为同一个真实会议启动第二个隔离参会实例并注入合成语音，主实例只观察 SDK 生成的远端发言人轨；该模式要求传共享会议 URL，拒绝 `zoom.us/test` 这类每次创建独立会议的入口。只有真实会议中的开始、稳定发言人、实时标注和结束证据全部通过，发布清单才会把对应平台标为 `production_ready`。
 
 验收环境明确授权外部会议动作后，可增加 `--auto-join=true --auto-leave=true --allow-external-actions=true`。自动化只使用受支持平台页面中可见的测试入口、浏览器入会、显示名、电脑音频和离会控件；错误页、普通产品首页和仅有 URL 的页面不会被点击。每次动作及结果都会写进验收报告，超时也会输出页面控件快照供复查。先用 `--startup-only=true --preview-browser-automation=true` 可在零点击情况下检查真实页面将选择的动作。
 

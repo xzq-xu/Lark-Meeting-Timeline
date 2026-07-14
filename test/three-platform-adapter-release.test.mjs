@@ -4,10 +4,36 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { buildThreePlatformReleaseReadiness } from '../scripts/three-platform-release-readiness.mjs';
 
 const execFileAsync = promisify(execFile);
 const repoRoot = new URL('..', import.meta.url);
 const outDir = await mkdtemp(join(tmpdir(), 'three-platform-adapters-'));
+
+const acceptedLiveRows = ['google_meet', 'microsoft_teams', 'zoom'].map((platform) => ({
+  platform,
+  accepted: true,
+  production_ready: true,
+  meeting_id: `${platform}-real-meeting`,
+  file: `/evidence/${platform}.json`,
+  failed_check_ids: [],
+}));
+const acceptedReadiness = buildThreePlatformReleaseReadiness({
+  accepted: true,
+  production_ready: true,
+  rows: acceptedLiveRows,
+});
+assert.equal(acceptedReadiness.production_ready, true);
+assert.equal(acceptedReadiness.adapters.every((row) => row.real_meeting_accepted), true);
+assert.equal(acceptedReadiness.remaining_gate, null);
+
+const incompleteReadiness = buildThreePlatformReleaseReadiness({
+  accepted: false,
+  production_ready: false,
+  rows: acceptedLiveRows.filter((row) => row.platform !== 'zoom'),
+});
+assert.equal(incompleteReadiness.production_ready, false);
+assert.deepEqual(incompleteReadiness.remaining_platforms, ['zoom']);
 
 try {
   const { stdout } = await execFileAsync(process.execPath, [
@@ -15,6 +41,7 @@ try {
     `--out-dir=${outDir}`,
     '--base-url=http://localhost:8787',
     '--offline=true',
+    `--live-evidence-dir=${join(outDir, 'no-live-evidence')}`,
     '--json=true',
   ], {
     cwd: repoRoot,
@@ -47,12 +74,17 @@ try {
     stat(join(outDir, 'release-manifest.json')),
   ]);
 
+  const extensionManifest = JSON.parse(await readFile(join(outDir, 'browser-extension', 'manifest.json'), 'utf8'));
+  assert.equal(extensionManifest.content_scripts[0].all_frames, false);
+
   const readme = await readFile(join(outDir, 'README.md'), 'utf8');
   assert.match(readme, /自动监听会议开始、结束和稳定发言人/);
   assert.match(readme, /只用于验收取证/);
   assert.match(readme, /不需要调用方自己构造 `windows\[\]`/);
   assert.match(readme, /meeting-timeline-adapters --out-dir/);
   assert.match(readme, /不需要回到源码仓库构建/);
+  assert.match(readme, /--speaker-peer=true/);
+  assert.match(readme, /官方测试会只能验证单参会者生命周期/);
 } finally {
   await rm(outDir, { recursive: true, force: true });
 }

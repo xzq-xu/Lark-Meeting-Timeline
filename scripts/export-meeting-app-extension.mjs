@@ -210,6 +210,7 @@ try {
   const scaffold = buildMeetingAppExtensionScaffold({
     platforms,
     baseUrl,
+    allFrames: false,
     packageName: String(args.get('package-name') || 'meeting-timeline-real-page-extension'),
     sdkDependencyVersion: String(args.get('sdk-dependency') || args.get('sdk-dependency-version') || localSdkDependencySpecifier()),
     outputScript: String(args.get('content-script') || 'content-script.js'),

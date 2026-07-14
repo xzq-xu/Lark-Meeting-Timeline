@@ -678,6 +678,8 @@ assert.deepEqual(plan.manifest.content_scripts[0].js, ['content.js']);
 const contentScriptSource = buildMeetingAppExtensionContentScriptSource({
   platforms: ['google_meet', 'microsoft_teams'],
 });
+assert.match(contentScriptSource, /meeting_app_extension_lifecycle_evidence/);
+assert.match(contentScriptSource, /bindLifecycleEndCapture/);
 assert.match(contentScriptSource, /installMeetingAppLocalContentRuntime/);
 assert.doesNotMatch(contentScriptSource, /platform-integration-runtime|node:crypto/);
 assert.match(contentScriptSource, /meet\.google\.com/);

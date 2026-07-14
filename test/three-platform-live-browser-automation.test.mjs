@@ -33,16 +33,56 @@ const zoomCurrentExperiment = chooseThreePlatformBrowserAutomationAction({
 assert.equal(zoomCurrentExperiment.phase, 'zoom_test_start');
 assert.deepEqual(zoomCurrentExperiment.selector, { id: 'btnJoinTest' });
 
+const duplicateZoomStart = chooseThreePlatformBrowserAutomationAction({
+  platform: 'zoom',
+  autoJoin: true,
+  completedActionKeys: ['phase:zoom_test_start'],
+  pages: [
+    page('zoom-test-old', 'https://zoom.us/test', [control({ id: 'btnJoinTest', text: '加入' })]),
+    page('zoom-test-new', 'https://zoom.us/test', [control({ id: 'btnJoinTest', text: '加入' })]),
+  ],
+});
+assert.equal(duplicateZoomStart, null);
+
 const zoomName = chooseThreePlatformBrowserAutomationAction({
   platform: 'zoom',
   autoJoin: true,
-  pages: [page('zoom-prejoin', 'https://zoom.us/wc/123/join', [
-    control({ tag: 'input', type: 'text', placeholder: '您的姓名', value_present: false }),
+  pages: [{ ...page('zoom-prejoin', 'https://zoom.us/wc/123/join', [
+    control({ tag: 'input', id: 'input-for-name', type: 'text', value_present: false }),
     control({ text: '加入' }),
-  ])],
+  ]), frame_id: 'zoom-webclient-frame' }],
 });
 assert.equal(zoomName.phase, 'fill_display_name');
 assert.equal(zoomName.value, 'Timeline Adapter Acceptance');
+assert.equal(zoomName.frame_id, 'zoom-webclient-frame');
+assert.equal(zoomName.global_key, 'phase:fill_display_name');
+
+const zoomSpeakerPeerName = chooseThreePlatformBrowserAutomationAction({
+  platform: 'zoom',
+  autoJoin: true,
+  displayName: 'Timeline Synthetic Speaker',
+  pages: [page('zoom-speaker-peer', 'https://zoom.us/wc/123/join', [
+    control({ tag: 'input', id: 'input-for-name', type: 'text', value_present: false }),
+    control({ text: 'Join' }),
+  ])],
+});
+assert.equal(zoomSpeakerPeerName.phase, 'fill_display_name');
+assert.equal(zoomSpeakerPeerName.value, 'Timeline Synthetic Speaker');
+
+const zoomTargetMeeting = chooseThreePlatformBrowserAutomationAction({
+  platform: 'zoom',
+  autoJoin: true,
+  meetingUrl: 'https://us05web.zoom.us/j/987654321?pwd=real-token',
+  pages: [
+    page('zoom-probe', 'https://app.zoom.us/wc/123456789/join', [
+      control({ tag: 'input', id: 'input-for-name', type: 'text', value_present: false }),
+    ]),
+    page('zoom-real', 'https://app.zoom.us/wc/987654321/join', [
+      control({ tag: 'input', id: 'input-for-name', type: 'text', value_present: false }),
+    ]),
+  ],
+});
+assert.equal(zoomTargetMeeting.target_id, 'zoom-real');
 
 const zoomJoin = chooseThreePlatformBrowserAutomationAction({
   platform: 'zoom',
@@ -55,6 +95,17 @@ const zoomJoin = chooseThreePlatformBrowserAutomationAction({
 });
 assert.equal(zoomJoin.phase, 'join_meeting');
 
+const zoomJoinAfterGlobalFill = chooseThreePlatformBrowserAutomationAction({
+  platform: 'zoom',
+  autoJoin: true,
+  completedActionKeys: ['phase:fill_display_name'],
+  pages: [page('zoom-prejoin-next', 'https://zoom.us/wc/123/join', [
+    control({ tag: 'input', id: 'input-for-name', type: 'text', value_present: true }),
+    control({ text: '加入' }),
+  ])],
+});
+assert.equal(zoomJoinAfterGlobalFill.phase, 'join_meeting');
+
 const zoomAudio = chooseThreePlatformBrowserAutomationAction({
   platform: 'zoom',
   autoJoin: true,
@@ -62,6 +113,15 @@ const zoomAudio = chooseThreePlatformBrowserAutomationAction({
   pages: [page('zoom-live', 'https://zoom.us/wc/123/join', [control({ text: '使用电脑音频加入' })])],
 });
 assert.equal(zoomAudio.phase, 'join_audio');
+
+const zoomAudioPaused = chooseThreePlatformBrowserAutomationAction({
+  platform: 'zoom',
+  autoJoin: true,
+  autoJoinAudio: false,
+  activeMeeting: true,
+  pages: [page('zoom-live', 'https://zoom.us/wc/123/join', [control({ text: '使用电脑音频加入' })])],
+});
+assert.equal(zoomAudioPaused, null);
 
 const zoomLeave = chooseThreePlatformBrowserAutomationAction({
   platform: 'zoom',
@@ -85,7 +145,7 @@ const zoomConfirmLeave = chooseThreePlatformBrowserAutomationAction({
   completedActionKeys: ['zoom-live:join_audio', 'zoom-live:leave_meeting'],
   pages: [page('zoom-live', 'https://zoom.us/wc/123/join', [
     control({ aria: 'Leave Meeting' }),
-    control({ text: 'Leave Meeting', in_dialog: true }),
+    control({ text: 'Leave Meeting', in_dialog: false }),
   ])],
 });
 assert.equal(zoomConfirmLeave.phase, 'confirm_leave_meeting');
@@ -124,5 +184,17 @@ const guarded = spawnSync(process.execPath, [
 ], { encoding: 'utf8' });
 assert.equal(guarded.status, 2);
 assert.match(guarded.stderr, /--allow-external-actions=true/);
+
+const sharedZoomMeetingGuard = spawnSync(process.execPath, [
+  fileURLToPath(new URL('../scripts/start-three-platform-live-acceptance.mjs', import.meta.url)),
+  '--platform=zoom',
+  '--speaker-peer=true',
+  '--auto-join=true',
+  '--allow-external-actions=true',
+  '--startup-only=true',
+  '--skip-build=true',
+], { encoding: 'utf8' });
+assert.equal(sharedZoomMeetingGuard.status, 2);
+assert.match(sharedZoomMeetingGuard.stderr, /shared Zoom meeting URL/);
 
 console.log('ok three platform live browser automation');

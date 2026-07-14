@@ -1,4 +1,5 @@
 import { normalizeMeetingPlatform } from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
+import { detectMeetingFromUrl } from '../packages/meeting-timeline-sdk/adapters/meeting-url.mjs';
 
 const ERROR_HINTS = Object.freeze([
   'error',
@@ -50,6 +51,13 @@ const LABELS = Object.freeze({
     '退出通话',
     '离开会议',
     '挂断',
+  ],
+  confirm_leave: [
+    'leave meeting',
+    'end meeting',
+    '离开会议',
+    '退出会议',
+    '结束会议',
   ],
   name: [
     'your name',
@@ -106,6 +114,22 @@ function pageMatchesPlatform(page = {}, platform) {
   return false;
 }
 
+function meetingIdentity(url, platform) {
+  const detected = detectMeetingFromUrl(String(url ?? ''));
+  if (detected?.platform !== platform || !detected.external_meeting_id) return null;
+  return `${platform}:${detected.external_meeting_id}`;
+}
+
+function pagesForMeeting(pages, platform, preferredMeetingUrl) {
+  const preferredIdentity = meetingIdentity(preferredMeetingUrl, platform);
+  if (!preferredIdentity) return pages;
+  const matched = pages.filter((page) => (
+    meetingIdentity(page.url, platform) === preferredIdentity
+    || meetingIdentity(page.top_level_url, platform) === preferredIdentity
+  ));
+  return matched.length > 0 ? matched : pages;
+}
+
 function meetingJoinSurface(page = {}, platform) {
   let path = '';
   try { path = new URL(String(page.url ?? '')).pathname.toLowerCase(); } catch {}
@@ -123,12 +147,24 @@ function controlSelector(control = {}) {
   return null;
 }
 
+function pageActionKey(page, phase) {
+  return `${page.target_id}:${page.frame_id ?? 'top'}:${phase}`;
+}
+
+function actionCompleted(completed, page, phase) {
+  return completed.has(`phase:${phase}`)
+    || completed.has(pageActionKey(page, phase))
+    || completed.has(`${page.target_id}:${phase}`);
+}
+
 function action(page, phase, type, control, value) {
   const selector = controlSelector(control);
   if (!selector) return null;
   return {
-    key: `${page.target_id}:${phase}`,
+    key: pageActionKey(page, phase),
+    global_key: `phase:${phase}`,
     target_id: page.target_id,
+    frame_id: page.frame_id,
     page_url: page.url,
     phase,
     type,
@@ -141,24 +177,24 @@ function firstControl(page, predicate) {
   return visibleControls(page).find(predicate) ?? null;
 }
 
-function nextJoinAction(page, platform, completed) {
+function nextJoinAction(page, platform, completed, displayName) {
   if (platform === 'zoom') {
     let path = '';
     try { path = new URL(String(page.url ?? '')).pathname.toLowerCase(); } catch {}
     if (path === '/test' || path.endsWith('/test')) {
       const start = firstControl(page, (item) => ['scheduleMtg', 'btnJoinTest'].includes(item.id)
         || exactLabel(item, ['start a new meeting', 'join a test meeting', '开始新会议', '加入测试会议']));
-      if (start && !completed.has(`${page.target_id}:zoom_test_start`)) return action(page, 'zoom_test_start', 'click', start);
+      if (start && !actionCompleted(completed, page, 'zoom_test_start')) return action(page, 'zoom_test_start', 'click', start);
       return null;
     }
   }
 
   const continueBrowser = firstControl(page, (item) => exactLabel(item, LABELS.continue_browser));
-  if (continueBrowser && !completed.has(`${page.target_id}:continue_browser`)) {
+  if (continueBrowser && !actionCompleted(completed, page, 'continue_browser')) {
     return action(page, 'continue_browser', 'click', continueBrowser);
   }
   const joinFromBrowser = firstControl(page, (item) => exactLabel(item, LABELS.join_from_browser));
-  if (joinFromBrowser && !completed.has(`${page.target_id}:join_from_browser`)) {
+  if (joinFromBrowser && !actionCompleted(completed, page, 'join_from_browser')) {
     return action(page, 'join_from_browser', 'click', joinFromBrowser);
   }
   if (!meetingJoinSurface(page, platform)) return null;
@@ -168,46 +204,59 @@ function nextJoinAction(page, platform, completed) {
     && ['text', '', undefined].includes(item.type)
     && item.value_present !== true
     && !text(item.value)
-    && includesLabel(item, LABELS.name)
+    && (includesLabel(item, LABELS.name) || (platform === 'zoom' && item.id === 'input-for-name'))
   ));
-  if (nameInput && !completed.has(`${page.target_id}:fill_display_name`)) {
-    return action(page, 'fill_display_name', 'fill', nameInput, 'Timeline Adapter Acceptance');
+  if (nameInput && !actionCompleted(completed, page, 'fill_display_name')) {
+    return action(page, 'fill_display_name', 'fill', nameInput, displayName);
   }
 
   const join = firstControl(page, (item) => (
     ['button', 'a'].includes(item.tag)
     && exactLabel(item, LABELS.join)
   ));
-  if (join && !completed.has(`${page.target_id}:join_meeting`)) return action(page, 'join_meeting', 'click', join);
+  if (join && !actionCompleted(completed, page, 'join_meeting')) return action(page, 'join_meeting', 'click', join);
   return null;
 }
 
 export function chooseThreePlatformBrowserAutomationAction(input = {}) {
   const platform = normalizeMeetingPlatform(input.platform);
   const completed = new Set(input.completedActionKeys ?? []);
-  const pages = (input.pages ?? [])
+  const displayName = String(input.displayName ?? input.display_name ?? 'Timeline Adapter Acceptance').trim()
+    || 'Timeline Adapter Acceptance';
+  const platformPages = (input.pages ?? [])
     .filter((page) => pageMatchesPlatform(page, platform))
     .filter((page) => !pageError(page));
+  const pages = pagesForMeeting(
+    platformPages,
+    platform,
+    input.meetingUrl ?? input.meeting_url ?? input.preferredMeetingUrl ?? input.preferred_meeting_url,
+  );
 
   if (input.activeMeeting === true) {
     for (const page of pages) {
       const joinAudio = firstControl(page, (item) => exactLabel(item, LABELS.join_audio));
-      if (input.autoJoin === true && joinAudio && !completed.has(`${page.target_id}:join_audio`)) {
+      if (
+        input.autoJoin === true
+        && input.autoJoinAudio !== false
+        && joinAudio
+        && !actionCompleted(completed, page, 'join_audio')
+      ) {
         return action(page, 'join_audio', 'click', joinAudio);
       }
     }
     if (input.autoLeave === true && input.speakerSeen === true && input.leaveReady === true) {
-      for (const page of pages) {
-        const initialLeaveKey = `${page.target_id}:leave_meeting`;
-        if (completed.has(initialLeaveKey)) {
-          const confirmation = firstControl(page, (item) => item.in_dialog === true && exactLabel(item, LABELS.leave));
-          if (confirmation && !completed.has(`${page.target_id}:confirm_leave_meeting`)) {
+      if (completed.has('phase:leave_meeting') || pages.some((page) => actionCompleted(completed, page, 'leave_meeting'))) {
+        for (const page of pages) {
+          const confirmation = firstControl(page, (item) => exactLabel(item, LABELS.confirm_leave));
+          if (confirmation && !actionCompleted(completed, page, 'confirm_leave_meeting')) {
             return action(page, 'confirm_leave_meeting', 'click', confirmation);
           }
-          continue;
         }
+        return null;
+      }
+      for (const page of pages) {
         const leave = firstControl(page, (item) => exactLabel(item, LABELS.leave));
-        if (leave && !completed.has(`${page.target_id}:leave_meeting`)) {
+        if (leave && !actionCompleted(completed, page, 'leave_meeting')) {
           return action(page, 'leave_meeting', 'click', leave);
         }
       }
@@ -217,7 +266,7 @@ export function chooseThreePlatformBrowserAutomationAction(input = {}) {
 
   if (input.autoJoin !== true) return null;
   for (const page of pages) {
-    const candidate = nextJoinAction(page, platform, completed);
+    const candidate = nextJoinAction(page, platform, completed, displayName);
     if (candidate) return candidate;
   }
   return null;

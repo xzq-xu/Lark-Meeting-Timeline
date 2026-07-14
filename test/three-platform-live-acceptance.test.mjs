@@ -10,6 +10,12 @@ import { verifyThreePlatformLiveAcceptance } from '../scripts/verify-three-platf
 
 const startMs = 1_784_100_000_000;
 
+const LIVE_URLS = Object.freeze({
+  google_meet: 'https://meet.google.com/abc-defg-hij',
+  microsoft_teams: 'https://teams.microsoft.com/v2/?meetingjoin=true',
+  zoom: 'https://app.zoom.us/wc/987654321/join?pwd=test-token',
+});
+
 function liveEvidence(platform, meetingId = `${platform}-real-1`) {
   return {
     schema: 'meeting_platform_field_evidence_input',
@@ -32,10 +38,11 @@ function liveEvidence(platform, meetingId = `${platform}-real-1`) {
         snapshot: {
           schema: 'meeting_app_dom_capture',
           source: 'meeting_app_extension_auto_evidence',
-          url: `https://example.test/${meetingId}`,
+          url: LIVE_URLS[platform],
           inMeeting: true,
           interaction: { in_call: true, can_leave: true },
           semanticSignalTypes: ['meeting_leave_available', 'active_speaker_candidate'],
+          capture: { profile: platform },
         },
       },
       {
@@ -45,10 +52,11 @@ function liveEvidence(platform, meetingId = `${platform}-real-1`) {
         snapshot: {
           schema: 'meeting_app_dom_capture',
           source: 'meeting_app_extension_auto_evidence',
-          url: `https://example.test/${meetingId}`,
+          url: LIVE_URLS[platform],
           inMeeting: false,
           interaction: { pre_join: true },
           semanticSignalTypes: ['meeting_join_available'],
+          capture: { profile: platform },
         },
       },
     ],
@@ -98,6 +106,14 @@ falsePositive.meetingAppRecords[0].snapshot = {
 const rejectedFalsePositive = evaluateThreePlatformLiveEvidence(falsePositive);
 assert.equal(rejectedFalsePositive.accepted, false);
 assert.equal(rejectedFalsePositive.failed_check_ids.includes('real_active_snapshot'), true);
+
+const untrustedDomain = liveEvidence('zoom', 'fake-zoom-domain');
+untrustedDomain.meetingAppRecords.forEach((record) => {
+  record.snapshot.url = 'https://example.test/wc/987654321/join';
+});
+const rejectedUntrustedDomain = evaluateThreePlatformLiveEvidence(untrustedDomain);
+assert.equal(rejectedUntrustedDomain.accepted, false);
+assert.equal(rejectedUntrustedDomain.failed_check_ids.includes('real_active_snapshot'), true);
 
 const contaminated = liveEvidence('zoom');
 contaminated.measurements.previous_meeting_annotation_count_on_new_axis = 1;

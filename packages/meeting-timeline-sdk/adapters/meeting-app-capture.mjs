@@ -168,8 +168,8 @@ const PLATFORM_INTERACTION_HINTS = Object.freeze({
     chat: Object.freeze([/\bshow conversation\b/i]),
   }),
   zoom: Object.freeze({
-    leave: Object.freeze([/\bleave meeting\b/i, /\bend meeting\b/i]),
-    participants: Object.freeze([/\bparticipants\b/i]),
+    leave: Object.freeze([/\bleave meeting\b/i, /\bend meeting\b/i, /^离开$/]),
+    participants: Object.freeze([/\bparticipants\b/i, /参会者/]),
   }),
   lark: Object.freeze({
     leave: Object.freeze([/挂断/, /离开会议/]),
@@ -599,6 +599,38 @@ function queryAll(root, selector) {
   }
 }
 
+function sameOriginDocumentRoots(root, options = {}) {
+  const include = optionBool(options, [
+    'includeSameOriginFrames',
+    'include_same_origin_frames',
+  ], false);
+  if (!include || !root?.querySelectorAll) return [root];
+  const maxDocuments = Math.max(1, optionNumber(options, [
+    'maxFrameDocuments',
+    'max_frame_documents',
+  ], 12));
+  const seen = new Set([root]);
+  const roots = [root];
+  const queue = [root];
+  while (queue.length && roots.length < maxDocuments) {
+    const current = queue.shift();
+    for (const frame of queryAll(current, 'iframe, frame')) {
+      let child = null;
+      try {
+        child = frame.contentDocument;
+      } catch {
+        child = null;
+      }
+      if (!child?.querySelectorAll || seen.has(child)) continue;
+      seen.add(child);
+      roots.push(child);
+      queue.push(child);
+      if (roots.length >= maxDocuments) break;
+    }
+  }
+  return roots;
+}
+
 function shadowRoots(root, options = {}) {
   const include = optionBool(options, [
     'includeShadowDom',
@@ -634,7 +666,10 @@ function selectorResults(root, selectors = [], limit = 80, options = {}) {
   if (!root?.querySelectorAll) return [];
   const seen = new Set();
   const results = [];
-  const roots = [root, ...(options.__shadowRoots ?? shadowRoots(root, options))];
+  const roots = [
+    ...(options.__documentRoots ?? [root]),
+    ...(options.__shadowRoots ?? shadowRoots(root, options)),
+  ];
   for (const selector of selectors) {
     if (!selector || results.length >= limit) break;
     for (const current of roots) {
@@ -941,9 +976,11 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
     url,
     title,
   }, options);
-  const capturedShadowRoots = shadowRoots(doc, options);
+  const capturedDocuments = sameOriginDocumentRoots(doc, options);
+  const capturedShadowRoots = capturedDocuments.flatMap((root) => shadowRoots(root, options));
   const selectorOptions = {
     ...options,
+    __documentRoots: capturedDocuments,
     __shadowRoots: capturedShadowRoots,
   };
   const controls = selectorResults(doc, [
@@ -1027,6 +1064,7 @@ export function captureMeetingAppDomSnapshot(input = {}, options = {}) {
     capture: {
       profile: profile?.platform,
       profile_display_name: profile?.displayName,
+      frame_document_count: capturedDocuments.length > 1 ? capturedDocuments.length - 1 : undefined,
       shadow_root_count: capturedShadowRoots.length || undefined,
       control_count: controls.length,
       participant_count: participants.length,

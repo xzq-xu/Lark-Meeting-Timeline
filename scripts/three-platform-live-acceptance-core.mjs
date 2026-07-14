@@ -41,11 +41,64 @@ function recordTime(record = {}) {
   return absoluteMs(record.captured_at_ms ?? record.capturedAtMs ?? record.snapshot?.observedAtMs ?? record.snapshot?.observed_at_ms) ?? 0;
 }
 
-function realRecord(record = {}) {
+function recordUrl(record = {}) {
+  return String(
+    record.snapshot?.url
+      ?? record.snapshot?.page?.url
+      ?? record.snapshot?.dom?.url
+      ?? '',
+  ).trim();
+}
+
+function officialMeetingUrl(record = {}, platform) {
+  let url;
+  try { url = new URL(recordUrl(record)); } catch { return false; }
+  const host = url.hostname.toLowerCase();
+  const path = url.pathname.toLowerCase();
+  if (platform === 'google_meet') {
+    return host === 'meet.google.com' && /^\/[a-z]{3}-[a-z]{4}-[a-z]{3}\/?$/.test(path);
+  }
+  if (platform === 'microsoft_teams') {
+    return host === 'teams.microsoft.com'
+      || host.endsWith('.teams.microsoft.com')
+      || host === 'teams.live.com'
+      || host.endsWith('.teams.live.com')
+      || host === 'teams.cloud.microsoft'
+      || host.endsWith('.teams.cloud.microsoft');
+  }
+  if (platform === 'zoom') {
+    const zoomHost = host === 'zoom.us'
+      || host.endsWith('.zoom.us')
+      || host === 'zoom.com'
+      || host.endsWith('.zoom.com');
+    return zoomHost && (path.includes('/wc/') || path.includes('/j/') || path.includes('/join/'));
+  }
+  return false;
+}
+
+function captureProfileMatches(record = {}, platform) {
+  const profile = record.snapshot?.capture?.profile;
+  if (!profile) return false;
+  try { return normalizeMeetingPlatform(profile) === platform; } catch { return false; }
+}
+
+function trustedCaptureProvenance(record = {}, platform) {
+  const snapshot = record.snapshot ?? {};
+  const source = `${record.source ?? ''} ${snapshot.source ?? ''}`.toLowerCase();
+  if (!source.includes('meeting_app_extension_')) return false;
+  if (snapshot.schema !== 'meeting_app_dom_capture') return false;
+  const phase = String(record.phase ?? '').toLowerCase();
+  if (phase === 'ended' && snapshot.lifecycle?.meeting_was_active === true) return true;
+  return captureProfileMatches(record, platform);
+}
+
+function realRecord(record = {}, platform) {
   const source = `${record.source ?? ''} ${record.snapshot?.source ?? ''}`.toLowerCase();
   const title = String(record.snapshot?.title ?? '').toLowerCase();
   return Boolean(record.snapshot)
-    && !/fixture|synthetic|simulation|sdk fixture/.test(`${source} ${title}`);
+    && !/fixture|synthetic|simulation|sdk fixture/.test(`${source} ${title}`)
+    && officialMeetingUrl(record, platform)
+    && trustedCaptureProvenance(record, platform);
 }
 
 function semanticTypes(snapshot = {}) {
@@ -157,8 +210,10 @@ function rowsWithin(rows = [], startMs, endMs) {
   });
 }
 
-function selectRun(records = [], meeting = {}) {
-  const sorted = records.filter(realRecord).sort((left, right) => recordTime(left) - recordTime(right));
+function selectRun(records = [], meeting = {}, platform) {
+  const sorted = records
+    .filter((record) => realRecord(record, platform))
+    .sort((left, right) => recordTime(left) - recordTime(right));
   const meetingStartMs = absoluteMs(meeting.start_time ?? meeting.start_time_ms);
   const activeCandidates = sorted.filter((record) => (
     String(record.phase ?? '').toLowerCase() === 'active'
@@ -185,7 +240,7 @@ export function evaluateThreePlatformLiveEvidence(input = {}, options = {}) {
     platform = normalizeMeetingPlatform(options.platform ?? input.platform);
   } catch {}
   const meeting = input.meeting ?? {};
-  const run = selectRun(input.meetingAppRecords ?? input.meeting_app_records ?? [], meeting);
+  const run = selectRun(input.meetingAppRecords ?? input.meeting_app_records ?? [], meeting, platform);
   const activeMs = run.active ? recordTime(run.active) : null;
   const endedMs = run.ended ? recordTime(run.ended) : null;
   const rangeEndMs = endedMs ?? Number.MAX_SAFE_INTEGER;

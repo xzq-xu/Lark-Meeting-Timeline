@@ -50,6 +50,7 @@ function selectorAttrMatches(item, selector) {
 function queryNodes(nodes, selector) {
   const text = String(selector);
   if (text === '*') return nodes;
+  if (text === 'iframe, frame') return nodes.filter((item) => ['IFRAME', 'FRAME'].includes(item.tagName));
   const generic = nodes.filter((item) => selectorAttrMatches(item, text));
   if (generic.length) return generic;
   if (text === 'button') return nodes.filter((item) => item.tagName === 'BUTTON');
@@ -267,6 +268,50 @@ assert.equal(zoomCaptured.page.interaction.can_leave, true);
 assert.equal(zoomCaptured.page.interaction.participant_roster_observed, true);
 assert.equal(zoomCaptured.page.controlSignalSummary.participants_available, true);
 assert.ok(zoomCaptured.page.semanticSignals.some((signal) => signal.type === 'participants_control'));
+
+const zoomChineseCaptured = captureMeetingAppDomSnapshot({
+  document: fakeDocument({
+    url: 'https://app.zoom.us/wc/987654321/join',
+    title: 'Test Zoom Meeting',
+    nodes: [
+      node('button', { 'aria-label': '离开' }, '离开'),
+      node('button', { 'aria-label': 'open the participants list pane' }, '1 参会者'),
+      node('button', { 'aria-label': 'mute my microphone' }, '静音'),
+    ],
+  }),
+}, {
+  observedAtMs: startMs + 2_500,
+  captureProfile: 'zoom',
+});
+assert.equal(zoomChineseCaptured.inMeeting, true);
+assert.equal(zoomChineseCaptured.page.interaction.can_leave, true);
+assert.equal(zoomChineseCaptured.page.controlSignalSummary.participants_available, true);
+assert.equal(zoomChineseCaptured.page.interaction.microphone_control_available, true);
+
+const zoomMeetingFrame = node('iframe');
+zoomMeetingFrame.contentDocument = fakeDocument({
+  url: 'https://app.zoom.us/wc/987654321/join?from=pwa',
+  title: 'Web Zoom Meeting',
+  nodes: [
+    node('button', { 'aria-label': '离开' }, '离开'),
+    node('button', { 'aria-label': 'open the participants list pane' }, '1 参会者'),
+    node('div', { 'data-user-id': 'self', 'aria-label': 'Timeline Adapter Acceptance is speaking' }),
+  ],
+});
+const zoomFrameCaptured = captureMeetingAppDomSnapshot({
+  document: fakeDocument({
+    url: 'https://app.zoom.us/wc/987654321/join?fromPWA=1',
+    title: 'Test Zoom Meeting',
+    nodes: [zoomMeetingFrame],
+  }),
+}, {
+  observedAtMs: startMs + 2_700,
+  captureProfile: 'zoom',
+  includeSameOriginFrames: true,
+});
+assert.equal(zoomFrameCaptured.inMeeting, true);
+assert.equal(zoomFrameCaptured.capture.frame_document_count, 1);
+assert.equal(zoomFrameCaptured.page.interaction.active_speaker_candidate.id, 'self');
 
 const larkCaptured = captureMeetingAppDomSnapshot({
   document: fakeDocument({

@@ -6,6 +6,8 @@ import { chmod, copyFile, cp, mkdir, readFile, rm, writeFile } from 'node:fs/pro
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { buildThreePlatformReleaseReadiness } from './three-platform-release-readiness.mjs';
+import { verifyThreePlatformLiveAcceptance } from './verify-three-platform-live-acceptance.mjs';
 
 const execFileAsync = promisify(execFile);
 const args = new Map(process.argv.slice(2).map((raw) => {
@@ -15,8 +17,10 @@ const args = new Map(process.argv.slice(2).map((raw) => {
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = resolve(String(args.get('out-dir') ?? 'data/three-platform-adapters'));
 const baseUrl = String(args.get('base-url') ?? process.env.MEETING_TIMELINE_BASE_URL ?? 'http://localhost:8787').replace(/\/+$/, '');
+const liveEvidenceDir = resolve(String(args.get('live-evidence-dir') ?? 'data/meeting-platform-field-evidence'));
 const offline = args.get('offline') === 'true';
 const jsonOutput = args.get('json') === 'true';
+const requireLiveAcceptance = args.get('require-live-acceptance') === 'true';
 
 async function command(program, commandArgs, options = {}) {
   const startedAt = Date.now();
@@ -124,7 +128,7 @@ async function writeReadme(tarballName) {
     '',
     '构建、安装启动和合成状态机测试通过不等于真实会议生产验收。以 `release-manifest.json` 为准：只有真实会议中的开始、发言人、标注、结束四类证据齐全后，单个平台的 `production_ready` 才能变为 `true`。',
     '',
-    '在源码仓库中可运行自动验收器：`npm run meeting-platform:live-acceptance -- --platform=google-meet --synthetic-audio=true`，平台也可传 `teams` 或 `zoom`；Zoom 默认打开官方 `zoom.us/test` 测试会议入口。测试人员只需在启动的隔离浏览器中登录、加入会议并离会，不需要实现 adapter；macOS 的 `--synthetic-audio=true` 会注入固定语音并自动产生稳定发言段，其他系统可传 `--fake-audio-file=/absolute/path/to/mono.wav`。显式授权测试程序改变外部会议状态时，可加 `--auto-join=true --auto-leave=true --allow-external-actions=true` 自动处理可见的入会、电脑音频和离会控件。三平台完成后运行 `npm run meeting-platform:live-acceptance:verify`。',
+    '在源码仓库中可运行自动验收器：`npm run meeting-platform:live-acceptance -- --platform=google-meet --synthetic-audio=true`，平台也可传 `teams` 或 `zoom`；Zoom 默认打开官方 `zoom.us/test` 测试会议入口。官方测试会只能验证单参会者生命周期，不能可靠证明远端发言人识别。对普通共享会议传 `--meeting-url=<url> --speaker-peer=true --auto-join=true --auto-leave=true --allow-external-actions=true` 后，验收器会启动相互隔离的 SDK 观察者与合成语音参会者。其他系统可用 `--fake-audio-file=/absolute/path/to/mono.wav`。三平台完成后运行 `npm run meeting-platform:live-acceptance:verify`。',
     '',
   ].join('\n'), 'utf8');
   return path;
@@ -254,6 +258,10 @@ async function main() {
     readmePath,
   ];
   const artifacts = await Promise.all(artifactPaths.map(sha256));
+  const liveAcceptance = await verifyThreePlatformLiveAcceptance({
+    inputDir: liveEvidenceDir,
+  });
+  const releaseReadiness = buildThreePlatformReleaseReadiness(liveAcceptance);
   const report = {
     type: 'three_platform_adapter_release',
     schema: 'three_platform_adapter_release',
@@ -261,7 +269,7 @@ async function main() {
     generated_at: new Date().toISOString(),
     ok: true,
     delivery_ready: true,
-    production_ready: false,
+    production_ready: releaseReadiness.production_ready,
     base_url: baseUrl,
     out_dir: outDir,
     platforms: ['google_meet', 'microsoft_teams', 'zoom'],
@@ -292,13 +300,10 @@ async function main() {
         manifest_version: packagedExtensionManifest.manifest_version,
       },
     },
-    adapters: [
-      { platform: 'google_meet', installable: true, startable: true, web_ready: true, desktop_ready: false, real_meeting_accepted: false, production_ready: false },
-      { platform: 'microsoft_teams', installable: true, startable: true, web_ready: true, desktop_ready: true, real_meeting_accepted: false, production_ready: false },
-      { platform: 'zoom', installable: true, startable: true, web_ready: true, desktop_ready: true, real_meeting_accepted: false, production_ready: false },
-    ],
+    live_acceptance: liveAcceptance,
+    adapters: releaseReadiness.adapters,
     artifacts,
-    remaining_gate: 'Capture real meeting_started, speaker_started, realtime annotation, and meeting_ended evidence for each platform.',
+    remaining_gate: releaseReadiness.remaining_gate,
   };
   await writeFile(join(outDir, 'release-manifest.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   await rm(extensionBuildDir, { recursive: true, force: true });
@@ -307,8 +312,9 @@ async function main() {
     console.log(`three_platform_adapter_release | ok=yes | dir=${outDir}`);
     console.log(`browser_extension=${relative(repoRoot, extensionDir)}`);
     console.log(`desktop_package=${relative(repoRoot, tarballPath)}`);
-    console.log('production_ready=no (real meeting evidence pending)');
+    console.log(`production_ready=${report.production_ready ? 'yes' : 'no'}${report.production_ready ? '' : ' (real meeting evidence pending)'}`);
   }
+  if (requireLiveAcceptance && !report.production_ready) process.exitCode = 2;
   return report;
 }
 
