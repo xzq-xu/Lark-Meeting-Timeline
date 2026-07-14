@@ -50,6 +50,7 @@ assert.equal(packedFiles.includes('bin/meeting-platform-adapter-runtime-manifest
 assert.equal(packedFiles.includes('bin/meeting-platform-adapter-runtime-target.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-host-integration.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-provider-replay.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-timeline-desktop-adapter.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-connector-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-consumer-handoff.mjs'), true);
@@ -70,6 +71,11 @@ assert.equal(packedFiles.includes('cli/meeting-platform-adapter-runtime-manifest
 assert.equal(packedFiles.includes('cli/meeting-platform-adapter-runtime-target.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-host-integration.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-provider-replay.mjs'), true);
+assert.equal(packedFiles.includes('cli/desktop-meeting-adapter.mjs'), true);
+assert.equal(packedFiles.includes('adapters/desktop-meeting-host.mjs'), true);
+assert.equal(packedFiles.includes('adapters/desktop-meeting-host.d.ts'), true);
+assert.equal(packedFiles.includes('adapters/desktop-scanners/macos.jxa'), true);
+assert.equal(packedFiles.includes('adapters/desktop-scanners/windows.ps1'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.mjs'), true);
 assert.equal(packedFiles.includes('adapters/platform-kit.d.ts'), true);
 assert.equal(packedFiles.includes('adapters/internal-utils.mjs'), true);

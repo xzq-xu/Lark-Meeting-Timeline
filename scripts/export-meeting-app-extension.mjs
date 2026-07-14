@@ -2,8 +2,8 @@
 
 import { execFile } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import {
   assertMeetingAppExtensionScaffold,
@@ -43,6 +43,7 @@ const jsonOutput = args.get('json') === 'true';
 const reportFile = String(args.get('report-file') || args.get('write-report') || '');
 const buildEnabled = args.get('build') === 'true';
 const installEnabled = args.has('install') ? args.get('install') === 'true' : buildEnabled;
+const offlineEnabled = args.get('offline') === 'true';
 const packageManager = String(args.get('package-manager') || process.env.MEETING_APP_EXTENSION_PACKAGE_MANAGER || 'npm');
 
 function boolLabel(value) {
@@ -56,8 +57,9 @@ function tail(value, max = 1600) {
 
 function localSdkDependencySpecifier() {
   const sdkDir = join(repoRoot, 'packages/meeting-timeline-sdk');
-  const rel = relative(outDir, sdkDir).replaceAll('\\', '/');
-  return `file:${rel.startsWith('.') ? rel : `./${rel}`}`;
+  // npm resolves dependency paths from the real cwd. An absolute file URL avoids
+  // macOS /var -> /private/var aliases breaking builds in temporary directories.
+  return pathToFileURL(sdkDir).href;
 }
 
 function compactAcceptance(report = {}) {
@@ -118,6 +120,7 @@ async function validateBundleOutputs(scaffold) {
     scaffold.bundle?.content_script_output,
     scaffold.bundle?.live_capture_output,
     scaffold.bundle?.background_output,
+    scaffold.bundle?.popup_output,
   ].filter(Boolean);
   const files = [];
   const missing = [];
@@ -143,8 +146,10 @@ async function validateBundleOutputs(scaffold) {
 }
 
 async function runBuildGate(scaffold) {
+  const installArgs = ['install', '--include=dev', '--no-audit', '--no-fund'];
+  if (offlineEnabled) installArgs.push('--offline');
   const install = installEnabled
-    ? await runCommand(packageManager, ['install'], { cwd: outDir })
+    ? await runCommand(packageManager, installArgs, { cwd: outDir })
     : { ok: true, skipped: true, command: `${packageManager} install` };
   const build = buildEnabled && install.ok
     ? await runCommand(packageManager, ['run', 'build'], { cwd: outDir })
@@ -164,6 +169,7 @@ async function runBuildGate(scaffold) {
   return {
     requested: buildEnabled || installEnabled,
     package_manager: packageManager,
+    offline: offlineEnabled,
     install,
     build,
     validation,
@@ -187,6 +193,7 @@ function buildSummary(scaffold, acceptance, written, buildGate) {
       host_permissions: scaffold.manifest?.host_permissions ?? [],
       permissions: scaffold.manifest?.permissions ?? [],
       background: scaffold.manifest?.background ?? null,
+      action: scaffold.manifest?.action ?? null,
     },
     bundle: scaffold.bundle,
     acceptance: compactAcceptance(acceptance),
@@ -194,7 +201,7 @@ function buildSummary(scaffold, acceptance, written, buildGate) {
     next_steps: [
       buildEnabled ? `Load unpacked from ${outDir}` : `cd ${outDir} && npm install && npm run build`,
       `Open chrome://extensions or edge://extensions, enable Developer mode, Load unpacked, then select ${outDir}.`,
-      'Open a real meeting page and run window.__meetingTimelineLiveCapture.captureActive(), captureEnded(), evidencePackage(), or diagnose() in DevTools.',
+      'Pin Meeting Timeline Adapter, open a real meeting page, then use its popup to check the adapter, capture active/ended evidence, send a test mark, and export evidence.',
     ],
   };
 }
@@ -208,6 +215,7 @@ try {
     outputScript: String(args.get('content-script') || 'content-script.js'),
     liveCaptureScript: String(args.get('live-capture-script') || 'live-capture.js'),
     backgroundScript: String(args.get('background-script') || 'background.js'),
+    popupScript: String(args.get('popup-script') || 'popup.js'),
   });
   const acceptance = assertMeetingAppExtensionScaffold(scaffold);
   const written = await writeScaffoldFiles(scaffold);

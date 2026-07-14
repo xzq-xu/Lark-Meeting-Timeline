@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import {
   MEETING_APP_EXTENSION_MESSAGE_TYPES,
+  MEETING_APP_EXTENSION_BASE_URL_STORAGE_KEY,
   MEETING_APP_EXTENSION_PLATFORM_KEYS,
   MEETING_APP_EXTENSION_PROFILES,
   MEETING_APP_EXTENSION_STATUS_STORAGE_KEY,
@@ -22,6 +23,9 @@ import {
   buildMeetingAppExtensionOpenSessionMessage,
   buildMeetingAppExtensionOpenCandidateSessionMessage,
   buildMeetingAppExtensionPackageJson,
+  buildMeetingAppExtensionPopupCss,
+  buildMeetingAppExtensionPopupHtml,
+  buildMeetingAppExtensionPopupSource,
   buildMeetingAppExtensionPreflightCandidatesMessage,
   buildMeetingAppExtensionRuntimeTargetMessage,
   buildMeetingAppExtensionScaffold,
@@ -398,6 +402,9 @@ assert.equal(normalizeMeetingAppExtensionPlatform('feishu'), 'lark');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call, 'meeting_timeline.client_call');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached, 'meeting_timeline.extension_attached');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status, 'meeting_timeline.extension_status');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.service_status, 'meeting_timeline.service_status');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.configure, 'meeting_timeline.configure');
+assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.capture_evidence, 'meeting_timeline.capture_evidence');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates, 'meeting_timeline.observe_candidates');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window, 'meeting_timeline.preflight_current_window');
 assert.equal(MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates, 'meeting_timeline.preflight_candidates');
@@ -411,6 +418,9 @@ assert.equal(MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS.recordP0Reference, '/api/m
 assert.equal(normalizeMeetingAppExtensionMessageType('client_call'), MEETING_APP_EXTENSION_MESSAGE_TYPES.client_call);
 assert.equal(normalizeMeetingAppExtensionMessageType('attached'), MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_attached);
 assert.equal(normalizeMeetingAppExtensionMessageType('extension-status'), MEETING_APP_EXTENSION_MESSAGE_TYPES.extension_status);
+assert.equal(normalizeMeetingAppExtensionMessageType('service-status'), MEETING_APP_EXTENSION_MESSAGE_TYPES.service_status);
+assert.equal(normalizeMeetingAppExtensionMessageType('configuration'), MEETING_APP_EXTENSION_MESSAGE_TYPES.configure);
+assert.equal(normalizeMeetingAppExtensionMessageType('capture-evidence'), MEETING_APP_EXTENSION_MESSAGE_TYPES.capture_evidence);
 assert.equal(normalizeMeetingAppExtensionMessageType('observe-platform-candidates'), MEETING_APP_EXTENSION_MESSAGE_TYPES.observe_candidates);
 assert.equal(normalizeMeetingAppExtensionMessageType('current-window-preflight'), MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window);
 assert.equal(normalizeMeetingAppExtensionMessageType('preflight-platform-candidates'), MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_candidates);
@@ -672,6 +682,8 @@ assert.match(contentScriptSource, /startRuntime: true/);
 assert.match(contentScriptSource, /startOptions: \{ startRuntime: true \}/);
 assert.match(contentScriptSource, /bindOperatorReferenceCapture/);
 assert.match(contentScriptSource, /recordP0Reference/);
+assert.match(contentScriptSource, /meeting_timeline\.capture_evidence/);
+assert.match(contentScriptSource, /handleEvidenceRequest/);
 
 const contentScriptRuntime = installGeneratedContentScript(contentScriptSource);
 try {
@@ -787,9 +799,12 @@ try {
 const backgroundSource = buildMeetingAppExtensionBackgroundSource({
   baseUrl: 'https://timeline.example.com/',
 });
-assert.match(backgroundSource, /const BASE_URL = "https:\/\/timeline\.example\.com";/);
+assert.match(backgroundSource, /const DEFAULT_BASE_URL = "https:\/\/timeline\.example\.com";/);
 assert.match(backgroundSource, /meeting_timeline\.extension_attached/);
 assert.match(backgroundSource, /meeting_timeline\.extension_status/);
+assert.match(backgroundSource, /meeting_timeline\.service_status/);
+assert.match(backgroundSource, /meeting_timeline\.configure/);
+assert.match(backgroundSource, /meeting_timeline\.capture_evidence/);
 assert.match(backgroundSource, /meeting_timeline\.observe_candidates/);
 assert.match(backgroundSource, /meeting_timeline\.preflight_current_window/);
 assert.match(backgroundSource, /meeting_timeline\.preflight_candidates/);
@@ -924,6 +939,31 @@ try {
   assert.equal(backgroundRuntime.tabMessages[4].message.input.url, 'https://us06web.zoom.us/wc/987654321/start');
   assert.equal(backgroundRuntime.tabMessages[5].message.type, MEETING_APP_EXTENSION_MESSAGE_TYPES.preflight_current_window);
   assert.equal(backgroundRuntime.fetchCalls.length, 2);
+
+  const captureResponse = await backgroundRuntime.send({
+    type: MEETING_APP_EXTENSION_MESSAGE_TYPES.capture_evidence,
+    action: 'capture_active',
+    tab_id: 7,
+  });
+  assert.equal(captureResponse.ok, true);
+  assert.equal(captureResponse.tab_id, 7);
+  assert.equal(backgroundRuntime.tabMessages.at(-1).message.type, MEETING_APP_EXTENSION_MESSAGE_TYPES.capture_evidence);
+  assert.equal(backgroundRuntime.tabMessages.at(-1).message.action, 'capture_active');
+
+  const configureResponse = await backgroundRuntime.send({
+    type: MEETING_APP_EXTENSION_MESSAGE_TYPES.configure,
+    base_url: 'https://alternate.example.com/',
+  });
+  assert.equal(configureResponse.ok, true);
+  assert.equal(configureResponse.base_url, 'https://alternate.example.com');
+  assert.equal(backgroundRuntime.storage[MEETING_APP_EXTENSION_BASE_URL_STORAGE_KEY], 'https://alternate.example.com');
+
+  const serviceResponse = await backgroundRuntime.send({
+    type: MEETING_APP_EXTENSION_MESSAGE_TYPES.service_status,
+  });
+  assert.equal(serviceResponse.ok, true);
+  assert.equal(serviceResponse.service.base_url, 'https://alternate.example.com');
+  assert.equal(backgroundRuntime.fetchCalls.at(-1).url, 'https://alternate.example.com/api/state');
 } finally {
   backgroundRuntime.restore();
 }
@@ -944,10 +984,27 @@ const buildSource = buildMeetingAppExtensionBuildSource({
 assert.match(buildSource, /from 'esbuild'/);
 assert.match(buildSource, /src\/content-script\.entry\.mjs/);
 assert.match(buildSource, /src\/background\.entry\.mjs/);
+assert.match(buildSource, /src\/popup\.entry\.mjs/);
 assert.match(buildSource, /src\/live-capture\.entry\.mjs/);
 assert.match(buildSource, /live-capture\.js/);
+assert.match(buildSource, /popup\.js/);
 assert.match(buildSource, /format: "iife"/);
 assert.match(buildSource, /format: "esm"/);
+
+const popupHtml = buildMeetingAppExtensionPopupHtml();
+const popupCss = buildMeetingAppExtensionPopupCss();
+const popupSource = buildMeetingAppExtensionPopupSource({
+  baseUrl: 'https://timeline.example.com',
+  platforms: ['google_meet', 'microsoft_teams', 'zoom'],
+});
+assert.match(popupHtml, /Meeting Timeline Adapter/);
+assert.match(popupHtml, /popup\.js/);
+assert.match(popupHtml, /capture-active/);
+assert.match(popupCss, /\.button-grid/);
+assert.match(popupSource, /meeting_timeline\.service_status/);
+assert.match(popupSource, /meeting_timeline\.capture_evidence/);
+assert.match(popupSource, /ensureOriginPermission/);
+assert.match(popupSource, /Adapter test mark/);
 
 const scaffold = buildMeetingAppExtensionScaffold({
   platforms: ['google_meet'],
@@ -958,6 +1015,9 @@ assert.equal(scaffold.type, 'meeting_app_extension_scaffold');
 assert.equal(scaffold.validation.uses_all_urls, false);
 assert.equal(scaffold.manifest.background.service_worker, 'background.js');
 assert.equal(scaffold.manifest.background.type, 'module');
+assert.equal(scaffold.manifest.action.default_popup, 'popup.html');
+assert.equal(scaffold.manifest.optional_host_permissions.includes('http://*/*'), true);
+assert.equal(scaffold.manifest.optional_host_permissions.includes('https://*/*'), true);
 assert.equal(scaffold.manifest.permissions.includes('storage'), true);
 assert.equal(scaffold.manifest.permissions.includes('tabs'), true);
 assert.equal(scaffold.manifest.host_permissions.includes('https://timeline.example.com/*'), true);
@@ -965,6 +1025,8 @@ assert.deepEqual(scaffold.manifest.content_scripts[0].js, ['content-script.js', 
 assert.equal(scaffold.bundle.background_input, 'src/background.entry.mjs');
 assert.equal(scaffold.bundle.live_capture_input, 'src/live-capture.entry.mjs');
 assert.equal(scaffold.bundle.live_capture_output, 'live-capture.js');
+assert.equal(scaffold.bundle.popup_input, 'src/popup.entry.mjs');
+assert.equal(scaffold.bundle.popup_output, 'popup.js');
 assert.equal(scaffold.files.find((file) => file.path === 'package.json').mime, 'application/json');
 assert.match(scaffold.files.find((file) => file.path === 'package.json').content, /"esbuild"/);
 assert.match(scaffold.files.find((file) => file.path === 'build.mjs').content, /content-script\.js/);
@@ -982,6 +1044,11 @@ assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.m
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /meeting_timeline\.observe_candidates/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /meeting_timeline\.preflight_current_window/);
 assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /meeting_timeline\.preflight_candidates/);
+assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /meeting_timeline\.service_status/);
+assert.match(scaffold.files.find((file) => file.path === 'src/background.entry.mjs').content, /meeting_timeline\.capture_evidence/);
+assert.match(scaffold.files.find((file) => file.path === 'src/popup.entry.mjs').content, /checkCurrentMeeting/);
+assert.match(scaffold.files.find((file) => file.path === 'popup.html').content, /popup\.js/);
+assert.match(scaffold.files.find((file) => file.path === 'popup.css').content, /button-grid/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /npm run build/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /observe_candidates/);
 assert.match(scaffold.files.find((file) => file.path === 'README.md').content, /preflight_current_window/);

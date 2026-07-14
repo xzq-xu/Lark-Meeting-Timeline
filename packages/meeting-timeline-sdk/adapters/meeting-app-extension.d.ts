@@ -9,6 +9,9 @@ export type MeetingAppExtensionMessageType =
   | 'meeting_timeline.client_call'
   | 'meeting_timeline.extension_attached'
   | 'meeting_timeline.extension_status'
+  | 'meeting_timeline.service_status'
+  | 'meeting_timeline.configure'
+  | 'meeting_timeline.capture_evidence'
   | 'meeting_timeline.observe_candidates'
   | 'meeting_timeline.preflight_current_window'
   | 'meeting_timeline.preflight_candidates'
@@ -78,6 +81,16 @@ export interface MeetingAppExtensionOptions {
   live_capture_entry?: string;
   backgroundEntry?: string;
   background_entry?: string;
+  popupScript?: string;
+  popup_script?: string;
+  popupEntry?: string;
+  popup_entry?: string;
+  popupHtml?: string;
+  popup_html?: string;
+  popupCss?: string;
+  popup_css?: string;
+  popupTitle?: string;
+  popup_title?: string;
   includeLiveCapture?: boolean;
   include_live_capture?: boolean;
   liveCaptureGlobal?: string;
@@ -193,6 +206,9 @@ export const MEETING_APP_EXTENSION_MESSAGE_TYPES: Readonly<{
   client_call: 'meeting_timeline.client_call';
   extension_attached: 'meeting_timeline.extension_attached';
   extension_status: 'meeting_timeline.extension_status';
+  service_status: 'meeting_timeline.service_status';
+  configure: 'meeting_timeline.configure';
+  capture_evidence: 'meeting_timeline.capture_evidence';
   observe_candidates: 'meeting_timeline.observe_candidates';
   preflight_current_window: 'meeting_timeline.preflight_current_window';
   preflight_candidates: 'meeting_timeline.preflight_candidates';
@@ -202,6 +218,7 @@ export const MEETING_APP_EXTENSION_MESSAGE_TYPES: Readonly<{
   open_candidate_session: 'meeting_timeline.open_candidate_session';
 }>;
 export const MEETING_APP_EXTENSION_STATUS_STORAGE_KEY: 'meeting_timeline_extension_status';
+export const MEETING_APP_EXTENSION_BASE_URL_STORAGE_KEY: 'meeting_timeline_base_url';
 export const MEETING_APP_EXTENSION_TIMELINE_ENDPOINTS: Readonly<Record<MeetingAppExtensionClientCallMethod, string>>;
 
 export function normalizeMeetingAppExtensionPlatform(platform: MeetingAppExtensionPlatform | string): MeetingAppExtensionPlatform;
@@ -350,6 +367,12 @@ export function buildMeetingAppExtensionContentScriptSource(options?: MeetingApp
 export function buildMeetingAppExtensionLiveCaptureSource(options?: MeetingAppExtensionOptions): string;
 
 export function buildMeetingAppExtensionBackgroundSource(options?: MeetingAppExtensionOptions): string;
+
+export function buildMeetingAppExtensionPopupHtml(options?: MeetingAppExtensionOptions): string;
+
+export function buildMeetingAppExtensionPopupCss(options?: MeetingAppExtensionOptions): string;
+
+export function buildMeetingAppExtensionPopupSource(options?: MeetingAppExtensionOptions): string;
 
 export function buildMeetingAppExtensionPackageJson(options?: MeetingAppExtensionOptions): Record<string, unknown>;
 

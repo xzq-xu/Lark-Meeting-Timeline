@@ -37,12 +37,16 @@ assert.deepEqual(filePaths, [
   'src/content-script.entry.mjs',
   'src/live-capture.entry.mjs',
   'src/background.entry.mjs',
+  'src/popup.entry.mjs',
+  'popup.html',
+  'popup.css',
   'README.md',
 ]);
 
 const generatedPackage = JSON.parse(await readFile(join(outDir, 'package.json'), 'utf8'));
 assert.equal(generatedPackage.name, 'meeting-timeline-real-page-extension');
 assert.match(generatedPackage.dependencies['@ai-annotation/meeting-timeline-sdk'], /^file:/);
+assert.match(generatedPackage.dependencies['@ai-annotation/meeting-timeline-sdk'], /packages\/meeting-timeline-sdk$/);
 assert.equal(generatedPackage.scripts.build, 'node build.mjs');
 
 const manifest = JSON.parse(await readFile(join(outDir, 'manifest.json'), 'utf8'));
@@ -54,11 +58,15 @@ assert.equal(manifest.content_scripts[0].matches.includes('https://meet.google.c
 assert.equal(manifest.content_scripts[0].matches.includes('https://teams.microsoft.com/*'), true);
 assert.equal(manifest.content_scripts[0].matches.includes('https://*.teams.microsoft.com/*'), true);
 assert.deepEqual(manifest.background, { service_worker: 'background.js', type: 'module' });
+assert.equal(manifest.action.default_popup, 'popup.html');
+assert.equal(manifest.optional_host_permissions.includes('http://*/*'), true);
+assert.equal(manifest.optional_host_permissions.includes('https://*/*'), true);
 
 const buildSource = await readFile(join(outDir, 'build.mjs'), 'utf8');
 assert.match(buildSource, /src\/content-script\.entry\.mjs/);
 assert.match(buildSource, /src\/live-capture\.entry\.mjs/);
 assert.match(buildSource, /src\/background\.entry\.mjs/);
+assert.match(buildSource, /src\/popup\.entry\.mjs/);
 
 const liveCaptureSource = await readFile(join(outDir, 'src/live-capture.entry.mjs'), 'utf8');
 assert.match(liveCaptureSource, /__meetingTimelineLiveCapture/);
@@ -66,6 +74,12 @@ assert.match(liveCaptureSource, /captureActive/);
 assert.match(liveCaptureSource, /captureEnded/);
 assert.match(liveCaptureSource, /meeting_app_dom_adaptation_diagnosis/);
 assert.match(liveCaptureSource, /diagnose/);
+
+const popupSource = await readFile(join(outDir, 'src/popup.entry.mjs'), 'utf8');
+assert.match(popupSource, /checkCurrentMeeting/);
+assert.match(popupSource, /meeting_timeline\.capture_evidence/);
+const popupHtml = await readFile(join(outDir, 'popup.html'), 'utf8');
+assert.match(popupHtml, /popup\.js/);
 
 const readme = await readFile(join(outDir, 'README.md'), 'utf8');
 assert.match(readme, /npm run build/);

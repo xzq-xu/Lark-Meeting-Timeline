@@ -129,7 +129,15 @@ await applyMeetingSignals(timeline, signals);
 | Microsoft Teams | 桌面观察器或 WebView preload；网页版可用浏览器扩展 | Teams 窗口、会议控件、Accessibility/DOM 和发言状态 | Microsoft Graph `meetingCallEvents` |
 | Zoom | Native desktop helper；网页版可用浏览器扩展 | Zoom 进程、会议窗口、离会控件和发言状态 | Zoom Meeting Webhooks |
 
-单个平台的宿主可以使用轻量 connector。`platform` 分别传 `google-meet`、`microsoft-teams` 或 `zoom`：
+默认接入方式不是让业务项目实现 adapter，而是直接生成并安装仓库内置运行时：
+
+```sh
+npm run meeting-platform:adapters:release -- --offline=true
+```
+
+生成的 Chrome/Edge 扩展覆盖 Google Meet、Teams Web 和 Zoom Web；content script 进入会议页后会自动监听会议开始、结束和稳定发言人。桌面 host 覆盖 macOS/Windows 的 Teams、Zoom 客户端，已经内置进程/窗口扫描、Accessibility/UI Automation 采集和滤波。业务项目只需安装运行时并配置时间轴服务地址，不需要编写 DOM selector、构造 `windows[]` 或实现平台事件状态机。完整安装说明见下文“可直接安装的 Google Meet / Teams / Zoom 运行时”。
+
+只有在宿主希望把同一运行时嵌入自己的 Electron、WebView 或后台进程时，才需要使用下面的代码级 connector。`platform` 分别传 `google-meet`、`microsoft-teams` 或 `zoom`：
 
 ```js
 import {
@@ -163,7 +171,7 @@ installMeetingPlatformConnectorContentScriptBridge({
 });
 ```
 
-当前包提供统一协议、平台 adapter、浏览器 bridge 和桌面宿主接入契约，不等同于已经完成发布的 Google Meet、Teams 或 Zoom 插件。接入方仍需把观察器装入目标宿主，并用真实会议页面或真实桌面窗口完成 selector、窗口识别、开始/结束和发言人滤波验收。
+三个 adapter 的可安装实现已经包含在发行包中。接入方仍需安装扩展或 desktop host，并在自己的账号和真实会议中完成上线验收；这一步用于验证平台页面/客户端版本和权限环境，不是要求接入方继续实现 adapter。
 
 当前内置归一化器：
 
@@ -3802,6 +3810,65 @@ assertMeetingPlatformHostIntegrationScaffold(scaffold);
 // host.runtimeBundles() 和 /api/meeting-platform/runtime-bundles 可直接给扩展/WebView/native host 读取。
 // host.extensionInstallPlan() 和 /api/meeting-platform/extension-plan 可直接给扩展构建器读取。
 ```
+
+## 可直接安装的 Google Meet / Teams / Zoom 运行时
+
+下游项目不需要再实现三个 adapter。仓库提供两个可执行交付物：一个 Chrome/Edge MV3 扩展覆盖 Google Meet、Teams Web、Zoom Web；一个 desktop host 覆盖 macOS/Windows 上的 Teams 和 Zoom 客户端。
+
+```sh
+npm run meeting-platform:adapters:release -- --offline=true
+```
+
+命令会在 `data/three-platform-adapters` 生成：
+
+- `browser-extension/`：Chrome/Edge 可直接“加载已解压扩展”的目录。
+- `meeting-timeline-browser-extension.zip`：用于分发或提交扩展商店的压缩包。
+- `desktop-host/ai-annotation-meeting-timeline-sdk-*.tgz`：包含 desktop host CLI、macOS System Events/Accessibility 扫描器和 Windows UI Automation 扫描器。
+- `desktop-host/install-macos.command` / `install-windows.cmd`：安装并立即执行权限/服务诊断。
+- `desktop-host/start-macos.command` / `start-windows.cmd`：持续观察 Teams/Zoom，自动写入会议开始、结束和稳定发言人 marker。
+- `release-manifest.json`：构建哈希、可安装/可启动状态和真实会议剩余 gate。
+
+安装 desktop host 后也可以直接运行：
+
+```sh
+meeting-timeline-desktop-adapter --diagnose \
+  --base-url=http://localhost:8787 \
+  --platforms=teams,zoom
+
+meeting-timeline-desktop-adapter \
+  --base-url=http://localhost:8787 \
+  --platforms=teams,zoom \
+  --interval-ms=750 \
+  --evidence-file=desktop-adapter-evidence.jsonl
+```
+
+macOS 首次读取 Teams/Zoom 控件时需要给终端或打包宿主“辅助功能”权限。Windows adapter 必须与 Teams/Zoom 运行在同一登录会话和权限级别。desktop host 内置开始、结束和发言人去抖，不要求调用方自己构造 `windows[]`。
+
+如果宿主仍希望以代码方式控制生命周期，可以直接使用同一实现：
+
+```js
+import {
+  createDesktopMeetingAdapterHost,
+} from '@ai-annotation/meeting-timeline-sdk/adapters/desktop-meeting-host';
+
+const host = createDesktopMeetingAdapterHost({
+  baseUrl: 'http://localhost:8787',
+  platforms: ['teams', 'zoom'],
+});
+
+await host.start();
+// 退出应用时：await host.stop();
+```
+
+浏览器扩展进入支持的会议页后会自动监听并写入会议开始、结束和发言人位置。popup 中的 `Capture active` / `Capture ended` 只用于验收取证，不是运行时必须点击的开关；popup 还可以检查当前会议、发送测试标注并导出 evidence。真实域名注入可以连接到一个已加载扩展的调试 Chromium 后复验：
+
+```sh
+node scripts/verify-three-platform-browser-extension.mjs \
+  --debug-url=http://127.0.0.1:9222 \
+  --report-file=data/three-platform-browser-extension-verification.json
+```
+
+静态测试、安装启动和真实域名注入通过仍不等于生产验收。每个平台必须在真实会议中采集 `meeting_started`、稳定 `speaker_started`、实时设备标注和 `meeting_ended` 后，才能把 `production_ready` 设为 `true`。
 
 ## Webhook 验证工具
 
