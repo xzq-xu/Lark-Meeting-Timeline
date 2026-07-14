@@ -519,12 +519,18 @@ export function createDesktopMeetingAdapterHost(options = {}) {
       id: `speaker-${activeMeeting.meeting_id}-${stableHash(`${speaker.name}:${occurredAtMs}`)}`,
       meeting_id: activeMeeting.meeting_id,
       platform: activeMeeting.platform,
-      kind: 'speaker',
+      kind: 'speaker_started',
+      intent: 'speaker_track',
+      speaker_name: speaker.name,
       label: `Speaker: ${speaker.name}`,
       captured_at_ms: occurredAtMs,
       source: 'desktop_meeting_adapter',
       confidence: speaker.confidence,
-      payload: { speaker: { name: speaker.name }, detector_source: 'desktop_accessibility' },
+      payload: {
+        speaker: { name: speaker.name },
+        speaker_name: speaker.name,
+        detector_source: 'desktop_accessibility',
+      },
     };
     const response = await client.insertMark(mark);
     currentSpeaker = { name: speaker.name, occurred_at_ms: occurredAtMs };

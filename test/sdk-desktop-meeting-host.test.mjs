@@ -88,6 +88,9 @@ const speakerTick = await host.tick({ scan: teamsScan(1_784_000_003_250) });
 assert.equal(speakerTick.events[0].type, 'speaker_started');
 assert.equal(calls.marks.length, 1);
 assert.equal(calls.marks[0].label, 'Speaker: Alex Chen');
+assert.equal(calls.marks[0].kind, 'speaker_started');
+assert.equal(calls.marks[0].intent, 'speaker_track');
+assert.equal(calls.marks[0].speaker_name, 'Alex Chen');
 assert.equal(calls.marks[0].captured_at_ms, 1_784_000_002_500);
 
 const emptyScan = (atMs) => ({

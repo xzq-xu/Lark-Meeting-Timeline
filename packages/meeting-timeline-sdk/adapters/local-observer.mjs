@@ -182,6 +182,22 @@ function closedCandidate(snapshot = {}) {
     || snapshot.tab?.discarded === true;
 }
 
+function hasInMeetingEvidence(snapshot = {}) {
+  return nestedBoolean(snapshot, [
+    'in_meeting',
+    'inMeeting',
+    'meeting.in_meeting',
+    'meeting.inMeeting',
+    'page.in_meeting',
+    'page.inMeeting',
+    'dom.in_meeting',
+    'dom.inMeeting',
+    'interaction.in_call',
+    'page.interaction.in_call',
+    'dom.interaction.in_call',
+  ]) === true;
+}
+
 function safeCandidateSnapshot(snapshot = {}, selected = {}) {
   const safe = {
     ...snapshot,
@@ -203,6 +219,11 @@ export function selectMeetingSnapshot(input = {}, options = {}) {
     .map((snapshot, index) => {
       const detectedMeeting = meetingFromSnapshot(snapshot);
       if (!detectedMeeting || closedCandidate(snapshot)) return null;
+      if (
+        options.requireInMeetingEvidence === true
+        && !hasInMeetingEvidence(snapshot)
+        && !sameMeeting(detectedMeeting, options.activeMeeting)
+      ) return null;
       return {
         index,
         snapshot,

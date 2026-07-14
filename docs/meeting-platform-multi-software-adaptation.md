@@ -1,6 +1,8 @@
 # 会议软件适配快照（Google Meet、Teams、Zoom、Webex、Lark）
 
-你问的核心是：`SDK`方向下，Google Meet 等会议软件怎么真正落地进时间轴能力。结论先说在前面——**架构层面已经具备“统一路线”**，现在差的是把每个平台的真实采样证据补齐后放到生产上线。
+> 状态说明：本文是早期适配决策快照，用于保留设计背景，不再代表当前安装方式。Google Meet、Microsoft Teams、Zoom 的本地 adapter 已经封装为浏览器扩展和 desktop host；使用方不需要按本文的“开发顺序”自行实现。当前剩余工作是逐平台真实会议验收，而不是把实现转交给 SDK 使用方。最新入口见 [SDK README](../packages/meeting-timeline-sdk/README.md#google-meetzoomteams-快速接入)。
+
+你问的核心是：`SDK`方向下，Google Meet 等会议软件怎么真正落地进时间轴能力。当前结论是：统一路线及三个 P0 本地运行时已经交付，生产状态仍以真实会议开始、发言人、实时标注、会议结束四类证据为准。
 
 ## 统一结论
 

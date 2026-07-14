@@ -100,6 +100,11 @@ export function createMeetingAppLocalContentRuntime(client, options = {}) {
       endIdleMs: 1_500,
       ...(options.speakerOptions ?? options.speaker_options ?? {}),
     },
+    requireInMeetingEvidence: firstNonEmpty(
+      options.requireInMeetingEvidence,
+      options.require_in_meeting_evidence,
+      true,
+    ) !== false,
   });
   let running = false;
   let mutationObserver = null;
@@ -166,14 +171,25 @@ export function createMeetingAppLocalContentRuntime(client, options = {}) {
       source: options.source ?? 'meeting_app_local_content_runtime',
     });
     const meetingId = normalized.meeting_id ?? normalized.meeting?.meeting_id;
+    const inMeeting = normalized.inMeeting === true;
+    const semanticSignalTypes = snapshot.semanticSignalTypes
+      ?? snapshot.capture?.semantic_signal_types
+      ?? [];
     return {
-      accepted: Boolean(meetingId && snapshot.capture?.control_count > 0),
+      accepted: Boolean(meetingId && inMeeting),
+      reason: !meetingId
+        ? 'missing_meeting_identity'
+        : !inMeeting
+          ? 'missing_in_meeting_evidence'
+          : 'active_meeting_confirmed',
       platform: normalized.platform ?? snapshot.platform,
       meeting_id: meetingId,
+      in_meeting: inMeeting,
       captured_at_ms: snapshot.observedAtMs ?? snapshot.observed_at_ms,
       control_count: snapshot.capture?.control_count ?? 0,
       participant_count: snapshot.capture?.participant_count ?? 0,
       active_speaker_count: snapshot.capture?.active_speaker_count ?? 0,
+      semantic_signal_types: semanticSignalTypes,
       normalized,
       snapshot,
     };

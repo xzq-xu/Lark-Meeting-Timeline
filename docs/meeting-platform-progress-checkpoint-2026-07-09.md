@@ -1,5 +1,7 @@
 # 会议时间轴 SDK 进度快照（2026-07-09，更新于 2026-07-13）
 
+> 历史快照：本文保留 2026-07-09 当时的缺口，不代表当前安装方式。Google Meet、Microsoft Teams、Zoom 的本地 adapter 现已封装为可安装浏览器扩展和 desktop host；当前状态以 `data/three-platform-adapters/release-manifest.json` 和 `meeting-platform:live-acceptance:verify` 的报告为准。
+
 ## 当前结论
 
 SDK 发布验收与平台现场验收已经拆开。SDK 不依赖汉王设备；多平台本地实时链路的代码和验收基础设施已经收敛，但真实会议页面的现场 P0 尚未完成。不要把 SDK 契约门禁通过等同于真实会议 selector 通过。

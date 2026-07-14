@@ -624,6 +624,10 @@ const googleManifest = buildMeetingAppContentScriptManifest({
 assert.equal(googleManifest.manifest_version, 3);
 assert.deepEqual(googleManifest.permissions, ['storage']);
 assert.deepEqual(googleManifest.host_permissions, ['https://meet.google.com/*']);
+
+const teamsManifest = buildMeetingAppContentScriptManifest({ platforms: ['teams'] });
+assert.equal(teamsManifest.host_permissions.includes('https://teams.live.com/*'), true);
+assert.equal(teamsManifest.host_permissions.includes('https://teams.cloud.microsoft/*'), true);
 assert.deepEqual(googleManifest.content_scripts[0].matches, ['https://meet.google.com/*']);
 assert.deepEqual(googleManifest.content_scripts[0].js, ['content.js']);
 assert.equal(googleManifest.content_scripts[0].run_at, 'document_idle');

@@ -142,10 +142,18 @@ export const MEETING_APP_EXTENSION_PROFILES = Object.freeze({
     matches: Object.freeze([
       'https://teams.microsoft.com/*',
       'https://*.teams.microsoft.com/*',
+      'https://teams.live.com/*',
+      'https://*.teams.live.com/*',
+      'https://teams.cloud.microsoft/*',
+      'https://*.teams.cloud.microsoft/*',
     ]),
     host_permissions: Object.freeze([
       'https://teams.microsoft.com/*',
       'https://*.teams.microsoft.com/*',
+      'https://teams.live.com/*',
+      'https://*.teams.live.com/*',
+      'https://teams.cloud.microsoft/*',
+      'https://*.teams.cloud.microsoft/*',
     ]),
   }),
   zoom: Object.freeze({

@@ -3870,6 +3870,18 @@ node scripts/verify-three-platform-browser-extension.mjs \
 
 静态测试、安装启动和真实域名注入通过仍不等于生产验收。每个平台必须在真实会议中采集 `meeting_started`、稳定 `speaker_started`、实时设备标注和 `meeting_ended` 后，才能把 `production_ready` 设为 `true`。
 
+仓库提供自动化真实会议验收器。它会启动带扩展的隔离 Chromium；测试人员只需登录、加入或创建会议、发言至少两秒并离会，工具会自动插入实时验收标注并校验四类证据：
+
+```sh
+npm run meeting-platform:live-acceptance -- --platform=google-meet
+npm run meeting-platform:live-acceptance -- --platform=teams
+npm run meeting-platform:live-acceptance -- --platform=zoom
+
+npm run meeting-platform:live-acceptance:verify
+```
+
+验收器会拒绝登录页、预加入页、错误页、fixture 和 URL-only 候选；还会检查标注延迟、时间轴误差、重复写入以及跨会议残留。账号登录和真实会议交互无法由 SDK 伪造，但不需要使用方编写任何 adapter 代码。
+
 ## Webhook 验证工具
 
 真实接 Zoom / Microsoft Graph / Google Pub/Sub push 时，建议先在 webhook 层完成平台验证，再把 payload 交给 normalizer：

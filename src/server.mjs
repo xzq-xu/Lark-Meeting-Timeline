@@ -2407,6 +2407,24 @@ async function startOpenMeetingSession(body = {}) {
     error.current_meeting = current.meeting;
     throw error;
   }
+  if (currentIsActiveReal && sameMeeting(current.meeting, meeting) && !body.force) {
+    const sessionEvidence = persistMeetingAppSessionEvidence(body, current.meeting, current, 'active', Date.now());
+    return {
+      ok: true,
+      deduplicated: true,
+      meeting: current.meeting,
+      state: current,
+      auto_acceptance_annotation: null,
+      device_simulator_annotation: null,
+      session_evidence: sessionEvidence,
+      contract: {
+        source: current.meeting.source ?? axisSource,
+        strict_lark_event_axis: ['lark_ws_event', 'lark_http_event'].includes(current.meeting.source),
+        product_axis: true,
+        note: 'Repeated start for the active meeting is idempotent and does not rebuild the axis.',
+      },
+    };
+  }
   const next = buildTimeline({
     meeting,
     segments: body.keep_segments === true ? current.segments ?? [] : [],
@@ -2695,6 +2713,30 @@ function consumePendingMeetingPlatformP0Reference(meeting = {}, action) {
   else pendingMeetingPlatformP0References.delete(key);
 }
 
+function emptyMeetingPlatformEvidence(meeting = {}) {
+  return {
+    schema: 'meeting_platform_field_evidence_input',
+    schema_version: 1,
+    platform: meeting.platform ?? 'unknown',
+    meeting_id: meeting.meeting_id ?? null,
+    run_id: meeting.meeting_id ? `${meeting.platform ?? 'unknown'}:${meeting.meeting_id}` : null,
+    meeting: {
+      platform: meeting.platform ?? 'unknown',
+      meeting_id: meeting.meeting_id ?? null,
+      meeting_url: meeting.meeting_url ?? null,
+      title: meeting.title ?? null,
+      start_time: meeting.start_time ?? null,
+      end_time: meeting.end_time ?? null,
+      source: meeting.source ?? null,
+    },
+    meetingAppRecords: [],
+    annotations: [],
+    speaker_markers: [],
+    participant_markers: [],
+    measurements: {},
+  };
+}
+
 function loadMeetingPlatformEvidence(meeting = {}) {
   const path = meetingPlatformEvidencePath(meeting);
   try {
@@ -2702,27 +2744,7 @@ function loadMeetingPlatformEvidence(meeting = {}) {
   } catch {
     return {
       path,
-      value: {
-        schema: 'meeting_platform_field_evidence_input',
-        schema_version: 1,
-        platform: meeting.platform ?? 'unknown',
-        meeting_id: meeting.meeting_id ?? null,
-        run_id: meeting.meeting_id ? `${meeting.platform ?? 'unknown'}:${meeting.meeting_id}` : null,
-        meeting: {
-          platform: meeting.platform ?? 'unknown',
-          meeting_id: meeting.meeting_id ?? null,
-          meeting_url: meeting.meeting_url ?? null,
-          title: meeting.title ?? null,
-          start_time: meeting.start_time ?? null,
-          end_time: meeting.end_time ?? null,
-          source: meeting.source ?? null,
-        },
-        meetingAppRecords: [],
-        annotations: [],
-        speaker_markers: [],
-        participant_markers: [],
-        measurements: {},
-      },
+      value: emptyMeetingPlatformEvidence(meeting),
     };
   }
 }
@@ -2795,7 +2817,17 @@ function persistMeetingAppSessionEvidence(body = {}, meeting = {}, state = {}, p
   const record = meetingAppRecordFromSessionBody(body, meeting, phase, visibleAtMs);
   if (!record) return { recorded: false, reason: 'missing_meeting_app_snapshot' };
   const loaded = loadMeetingPlatformEvidence(meeting);
-  const value = loaded.value;
+  const existingStartMs = parseAbsoluteMs(loaded.value.meeting?.start_time);
+  const currentStartMs = parseAbsoluteMs(meeting.start_time);
+  const startsNewRun = phase === 'active' && (
+    Boolean(loaded.value.meeting?.end_time)
+    || (
+      existingStartMs != null
+      && currentStartMs != null
+      && Math.abs(existingStartMs - currentStartMs) > 1_000
+    )
+  );
+  const value = startsNewRun ? emptyMeetingPlatformEvidence(meeting) : loaded.value;
   const startMs = parseAbsoluteMs(meeting.start_time);
   const observedAtMs = record.captured_at_ms;
   const observerSurface = record.observer_surface

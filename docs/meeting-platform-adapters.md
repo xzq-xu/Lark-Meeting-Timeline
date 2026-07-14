@@ -1,6 +1,23 @@
 # 多会议平台时间轴适配方案
 
-本文档定义会议时间轴 SDK 后续如何适配 Google Meet、Microsoft Teams、Zoom 等会议软件。目标不是为每个平台重写一套时间轴，而是把不同平台的会议事件归一化为同一套 Meeting Timeline Signal，再调用现有 SDK 协议建轴、插入标注、结束轴和导入会后产物。
+本文档解释会议时间轴 SDK 的跨平台架构和官方事件校准方案。它不是要求接入方自行实现 Google Meet、Microsoft Teams、Zoom adapter 的任务清单。
+
+## 当前交付状态
+
+Google Meet、Microsoft Teams、Zoom 的本地实时 adapter 已包含在 SDK 发行包中：
+
+- Chrome/Edge MV3 扩展覆盖 Google Meet、Teams Web 和 Zoom Web，自动识别真实入会、离会和稳定发言人。
+- macOS/Windows desktop host 覆盖 Teams、Zoom 客户端，内置 Accessibility/UI Automation 采集和滤波。
+- 使用方只需安装运行时、配置 `MEETING_TIMELINE_BASE_URL` 并启动，不需要编写 DOM selector、窗口扫描或平台状态机。
+- Google Workspace Events、Microsoft Graph、Zoom Webhook 属于可选的服务端校准和会后产物链路，不是实时标注的前置条件。
+
+在仓库根目录生成可安装交付物：
+
+```sh
+npm run meeting-platform:adapters:release -- --offline=true
+```
+
+产物位于 `data/three-platform-adapters/`。安装说明以其中的 `README.md` 和 `release-manifest.json` 为准。只有主动把运行时嵌入自有 Electron/WebView/后台进程时，接入方才需要使用本文后面的低层 API。
 
 ## 目标
 
@@ -172,7 +189,7 @@ type NormalizedMeetingSignal =
 | Zoom | 本地 `meeting-apps`/native 预设先建轴；Zoom Meeting webhooks 校准 | 本地 active speaker tile 或 meeting participant webhook | `recording.completed` 后取录制和转写文件 | HTTPS webhook、事件 scope、3 秒响应要求、云录制/转写设置 |
 | Cisco Webex | Webex webhooks 的 meetings started/ended | `meetingParticipants` joined/left webhook | `meetingTranscripts` created、recordings created/updated | webhook payload 可能只有元数据、完整内容需 REST 补拉、FedRAMP 支持范围不同 |
 
-## Google Meet 适配
+## Google Meet 架构说明
 
 官方能力：
 
@@ -180,9 +197,9 @@ type NormalizedMeetingSignal =
 - 订阅目标可以是 meeting space，也可以是 user。user 目标会收到该用户拥有的会议空间相关事件。
 - Meet REST API 提供 `conferenceRecords`、participants、participantSessions、recordings、smartNotes、transcripts、transcript entries 等资源。
 
-推荐接入方式：
+SDK 内部实现与可选增强：
 
-1. P0：先支持本地/桌面检测器建轴。浏览器扩展 content script 优先用 `adapters/meeting-app-browser-runtime`，Electron WebView 或自定义宿主可直接用 `adapters/meeting-app-runtime`；runtime 内部由 `meeting-app-monitor` 驱动 `meeting-app-capture` 低成本读取 Google Meet 的 URL、按钮文案、tile/ariaLabel、active speaker 信息，再交给 `adapters/meeting-apps` preset 归一成 `meeting_started` / `speaker_started`，最后通过 `meeting-source` 调用 `startMeeting({ platform: 'google_meet', start_time_ms })`。monitor 负责轮询、去重、限流和 keep-alive，避免调用方自己处理 active speaker 稳定窗口。
+1. P0 已交付：浏览器扩展 content script 使用 `adapters/meeting-app-local-content-runtime`、`meeting-app-capture` 和 `meeting-apps` 自动完成 URL/控件/tile/active speaker 采集、状态归一化、去重和滤波。调用方不需要实现这条链路。
 2. P1：接 Google Workspace Events API，处理：
    - `google.workspace.meet.conference.v2.started`
    - `google.workspace.meet.conference.v2.ended`
@@ -205,7 +222,7 @@ type NormalizedMeetingSignal =
 - [Google Meet REST API reference](https://developers.google.com/workspace/meet/api/reference/rest/v2)
 - [Google Meet transcript entries](https://developers.google.com/workspace/meet/api/reference/rest/v2/conferenceRecords.transcripts.entries/get)
 
-## Microsoft Teams 适配
+## Microsoft Teams 架构说明
 
 官方能力有两条路线：
 
@@ -260,7 +277,7 @@ Teams SDK 可以让会议内 app/bot 接收 meetingStart、meetingEnd、particip
 - [Teams transcript and recording notifications](https://learn.microsoft.com/en-us/graph/teams-changenotifications-callrecording-and-calltranscript)
 - [Teams transcript/recording overview](https://learn.microsoft.com/en-us/microsoftteams/platform/graph-api/meeting-transcripts/overview-transcripts)
 
-## Zoom 适配
+## Zoom 架构说明
 
 官方能力：
 

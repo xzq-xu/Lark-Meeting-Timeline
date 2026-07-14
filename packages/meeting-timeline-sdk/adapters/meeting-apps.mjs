@@ -550,10 +550,23 @@ function audibleFlag(input = {}) {
   ]);
 }
 
-function inferInMeeting(input = {}, preset = {}) {
+function requireInMeetingEvidence(options = {}) {
+  return firstNonEmpty(
+    options.requireInMeetingEvidence,
+    options.require_in_meeting_evidence,
+    false,
+  ) === true;
+}
+
+function inferInMeeting(input = {}, preset = {}, options = {}) {
   const explicit = explicitInMeeting(input);
   if (explicit != null) return explicit;
   const corpus = textCorpus(input, preset);
+  if (requireInMeetingEvidence(options)) {
+    if (firstSpeaker(input, preset)) return true;
+    if (corpusMatches(preset.preJoinHints, corpus)) return false;
+    return undefined;
+  }
   if (corpusMatches(preset.preJoinHints, corpus)) return false;
   if (corpusMatches(preset.joinedHints, corpus)) return true;
   if (firstSpeaker(input, preset)) return true;
@@ -857,7 +870,7 @@ export function normalizeMeetingAppSnapshot(input = {}, options = {}) {
     active: activeFlag(input),
     visible: visibleFlag(input),
     audible: audibleFlag(input),
-    inMeeting: inferInMeeting(input, preset),
+    inMeeting: inferInMeeting(input, preset, options),
     activeSpeaker,
     participants: participants.length ? participants : undefined,
     meeting_app: {
@@ -1106,27 +1119,56 @@ function fitMatrixFromReports(reports = []) {
 }
 
 export function observeMeetingAppSample(state = null, input = {}, options = {}) {
+  const strictOptions = meetingAppObserverOptions(options);
   return observeBrowserMeetingSample(state, {
-    candidates: normalizeMeetingAppSnapshots(input, options),
+    candidates: normalizeMeetingAppSnapshots(input, strictOptions),
   }, {
     source: options.source ?? 'meeting_app_observer',
-    ...options,
+    ...strictOptions,
   });
 }
 
+function meetingAppObserverOptions(options = {}) {
+  const strict = firstNonEmpty(
+    options.requireInMeetingEvidence,
+    options.require_in_meeting_evidence,
+    true,
+  ) !== false;
+  return {
+    ...options,
+    requireInMeetingEvidence: strict,
+    sessionOptions: {
+      ...(options.sessionOptions ?? {}),
+      requireInMeetingEvidence: firstNonEmpty(
+        options.sessionOptions?.requireInMeetingEvidence,
+        options.sessionOptions?.require_in_meeting_evidence,
+        strict,
+      ) !== false,
+    },
+  };
+}
+
 export function createMeetingAppObserver(options = {}) {
+  const strictOptions = meetingAppObserverOptions(options);
   const observer = createBrowserMeetingObserver({
     source: options.source ?? 'meeting_app_observer',
-    ...options,
+    ...strictOptions,
   });
   return {
     observe(input = {}, observeOptions = {}) {
+      const mergedOptions = meetingAppObserverOptions({
+        ...strictOptions,
+        ...observeOptions,
+        sessionOptions: {
+          ...strictOptions.sessionOptions,
+          ...(observeOptions.sessionOptions ?? {}),
+        },
+      });
       return observer.observe({
         candidates: normalizeMeetingAppSnapshots(input, {
-          ...options,
-          ...observeOptions,
+          ...mergedOptions,
         }),
-      }, observeOptions);
+      }, mergedOptions);
     },
     getState() {
       return observer.getState();
@@ -1138,18 +1180,26 @@ export function createMeetingAppObserver(options = {}) {
 }
 
 export function createMeetingAppTimelineObserver(client, options = {}) {
+  const strictOptions = meetingAppObserverOptions(options);
   const observer = createBrowserMeetingTimelineObserver(client, {
     source: options.source ?? 'meeting_app_observer',
-    ...options,
+    ...strictOptions,
   });
   return {
     observe(input = {}, observeOptions = {}) {
+      const mergedOptions = meetingAppObserverOptions({
+        ...strictOptions,
+        ...observeOptions,
+        sessionOptions: {
+          ...strictOptions.sessionOptions,
+          ...(observeOptions.sessionOptions ?? {}),
+        },
+      });
       return observer.observe({
         candidates: normalizeMeetingAppSnapshots(input, {
-          ...options,
-          ...observeOptions,
+          ...mergedOptions,
         }),
-      }, observeOptions);
+      }, mergedOptions);
     },
     getState() {
       return observer.getState();

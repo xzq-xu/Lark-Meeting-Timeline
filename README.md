@@ -27,8 +27,13 @@
 - 手动导入任意数据序列 JSON
 - 在浏览器中可视化 transcript、meeting events、external sequence 的对齐结果
 
-SDK 后续跨 Google Meet、Microsoft Teams、Zoom 等会议软件的适配方案见 [多会议平台时间轴适配方案](docs/meeting-platform-adapters.md)。
-多软件接入执行清单（Google Meet / Teams / Zoom / Webex / Lark）：[会议软件适配快照（多软件）](docs/meeting-platform-multi-software-adaptation.md)。
+Google Meet、Microsoft Teams、Zoom 不再要求 SDK 使用方自行实现 adapter。生成可安装的 Chrome/Edge 扩展与 Teams/Zoom desktop host：
+
+```bash
+npm run meeting-platform:adapters:release -- --offline=true
+```
+
+产物位于 `data/three-platform-adapters/`；安装后只需配置时间轴服务地址。架构和官方事件校准说明见 [多会议平台时间轴适配方案](docs/meeting-platform-adapters.md)。[会议软件适配快照](docs/meeting-platform-multi-software-adaptation.md) 是历史设计记录，不是当前接入任务清单。
 SDK 包的设备无关发布标准见：[会议时间轴 SDK 发布验收单](docs/meeting-timeline-sdk-release-acceptance.md)。
 五个平台可直接照做的现场通过标准见：[多会议平台 P0 现场验收单](docs/meeting-platform-p0-field-acceptance.md)。
 最新执行进度与未完成项对齐见：[会议时间轴 SDK 进度快照（2026-07-09）](docs/meeting-platform-progress-checkpoint-2026-07-09.md)。
@@ -41,7 +46,16 @@ npm run sdk:release-acceptance
 
 该门禁不连接电子纸或 Android 设备；它通过标准标注生产者验证包导入、稳定 ID 重试、五平台统一协议、时间轴位置和跨会议隔离。真实会议网页兼容性由后面的现场验收单单独判断。
 
-如果要在真实 Google Meet / Microsoft Teams / Zoom / Webex / Lark 网页上采样 DOM 证据，先导出会议应用浏览器扩展：
+Google Meet、Microsoft Teams、Zoom 的真实会议验收使用自动验收器；它会构建扩展、启动隔离浏览器、自动插入标注并验证会议开始、发言人、标注和会议结束：
+
+```bash
+npm run meeting-platform:live-acceptance -- --platform=google-meet
+npm run meeting-platform:live-acceptance -- --platform=teams
+npm run meeting-platform:live-acceptance -- --platform=zoom
+npm run meeting-platform:live-acceptance:verify
+```
+
+测试人员只负责在启动的浏览器中登录、加入/创建会议、发言至少两秒并离会，不需要实现或手动调用 adapter。旧的手工 DOM 采样流程仅保留给 Webex、Lark 或新增自定义平台调试：
 
 ```bash
 npm run meeting-app:extension
@@ -56,7 +70,7 @@ npm run build
 npm run meeting-app:extension:build
 ```
 
-然后在 `chrome://extensions` 或 `edge://extensions` 打开开发者模式，选择 `data/meeting-app-extension` 作为 unpacked extension。进入真实会议页面后，可在 DevTools 里调用 `window.__meetingTimelineLiveCapture.captureActive()`、`captureEnded()`、`evidencePackage()` 或 `diagnose()`，把真实页面的 active speaker、结束态和 DOM 适配问题变成 SDK 可验收的数据，而不是依赖 demo 模拟。
+然后在 `chrome://extensions` 或 `edge://extensions` 打开开发者模式，选择 `data/meeting-app-extension` 作为 unpacked extension。自定义平台调试时可在 DevTools 里调用 `window.__meetingTimelineLiveCapture.captureActive()`、`captureEnded()`、`evidencePackage()` 或 `diagnose()`。
 
 把 `window.__meetingTimelineLiveCapture.exportRecords()` 或 `evidencePackage()` 的返回值保存成 JSON 后，用 evidence gate 校验是否真的满足生产接入：
 

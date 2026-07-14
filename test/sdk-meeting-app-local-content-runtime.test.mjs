@@ -127,4 +127,72 @@ runtime.stop();
 assert.equal(runtime.getState().running, false);
 assert.equal(listeners.size, 0);
 
+const inactiveSurfaces = [
+  {
+    platform: 'google_meet',
+    url: 'https://meet.google.com/xyz-abcd-efg',
+    title: 'Google Meet',
+    nodes: [
+      node('button', { 'aria-label': 'Join now' }),
+      node('button', { 'aria-label': 'Turn off microphone' }),
+    ],
+  },
+  {
+    platform: 'microsoft_teams',
+    url: 'https://teams.microsoft.com/v2/',
+    title: 'Microsoft Teams',
+    nodes: [
+      node('button', { 'aria-label': 'Retry' }),
+      node('button', { 'aria-label': 'Clear cache and retry' }),
+    ],
+  },
+  {
+    platform: 'zoom',
+    url: 'https://zoom.us/wc/123456789/join',
+    title: 'Join Zoom Meeting',
+    nodes: [
+      node('button', { 'aria-label': 'Join meeting' }),
+      node('button', { 'aria-label': 'Mute microphone' }),
+    ],
+  },
+];
+
+for (const surface of inactiveSurfaces) {
+  const inactiveCalls = [];
+  const inactiveDocument = {
+    nodeType: 9,
+    title: surface.title,
+    location: { href: surface.url },
+    body: {},
+    querySelectorAll(selector) {
+      return surface.nodes.filter((item) => selectorMatches(item, selector));
+    },
+  };
+  const inactiveWindow = {
+    document: inactiveDocument,
+    location: inactiveDocument.location,
+  };
+  const inactiveRuntime = createMeetingAppLocalContentRuntime({
+    async startMeeting(input) { inactiveCalls.push({ method: 'startMeeting', input }); },
+    async endMeeting(input) { inactiveCalls.push({ method: 'endMeeting', input }); },
+    async insertMark(input) { inactiveCalls.push({ method: 'insertMark', input }); },
+    async insertMarks(input) { inactiveCalls.push({ method: 'insertMarks', input }); },
+  }, {
+    window: inactiveWindow,
+    document: inactiveDocument,
+    location: inactiveDocument.location,
+    platform: surface.platform,
+    windowMessaging: false,
+  });
+  const inactivePreflight = inactiveRuntime.preflight();
+  assert.equal(inactivePreflight.accepted, false, `${surface.platform} inactive page must fail preflight`);
+  assert.equal(inactivePreflight.reason, 'missing_in_meeting_evidence');
+  await inactiveRuntime.sample({ observedAtMs: startMs + 1_000, trigger: 'inactive_surface_regression' });
+  assert.equal(
+    inactiveCalls.some((call) => call.method === 'startMeeting'),
+    false,
+    `${surface.platform} inactive page must not start a timeline`,
+  );
+}
+
 console.log('ok meeting app local content runtime');
