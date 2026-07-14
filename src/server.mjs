@@ -192,7 +192,7 @@ function loadDotEnv() {
 
 loadDotEnv();
 const lark = createLarkClient(process.env);
-const port = Number(process.env.PORT || 8787);
+const port = Number(process.env.PORT || 8789);
 let authState = loadAuthState();
 let larkWsClient = null;
 let probeAutoSearchTimer = null;
@@ -6179,6 +6179,17 @@ function oauthStartPayload(scopes = [], options = {}) {
   };
 }
 
+function withMeetingSearchScope(scopes = '') {
+  const rows = String(scopes ?? '')
+    .split(/[\s,]+/)
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+  for (const scope of ['vc:meeting.search:read', 'vc:meeting.meetingid:read', 'calendar:calendar:read', 'calendar:calendar.event:read']) {
+    if (!rows.includes(scope)) rows.push(scope);
+  }
+  return rows.join(' ');
+}
+
 function oauthRedirectUrlFor(req, scopes = []) {
   const params = new URLSearchParams();
   const requestedScope = Array.isArray(scopes) ? scopes.filter(Boolean).join(' ') : String(scopes ?? '');
@@ -7997,7 +8008,7 @@ async function handleApi(req, res, url) {
     const useMinutesOnly = ['minute', 'minutes', 'transcript'].includes(purpose);
     const payload = useMinutesOnly
       ? oauthStartPayload(minuteOAuthScopes, { ignoreDefaultScopes: true, scopeMode: 'minutes' })
-      : oauthStartPayload(requestedScope);
+      : oauthStartPayload(withMeetingSearchScope(requestedScope));
     if (['1', 'true', 'yes'].includes(String(url.searchParams.get('redirect') ?? '').toLowerCase())) {
       return sendRedirect(res, payload.auth_url);
     }
