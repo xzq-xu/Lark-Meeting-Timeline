@@ -13,7 +13,10 @@ const outDir = await mkdtemp(join(tmpdir(), 'three-platform-adapters-'));
 const acceptedLiveRows = ['google_meet', 'microsoft_teams', 'zoom'].map((platform) => ({
   platform,
   accepted: true,
+  core_accepted: true,
+  speaker_accepted: true,
   production_ready: true,
+  full_production_ready: true,
   meeting_id: `${platform}-real-meeting`,
   file: `/evidence/${platform}.json`,
   failed_check_ids: [],
@@ -21,11 +24,31 @@ const acceptedLiveRows = ['google_meet', 'microsoft_teams', 'zoom'].map((platfor
 const acceptedReadiness = buildThreePlatformReleaseReadiness({
   accepted: true,
   production_ready: true,
+  full_production_ready: true,
   rows: acceptedLiveRows,
 });
 assert.equal(acceptedReadiness.production_ready, true);
+assert.equal(acceptedReadiness.speaker_ready, true);
+assert.equal(acceptedReadiness.full_production_ready, true);
 assert.equal(acceptedReadiness.adapters.every((row) => row.real_meeting_accepted), true);
 assert.equal(acceptedReadiness.remaining_gate, null);
+
+const coreOnlyReadiness = buildThreePlatformReleaseReadiness({
+  accepted: true,
+  production_ready: true,
+  full_production_ready: false,
+  rows: acceptedLiveRows.map((row) => ({
+    ...row,
+    speaker_accepted: false,
+    full_production_ready: false,
+    failed_speaker_check_ids: ['stable_speaker_marker'],
+  })),
+});
+assert.equal(coreOnlyReadiness.production_ready, true);
+assert.equal(coreOnlyReadiness.speaker_ready, false);
+assert.equal(coreOnlyReadiness.full_production_ready, false);
+assert.equal(coreOnlyReadiness.remaining_gate, null);
+assert.deepEqual(coreOnlyReadiness.remaining_speaker_platforms, ['google_meet', 'microsoft_teams', 'zoom']);
 
 const incompleteReadiness = buildThreePlatformReleaseReadiness({
   accepted: false,
@@ -54,6 +77,8 @@ try {
   assert.equal(report.ok, true);
   assert.equal(report.delivery_ready, true);
   assert.equal(report.production_ready, false);
+  assert.equal(report.speaker_ready, false);
+  assert.equal(report.full_production_ready, false);
   assert.deepEqual(report.platforms, ['google_meet', 'microsoft_teams', 'zoom']);
   assert.equal(report.browser_extension.build_ok, true);
   assert.equal(report.desktop_host.package_ok, true);
@@ -84,7 +109,8 @@ try {
   assert.match(readme, /meeting-timeline-adapters --out-dir/);
   assert.match(readme, /不需要回到源码仓库构建/);
   assert.match(readme, /--speaker-peer=true/);
-  assert.match(readme, /官方测试会只能验证单参会者生命周期/);
+  assert.match(readme, /不要求第二账号/);
+  assert.match(readme, /full_production_ready/);
 } finally {
   await rm(outDir, { recursive: true, force: true });
 }

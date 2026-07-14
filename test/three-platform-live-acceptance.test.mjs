@@ -90,7 +90,32 @@ const evaluations = ['google_meet', 'microsoft_teams', 'zoom'].map((platform) =>
   evaluateThreePlatformLiveEvidence(liveEvidence(platform), { platform })
 ));
 assert.equal(evaluations.every((row) => row.accepted), true);
+assert.equal(evaluations.every((row) => row.core_accepted), true);
+assert.equal(evaluations.every((row) => row.speaker_accepted), true);
 assert.equal(buildThreePlatformLiveAcceptanceReport(evaluations).accepted, true);
+
+const coreOnly = liveEvidence('zoom', 'zoom-core-only');
+coreOnly.speaker_markers = [];
+const coreOnlyEvaluation = evaluateThreePlatformLiveEvidence(coreOnly);
+assert.equal(coreOnlyEvaluation.accepted, true);
+assert.equal(coreOnlyEvaluation.core_accepted, true);
+assert.equal(coreOnlyEvaluation.production_ready, true);
+assert.equal(coreOnlyEvaluation.speaker_accepted, false);
+assert.equal(coreOnlyEvaluation.full_production_ready, false);
+assert.deepEqual(coreOnlyEvaluation.failed_check_ids, []);
+assert.deepEqual(coreOnlyEvaluation.warning_check_ids, [
+  'stable_speaker_marker',
+  'speaker_marker_visible_latency',
+]);
+
+const strictCoreOnlyEvaluation = evaluateThreePlatformLiveEvidence(coreOnly, { requireSpeaker: true });
+assert.equal(strictCoreOnlyEvaluation.accepted, false);
+assert.equal(strictCoreOnlyEvaluation.production_ready, true);
+assert.equal(strictCoreOnlyEvaluation.full_production_ready, false);
+assert.deepEqual(strictCoreOnlyEvaluation.failed_check_ids, [
+  'stable_speaker_marker',
+  'speaker_marker_visible_latency',
+]);
 
 const falsePositive = liveEvidence('microsoft_teams', 'teams.microsoft.com-v2');
 falsePositive.meetingAppRecords[0].snapshot = {
@@ -129,6 +154,27 @@ try {
   const report = await verifyThreePlatformLiveAcceptance({ inputDir: tempDir });
   assert.equal(report.accepted, true);
   assert.equal(report.accepted_platform_count, 3);
+  assert.equal(report.production_ready, true);
+  assert.equal(report.full_production_ready, true);
+
+  await writeFile(join(tempDir, 'zoom.json'), `${JSON.stringify(coreOnly, null, 2)}\n`, 'utf8');
+  const coreReport = await verifyThreePlatformLiveAcceptance({
+    inputDir: tempDir,
+    platforms: ['zoom'],
+  });
+  assert.equal(coreReport.accepted, true);
+  assert.equal(coreReport.production_ready, true);
+  assert.equal(coreReport.full_production_ready, false);
+  assert.deepEqual(coreReport.remaining_speaker_platforms, ['zoom']);
+
+  const strictReport = await verifyThreePlatformLiveAcceptance({
+    inputDir: tempDir,
+    platforms: ['zoom'],
+    requireSpeaker: true,
+  });
+  assert.equal(strictReport.accepted, false);
+  assert.equal(strictReport.production_ready, true);
+  assert.equal(strictReport.full_production_ready, false);
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }

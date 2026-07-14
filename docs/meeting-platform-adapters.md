@@ -27,9 +27,12 @@ npm run meeting-platform:live-acceptance -- --platform=teams --synthetic-audio=t
 npm run meeting-platform:live-acceptance -- --platform=zoom --synthetic-audio=true
 npm run meeting-platform:live-acceptance -- --platform=zoom --meeting-url='https://zoom.us/j/<meeting-id>?pwd=<token>' --speaker-peer=true --auto-join=true --auto-leave=true --allow-external-actions=true
 npm run meeting-platform:live-acceptance:verify
+npm run meeting-platform:live-acceptance:verify -- --require-speaker=true
 ```
 
-账号登录、创建/加入会议和离会仍是平台账号动作；这些不是 SDK 使用方需要实现的代码。`--speaker-peer=true` 会为同一个真实会议启动第二个隔离参会实例并注入合成语音，主实例只观察 SDK 生成的远端发言人轨；该模式要求传共享会议 URL，拒绝 `zoom.us/test` 这类每次创建独立会议的入口。只有真实会议中的开始、稳定发言人、实时标注和结束证据全部通过，发布清单才会把对应平台标为 `production_ready`。
+账号登录、创建/加入会议和离会仍是平台账号动作；这些不是 SDK 使用方需要实现的代码。单账号验收不传 `--synthetic-audio` 或 `--speaker-peer`，会在真实会议开始、自动标注落轴后允许 `--auto-leave=true` 离会，验证开始、标注、结束和跨会议隔离。`--speaker-peer=true` 会为同一个真实会议启动第二个隔离参会实例并注入合成语音，主实例只观察 SDK 生成的远端发言人轨；该模式要求传共享会议 URL，拒绝 `zoom.us/test` 这类每次创建独立会议的入口，并默认启用 `--require-speaker=true`。
+
+发布清单把两层结果分开：`production_ready` 只要求真实会议开始、实时标注和结束，代表核心时间轴链路可交付；`speaker_ready` / `full_production_ready` 还要求远端稳定发言人和显示延迟证据。这样没有第二账号时不会阻塞核心验收，也不会把发言人能力误报为已实测。发布时可用 `--require-live-acceptance=true` 强制核心门禁，使用 `--require-speaker-acceptance=true` 再强制完整门禁。
 
 验收环境明确授权外部会议动作后，可增加 `--auto-join=true --auto-leave=true --allow-external-actions=true`。自动化只使用受支持平台页面中可见的测试入口、浏览器入会、显示名、电脑音频和离会控件；错误页、普通产品首页和仅有 URL 的页面不会被点击。每次动作及结果都会写进验收报告，超时也会输出页面控件快照供复查。先用 `--startup-only=true --preview-browser-automation=true` 可在零点击情况下检查真实页面将选择的动作。
 

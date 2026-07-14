@@ -37,6 +37,7 @@ export async function verifyThreePlatformLiveAcceptance(options = {}) {
   const platforms = (options.platforms ?? THREE_PLATFORM_LIVE_ACCEPTANCE_PLATFORMS)
     .map((platform) => normalizeMeetingPlatform(platform));
   const files = await jsonFiles(inputDir);
+  const requireSpeaker = options.requireSpeaker === true || options.require_speaker === true;
   const evaluations = [];
   const errors = [];
   for (const file of files) {
@@ -50,20 +51,23 @@ export async function verifyThreePlatformLiveAcceptance(options = {}) {
         file,
         sinceMs: options.sinceMs ?? options.since_ms,
         annotationSource: options.annotationSource ?? options.annotation_source,
+        requireSpeaker,
       }));
     } catch (error) {
       errors.push({ file, error: String(error?.message ?? error) });
     }
   }
   const report = {
-    ...buildThreePlatformLiveAcceptanceReport(evaluations, { platforms }),
+    ...buildThreePlatformLiveAcceptanceReport(evaluations, { platforms, requireSpeaker }),
     input_dir: inputDir,
     source_file_count: files.length,
     evaluated_file_count: evaluations.length,
     errors,
   };
   report.accepted = report.accepted && errors.length === 0;
-  report.production_ready = report.accepted;
+  report.core_accepted = report.core_accepted && errors.length === 0;
+  report.production_ready = report.core_accepted;
+  report.full_production_ready = report.full_production_ready && errors.length === 0;
   return report;
 }
 
@@ -78,6 +82,7 @@ async function main() {
     platforms,
     sinceMs: args.get('since-ms'),
     annotationSource: args.get('annotation-source'),
+    requireSpeaker: args.get('require-speaker') === 'true',
   });
   const reportFile = resolve(String(args.get('report-file') ?? 'data/three-platform-live-acceptance/report.json'));
   await mkdir(dirname(reportFile), { recursive: true });
@@ -85,9 +90,9 @@ async function main() {
   if (args.get('json') === 'true') {
     console.log(JSON.stringify(report, null, 2));
   } else {
-    console.log(`three_platform_live_acceptance | accepted=${report.accepted ? 'yes' : 'no'} | platforms=${report.accepted_platform_count}/${report.platform_count}`);
+    console.log(`three_platform_live_acceptance | accepted=${report.accepted ? 'yes' : 'no'} | profile=${report.acceptance_profile} | core=${report.core_accepted_platform_count}/${report.platform_count} | speaker=${report.speaker_accepted_platform_count}/${report.platform_count}`);
     for (const row of report.rows) {
-      console.log(`${row.platform}: accepted=${row.accepted ? 'yes' : 'no'} meeting=${row.meeting_id ?? '-'} speaker=${row.speaker_identity || '-'} failed=${row.failed_check_ids?.join(',') || '-'}`);
+      console.log(`${row.platform}: accepted=${row.accepted ? 'yes' : 'no'} core=${row.core_accepted ? 'yes' : 'no'} speaker=${row.speaker_accepted ? 'yes' : 'no'} meeting=${row.meeting_id ?? '-'} speaker_identity=${row.speaker_identity || '-'} failed=${row.failed_check_ids?.join(',') || '-'} warnings=${row.warning_check_ids?.join(',') || '-'}`);
     }
     console.log(`report=${reportFile}`);
   }

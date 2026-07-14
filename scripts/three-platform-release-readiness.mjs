@@ -30,25 +30,39 @@ export function buildThreePlatformReleaseReadiness(liveAcceptance = {}) {
   }));
   const adapters = THREE_PLATFORM_RELEASE_CAPABILITIES.map((capability) => {
     const evidence = liveRows.get(capability.platform);
-    const realMeetingAccepted = evidence?.accepted === true && evidence?.production_ready === true;
+    const realMeetingAccepted = evidence?.core_accepted === true
+      || (evidence?.accepted === true && evidence?.production_ready === true);
+    const speakerAccepted = evidence?.speaker_accepted === true
+      || evidence?.full_production_ready === true;
     return {
       ...capability,
       real_meeting_accepted: realMeetingAccepted,
+      speaker_real_meeting_accepted: speakerAccepted,
       production_ready: realMeetingAccepted,
+      full_production_ready: realMeetingAccepted && speakerAccepted,
       meeting_id: evidence?.meeting_id ?? null,
       evidence_file: evidence?.file ?? null,
-      failed_check_ids: evidence?.failed_check_ids ?? ['missing_real_meeting_evidence'],
+      failed_check_ids: evidence?.failed_core_check_ids ?? evidence?.failed_check_ids ?? ['missing_real_meeting_evidence'],
+      failed_speaker_check_ids: evidence?.failed_speaker_check_ids ?? (speakerAccepted ? [] : ['missing_real_meeting_evidence']),
     };
   });
-  const productionReady = liveAcceptance.accepted === true
-    && liveAcceptance.production_ready === true
+  const productionReady = liveAcceptance.production_ready === true
     && adapters.every((row) => row.production_ready);
+  const fullProductionReady = productionReady
+    && liveAcceptance.full_production_ready === true
+    && adapters.every((row) => row.full_production_ready);
   return {
     adapters,
     production_ready: productionReady,
+    speaker_ready: adapters.length > 0 && adapters.every((row) => row.speaker_real_meeting_accepted),
+    full_production_ready: fullProductionReady,
     remaining_platforms: adapters.filter((row) => !row.production_ready).map((row) => row.platform),
+    remaining_speaker_platforms: adapters.filter((row) => !row.speaker_real_meeting_accepted).map((row) => row.platform),
     remaining_gate: productionReady
       ? null
-      : 'Capture real meeting_started, speaker_started, realtime annotation, and meeting_ended evidence for each remaining platform.',
+      : 'Capture real meeting_started, realtime annotation, and meeting_ended evidence for each remaining platform.',
+    speaker_remaining_gate: fullProductionReady
+      ? null
+      : 'Capture a stable remote speaker marker and its visible latency for each remaining platform; this supplementary gate does not block the core timeline release.',
   };
 }

@@ -434,6 +434,9 @@ async function main() {
   const autoJoinAudio = args.get('auto-join-audio') !== 'false';
   const autoLeave = args.get('auto-leave') === 'true';
   const speakerPeer = args.get('speaker-peer') === 'true';
+  const requireSpeaker = args.has('require-speaker')
+    ? args.get('require-speaker') === 'true'
+    : speakerPeer || args.get('synthetic-audio') === 'true';
   const automationPreview = args.get('preview-browser-automation') === 'true';
   const allowExternalActions = args.get('allow-external-actions') === 'true';
   if ((autoJoin || autoLeave) && !allowExternalActions) {
@@ -574,6 +577,8 @@ async function main() {
         fake_audio_file: fakeAudio?.file ?? null,
         synthetic_audio_generated: fakeAudio?.generated === true,
         fake_audio_target: fakeAudio ? (speakerPeer ? 'speaker_peer' : 'observer') : null,
+        acceptance_profile: requireSpeaker ? 'core_and_speaker' : 'core',
+        speaker_acceptance_required: requireSpeaker,
         speaker_peer: {
           enabled: speakerPeer,
           browser_profile_dir: speakerPeer ? speakerPeerProfileDir : null,
@@ -606,7 +611,7 @@ async function main() {
     let evidence = null;
     let annotation = null;
     let speakerSeen = false;
-    let speakerSeenAtMs = null;
+    let completionSeenAtMs = null;
     const completedAutomationActions = new Set();
     const browserAutomationEvents = [];
     const speakerPeerCompletedActions = new Set();
@@ -639,6 +644,7 @@ async function main() {
             payload: { acceptance: 'three_platform_live', platform, meeting_id: current.meeting_id },
           });
           if (annotation.ack?.accepted !== true) throw new Error(`Acceptance annotation was rejected: ${JSON.stringify(annotation.ack ?? annotation)}`);
+          if (!requireSpeaker) completionSeenAtMs = Date.now();
           console.log(`REAL_MEETING_DETECTED meeting=${current.meeting_id} annotation=${id}`);
         }
         if (evidence) {
@@ -646,7 +652,7 @@ async function main() {
             row.kind === 'speaker_started' || row.intent === 'speaker_track'
           ));
           if (nextSpeakerSeen && !speakerSeen) console.log(`SPEAKER_EVIDENCE_DETECTED meeting=${current.meeting_id}`);
-          if (nextSpeakerSeen && !speakerSeenAtMs) speakerSeenAtMs = Date.now();
+          if (requireSpeaker && nextSpeakerSeen && !completionSeenAtMs) completionSeenAtMs = Date.now();
           speakerSeen = nextSpeakerSeen;
         }
       }
@@ -661,8 +667,8 @@ async function main() {
           autoJoinAudio,
           autoLeave,
           activeMeeting: Boolean(meeting && current?.meeting_id === meeting.meeting_id && !current.end_time),
-          speakerSeen,
-          leaveReady: speakerSeenAtMs != null && Date.now() - speakerSeenAtMs >= 2_500,
+          speakerSeen: requireSpeaker ? speakerSeen : Boolean(annotation),
+          leaveReady: completionSeenAtMs != null && Date.now() - completionSeenAtMs >= 2_500,
           displayName: speakerPeer ? 'Timeline Adapter Observer' : 'Timeline Adapter Acceptance',
           completedActionKeys: [...completedAutomationActions],
         });
@@ -724,6 +730,7 @@ async function main() {
           inputDir: evidenceDir,
           platforms: [platform],
           sinceMs: launchedAtMs,
+          requireSpeaker,
         });
         const reportFile = join(outputDir, `${platform}-${launchedAtMs}.json`);
         await writeFile(reportFile, `${JSON.stringify({
@@ -735,6 +742,8 @@ async function main() {
           fake_audio_file: fakeAudio?.file ?? null,
           synthetic_audio_generated: fakeAudio?.generated === true,
           fake_audio_target: fakeAudio ? (speakerPeer ? 'speaker_peer' : 'observer') : null,
+          acceptance_profile: requireSpeaker ? 'core_and_speaker' : 'core',
+          speaker_acceptance_required: requireSpeaker,
           speaker_peer: {
             enabled: speakerPeer,
             browser_profile_dir: speakerPeer ? speakerPeerProfileDir : null,
@@ -766,6 +775,8 @@ async function main() {
       meeting_url: meetingUrl,
       meeting,
       speaker_seen: speakerSeen,
+      acceptance_profile: requireSpeaker ? 'core_and_speaker' : 'core',
+      speaker_acceptance_required: requireSpeaker,
       annotation_inserted: Boolean(annotation),
       fake_audio_target: fakeAudio ? (speakerPeer ? 'speaker_peer' : 'observer') : null,
       speaker_peer: {

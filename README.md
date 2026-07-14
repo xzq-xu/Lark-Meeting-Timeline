@@ -55,6 +55,7 @@ npm run meeting-platform:live-acceptance -- --platform=zoom
 npm run meeting-platform:live-acceptance -- --platform=zoom --synthetic-audio=true
 npm run meeting-platform:live-acceptance -- --platform=zoom --meeting-url='https://zoom.us/j/<meeting-id>?pwd=<token>' --speaker-peer=true --auto-join=true --auto-leave=true --allow-external-actions=true
 npm run meeting-platform:live-acceptance:verify
+npm run meeting-platform:live-acceptance:verify -- --require-speaker=true
 ```
 
 测试人员只负责在启动的浏览器中登录、加入/创建会议并离会，不需要实现或手动调用 adapter；Zoom 默认打开官方 `zoom.us/test` 测试会议入口。加上 `--synthetic-audio=true` 后，macOS 验收器会生成并循环注入固定英文语音；其他系统可传 `--fake-audio-file=/absolute/path/to/mono.wav`。官方测试会只能验证单参会者生命周期，不能可靠证明远端发言人识别。对普通共享会议传 `--speaker-peer=true` 后，验收器会额外启动独立的合成发言参会者，观察者只加载 SDK，从而自动验证远端稳定发言段和滤波。未启用合成语音时才需要人工发言至少两秒。旧的手工 DOM 采样流程仅保留给 Webex、Lark 或新增自定义平台调试：
@@ -89,7 +90,7 @@ npm run meeting-app:extension:build
 npm run meeting-app:evidence-gate -- --input=data/meeting-app-live-evidence.json --report-file=data/meeting-app-live-gate-report.json
 ```
 
-这个 gate 默认不允许 fixture 兜底，并要求 `production_ready=true`；如果缺 active speaker、meeting ended 或平台识别，会在报告里给出 `missing_required_coverage` 和 `next_actions`。
+三平台 live acceptance 默认把真实 `meeting_started`、实时标注和 `meeting_ended` 作为核心门禁，并单独报告远端稳定发言人证据。`production_ready=true` 表示核心时间轴链路可交付，`full_production_ready=true` 才表示发言人实测也完成；需要把发言人作为硬门禁时传 `--require-speaker=true`。其他 evidence gate 仍不允许 fixture 兜底，并会在报告里给出 `missing_required_coverage` 和 `next_actions`。
 
 多平台推进时，把各平台的采样 JSON 放进 `data/meeting-app-evidence/`，再生成矩阵报告：
 
