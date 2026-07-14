@@ -1,12 +1,76 @@
-import {
-  compactObject,
-  normalizeAbsoluteMs,
-} from '../index.mjs';
-import {
-  MEETING_PLATFORM_KEYS,
-  buildPlatformIntegrationPlan,
-  normalizeMeetingPlatform,
-} from './platform-setup.mjs';
+const MEETING_PLATFORM_KEYS = Object.freeze(['local_detector', 'lark', 'google_meet', 'microsoft_teams', 'zoom', 'webex']);
+
+const MEETING_PLATFORM_ALIASES = Object.freeze({
+  'local-detector': 'local_detector',
+  detector: 'local_detector',
+  local_detector: 'local_detector',
+  manual: 'local_detector',
+  lark: 'lark',
+  feishu: 'lark',
+  larksuite: 'lark',
+  'google-meet': 'google_meet',
+  google_meet: 'google_meet',
+  meet: 'google_meet',
+  'microsoft-teams': 'microsoft_teams',
+  microsoft_teams: 'microsoft_teams',
+  teams: 'microsoft_teams',
+  zoom: 'zoom',
+  webex: 'webex',
+});
+
+const DISPLAY_NAMES = Object.freeze({
+  local_detector: 'Local Meeting Detector',
+  lark: 'Lark / Feishu',
+  google_meet: 'Google Meet',
+  microsoft_teams: 'Microsoft Teams',
+  zoom: 'Zoom',
+  webex: 'Webex',
+});
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
+}
+
+function compactObject(value) {
+  if (Array.isArray(value)) return value.map((item) => compactObject(item));
+  if (!isPlainObject(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .map(([key, item]) => [key, compactObject(item)]),
+  );
+}
+
+function normalizeAbsoluteMs(value, fieldName = 'timestamp') {
+  if (value == null || value === '') return undefined;
+  if (value instanceof Date) {
+    const ms = value.getTime();
+    if (Number.isFinite(ms)) return ms;
+    throw new Error(`Invalid ${fieldName}: Date is not finite`);
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error(`Invalid ${fieldName}: number is not finite`);
+    if (value > 10_000_000_000_000) return Math.round(value / 1000);
+    if (value > 10_000_000_000) return Math.round(value);
+    if (value > 1_000_000_000) return Math.round(value * 1000);
+    throw new Error(`Invalid ${fieldName}: expected absolute unix time`);
+  }
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) return normalizeAbsoluteMs(numeric, fieldName);
+  const parsed = Date.parse(String(value));
+  if (Number.isFinite(parsed)) return parsed;
+  throw new Error(`Invalid ${fieldName}: cannot parse absolute time`);
+}
+
+function normalizeMeetingPlatform(platform) {
+  const key = String(platform ?? 'lark').trim().toLowerCase().replace(/\s+/g, '_');
+  return MEETING_PLATFORM_ALIASES[key] ?? key.replace(/-/g, '_');
+}
+
+function buildPlatformIntegrationPlan(platform) {
+  const key = normalizeMeetingPlatform(platform);
+  return { platform: key, display_name: DISPLAY_NAMES[key] ?? key };
+}
 
 export const MEETING_PLATFORM_TIMELINE_VIEW_PLAN_SCHEMA = 'meeting_platform_timeline_view_plan';
 export const MEETING_PLATFORM_TIMELINE_VIEW_MATRIX_SCHEMA = 'meeting_platform_timeline_view_matrix';
