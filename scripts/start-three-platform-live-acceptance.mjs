@@ -3,7 +3,7 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +15,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_URLS = Object.freeze({
   google_meet: 'https://meet.google.com/',
   microsoft_teams: 'https://teams.microsoft.com/v2/',
-  zoom: 'https://zoom.us/join',
+  zoom: 'https://zoom.us/test',
 });
 const STARTUP_PROBE_URLS = Object.freeze({
   google_meet: 'https://meet.google.com/abc-defg-hij',
@@ -74,6 +74,44 @@ async function run(program, args, options = {}) {
   });
   const [code] = await once(child, 'exit');
   if (code !== 0) throw new Error(`${program} ${args.join(' ')} exited with ${code}`);
+}
+
+async function prepareFakeAudio(args, outputDir, platform) {
+  const explicit = args.get('fake-audio-file');
+  if (explicit) {
+    const file = resolve(String(explicit));
+    if (!existsSync(file)) throw new Error(`Fake audio file does not exist: ${file}`);
+    return { file, generated: false };
+  }
+  if (args.get('synthetic-audio') !== 'true') return null;
+  if (process.platform !== 'darwin') {
+    throw new Error('Automatic synthetic speech currently requires macOS. Pass --fake-audio-file=/absolute/path/to/mono.wav on this OS.');
+  }
+
+  const aiffFile = join(outputDir, `${platform}-acceptance-speaker.aiff`);
+  const wavFile = join(outputDir, `${platform}-acceptance-speaker.wav`);
+  const text = String(args.get('synthetic-audio-text') ?? [
+    'Meeting timeline adapter acceptance.',
+    'Why is this annotation important?',
+    'This sentence creates a stable active speaker segment.',
+  ].join(' '));
+  const voice = String(args.get('synthetic-audio-voice') ?? 'Samantha');
+  await rm(aiffFile, { force: true });
+  await rm(wavFile, { force: true });
+  try {
+    await run('/usr/bin/say', ['-v', voice, '-r', '175', '-o', aiffFile, text], { stdio: 'ignore' });
+    await run('/usr/bin/afconvert', [
+      aiffFile,
+      '-o', wavFile,
+      '-f', 'WAVE',
+      '-d', 'LEI16@44100',
+      '-c', '1',
+    ], { stdio: 'ignore' });
+  } finally {
+    await rm(aiffFile, { force: true });
+  }
+  if (!existsSync(wavFile)) throw new Error(`Synthetic audio generation did not create ${wavFile}`);
+  return { file: wavFile, generated: true, voice, text };
 }
 
 async function ensureService(baseUrl, options = {}) {
@@ -288,6 +326,7 @@ async function main() {
   const timeoutMs = Math.max(60_000, Number(args.get('timeout-ms') ?? 30 * 60_000));
   const launchedAtMs = Date.now();
   await Promise.all([mkdir(outputDir, { recursive: true }), mkdir(profileDir, { recursive: true })]);
+  const fakeAudio = await prepareFakeAudio(args, outputDir, platform);
 
   if (args.get('skip-build') !== 'true') {
     await run(process.execPath, [
@@ -319,7 +358,7 @@ async function main() {
     await endStaleAxis(baseUrl, initialStatus, args.get('end-stale') === 'true');
     const chromePath = await chromeExecutable(args.get('chrome-path'));
     const debugPort = args.get('debug-port') ? Number(args.get('debug-port')) : await freePort();
-    browser = spawn(chromePath, [
+    const chromeArgs = [
       `--user-data-dir=${profileDir}`,
       `--remote-debugging-port=${debugPort}`,
       `--disable-extensions-except=${extensionDir}`,
@@ -330,17 +369,25 @@ async function main() {
       '--disable-renderer-backgrounding',
       '--autoplay-policy=no-user-gesture-required',
       '--use-fake-ui-for-media-stream',
+      ...(fakeAudio ? [
+        '--use-fake-device-for-media-stream',
+        `--use-file-for-fake-audio-capture=${fakeAudio.file}`,
+      ] : []),
       '--window-size=1440,1000',
       baseUrl,
       startupProbeUrl,
       meetingUrl,
-    ], { stdio: ['ignore', 'ignore', 'ignore'] });
+    ];
+    browser = spawn(chromePath, chromeArgs, { stdio: ['ignore', 'ignore', 'ignore'] });
     await waitForDebugPort(debugPort);
     const worker = await waitForExtensionWorker(debugPort);
     const attached = await waitForExtensionAttachment(debugPort, platform, launchedAtMs);
     console.log(`LIVE_ACCEPTANCE_READY platform=${platform} browser=${chromePath}`);
-    console.log(`Open or join a real ${DISPLAY_NAMES[platform]} meeting in the launched browser, speak for at least two seconds, then end or leave the meeting.`);
+    console.log(fakeAudio
+      ? `Open or join a real ${DISPLAY_NAMES[platform]} meeting in the launched browser, keep the microphone unmuted for the synthetic speaker stimulus, then end or leave the meeting.`
+      : `Open or join a real ${DISPLAY_NAMES[platform]} meeting in the launched browser, speak for at least two seconds, then end or leave the meeting.`);
     console.log(`The acceptance annotation will be inserted automatically after real in-call evidence appears. Extension worker=${worker.url} attached=${attached.url}`);
+    if (fakeAudio) console.log(`Synthetic speaker stimulus is enabled with ${fakeAudio.file}`);
     if (args.get('startup-only') === 'true') {
       const startupReport = {
         type: 'three_platform_live_acceptance_startup',
@@ -357,6 +404,8 @@ async function main() {
         debug_port: debugPort,
         extension_worker_url: worker.url,
         extension_attachment: attached,
+        fake_audio_file: fakeAudio?.file ?? null,
+        synthetic_audio_generated: fakeAudio?.generated === true,
       };
       const startupReportFile = join(outputDir, `${platform}-startup.json`);
       await writeFile(startupReportFile, `${JSON.stringify(startupReport, null, 2)}\n`, 'utf8');
@@ -421,6 +470,8 @@ async function main() {
           meeting_url: meetingUrl,
           browser_profile_dir: profileDir,
           extension_dir: extensionDir,
+          fake_audio_file: fakeAudio?.file ?? null,
+          synthetic_audio_generated: fakeAudio?.generated === true,
         }, null, 2)}\n`, 'utf8');
         console.log(`LIVE_ACCEPTANCE_COMPLETE accepted=${report.accepted ? 'yes' : 'no'} report=${reportFile}`);
         if (!report.accepted) process.exitCode = 2;

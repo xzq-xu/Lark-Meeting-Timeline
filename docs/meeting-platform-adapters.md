@@ -17,7 +17,18 @@ Google Meet、Microsoft Teams、Zoom 的本地实时 adapter 已包含在 SDK �
 npm run meeting-platform:adapters:release -- --offline=true
 ```
 
-产物位于 `data/three-platform-adapters/`。安装说明以其中的 `README.md` 和 `release-manifest.json` 为准。只有主动把运行时嵌入自有 Electron/WebView/后台进程时，接入方才需要使用本文后面的低层 API。
+产物位于 `data/three-platform-adapters/`。安装说明以其中的 `README.md` 和 `release-manifest.json` 为准。`desktop-host/*.tgz` 不只是桌面 host：它也包含三平台预构建浏览器扩展。其他项目安装 tarball 后可直接运行 `npx meeting-timeline-adapters --out-dir=./meeting-timeline-browser-extension` 导出扩展，不需要克隆本仓库或重新构建。只有主动把运行时嵌入自有 Electron/WebView/后台进程时，接入方才需要使用本文后面的低层 API。
+
+真实会议发布门禁同样由仓库提供，不要求接入方补写 adapter。`meeting-platform:live-acceptance` 会启动带扩展的隔离浏览器并自动插入验收标注；macOS 可传 `--synthetic-audio=true` 自动生成稳定发言段，其他系统可传 `--fake-audio-file=/absolute/path/to/mono.wav`：
+
+```sh
+npm run meeting-platform:live-acceptance -- --platform=google-meet --synthetic-audio=true
+npm run meeting-platform:live-acceptance -- --platform=teams --synthetic-audio=true
+npm run meeting-platform:live-acceptance -- --platform=zoom --synthetic-audio=true
+npm run meeting-platform:live-acceptance:verify
+```
+
+账号登录、创建/加入会议和离会仍是平台账号动作；这些不是 SDK 使用方需要实现的代码。只有真实会议中的开始、稳定发言人、实时标注和结束证据全部通过，发布清单才会把对应平台标为 `production_ready`。
 
 ## 目标
 

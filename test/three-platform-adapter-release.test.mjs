@@ -32,6 +32,10 @@ try {
   assert.equal(report.desktop_host.package_ok, true);
   assert.equal(report.desktop_host.install_start_ok, true);
   assert.equal(report.desktop_host.missing_package_files.length, 0);
+  assert.equal(report.desktop_host.bundled_browser_extension.ok, true);
+  assert.equal(report.desktop_host.bundled_browser_extension.manifest_version, 3);
+  assert.deepEqual(report.desktop_host.bundled_browser_extension.platforms, ['google_meet', 'microsoft_teams', 'zoom']);
+  assert.equal(report.desktop_host.required_package_files.includes('package/runtime/browser-extension/manifest.json'), true);
 
   await Promise.all([
     stat(join(outDir, 'browser-extension', 'manifest.json')),
@@ -47,6 +51,8 @@ try {
   assert.match(readme, /自动监听会议开始、结束和稳定发言人/);
   assert.match(readme, /只用于验收取证/);
   assert.match(readme, /不需要调用方自己构造 `windows\[\]`/);
+  assert.match(readme, /meeting-timeline-adapters --out-dir/);
+  assert.match(readme, /不需要回到源码仓库构建/);
 } finally {
   await rm(outDir, { recursive: true, force: true });
 }

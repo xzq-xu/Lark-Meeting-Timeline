@@ -29,6 +29,14 @@ import { createMeetingTimelineClient } from './packages/meeting-timeline-sdk/ind
 }
 ```
 
+正式三平台发行 tarball 已把 Google Meet、Teams Web、Zoom Web 的预构建扩展一起打进包内。安装包后直接导出扩展，不需要 SDK 使用方克隆本仓库、执行 bundler 或编写 selector：
+
+```bash
+npx meeting-timeline-adapters --out-dir=./meeting-timeline-browser-extension
+```
+
+随后在 Chrome/Edge 中加载该目录；Teams/Zoom 桌面客户端则直接启动同一包提供的 `meeting-timeline-desktop-adapter`。两条命令都只需要配置 `MEETING_TIMELINE_BASE_URL`，平台状态机由 SDK 运行时负责。
+
 提交给外部项目接入前，建议在仓库根目录跑一次包级 smoke：
 
 ```bash
@@ -129,7 +137,13 @@ await applyMeetingSignals(timeline, signals);
 | Microsoft Teams | 桌面观察器或 WebView preload；网页版可用浏览器扩展 | Teams 窗口、会议控件、Accessibility/DOM 和发言状态 | Microsoft Graph `meetingCallEvents` |
 | Zoom | Native desktop helper；网页版可用浏览器扩展 | Zoom 进程、会议窗口、离会控件和发言状态 | Zoom Meeting Webhooks |
 
-默认接入方式不是让业务项目实现 adapter，而是直接生成并安装仓库内置运行时：
+默认接入方式不是让业务项目实现 adapter。使用正式 tarball 时直接导出包内预构建运行时：
+
+```sh
+npx meeting-timeline-adapters --out-dir=./meeting-timeline-browser-extension
+```
+
+只有在 SDK 源码仓库内重新制作发行物时才运行：
 
 ```sh
 npm run meeting-platform:adapters:release -- --offline=true

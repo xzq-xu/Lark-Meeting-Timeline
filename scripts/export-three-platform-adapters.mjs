@@ -2,7 +2,7 @@
 
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { chmod, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -106,6 +106,8 @@ async function writeReadme(tarballName) {
     '',
     '同一扩展已经内置三个平台的 URL 匹配、DOM/无障碍语义归一化、开始/结束检测、发言人滤波、时间轴写入和证据导出。',
     '',
+    `同一个 SDK tarball 也内置了这份预构建扩展。安装 \`desktop-host/${tarballName}\` 后可运行 \`meeting-timeline-adapters --out-dir=./meeting-timeline-browser-extension\` 导出，不需要回到源码仓库构建。`,
+    '',
     '## Teams / Zoom 桌面客户端',
     '',
     `SDK 安装包位于 \`desktop-host/${tarballName}\`。macOS 双击 \`install-macos.command\`，Windows 运行 \`install-windows.cmd\`。`,
@@ -122,7 +124,7 @@ async function writeReadme(tarballName) {
     '',
     '构建、安装启动和合成状态机测试通过不等于真实会议生产验收。以 `release-manifest.json` 为准：只有真实会议中的开始、发言人、标注、结束四类证据齐全后，单个平台的 `production_ready` 才能变为 `true`。',
     '',
-    '在源码仓库中可运行自动验收器：`npm run meeting-platform:live-acceptance -- --platform=google-meet`，平台也可传 `teams` 或 `zoom`。测试人员只需在启动的隔离浏览器中登录、加入会议、发言并离会，不需要实现 adapter。三平台完成后运行 `npm run meeting-platform:live-acceptance:verify`。',
+    '在源码仓库中可运行自动验收器：`npm run meeting-platform:live-acceptance -- --platform=google-meet --synthetic-audio=true`，平台也可传 `teams` 或 `zoom`；Zoom 默认打开官方 `zoom.us/test` 测试会议入口。测试人员只需在启动的隔离浏览器中登录、加入会议并离会，不需要实现 adapter；macOS 的 `--synthetic-audio=true` 会注入固定语音并自动产生稳定发言段，其他系统可传 `--fake-audio-file=/absolute/path/to/mono.wav`。三平台完成后运行 `npm run meeting-platform:live-acceptance:verify`。',
     '',
   ].join('\n'), 'utf8');
   return path;
@@ -159,7 +161,22 @@ async function main() {
   const zip = await command('zip', ['-q', '-r', extensionZip, '.'], { cwd: extensionDir });
   if (!zip.ok) throw new Error(`Extension zip failed: ${zip.stderr || zip.error}`);
 
-  const pack = await command('npm', ['pack', join(repoRoot, 'packages/meeting-timeline-sdk'), '--json', `--pack-destination=${desktopDir}`]);
+  const sdkPackageBuildDir = join(outDir, '.sdk-package-build');
+  await cp(join(repoRoot, 'packages/meeting-timeline-sdk'), sdkPackageBuildDir, { recursive: true });
+  const bundledExtensionDir = join(sdkPackageBuildDir, 'runtime', 'browser-extension');
+  await mkdir(dirname(bundledExtensionDir), { recursive: true });
+  await cp(extensionDir, bundledExtensionDir, { recursive: true });
+  const stagedPackageJsonPath = join(sdkPackageBuildDir, 'package.json');
+  const stagedPackageJson = JSON.parse(await readFile(stagedPackageJsonPath, 'utf8'));
+  stagedPackageJson.meetingTimelineAdapters = {
+    platforms: ['google_meet', 'microsoft_teams', 'zoom'],
+    browser_extension: 'runtime/browser-extension',
+    desktop_host_binary: 'meeting-timeline-desktop-adapter',
+    browser_export_binary: 'meeting-timeline-adapters',
+  };
+  await writeFile(stagedPackageJsonPath, `${JSON.stringify(stagedPackageJson, null, 2)}\n`, 'utf8');
+
+  const pack = await command('npm', ['pack', sdkPackageBuildDir, '--json', `--pack-destination=${desktopDir}`]);
   if (!pack.ok) throw new Error(`SDK pack failed: ${pack.stderr || pack.error}`);
   const packRows = JSON.parse(pack.stdout);
   const tarballName = packRows[0]?.filename;
@@ -172,6 +189,11 @@ async function main() {
     'package/adapters/desktop-meeting-host.mjs',
     'package/adapters/desktop-scanners/macos.jxa',
     'package/adapters/desktop-scanners/windows.ps1',
+    'package/bin/meeting-timeline-adapters.mjs',
+    'package/runtime/browser-extension/manifest.json',
+    'package/runtime/browser-extension/content-script.js',
+    'package/runtime/browser-extension/live-capture.js',
+    'package/runtime/browser-extension/background.js',
   ];
   const missingPackageFiles = requiredPackageFiles.filter((file) => !tarList.stdout.split('\n').includes(file));
   if (!tarList.ok || missingPackageFiles.length > 0) {
@@ -198,7 +220,29 @@ async function main() {
     && desktopDiagnosis?.platforms?.includes('microsoft_teams')
     && desktopDiagnosis?.platforms?.includes('zoom');
   if (!desktopInstallStartOk) throw new Error(`Desktop package start failed: ${desktopStart.stderr || desktopStart.stdout || desktopStart.error}`);
+
+  const packagedExtensionDir = join(outDir, '.packaged-extension-smoke');
+  const adaptersBinary = process.platform === 'win32'
+    ? join(desktopInstallDir, 'meeting-timeline-adapters.cmd')
+    : join(desktopInstallDir, 'bin', 'meeting-timeline-adapters');
+  const packagedExtensionExport = await command(adaptersBinary, [
+    `--out-dir=${packagedExtensionDir}`,
+    '--json=true',
+  ]);
+  let packagedExtensionReport = null;
+  let packagedExtensionManifest = null;
+  try { packagedExtensionReport = JSON.parse(packagedExtensionExport.stdout); } catch {}
+  try { packagedExtensionManifest = JSON.parse(await readFile(join(packagedExtensionDir, 'manifest.json'), 'utf8')); } catch {}
+  const packagedExtensionExportOk = packagedExtensionExport.ok
+    && packagedExtensionReport?.ok === true
+    && packagedExtensionManifest?.manifest_version === 3
+    && packagedExtensionReport?.platforms?.length === 3;
+  if (!packagedExtensionExportOk) {
+    throw new Error(`Packaged browser extension export failed: ${packagedExtensionExport.stderr || packagedExtensionExport.stdout || packagedExtensionExport.error}`);
+  }
   await rm(desktopInstallDir, { recursive: true, force: true });
+  await rm(packagedExtensionDir, { recursive: true, force: true });
+  await rm(sdkPackageBuildDir, { recursive: true, force: true });
 
   const launchers = await writeLaunchers(desktopDir, basename(tarballPath));
   const readmePath = await writeReadme(basename(tarballPath));
@@ -240,6 +284,12 @@ async function main() {
         install: { ok: desktopInstall.ok, duration_ms: desktopInstall.duration_ms, command: desktopInstall.command },
         start: { ok: desktopStart.ok, duration_ms: desktopStart.duration_ms, command: desktopStart.command },
         diagnosis: desktopDiagnosis,
+      },
+      bundled_browser_extension: {
+        ok: packagedExtensionExportOk,
+        command: packagedExtensionExport.command,
+        platforms: packagedExtensionReport.platforms,
+        manifest_version: packagedExtensionManifest.manifest_version,
       },
     },
     adapters: [
