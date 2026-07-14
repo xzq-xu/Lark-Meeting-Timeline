@@ -36,6 +36,13 @@ function scopesFromAuthUrl(authUrl) {
   return new URL(authUrl).searchParams.get('scope')?.split(/\s+/).filter(Boolean) ?? [];
 }
 
+const meetingDiscoveryScopes = [
+  'vc:meeting.search:read',
+  'vc:meeting.meetingid:read',
+  'calendar:calendar:read',
+  'calendar:calendar.event:read',
+];
+
 const port = await freePort();
 const tempDir = await mkdtemp(join(tmpdir(), 'lark-timeline-oauth-scope-'));
 const baseUrl = `http://127.0.0.1:${port}`;
@@ -87,7 +94,7 @@ try {
   assert.deepEqual(scopesFromAuthUrl(normal.auth_url), [
     'minutes:minutes.search:read',
     'minutes:minutes.basic:read',
-    'vc:meeting.search:read',
+    ...meetingDiscoveryScopes,
   ]);
 
   const minutesOnly = await (await fetch(`${baseUrl}/api/auth/lark/start?purpose=minutes`)).json();
@@ -103,14 +110,17 @@ try {
   assert.deepEqual(scopesFromAuthUrl(expanded.auth_url), [
     'minutes:minutes.search:read',
     'minutes:minutes.basic:read',
-    'vc:meeting.search:read',
+    ...meetingDiscoveryScopes,
   ]);
   assert.deepEqual(expanded.scopes, [
     'minutes:minutes.search:read',
     'minutes:minutes.basic:read',
-    'vc:meeting.search:read',
+    ...meetingDiscoveryScopes,
   ]);
-  assert.equal(expanded.requested_scope, 'vc:meeting.search:read minutes:minutes.basic:read');
+  assert.equal(
+    expanded.requested_scope,
+    'vc:meeting.search:read minutes:minutes.basic:read vc:meeting.meetingid:read calendar:calendar:read calendar:calendar.event:read',
+  );
   assert.equal(expanded.redirect_uri, `${baseUrl}/api/auth/lark/callback`);
   assert.equal(expanded.callback_url, `${baseUrl}/api/auth/lark/callback`);
   assert.equal(typeof expanded.state_created_at, 'string');
@@ -126,7 +136,7 @@ try {
   assert.deepEqual(scopesFromAuthUrl(location), [
     'minutes:minutes.search:read',
     'minutes:minutes.basic:read',
-    'vc:meeting.search:read',
+    ...meetingDiscoveryScopes,
   ]);
 
   const status = await (await fetch(`${baseUrl}/api/auth/lark/status`)).json();
