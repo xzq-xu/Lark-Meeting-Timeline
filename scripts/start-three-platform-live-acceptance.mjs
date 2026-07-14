@@ -669,7 +669,7 @@ async function main() {
           autoJoinAudio,
           autoLeave,
           activeMeeting: Boolean(meeting && current?.meeting_id === meeting.meeting_id && !current.end_time),
-          speakerSeen: requireSpeaker ? speakerSeen : Boolean(annotation),
+          completionSeen: requireSpeaker ? speakerSeen : Boolean(annotation),
           leaveReady: completionSeenAtMs != null && Date.now() - completionSeenAtMs >= 2_500,
           displayName: speakerPeer ? 'Timeline Adapter Observer' : 'Timeline Adapter Acceptance',
           completedActionKeys: [...completedAutomationActions],

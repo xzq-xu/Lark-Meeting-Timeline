@@ -231,6 +231,9 @@ export function chooseThreePlatformBrowserAutomationAction(input = {}) {
     platform,
     input.meetingUrl ?? input.meeting_url ?? input.preferredMeetingUrl ?? input.preferred_meeting_url,
   );
+  const completionSeen = input.completionSeen === true
+    || input.completion_seen === true
+    || input.speakerSeen === true;
 
   if (input.activeMeeting === true) {
     for (const page of pages) {
@@ -244,7 +247,7 @@ export function chooseThreePlatformBrowserAutomationAction(input = {}) {
         return action(page, 'join_audio', 'click', joinAudio);
       }
     }
-    if (input.autoLeave === true && input.speakerSeen === true && input.leaveReady === true) {
+    if (input.autoLeave === true && completionSeen && input.leaveReady === true) {
       if (completed.has('phase:leave_meeting') || pages.some((page) => actionCompleted(completed, page, 'leave_meeting'))) {
         for (const page of pages) {
           const confirmation = firstControl(page, (item) => exactLabel(item, LABELS.confirm_leave));

@@ -58,6 +58,8 @@ npm run meeting-platform:live-acceptance:verify
 npm run meeting-platform:live-acceptance:verify -- --require-speaker=true
 ```
 
+正式 tarball 安装后可运行 `meeting-timeline-adapters --status=true --json=true`，直接读取打包时的逐平台核心与发言人真实验收状态，不需要回源码仓库查 `release-manifest.json`。
+
 测试人员只负责在启动的浏览器中登录、加入/创建会议并离会，不需要实现或手动调用 adapter；Zoom 默认打开官方 `zoom.us/test` 测试会议入口。加上 `--synthetic-audio=true` 后，macOS 验收器会生成并循环注入固定英文语音；其他系统可传 `--fake-audio-file=/absolute/path/to/mono.wav`。官方测试会只能验证单参会者生命周期，不能可靠证明远端发言人识别。对普通共享会议传 `--speaker-peer=true` 后，验收器会额外启动独立的合成发言参会者，观察者只加载 SDK，从而自动验证远端稳定发言段和滤波。未启用合成语音时才需要人工发言至少两秒。旧的手工 DOM 采样流程仅保留给 Webex、Lark 或新增自定义平台调试：
 
 显式允许验收器改变外部会议状态时，可以把浏览器入会、电脑音频和离会也自动化。Zoom 官方测试会可直接运行；Google Meet/Teams 还需传真实 `--meeting-url`，账号登录和等候室放行仍由平台控制：

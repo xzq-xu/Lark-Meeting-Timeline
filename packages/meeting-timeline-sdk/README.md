@@ -3854,6 +3854,8 @@ meeting-timeline-desktop-adapter \
   --platforms=teams,zoom \
   --interval-ms=750 \
   --evidence-file=desktop-adapter-evidence.jsonl
+
+meeting-timeline-adapters --status=true
 ```
 
 macOS 首次读取 Teams/Zoom 控件时需要给终端或打包宿主“辅助功能”权限。Windows adapter 必须与 Teams/Zoom 运行在同一登录会话和权限级别。desktop host 内置开始、结束和发言人去抖，不要求调用方自己构造 `windows[]`。
@@ -3882,9 +3884,9 @@ node scripts/verify-three-platform-browser-extension.mjs \
   --report-file=data/three-platform-browser-extension-verification.json
 ```
 
-静态测试、安装启动和真实域名注入通过仍不等于生产验收。每个平台必须在真实会议中采集 `meeting_started`、稳定 `speaker_started`、实时设备标注和 `meeting_ended` 后，才能把 `production_ready` 设为 `true`。
+静态测试、安装启动和真实域名注入通过仍不等于生产验收。每个平台必须在真实会议中采集 `meeting_started`、实时设备标注和 `meeting_ended` 后，才能把核心 `production_ready` 设为 `true`。远端稳定 `speaker_started` 与显示延迟单独写入 `speaker_ready`；三平台两层都通过时 `full_production_ready` 才为 `true`。正式发行 tarball 会内置打包时的状态，安装后可用 `meeting-timeline-adapters --status=true --json=true` 查询。
 
-仓库提供自动化真实会议验收器。它会启动带扩展的隔离 Chromium；测试人员只需登录、加入或创建会议、发言至少两秒并离会，工具会自动插入实时验收标注并校验四类证据：
+仓库提供自动化真实会议验收器。它会启动带扩展的隔离 Chromium；单账号核心模式只需登录、加入或创建会议并离会，工具会自动插入实时验收标注并校验开始、标注和结束证据：
 
 ```sh
 npm run meeting-platform:live-acceptance -- --platform=google-meet
@@ -3893,9 +3895,10 @@ npm run meeting-platform:live-acceptance -- --platform=zoom
 npm run meeting-platform:live-acceptance -- --platform=zoom --meeting-url='https://zoom.us/j/<meeting-id>?pwd=<token>' --speaker-peer=true --auto-join=true --auto-leave=true --allow-external-actions=true
 
 npm run meeting-platform:live-acceptance:verify
+npm run meeting-platform:live-acceptance:verify -- --require-speaker=true
 ```
 
-验收器会拒绝登录页、预加入页、错误页、fixture 和 URL-only 候选；还会检查标注延迟、时间轴误差、重复写入以及跨会议残留。对共享会议启用 `--speaker-peer=true` 会启动独立合成发言参会者，避免把本机自发言误当成远端 speaker 验收；该模式不能使用 `zoom.us/test`。账号登录和真实会议交互无法由 SDK 伪造，但不需要使用方编写任何 adapter 代码。
+验收器会拒绝登录页、预加入页、错误页、fixture 和 URL-only 候选；还会检查标注延迟、时间轴误差、重复写入以及跨会议残留。对共享会议启用 `--speaker-peer=true` 会启动独立合成发言参会者并默认启用 `--require-speaker=true`，避免把本机自发言误当成远端 speaker 验收；该模式不能使用 `zoom.us/test`。账号登录和真实会议交互无法由 SDK 伪造，但不需要使用方编写任何 adapter 代码。
 
 ## Webhook 验证工具
 

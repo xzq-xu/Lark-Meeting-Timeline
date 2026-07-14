@@ -135,6 +135,17 @@ const zoomLeave = chooseThreePlatformBrowserAutomationAction({
 });
 assert.equal(zoomLeave.phase, 'leave_meeting');
 
+const zoomCoreLeave = chooseThreePlatformBrowserAutomationAction({
+  platform: 'zoom',
+  autoJoin: true,
+  autoLeave: true,
+  activeMeeting: true,
+  completionSeen: true,
+  leaveReady: true,
+  pages: [page('zoom-core-live', 'https://zoom.us/wc/123/join', [control({ aria: 'Leave Meeting' })])],
+});
+assert.equal(zoomCoreLeave.phase, 'leave_meeting');
+
 const zoomConfirmLeave = chooseThreePlatformBrowserAutomationAction({
   platform: 'zoom',
   autoJoin: true,
@@ -157,12 +168,57 @@ const meetJoin = chooseThreePlatformBrowserAutomationAction({
 });
 assert.equal(meetJoin.phase, 'join_meeting');
 
+const meetAnonymousName = chooseThreePlatformBrowserAutomationAction({
+  platform: 'google-meet',
+  autoJoin: true,
+  displayName: 'Timeline Adapter Acceptance',
+  pages: [page('meet-anonymous', 'https://meet.google.com/abc-defg-hij', [
+    control({ tag: 'input', type: 'text', placeholder: 'Your name', value_present: false }),
+    control({ text: 'Ask to join' }),
+  ])],
+});
+assert.equal(meetAnonymousName.phase, 'fill_display_name');
+assert.equal(meetAnonymousName.value, 'Timeline Adapter Acceptance');
+
+const meetAnonymousJoin = chooseThreePlatformBrowserAutomationAction({
+  platform: 'google-meet',
+  autoJoin: true,
+  completedActionKeys: ['phase:fill_display_name'],
+  pages: [page('meet-anonymous', 'https://meet.google.com/abc-defg-hij', [
+    control({ tag: 'input', type: 'text', placeholder: 'Your name', value_present: true }),
+    control({ text: 'Ask to join' }),
+  ])],
+});
+assert.equal(meetAnonymousJoin.phase, 'join_meeting');
+
 const teamsContinue = chooseThreePlatformBrowserAutomationAction({
   platform: 'teams',
   autoJoin: true,
   pages: [page('teams-join', 'https://teams.microsoft.com/l/meetup-join/abc', [control({ text: 'Continue on this browser' })])],
 });
 assert.equal(teamsContinue.phase, 'continue_browser');
+
+const teamsAnonymousName = chooseThreePlatformBrowserAutomationAction({
+  platform: 'teams',
+  autoJoin: true,
+  displayName: 'Timeline Adapter Acceptance',
+  pages: [page('teams-anonymous', 'https://teams.live.com/meet/1234567890123?p=sample', [
+    control({ tag: 'input', type: 'text', placeholder: 'Type your name', value_present: false }),
+    control({ text: 'Join now' }),
+  ])],
+});
+assert.equal(teamsAnonymousName.phase, 'fill_display_name');
+
+const teamsAnonymousJoin = chooseThreePlatformBrowserAutomationAction({
+  platform: 'teams',
+  autoJoin: true,
+  completedActionKeys: ['phase:fill_display_name'],
+  pages: [page('teams-anonymous', 'https://teams.live.com/meet/1234567890123?p=sample', [
+    control({ tag: 'input', type: 'text', placeholder: 'Type your name', value_present: true }),
+    control({ text: 'Join now' }),
+  ])],
+});
+assert.equal(teamsAnonymousJoin.phase, 'join_meeting');
 
 const teamsError = chooseThreePlatformBrowserAutomationAction({
   platform: 'teams',

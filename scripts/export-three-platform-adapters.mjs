@@ -112,6 +112,7 @@ async function writeReadme(tarballName) {
     '同一扩展已经内置三个平台的 URL 匹配、DOM/无障碍语义归一化、开始/结束检测、发言人滤波、时间轴写入和证据导出。',
     '',
     `同一个 SDK tarball 也内置了这份预构建扩展。安装 \`desktop-host/${tarballName}\` 后可运行 \`meeting-timeline-adapters --out-dir=./meeting-timeline-browser-extension\` 导出，不需要回到源码仓库构建。`,
+    '安装后运行 `meeting-timeline-adapters --status=true` 可直接查看打包时的逐平台真实会议核心验收与远端发言人验收状态；不需要回到发行目录读取清单。',
     '',
     '## Teams / Zoom 桌面客户端',
     '',
@@ -141,6 +142,11 @@ async function main() {
   const extensionDir = join(outDir, 'browser-extension');
   const desktopDir = join(outDir, 'desktop-host');
   await Promise.all([mkdir(extensionBuildDir, { recursive: true }), mkdir(extensionDir, { recursive: true }), mkdir(desktopDir, { recursive: true })]);
+  const liveAcceptance = await verifyThreePlatformLiveAcceptance({
+    inputDir: liveEvidenceDir,
+    requireSpeaker: requireSpeakerAcceptance,
+  });
+  const releaseReadiness = buildThreePlatformReleaseReadiness(liveAcceptance);
 
   const extensionArgs = [
     'scripts/export-meeting-app-extension.mjs',
@@ -171,6 +177,27 @@ async function main() {
   const bundledExtensionDir = join(sdkPackageBuildDir, 'runtime', 'browser-extension');
   await mkdir(dirname(bundledExtensionDir), { recursive: true });
   await cp(extensionDir, bundledExtensionDir, { recursive: true });
+  const bundledReleaseStatusPath = join(sdkPackageBuildDir, 'runtime', 'three-platform-release-status.json');
+  const bundledReleaseAdapters = releaseReadiness.adapters.map((adapter) => ({
+    ...adapter,
+    evidence_file: adapter.evidence_file ? relative(repoRoot, adapter.evidence_file) : null,
+  }));
+  const bundledReleaseStatus = {
+    type: 'three_platform_adapter_release_status',
+    schema: 'three_platform_adapter_release_status',
+    schema_version: 1,
+    generated_at: new Date().toISOString(),
+    source: 'three_platform_adapter_release',
+    production_ready: releaseReadiness.production_ready,
+    speaker_ready: releaseReadiness.speaker_ready,
+    full_production_ready: releaseReadiness.full_production_ready,
+    adapters: bundledReleaseAdapters,
+    remaining_platforms: releaseReadiness.remaining_platforms,
+    remaining_speaker_platforms: releaseReadiness.remaining_speaker_platforms,
+    remaining_gate: releaseReadiness.remaining_gate,
+    speaker_remaining_gate: releaseReadiness.speaker_remaining_gate,
+  };
+  await writeFile(bundledReleaseStatusPath, `${JSON.stringify(bundledReleaseStatus, null, 2)}\n`, 'utf8');
   const stagedPackageJsonPath = join(sdkPackageBuildDir, 'package.json');
   const stagedPackageJson = JSON.parse(await readFile(stagedPackageJsonPath, 'utf8'));
   stagedPackageJson.meetingTimelineAdapters = {
@@ -178,6 +205,7 @@ async function main() {
     browser_extension: 'runtime/browser-extension',
     desktop_host_binary: 'meeting-timeline-desktop-adapter',
     browser_export_binary: 'meeting-timeline-adapters',
+    release_status: 'runtime/three-platform-release-status.json',
   };
   await writeFile(stagedPackageJsonPath, `${JSON.stringify(stagedPackageJson, null, 2)}\n`, 'utf8');
 
@@ -199,6 +227,7 @@ async function main() {
     'package/runtime/browser-extension/content-script.js',
     'package/runtime/browser-extension/live-capture.js',
     'package/runtime/browser-extension/background.js',
+    'package/runtime/three-platform-release-status.json',
   ];
   const missingPackageFiles = requiredPackageFiles.filter((file) => !tarList.stdout.split('\n').includes(file));
   if (!tarList.ok || missingPackageFiles.length > 0) {
@@ -245,6 +274,21 @@ async function main() {
   if (!packagedExtensionExportOk) {
     throw new Error(`Packaged browser extension export failed: ${packagedExtensionExport.stderr || packagedExtensionExport.stdout || packagedExtensionExport.error}`);
   }
+  const packagedReleaseStatusCommand = await command(adaptersBinary, [
+    '--status=true',
+    '--json=true',
+  ]);
+  let packagedReleaseStatus = null;
+  try { packagedReleaseStatus = JSON.parse(packagedReleaseStatusCommand.stdout); } catch {}
+  const packagedReleaseStatusOk = packagedReleaseStatusCommand.ok
+    && packagedReleaseStatus?.schema === 'three_platform_adapter_release_status'
+    && packagedReleaseStatus?.production_ready === releaseReadiness.production_ready
+    && packagedReleaseStatus?.speaker_ready === releaseReadiness.speaker_ready
+    && packagedReleaseStatus?.full_production_ready === releaseReadiness.full_production_ready
+    && packagedReleaseStatus?.adapters?.length === 3;
+  if (!packagedReleaseStatusOk) {
+    throw new Error(`Packaged release status failed: ${packagedReleaseStatusCommand.stderr || packagedReleaseStatusCommand.stdout || packagedReleaseStatusCommand.error}`);
+  }
   await rm(desktopInstallDir, { recursive: true, force: true });
   await rm(packagedExtensionDir, { recursive: true, force: true });
   await rm(sdkPackageBuildDir, { recursive: true, force: true });
@@ -259,11 +303,6 @@ async function main() {
     readmePath,
   ];
   const artifacts = await Promise.all(artifactPaths.map(sha256));
-  const liveAcceptance = await verifyThreePlatformLiveAcceptance({
-    inputDir: liveEvidenceDir,
-    requireSpeaker: requireSpeakerAcceptance,
-  });
-  const releaseReadiness = buildThreePlatformReleaseReadiness(liveAcceptance);
   const report = {
     type: 'three_platform_adapter_release',
     schema: 'three_platform_adapter_release',
@@ -302,6 +341,15 @@ async function main() {
         command: packagedExtensionExport.command,
         platforms: packagedExtensionReport.platforms,
         manifest_version: packagedExtensionManifest.manifest_version,
+      },
+      bundled_release_status: {
+        ok: packagedReleaseStatusOk,
+        command: packagedReleaseStatusCommand.command,
+        schema: packagedReleaseStatus.schema,
+        production_ready: packagedReleaseStatus.production_ready,
+        speaker_ready: packagedReleaseStatus.speaker_ready,
+        full_production_ready: packagedReleaseStatus.full_production_ready,
+        adapter_count: packagedReleaseStatus.adapters.length,
       },
     },
     live_acceptance: liveAcceptance,

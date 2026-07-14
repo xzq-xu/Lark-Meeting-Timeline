@@ -87,7 +87,22 @@ try {
   assert.equal(report.desktop_host.bundled_browser_extension.ok, true);
   assert.equal(report.desktop_host.bundled_browser_extension.manifest_version, 3);
   assert.deepEqual(report.desktop_host.bundled_browser_extension.platforms, ['google_meet', 'microsoft_teams', 'zoom']);
+  assert.equal(report.desktop_host.bundled_release_status.ok, true);
+  assert.equal(report.desktop_host.bundled_release_status.schema, 'three_platform_adapter_release_status');
+  assert.equal(report.desktop_host.bundled_release_status.production_ready, false);
+  assert.equal(report.desktop_host.bundled_release_status.speaker_ready, false);
+  assert.equal(report.desktop_host.bundled_release_status.full_production_ready, false);
+  assert.equal(report.desktop_host.bundled_release_status.adapter_count, 3);
   assert.equal(report.desktop_host.required_package_files.includes('package/runtime/browser-extension/manifest.json'), true);
+  assert.equal(report.desktop_host.required_package_files.includes('package/runtime/three-platform-release-status.json'), true);
+
+  const tarballStatus = JSON.parse(await execFileAsync('tar', [
+    '-xOzf',
+    join(outDir, report.desktop_host.package),
+    'package/runtime/three-platform-release-status.json',
+  ]).then((result) => result.stdout));
+  assert.equal(tarballStatus.schema, 'three_platform_adapter_release_status');
+  assert.equal(tarballStatus.adapters.some((row) => String(row.evidence_file ?? '').startsWith('/')), false);
 
   await Promise.all([
     stat(join(outDir, 'browser-extension', 'manifest.json')),
@@ -107,6 +122,7 @@ try {
   assert.match(readme, /只用于验收取证/);
   assert.match(readme, /不需要调用方自己构造 `windows\[\]`/);
   assert.match(readme, /meeting-timeline-adapters --out-dir/);
+  assert.match(readme, /meeting-timeline-adapters --status=true/);
   assert.match(readme, /不需要回到源码仓库构建/);
   assert.match(readme, /--speaker-peer=true/);
   assert.match(readme, /不要求第二账号/);
