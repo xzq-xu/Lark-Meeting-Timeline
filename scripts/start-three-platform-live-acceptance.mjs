@@ -547,11 +547,13 @@ async function main() {
     const worker = await waitForExtensionWorker(debugPort);
     const attached = await waitForExtensionAttachment(debugPort, platform, launchedAtMs);
     console.log(`LIVE_ACCEPTANCE_READY platform=${platform} browser=${chromePath}`);
-    console.log(fakeAudio && !speakerPeer
-      ? `Open or join a real ${DISPLAY_NAMES[platform]} meeting in the launched browser, keep the microphone unmuted for the synthetic speaker stimulus, then end or leave the meeting.`
-      : speakerPeer
-        ? `The SDK observer and synthetic speaker peer will join the shared ${DISPLAY_NAMES[platform]} meeting automatically.`
-        : `Open or join a real ${DISPLAY_NAMES[platform]} meeting in the launched browser, speak for at least two seconds, then end or leave the meeting.`);
+    console.log(speakerPeer
+      ? `The SDK observer and synthetic speaker peer will join the shared ${DISPLAY_NAMES[platform]} meeting automatically.`
+      : requireSpeaker && fakeAudio
+        ? `Open or join a real ${DISPLAY_NAMES[platform]} meeting in the launched browser, keep the microphone unmuted for the synthetic speaker stimulus, then end or leave the meeting.`
+        : requireSpeaker
+          ? `Open or join a real ${DISPLAY_NAMES[platform]} meeting in the launched browser, speak for at least two seconds, then end or leave the meeting.`
+          : `Open or join a real ${DISPLAY_NAMES[platform]} meeting in the launched browser; after the acceptance annotation appears, end or leave the meeting.`);
     console.log(`The acceptance annotation will be inserted automatically after real in-call evidence appears. Extension worker=${worker.url} attached=${attached.url}`);
     if (fakeAudio) console.log(`Synthetic speaker stimulus is enabled with ${fakeAudio.file}${speakerPeer ? ' on the peer browser' : ''}`);
     if (args.get('startup-only') === 'true') {
