@@ -5,6 +5,30 @@ import { extname, join, normalize } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as Lark from '@larksuiteoapi/node-sdk';
+import { applyMeetingSignals } from '../packages/meeting-timeline-sdk/adapters/core.mjs';
+import {
+  MEETING_PLATFORM_EVENT_ADAPTERS,
+  meetingPlatformEventAdapterFor,
+} from '../packages/meeting-timeline-sdk/adapters/platform-registry.mjs';
+import {
+  allPlatformCapabilityContracts,
+  allPlatformSetupManifests,
+  buildPlatformSetup,
+  evaluateAllPlatformSetupReadiness,
+  evaluateAllPlatformSubscriptionMaintenance,
+  evaluatePlatformSetupReadiness,
+  evaluatePlatformSubscriptionMaintenance,
+} from '../packages/meeting-timeline-sdk/adapters/platform-setup.mjs';
+import {
+  buildZoomUrlValidationResponse,
+  microsoftGraphValidationResponse,
+  platformWebhookVerificationStatus,
+  verifyGooglePubSubBearer,
+  verifyGooglePubSubOidcJwt,
+  verifyMicrosoftGraphClientState,
+  verifyWebexWebhookEvent,
+  verifyZoomWebhookEvent,
+} from '../packages/meeting-timeline-sdk/adapters/webhook-security.mjs';
 import { createLarkClient, extractMeetingNo, extractMinuteToken } from './larkClient.mjs';
 import {
   annotationCapturedAbsoluteMs,
@@ -21,6 +45,10 @@ import { TimelineStore } from './store.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const publicDir = join(root, 'public');
+const sdkBrowserModules = new Map([
+  ['/sdk/producer.mjs', join(root, 'packages/meeting-timeline-sdk/producer.mjs')],
+  ['/sdk/errors.mjs', join(root, 'packages/meeting-timeline-sdk/errors.mjs')],
+]);
 const dataDir = process.env.TIMELINE_DATA_DIR || join(root, 'data');
 const authPath = process.env.LARK_AUTH_PATH || join(dataDir, 'lark-auth.json');
 const realMeetingProbePath = process.env.REAL_MEETING_PROBE_PATH || join(dataDir, 'real-meeting-probe.json');
@@ -29,6 +57,10 @@ const autoAcceptancePath = process.env.AUTO_ACCEPTANCE_PATH || join(dataDir, 'au
 const deviceSimulatorPath = process.env.DEVICE_SIMULATOR_PATH || join(dataDir, 'device-simulator.json');
 const passiveMeetingScanPath = process.env.PASSIVE_MEETING_SCAN_PATH || join(dataDir, 'passive-meeting-scan.json');
 const realDemoSessionPath = process.env.REAL_DEMO_SESSION_PATH || join(dataDir, 'real-demo-session.json');
+const meetingPlatformFieldEvidenceDir = process.env.MEETING_PLATFORM_FIELD_EVIDENCE_DIR
+  || join(dataDir, 'meeting-platform-field-evidence');
+const pendingMeetingPlatformP0References = new Map();
+const meetingPlatformP0ReferenceTtlMs = 30 * 60 * 1000;
 const store = new TimelineStore();
 const streamClients = new Set();
 const streamTelemetry = {
@@ -122,6 +154,26 @@ const minuteOAuthScopes = [
   'minutes:minutes.basic:read',
   'minutes:minutes.transcript:export',
 ];
+const platformEventAdapterDefinitions = MEETING_PLATFORM_EVENT_ADAPTERS;
+const platformEventStatus = Object.fromEntries(platformEventAdapterDefinitions.map((adapter) => [
+  adapter.key,
+  {
+    platform: adapter.key,
+    receiver_ready: true,
+    source: adapter.source,
+    received_count: 0,
+    normalized_signal_count: 0,
+    applied_signal_count: 0,
+    skipped_signal_count: 0,
+    lifecycle_event_count: 0,
+    last_received_at: null,
+    last_event_type: null,
+    last_signal_type: null,
+    last_lifecycle: null,
+    last_verification: null,
+    last_error: null,
+  },
+]));
 
 function loadDotEnv() {
   const envPath = join(root, '.env');
@@ -140,7 +192,7 @@ function loadDotEnv() {
 
 loadDotEnv();
 const lark = createLarkClient(process.env);
-const port = Number(process.env.PORT || 8787);
+const port = Number(process.env.PORT || 8789);
 let authState = loadAuthState();
 let larkWsClient = null;
 let probeAutoSearchTimer = null;
@@ -728,12 +780,25 @@ function loggedEventPayload(entry = {}) {
   return entry.preview ?? null;
 }
 
-function isLoggedMeetingStartEntry(entry = {}) {
-  return Boolean(entry.timeline_started && (
+function isLoggedMeetingStartEventEntry(entry = {}) {
+  return Boolean(
     isDirectMeetingStartEvent(entry.event_type)
       || isReserveMeetingStartEvent(entry.event_type)
       || isMeetingContextBootstrapEvent(entry.event_type)
-  ));
+  );
+}
+
+function isLoggedMeetingStartEntry(entry = {}) {
+  return Boolean(entry.timeline_started && isLoggedMeetingStartEventEntry(entry));
+}
+
+function isRestorableLoggedMeetingStartEntry(entry = {}) {
+  return Boolean(
+    isLoggedMeetingStartEventEntry(entry)
+      && loggedEventPayload(entry)
+      && hasExplicitMeetingIdentity(loggedMeetingIdentity(entry))
+      && explicitMeetingStartMs(loggedEventPayload(entry)) != null
+  );
 }
 
 function isLoggedMeetingEndEntry(entry = {}) {
@@ -756,6 +821,10 @@ function latestLoggedMeetingStartEvent() {
   return larkEventLog.find((entry) => isLoggedMeetingStartEntry(entry)) ?? null;
 }
 
+function latestRestorableLoggedMeetingStartEvent() {
+  return larkEventLog.find((entry) => isRestorableLoggedMeetingStartEntry(entry)) ?? null;
+}
+
 function latestLoggedMeetingStartBefore(cutoff) {
   const cutoffMs = isoMs(cutoff);
   if (cutoffMs == null) return null;
@@ -773,6 +842,70 @@ function matchingLoggedMeetingEndAfter(startEntry = {}) {
       && eventLogEntryMs(entry) >= startMs
       && sameLoggedMeetingEntry(startEntry, entry)
   )) ?? null;
+}
+
+function matchingLoggedMeetingStartForEnd(endEntry = {}) {
+  if (!endEntry) return null;
+  return larkEventLog.find((entry) => (
+    isRestorableLoggedMeetingStartEntry(entry)
+      && sameLoggedMeetingEntry(entry, endEntry)
+  )) ?? null;
+}
+
+function latestRecoverableMeetingWindow() {
+  for (const entry of larkEventLog) {
+    if (isRestorableLoggedMeetingStartEntry(entry)) {
+      return {
+        restoreMode: 'latest_start_event',
+        startEntry: entry,
+        endEntry: matchingLoggedMeetingEndAfter(entry),
+      };
+    }
+    if (isLoggedMeetingEndEntry(entry) && loggedEventPayload(entry)) {
+      const startEntry = matchingLoggedMeetingStartForEnd(entry);
+      if (startEntry) {
+        return {
+          restoreMode: 'latest_ended_meeting_window',
+          startEntry,
+          endEntry: entry,
+        };
+      }
+    }
+  }
+  return null;
+}
+
+async function restoreRecentStartEventForProbe(body = {}) {
+  if (body.auto_search === false && body.auto_restore_recent_event !== true) return null;
+  if (body.auto_restore_recent_event === false) return null;
+  const startedMs = isoMs(realMeetingProbe.started_at);
+  if (startedMs == null) return null;
+  const lookbackMs = boundedNumber(
+    body.recent_event_lookback_ms ?? 5 * 60_000,
+    30_000,
+    10_000,
+    30 * 60_000,
+  );
+  const latestWindow = latestRecoverableMeetingWindow();
+  if (!latestWindow || latestWindow.restoreMode !== 'latest_start_event') return null;
+  const receivedMs = eventLogEntryMs(latestWindow.startEntry);
+  if (!receivedMs || receivedMs > startedMs || startedMs - receivedMs > lookbackMs) return null;
+  const endMs = latestWindow.endEntry ? eventLogEntryMs(latestWindow.endEntry) : null;
+  if (endMs != null && endMs <= startedMs) return null;
+  const restored = await restoreLatestRealMeetingAxisFromEventLog({
+    event_id: latestWindow.startEntry.id,
+    apply_end: true,
+  });
+  return {
+    restored: true,
+    reason: 'recent_start_event_before_probe',
+    lookback_ms: lookbackMs,
+    start_event_id: latestWindow.startEntry.id,
+    start_event_type: latestWindow.startEntry.event_type,
+    restored_at: restored.restored_at,
+    restore_mode: restored.restore_mode,
+    state: restored.state,
+  };
 }
 
 function missedMeetingWindowForProbe(req = null) {
@@ -1276,10 +1409,9 @@ function realDemoPresentationForState(state = {}) {
   const pending = Boolean(meeting.pending_binding);
   const demoSample = meeting.meeting_id === 'demo-lark-meeting-001' && !meeting.source && !pending;
   const localSimulation = meeting.source === 'local_simulation' && !pending;
-  const staleRealAxis = realDemoSession.active && realAxis && !axisObservedAfterPrepare;
   const hideTimeline = Boolean(
     realDemoWaiting
-      && (demoSample || localSimulation || pending || staleRealAxis || !realAxis),
+      && (demoSample || localSimulation || pending || !realAxis),
   );
   const hiddenReason = !hideTimeline
     ? null
@@ -1289,10 +1421,8 @@ function realDemoPresentationForState(state = {}) {
         ? 'demo_sample_axis_is_not_current_real_demo'
         : localSimulation
           ? 'local_simulation_hidden_during_real_demo'
-          : staleRealAxis
-            ? 'stale_real_axis_before_current_prepare'
-            : 'waiting_for_real_lark_meeting_axis';
-  const axisStatus = realAxis && axisObservedAfterPrepare
+          : 'waiting_for_real_lark_meeting_axis';
+  const axisStatus = realAxis
     ? 'real_axis_active'
     : pending
       ? 'pending_annotations_waiting_rebind'
@@ -1506,6 +1636,16 @@ async function appendAnnotation(input) {
   const current = await store.load();
   const result = appendAnnotationToState(current, input);
   const saved = await saveAndBroadcast(result.state, 'state');
+  const annotationEvidence = persistMeetingPlatformAnnotationEvidence(
+    input,
+    result.item,
+    saved.meeting,
+    Date.now(),
+    {
+      ...result.options,
+      visible_instance_count: (saved.sequence ?? []).filter((row) => row.id === result.item.id).length,
+    },
+  );
   return {
     ack: annotationAck(result.item, saved, result.options),
     meeting_session_binding: meetingSessionBinding,
@@ -1513,6 +1653,7 @@ async function appendAnnotation(input) {
     auto_open_session_binding: autoOpenSessionBinding,
     item: result.item,
     state: saved,
+    annotation_evidence: annotationEvidence,
   };
 }
 
@@ -1555,15 +1696,30 @@ async function appendAnnotationBatch(inputs = []) {
     results.push(result);
   }
   const saved = await saveAndBroadcast(working, 'state');
-  const rows = results.map((result) => ({
-    ack: annotationAck(result.item, saved, result.options),
-    item: result.item,
-  }));
+  const visibleAtMs = Date.now();
+  const rows = results.map((result, index) => {
+    const annotationEvidence = persistMeetingPlatformAnnotationEvidence(
+      inputs[index],
+      result.item,
+      saved.meeting,
+      visibleAtMs,
+      {
+        ...result.options,
+        visible_instance_count: (saved.sequence ?? []).filter((item) => item.id === result.item.id).length,
+      },
+    );
+    return {
+      ack: annotationAck(result.item, saved, result.options),
+      item: result.item,
+      annotation_evidence: annotationEvidence,
+    };
+  });
   return {
     accepted: true,
     count: rows.length,
     acks: rows.map((row) => row.ack),
     items: rows.map((row) => row.item),
+    annotation_evidence: rows.map((row) => row.annotation_evidence),
     meeting_session_binding: meetingSessionBinding,
     passive_binding: passiveBinding,
     auto_open_session_binding: autoOpenSessionBinding,
@@ -2070,8 +2226,8 @@ function rebasePendingSequence(sequence = [], meeting = {}) {
   return rebaseAnnotationSequence(sequence, meeting);
 }
 
-function canOpenSessionCarryIntoMeeting(current = {}, meeting = {}) {
-  if (current.meeting?.source !== 'open_meeting_session') return false;
+function canLocalSessionCarryIntoMeeting(current = {}, meeting = {}) {
+  if (!['open_meeting_session', 'local_detector'].includes(current.meeting?.source)) return false;
   if (current.meeting?.end_time) return false;
   if (sameMeeting(current.meeting, meeting)) return true;
   const currentStartMs = parseAbsoluteMs(current.meeting?.start_time);
@@ -2085,7 +2241,7 @@ function shouldCarrySequenceIntoNewAxis(current = {}, meeting = {}) {
   if (current.meeting?.pending_binding) return true;
   if (current.meeting?.source === 'local_simulation') return true;
   if (current.meeting?.source === 'lark_reserve_pending') return true;
-  if (current.meeting?.source === 'open_meeting_session') return canOpenSessionCarryIntoMeeting(current, meeting);
+  if (['open_meeting_session', 'local_detector'].includes(current.meeting?.source)) return canLocalSessionCarryIntoMeeting(current, meeting);
   if (isRealMeetingAxis(current.meeting)) return sameMeeting(current.meeting, meeting);
   return false;
 }
@@ -2116,6 +2272,7 @@ function meetingStartTimeFromSessionBody(body = {}, nowMs = Date.now()) {
 
 function openMeetingSessionMeetingFromBody(body = {}, current = {}, nowMs = Date.now()) {
   const start = meetingStartTimeFromSessionBody(body, nowMs);
+  const axisSource = body.axis_source ?? 'open_meeting_session';
   return {
     platform: body.platform ?? 'lark',
     meeting_id: String(firstNonEmpty(
@@ -2141,7 +2298,7 @@ function openMeetingSessionMeetingFromBody(body = {}, current = {}, nowMs = Date
     end_time: body.end_time ?? null,
     timezone: body.timezone ?? current.meeting?.timezone ?? 'Asia/Shanghai',
     pending_binding: false,
-    source: 'open_meeting_session',
+    source: axisSource,
   };
 }
 
@@ -2242,6 +2399,7 @@ async function startOpenMeetingSession(body = {}) {
   const current = await store.load();
   const nowMs = Date.now();
   const meeting = openMeetingSessionMeetingFromBody(body, current, nowMs);
+  const axisSource = meeting.source ?? 'open_meeting_session';
   const currentIsActiveReal = hasActiveMeeting(current) && isRealMeetingAxis(current.meeting);
   if (currentIsActiveReal && !sameMeeting(current.meeting, meeting) && !body.force) {
     const error = new Error('Current real meeting axis is active; pass force=true to replace it with an open meeting session.');
@@ -2249,17 +2407,35 @@ async function startOpenMeetingSession(body = {}) {
     error.current_meeting = current.meeting;
     throw error;
   }
+  if (currentIsActiveReal && sameMeeting(current.meeting, meeting) && !body.force) {
+    const sessionEvidence = persistMeetingAppSessionEvidence(body, current.meeting, current, 'active', Date.now());
+    return {
+      ok: true,
+      deduplicated: true,
+      meeting: current.meeting,
+      state: current,
+      auto_acceptance_annotation: null,
+      device_simulator_annotation: null,
+      session_evidence: sessionEvidence,
+      contract: {
+        source: current.meeting.source ?? axisSource,
+        strict_lark_event_axis: ['lark_ws_event', 'lark_http_event'].includes(current.meeting.source),
+        product_axis: true,
+        note: 'Repeated start for the active meeting is idempotent and does not rebuild the axis.',
+      },
+    };
+  }
   const next = buildTimeline({
     meeting,
     segments: body.keep_segments === true ? current.segments ?? [] : [],
     events: [{
-      id: `evt-open-session-${meeting.meeting_id}-start`,
+      id: body.event_id ?? `evt-${axisSource}-${meeting.meeting_id}-start`,
       time_ms: 0,
       type: 'meeting_start',
-      label: '开放会议会话开始',
-      source: 'open_meeting_session',
+      label: body.event_label ?? (axisSource === 'open_meeting_session' ? '开放会议会话开始' : '平台会议事件开始'),
+      source: axisSource,
       metadata: {
-        raw_type: 'local.open_meeting_session.started',
+        raw_type: body.raw_type ?? `local.${axisSource}.started`,
         detector_source: body.detector_source ?? body.source ?? null,
         note: body.note ?? null,
       },
@@ -2267,28 +2443,30 @@ async function startOpenMeetingSession(body = {}) {
     sequence: carriedSequenceForNewRealAxis(current, meeting),
   });
   const saved = await saveAndBroadcast(next, 'state');
+  const sessionEvidence = persistMeetingAppSessionEvidence(body, saved.meeting, saved, 'active', Date.now());
   if (realDemoSession.active && isRealMeetingAxis(saved.meeting)) {
     saveRealDemoSessionState({
       ...realDemoSession,
       last_real_axis_at: new Date().toISOString(),
-      last_real_axis_source: 'open_meeting_session',
+      last_real_axis_source: axisSource,
     });
   }
   const shouldSuppressDemoAnnotations = Boolean(body.suppress_auto_annotations || body.suppress_demo_annotations);
   const autoAnnotation = shouldSuppressDemoAnnotations
     ? { state: saved, annotation: null, skipped_reason: 'suppressed' }
-    : await maybeAppendAutoAcceptanceAnnotation(saved, 'open_meeting_session');
+    : await maybeAppendAutoAcceptanceAnnotation(saved, axisSource);
   const deviceAnnotation = shouldSuppressDemoAnnotations
     ? { state: autoAnnotation.state, annotation: null, skipped_reason: 'suppressed' }
-    : await maybeAppendDeviceSimulatorAnnotation(autoAnnotation.state, 'open_meeting_session');
+    : await maybeAppendDeviceSimulatorAnnotation(autoAnnotation.state, axisSource);
   return {
     ok: true,
     meeting: deviceAnnotation.state.meeting,
     state: deviceAnnotation.state,
     auto_acceptance_annotation: autoAnnotation.annotation,
     device_simulator_annotation: deviceAnnotation.annotation,
+    session_evidence: sessionEvidence,
     contract: {
-      source: 'open_meeting_session',
+      source: axisSource,
       strict_lark_event_axis: false,
       product_axis: true,
       note: 'This endpoint is the stable local meeting-session contract. Lark events, desktop observers, or e-ink host apps can all call it when a meeting actually starts.',
@@ -2314,15 +2492,17 @@ async function endOpenMeetingSession(body = {}) {
       : Number.isFinite(startMs)
         ? Math.max(0, now.getTime() - startMs)
         : 0;
+  const axisSource = body.axis_source ?? current.meeting?.source ?? 'open_meeting_session';
   const eventMap = new Map((current.events ?? []).map((item) => [item.id, item]));
-  eventMap.set('evt-open-session-end', {
-    id: 'evt-open-session-end',
+  const eventId = body.event_id ?? (axisSource === 'open_meeting_session' ? 'evt-open-session-end' : `evt-${axisSource}-end`);
+  eventMap.set(eventId, {
+    id: eventId,
     time_ms: offsetMs,
     type: 'meeting_end',
-    label: '开放会议会话结束',
-    source: 'open_meeting_session',
+    label: body.event_label ?? (axisSource === 'open_meeting_session' ? '开放会议会话结束' : '平台会议事件结束'),
+    source: axisSource,
     metadata: {
-      raw_type: 'local.open_meeting_session.ended',
+      raw_type: body.raw_type ?? `local.${axisSource}.ended`,
       detector_source: body.detector_source ?? body.source ?? null,
     },
   });
@@ -2334,9 +2514,12 @@ async function endOpenMeetingSession(body = {}) {
     },
     events: [...eventMap.values()],
   });
+  const saved = await saveAndBroadcast(next, 'state');
+  const sessionEvidence = persistMeetingAppSessionEvidence(body, saved.meeting, saved, 'ended', Date.now());
   return {
     ok: true,
-    state: await saveAndBroadcast(next, 'state'),
+    state: saved,
+    session_evidence: sessionEvidence,
   };
 }
 
@@ -2494,6 +2677,314 @@ function secondsOrMsToIso(value, fallback = null) {
 
 function firstNonEmpty(...values) {
   return values.find((value) => value != null && value !== '') ?? null;
+}
+
+function evidenceFileKey(value) {
+  return String(value ?? 'unknown').trim().replace(/[^a-zA-Z0-9_.-]+/g, '_').slice(0, 160) || 'unknown';
+}
+
+function meetingPlatformEvidencePath(meeting = {}) {
+  const platform = evidenceFileKey(meeting.platform ?? 'unknown');
+  const meetingId = evidenceFileKey(meeting.meeting_id ?? meeting.external_meeting_id ?? meeting.meeting_url ?? 'unknown');
+  return join(meetingPlatformFieldEvidenceDir, `${platform}-${meetingId}.json`);
+}
+
+function meetingPlatformP0ReferenceKey(meeting = {}) {
+  return `${evidenceFileKey(meeting.platform ?? 'unknown')}:${evidenceFileKey(meeting.meeting_id ?? meeting.external_meeting_id ?? meeting.meeting_url ?? 'unknown')}`;
+}
+
+function pendingMeetingPlatformP0Reference(meeting = {}, action) {
+  const key = meetingPlatformP0ReferenceKey(meeting);
+  const current = pendingMeetingPlatformP0References.get(key);
+  if (current?.queued_at_ms != null && Date.now() - current.queued_at_ms > meetingPlatformP0ReferenceTtlMs) {
+    pendingMeetingPlatformP0References.delete(key);
+    return null;
+  }
+  return current?.[action] ?? null;
+}
+
+function consumePendingMeetingPlatformP0Reference(meeting = {}, action) {
+  const key = meetingPlatformP0ReferenceKey(meeting);
+  const current = pendingMeetingPlatformP0References.get(key);
+  if (!current || current[action] == null) return;
+  const next = { ...current };
+  delete next[action];
+  if (next.join != null || next.leave != null) pendingMeetingPlatformP0References.set(key, next);
+  else pendingMeetingPlatformP0References.delete(key);
+}
+
+function emptyMeetingPlatformEvidence(meeting = {}) {
+  return {
+    schema: 'meeting_platform_field_evidence_input',
+    schema_version: 1,
+    platform: meeting.platform ?? 'unknown',
+    meeting_id: meeting.meeting_id ?? null,
+    run_id: meeting.meeting_id ? `${meeting.platform ?? 'unknown'}:${meeting.meeting_id}` : null,
+    meeting: {
+      platform: meeting.platform ?? 'unknown',
+      meeting_id: meeting.meeting_id ?? null,
+      meeting_url: meeting.meeting_url ?? null,
+      title: meeting.title ?? null,
+      start_time: meeting.start_time ?? null,
+      end_time: meeting.end_time ?? null,
+      source: meeting.source ?? null,
+    },
+    meetingAppRecords: [],
+    annotations: [],
+    speaker_markers: [],
+    participant_markers: [],
+    measurements: {},
+  };
+}
+
+function loadMeetingPlatformEvidence(meeting = {}) {
+  const path = meetingPlatformEvidencePath(meeting);
+  try {
+    return { path, value: JSON.parse(readFileSync(path, 'utf8')) };
+  } catch {
+    return {
+      path,
+      value: emptyMeetingPlatformEvidence(meeting),
+    };
+  }
+}
+
+function saveMeetingPlatformEvidence(path, value) {
+  mkdirSync(dirname(path), { recursive: true });
+  const saved = {
+    ...value,
+    updated_at: new Date().toISOString(),
+  };
+  writeFileSync(path, JSON.stringify(saved, null, 2));
+  return saved;
+}
+
+function normalizeEvidenceObserverSurface(value, source = '') {
+  const explicit = String(value ?? '').trim().toLowerCase().replace(/[-\s]+/g, '_');
+  if (['native', 'native_detector', 'desktop', 'desktop_observer', 'accessibility'].includes(explicit)) {
+    return 'native_detector';
+  }
+  if (['browser', 'browser_extension', 'content_script', 'web'].includes(explicit)) {
+    return 'browser_extension';
+  }
+  const sourceText = String(source ?? '').toLowerCase();
+  if (/extension|content[_ -]?script|browser/.test(sourceText)) return 'browser_extension';
+  if (/native|desktop|accessibility|window[_ -]?observer/.test(sourceText)) return 'native_detector';
+  return null;
+}
+
+function meetingAppRecordFromSessionBody(body = {}, meeting = {}, phase = 'active', visibleAtMs = Date.now()) {
+  const supplied = body.meeting_app_record ?? body.meetingAppRecord;
+  const snapshot = supplied?.snapshot ?? body.meeting_app_snapshot ?? body.meetingAppSnapshot;
+  if (!snapshot) return null;
+  const capturedAtMs = parseAbsoluteMs(firstNonEmpty(
+    supplied?.captured_at_ms,
+    supplied?.capturedAtMs,
+    phase === 'ended' ? body.end_time_ms : body.start_time_ms,
+    body.captured_at_ms,
+    snapshot.observedAtMs,
+    snapshot.observed_at_ms,
+    visibleAtMs,
+  )) ?? visibleAtMs;
+  return {
+    ...supplied,
+    schema: supplied?.schema ?? 'meeting_app_snapshot_record',
+    schema_version: supplied?.schema_version ?? 1,
+    id: supplied?.id ?? `${meeting.platform}:${meeting.meeting_id}:${phase}:${capturedAtMs}`,
+    platform: meeting.platform,
+    meeting_id: meeting.meeting_id,
+    run_id: firstNonEmpty(supplied?.run_id, supplied?.runId, body.run_id, body.runId, `${meeting.platform}:${meeting.meeting_id}`),
+    phase,
+    label: supplied?.label ?? (phase === 'ended' ? 'meeting_ended' : 'active_speaker'),
+    captured_at_ms: capturedAtMs,
+    visible_at_ms: visibleAtMs,
+    source: supplied?.source ?? 'meeting_app_extension_auto_evidence',
+    observer_surface: normalizeEvidenceObserverSurface(
+      firstNonEmpty(supplied?.observer_surface, supplied?.observerSurface, body.observer_surface, body.observerSurface),
+      supplied?.source ?? body.detector_source,
+    ),
+    snapshot,
+  };
+}
+
+function uniqueById(rows = []) {
+  const map = new Map();
+  for (const row of rows) map.set(String(row.id ?? `${row.phase}:${row.captured_at_ms}`), row);
+  return [...map.values()];
+}
+
+function persistMeetingAppSessionEvidence(body = {}, meeting = {}, state = {}, phase = 'active', visibleAtMs = Date.now()) {
+  const record = meetingAppRecordFromSessionBody(body, meeting, phase, visibleAtMs);
+  if (!record) return { recorded: false, reason: 'missing_meeting_app_snapshot' };
+  const loaded = loadMeetingPlatformEvidence(meeting);
+  const existingStartMs = parseAbsoluteMs(loaded.value.meeting?.start_time);
+  const currentStartMs = parseAbsoluteMs(meeting.start_time);
+  const startsNewRun = phase === 'active' && (
+    Boolean(loaded.value.meeting?.end_time)
+    || (
+      existingStartMs != null
+      && currentStartMs != null
+      && Math.abs(existingStartMs - currentStartMs) > 1_000
+    )
+  );
+  const value = startsNewRun ? emptyMeetingPlatformEvidence(meeting) : loaded.value;
+  const startMs = parseAbsoluteMs(meeting.start_time);
+  const observedAtMs = record.captured_at_ms;
+  const observerSurface = record.observer_surface
+    ?? value.observer_surface
+    ?? normalizeEvidenceObserverSurface(body.observer_surface ?? body.observerSurface, body.detector_source);
+  const referenceAction = phase === 'active' ? 'join' : 'leave';
+  const referenceAtMs = parseAbsoluteMs(firstNonEmpty(
+    phase === 'active'
+      ? value.measurements?.operator_join_at_ms
+      : value.measurements?.operator_leave_at_ms,
+    pendingMeetingPlatformP0Reference(meeting, referenceAction),
+  ));
+  const detectionLatencyField = phase === 'active'
+    ? 'start_detection_latency_ms'
+    : 'end_detection_latency_ms';
+  const next = {
+    ...value,
+    platform: meeting.platform,
+    meeting_id: meeting.meeting_id,
+    run_id: firstNonEmpty(value.run_id, record.run_id, body.run_id, body.runId, `${meeting.platform}:${meeting.meeting_id}`),
+    observer_surface: observerSurface,
+    meeting: {
+      ...(value.meeting ?? {}),
+      platform: meeting.platform,
+      meeting_id: meeting.meeting_id,
+      meeting_url: meeting.meeting_url ?? null,
+      title: meeting.title ?? null,
+      start_time: meeting.start_time ?? null,
+      end_time: meeting.end_time ?? null,
+      source: meeting.source ?? null,
+    },
+    meetingAppRecords: uniqueById([...(value.meetingAppRecords ?? []), record]),
+    measurements: {
+      ...(value.measurements ?? {}),
+      observer_surface: observerSurface,
+      ...(referenceAtMs != null ? { [`operator_${referenceAction}_at_ms`]: referenceAtMs } : {}),
+      [`${phase}_observer_captured_at_ms`]: observedAtMs,
+      [`${phase}_axis_visible_at_ms`]: visibleAtMs,
+      [`axis_${phase === 'active' ? 'started' : 'ended'}_at_ms`]: visibleAtMs,
+      [`${phase}_observer_to_axis_latency_ms`]: Math.max(0, visibleAtMs - observedAtMs),
+      ...(referenceAtMs != null ? {
+        [detectionLatencyField]: Math.max(0, visibleAtMs - referenceAtMs),
+      } : {}),
+      ...(phase === 'active' ? {
+        axis_start_ms: startMs,
+        previous_meeting_annotation_count_on_new_axis: (state.sequence ?? []).filter((item) => !['speaker_track', 'participant_track'].includes(item.intent)).length,
+      } : {}),
+    },
+  };
+  const saved = saveMeetingPlatformEvidence(loaded.path, next);
+  if (referenceAtMs != null) consumePendingMeetingPlatformP0Reference(meeting, referenceAction);
+  return {
+    recorded: true,
+    path: loaded.path,
+    record_count: saved.meetingAppRecords.length,
+    record,
+  };
+}
+
+function annotationEvidenceRow(input = {}, item = {}, meeting = {}, visibleAtMs = Date.now(), options = {}) {
+  const capturedAtMs = annotationCapturedAbsoluteMsStrict(input) ?? annotationCapturedAbsoluteMs(input, visibleAtMs);
+  const axisStartMs = parseAbsoluteMs(meeting.start_time);
+  const expectedPositionMs = axisStartMs == null ? null : Math.max(0, capturedAtMs - axisStartMs);
+  const actualPositionMs = Number.isFinite(Number(item.time_ms)) ? Number(item.time_ms) : null;
+  return {
+    id: item.id,
+    source: item.source ?? input.source ?? null,
+    kind: item.kind ?? input.kind ?? null,
+    intent: item.intent ?? input.intent ?? null,
+    label: item.label ?? input.label ?? null,
+    speaker_id: firstNonEmpty(input.speaker_id, input.payload?.speaker_id, item.payload?.speaker_id),
+    speaker_name: firstNonEmpty(input.speaker_name, input.payload?.speaker_name, item.payload?.speaker_name),
+    participant_id: firstNonEmpty(input.participant_id, input.payload?.participant_id, item.payload?.participant_id),
+    participant_name: firstNonEmpty(input.participant_name, input.payload?.participant_name, item.payload?.participant_name),
+    captured_at_ms: capturedAtMs,
+    visible_at_ms: visibleAtMs,
+    visible_latency_ms: visibleAtMs - capturedAtMs,
+    expected_position_ms: expectedPositionMs,
+    actual_position_ms: actualPositionMs,
+    timeline_error_ms: expectedPositionMs == null || actualPositionMs == null ? null : actualPositionMs - expectedPositionMs,
+    duplicate_delivery: options.replaced_existing === true,
+    visible_instance_count: Number(options.visible_instance_count ?? 1),
+    duplicate_visible: Number(options.visible_instance_count ?? 1) > 1,
+  };
+}
+
+function upsertAnnotationEvidenceRow(rows = [], row = {}) {
+  const index = rows.findIndex((item) => String(item.id) === String(row.id));
+  if (index < 0) {
+    return [...rows, {
+      ...row,
+      delivery_attempt_count: 1,
+      duplicate_delivery_count: row.duplicate_delivery ? 1 : 0,
+    }];
+  }
+  const existing = rows[index];
+  const next = [...rows];
+  next[index] = {
+    ...existing,
+    delivery_attempt_count: Number(existing.delivery_attempt_count ?? 1) + 1,
+    duplicate_delivery_count: Number(existing.duplicate_delivery_count ?? 0) + 1,
+    duplicate_delivery: true,
+    duplicate_visible: Boolean(existing.duplicate_visible || row.duplicate_visible),
+    visible_instance_count: Math.max(
+      Number(existing.visible_instance_count ?? 1),
+      Number(row.visible_instance_count ?? 1),
+    ),
+    last_delivery_visible_at_ms: row.visible_at_ms,
+    last_delivery_visible_latency_ms: row.visible_latency_ms,
+  };
+  return next;
+}
+
+function persistMeetingPlatformAnnotationEvidence(input = {}, item = {}, meeting = {}, visibleAtMs = Date.now(), options = {}) {
+  const loaded = loadMeetingPlatformEvidence(meeting);
+  if (!existsSync(loaded.path)) return { recorded: false, reason: 'meeting_session_evidence_not_started' };
+  const value = loaded.value;
+  const row = annotationEvidenceRow(input, item, meeting, visibleAtMs, options);
+  const isSpeaker = row.intent === 'speaker_track' || ['speaker_started', 'speaker_ended'].includes(row.kind);
+  const isParticipant = row.intent === 'participant_track' || ['participant_joined', 'participant_left'].includes(row.kind);
+  const collection = isSpeaker ? 'speaker_markers' : isParticipant ? 'participant_markers' : 'annotations';
+  const next = {
+    ...value,
+    [collection]: upsertAnnotationEvidenceRow(value[collection] ?? [], row),
+  };
+  const saved = saveMeetingPlatformEvidence(loaded.path, next);
+  return { recorded: true, path: loaded.path, collection, count: saved[collection].length, row };
+}
+
+function updateMeetingPlatformP0Reference(meeting = {}, input = {}) {
+  const loaded = loadMeetingPlatformEvidence(meeting);
+  const action = String(input.action ?? input.kind ?? '').trim().toLowerCase();
+  if (!['join', 'leave'].includes(action)) return { updated: false, reason: 'action_must_be_join_or_leave', path: loaded.path };
+  const atMs = parseAbsoluteMs(firstNonEmpty(input.at_ms, input.captured_at_ms, input.timestamp_ms, input.at, Date.now())) ?? Date.now();
+  if (!existsSync(loaded.path)) {
+    const key = meetingPlatformP0ReferenceKey(meeting);
+    pendingMeetingPlatformP0References.set(key, {
+      ...(pendingMeetingPlatformP0References.get(key) ?? {}),
+      [action]: atMs,
+      queued_at_ms: Date.now(),
+    });
+    return { updated: false, queued: true, reason: 'meeting_evidence_not_started', path: loaded.path, action, at_ms: atMs };
+  }
+  const value = loaded.value;
+  const visibleAtMs = action === 'join'
+    ? value.measurements?.active_axis_visible_at_ms
+    : value.measurements?.ended_axis_visible_at_ms;
+  const next = {
+    ...value,
+    measurements: {
+      ...(value.measurements ?? {}),
+      [`operator_${action}_at_ms`]: atMs,
+      ...(visibleAtMs != null ? { [`${action === 'join' ? 'start' : 'end'}_detection_latency_ms`]: Math.max(0, Number(visibleAtMs) - atMs) } : {}),
+    },
+  };
+  const saved = saveMeetingPlatformEvidence(loaded.path, next);
+  return { updated: true, path: loaded.path, action, at_ms: atMs, measurements: saved.measurements };
 }
 
 function meetingRecordTimeRaw(record = {}, kind = 'start') {
@@ -3517,6 +4008,11 @@ function isRealMeetingAxis(meeting = {}) {
     'lark_meeting_lookup_api',
     'lark_probe_auto_search',
     'lark_passive_meeting_scan',
+    'local_detector',
+    'google_meet_webhook',
+    'microsoft_teams_webhook',
+    'zoom_webhook',
+    'webex_webhook',
   ].includes(meeting.source)
     && !meeting.pending_binding
     && meeting.start_time_reliable !== false
@@ -3557,10 +4053,32 @@ function sourceForLoggedEvent(entry = {}) {
 }
 
 async function restoreLatestRealMeetingAxisFromEventLog(body = {}) {
-  const startEntry = body.event_id
+  const selectedEntry = body.event_id
     ? larkEventLog.find((entry) => entry.id === body.event_id || entry.preview?.event_id === body.event_id)
-    : latestLoggedMeetingStartEvent();
-  if (!startEntry || !isLoggedMeetingStartEntry(startEntry)) {
+    : null;
+  let restoreMode = 'latest_start_event';
+  let startEntry = null;
+  let endEntry = null;
+
+  if (selectedEntry && isLoggedMeetingEndEntry(selectedEntry)) {
+    restoreMode = 'selected_end_event';
+    endEntry = selectedEntry;
+    startEntry = matchingLoggedMeetingStartForEnd(endEntry);
+  } else if (selectedEntry) {
+    restoreMode = 'selected_start_event';
+    startEntry = selectedEntry;
+  } else {
+    const latestWindow = latestRecoverableMeetingWindow();
+    if (latestWindow) {
+      restoreMode = latestWindow.restoreMode;
+      startEntry = latestWindow.startEntry;
+      endEntry = latestWindow.endEntry;
+    } else {
+      startEntry = latestRestorableLoggedMeetingStartEvent() ?? latestLoggedMeetingStartEvent();
+    }
+  }
+
+  if (!startEntry || !isRestorableLoggedMeetingStartEntry(startEntry)) {
     const error = new Error('No logged real meeting start event is available to restore');
     error.status = 404;
     throw error;
@@ -3573,18 +4091,21 @@ async function restoreLatestRealMeetingAxisFromEventLog(body = {}) {
   }
   const startResult = await processLarkEventPayload(startPayload, {
     source: sourceForLoggedEvent(startEntry),
+    received_at: startEntry.at,
     suppress_auto_annotations: true,
+    force_restore: true,
   });
-  let endEntry = null;
   let endResult = null;
   if (body.apply_end !== false) {
-    endEntry = matchingLoggedMeetingEndAfter(startEntry);
+    endEntry = endEntry ?? matchingLoggedMeetingEndAfter(startEntry);
     if (endEntry) {
       const endPayload = loggedEventPayload(endEntry);
       if (endPayload) {
         endResult = await processLarkEventPayload(endPayload, {
           source: sourceForLoggedEvent(endEntry),
+          received_at: endEntry.at,
           suppress_auto_annotations: true,
+          force_restore: true,
         });
       }
     }
@@ -3592,6 +4113,7 @@ async function restoreLatestRealMeetingAxisFromEventLog(body = {}) {
   return {
     restored: true,
     restored_at: new Date().toISOString(),
+    restore_mode: restoreMode,
     start_event: startEntry,
     end_event: endEntry,
     start_result: {
@@ -4113,6 +4635,16 @@ async function processLarkEventPayload(payload, opts = {}) {
   const event = normalizeLarkEventPayload(payload, { ...current.meeting, ...meetingPatch });
   const source = opts.source ?? 'lark_event';
   event.source = source;
+  const receivedAtMs = parseAbsoluteMs(opts.received_at ?? opts.received_at_ms);
+  const eventCreatedMs = larkEventCreatedMsFromPayload(payload);
+  event.metadata = {
+    ...(event.metadata ?? {}),
+    event_created_at: eventCreatedMs != null ? new Date(eventCreatedMs).toISOString() : null,
+    received_at: receivedAtMs != null ? new Date(receivedAtMs).toISOString() : null,
+    delivery_delay_ms: eventCreatedMs != null && receivedAtMs != null
+      ? Math.max(0, receivedAtMs - eventCreatedMs)
+      : null,
+  };
   const payloadStartMs = explicitMeetingStartMs(payload);
   const incomingIdentity = explicitMeetingIdentity(payload);
   const hasIncomingIdentity = hasExplicitMeetingIdentity(incomingIdentity);
@@ -4137,6 +4669,7 @@ async function processLarkEventPayload(payload, opts = {}) {
   const incomingStartMs = payloadStartMs ?? parseAbsoluteMs(meetingPatch.start_time);
   const staleStartBeforeCurrentAxis = Boolean(
     event.type === 'meeting_start'
+      && !opts.force_restore
       && currentIsRealAxis
       && !currentIsCarryableFallbackAxis
       && !incomingMatchesCurrent
@@ -4266,7 +4799,10 @@ async function handleWsTimelineEvent(parsed = {}, raw = {}, forcedEventType = nu
     return `ignored ${eventType || 'unknown'} event`;
   }
 
-  const result = await processLarkEventPayload(buildWsPayload(eventType, parsed, raw), { source: 'lark_ws_event' });
+  const result = await processLarkEventPayload(buildWsPayload(eventType, parsed, raw), {
+    source: 'lark_ws_event',
+    received_at: logEntry.at,
+  });
   logEntry.timeline_processed = result.ok !== false;
   logEntry.timeline_started = result.timeline_started;
   if (result.ignored_reason) logEntry.ignored_reason = result.ignored_reason;
@@ -5523,6 +6059,15 @@ async function readJson(req) {
   return JSON.parse(text);
 }
 
+async function readJsonWithRaw(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  if (!chunks.length) return { body: {}, rawBody: '' };
+  const rawBody = Buffer.concat(chunks).toString('utf8');
+  if (!rawBody.trim()) return { body: {}, rawBody };
+  return { body: JSON.parse(rawBody), rawBody };
+}
+
 function safePublicPath(urlPath) {
   const pathname = decodeURIComponent(new URL(urlPath, 'http://localhost').pathname);
   const requested = pathname === '/' ? '/index.html' : pathname;
@@ -5542,6 +6087,37 @@ function localUrlFor(req, pathname) {
   const host = req.headers.host ?? `localhost:${port}`;
   const proto = req.headers['x-forwarded-proto'] ?? 'http';
   return new URL(pathname, `${proto}://${host}`).toString();
+}
+
+function meetingPlatformFromCandidate(candidate = {}) {
+  const explicit = firstNonEmpty(candidate.platform, candidate.provider, candidate.adapter);
+  if (explicit) return String(explicit).trim().toLowerCase().replaceAll('-', '_');
+  const rawUrl = firstNonEmpty(candidate.url, candidate.meeting_url, candidate.href);
+  if (!rawUrl) return null;
+  try {
+    const host = new URL(String(rawUrl)).hostname.toLowerCase();
+    if (host === 'meet.google.com') return 'google_meet';
+    if (host === 'teams.microsoft.com' || host.endsWith('.teams.microsoft.com')) return 'microsoft_teams';
+    if (host === 'zoom.us' || host.endsWith('.zoom.us') || host.endsWith('.zoom.com')) return 'zoom';
+    if (host.endsWith('.webex.com') || host.endsWith('.webex.com.cn')) return 'webex';
+    if (host === 'vc.feishu.cn' || host.endsWith('.feishu.cn') || host.endsWith('.larksuite.com') || host.endsWith('.larkoffice.com')) return 'lark';
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function observedMeetingCandidates(input = {}) {
+  const rows = [
+    ...(Array.isArray(input.tabs) ? input.tabs : []),
+    ...(Array.isArray(input.windows) ? input.windows : []),
+    ...(Array.isArray(input.candidates) ? input.candidates : []),
+    ...(Array.isArray(input.applications) ? input.applications : []),
+  ];
+  return rows.map((candidate) => ({
+    ...candidate,
+    platform: meetingPlatformFromCandidate(candidate),
+  })).filter((candidate) => candidate.platform);
 }
 
 function publicWebhookStatus(callbackUrl) {
@@ -5601,6 +6177,17 @@ function oauthStartPayload(scopes = [], options = {}) {
       : null,
     ...oauthAuthorizeDetails(authUrl),
   };
+}
+
+function withMeetingSearchScope(scopes = '') {
+  const rows = String(scopes ?? '')
+    .split(/[\s,]+/)
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+  for (const scope of ['vc:meeting.search:read', 'vc:meeting.meetingid:read', 'calendar:calendar:read', 'calendar:calendar.event:read']) {
+    if (!rows.includes(scope)) rows.push(scope);
+  }
+  return rows.join(' ');
 }
 
 function oauthRedirectUrlFor(req, scopes = []) {
@@ -5734,6 +6321,40 @@ async function annotationIngestInfoPayload(req) {
     stream_status_alias_url: localUrlFor(req, '/api/stream-status'),
     meeting_session_start_endpoint: meetingSessionStartEndpoint,
     meeting_session_end_endpoint: meetingSessionEndEndpoint,
+    transcript_import: {
+      supported: true,
+      endpoint: localUrlFor(req, '/api/import/transcript'),
+      legacy_lark_endpoint: localUrlFor(req, '/api/import/lark-transcript'),
+      description: 'Post-meeting transcript segments can be imported after platform adapters fetch Google Meet, Microsoft Teams, Zoom, Webex, or Lark transcript content.',
+      accepted_fields: [
+        'meeting.platform',
+        'meeting.meeting_id',
+        'meeting.start_time or meeting.start_time_ms',
+        'transcript[].start_ms/end_ms or transcript[].start_time/end_time',
+        'transcript[].speaker_id/speaker_name/text/source',
+      ],
+    },
+    platform_events: {
+      supported: true,
+      status_endpoint: localUrlFor(req, '/api/platform-events/status'),
+      setup_endpoint: localUrlFor(req, '/api/platform-events/setup'),
+      capability_contracts: allPlatformCapabilityContracts({ baseUrl: localUrlFor(req, '') }),
+      description: 'Server-side adapters can ingest Google Meet, Microsoft Teams, Zoom, and Webex event payloads, normalize them into meeting timeline signals, start/end the same meeting axis contract, and append participant join/leave plus artifact-ready events with duplicate filtering.',
+      platforms: platformEventAdapterDefinitions.map((item) => ({
+        platform: item.key,
+        aliases: item.aliases,
+        source: item.source,
+        ingest_endpoint: localUrlFor(req, `/api/platform-events/${item.aliases[0]}`),
+        status_endpoint: localUrlFor(req, `/api/platform-events/${item.aliases[0]}/status`),
+      })),
+      webhook_security: {
+        zoom_secret_configured: Boolean(process.env.ZOOM_WEBHOOK_SECRET_TOKEN),
+        microsoft_graph_client_state_configured: Boolean(process.env.MICROSOFT_GRAPH_CLIENT_STATE),
+        google_pubsub_bearer_configured: Boolean(process.env.GOOGLE_PUBSUB_BEARER_TOKEN),
+        google_pubsub_oidc_configured: Boolean(process.env.GOOGLE_PUBSUB_OIDC_AUDIENCE || process.env.GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL),
+        webex_secret_configured: Boolean(process.env.WEBEX_WEBHOOK_SECRET),
+      },
+    },
     meeting_session_inline_annotation: {
       supported: true,
       description: 'A single POST /api/annotations can start an open meeting session and append the mark when the payload includes meeting_session or start_meeting_session=true.',
@@ -5970,6 +6591,606 @@ function annotationBatchInputsFromBody(body = {}, req = {}) {
   return rows.map((item) => annotationInputWithRequestMetadata(item, req));
 }
 
+function parsePlatformEventRoute(pathname = '') {
+  const parts = pathname.split('/').filter(Boolean);
+  if (parts[0] !== 'api' || parts[1] !== 'platform-events') return null;
+  if (parts.length === 3 && parts[2] === 'status') return { action: 'status', platform: null };
+  if (parts.length === 3 && parts[2] === 'setup') return { action: 'setup', platform: null };
+  if (parts.length === 3) return { action: 'ingest', platform: parts[2] };
+  if (parts.length === 4 && parts[3] === 'status') return { action: 'status', platform: parts[2] };
+  if (parts.length === 4 && parts[3] === 'setup') return { action: 'setup', platform: parts[2] };
+  return null;
+}
+
+function platformEventAdapterFor(platform) {
+  return meetingPlatformEventAdapterFor(platform);
+}
+
+function platformEventRawInput(body = {}) {
+  if (Array.isArray(body)) return body;
+  if (body.raw_event !== undefined) return body.raw_event;
+  if (body.rawEvent !== undefined) return body.rawEvent;
+  if (body.raw !== undefined) return body.raw;
+  if (Array.isArray(body.events)) return body.events;
+  if (Array.isArray(body.items)) return body.items;
+  return body;
+}
+
+function firstPlatformRawEvent(raw) {
+  if (Array.isArray(raw)) return raw[0] ?? {};
+  if (Array.isArray(raw?.value)) return raw.value[0] ?? raw;
+  return raw ?? {};
+}
+
+function platformRawEventType(raw) {
+  const first = firstPlatformRawEvent(raw);
+  return firstNonEmpty(
+    first.event,
+    first.type,
+    first.event_type,
+    first.eventType,
+    first.resourceData?.eventType,
+    first.resourceData?.callEventType,
+    first.payload?.object?.event,
+    'unknown',
+  );
+}
+
+async function platformWebhookVerification(adapter = {}, req = {}, body = {}, rawBody = '') {
+  if (adapter.key === 'zoom') {
+    return platformWebhookVerificationStatus(
+      adapter.key,
+      verifyZoomWebhookEvent({ headers: req.headers, rawBody, body }),
+    );
+  }
+  if (adapter.key === 'webex') {
+    return platformWebhookVerificationStatus(
+      adapter.key,
+      verifyWebexWebhookEvent({ headers: req.headers, rawBody, body }),
+    );
+  }
+  if (adapter.key === 'microsoft_teams') {
+    return platformWebhookVerificationStatus(
+      adapter.key,
+      verifyMicrosoftGraphClientState(body),
+    );
+  }
+  if (adapter.key === 'google_meet') {
+    if (process.env.GOOGLE_PUBSUB_OIDC_AUDIENCE || process.env.GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL) {
+      return platformWebhookVerificationStatus(
+        adapter.key,
+        await verifyGooglePubSubOidcJwt({
+          headers: req.headers,
+          expectedAudience: process.env.GOOGLE_PUBSUB_OIDC_AUDIENCE,
+          serviceAccountEmail: process.env.GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL,
+          jwksUrl: process.env.GOOGLE_PUBSUB_JWKS_URL,
+        }),
+      );
+    }
+    return platformWebhookVerificationStatus(
+      adapter.key,
+      verifyGooglePubSubBearer({ headers: req.headers }),
+    );
+  }
+  return { platform: adapter.key, ok: true, skipped: true, reason: 'platform_verification_not_configured' };
+}
+
+function publicPlatformEventStatus(req, adapter = null) {
+  const rows = adapter
+    ? [platformEventStatus[adapter.key]]
+    : platformEventAdapterDefinitions.map((item) => platformEventStatus[item.key]);
+  return {
+    generated_at: new Date().toISOString(),
+    ready: true,
+    supported_platforms: platformEventAdapterDefinitions.map((item) => ({
+      platform: item.key,
+      aliases: item.aliases,
+      source: item.source,
+      ingest_endpoint: localUrlFor(req, `/api/platform-events/${item.aliases[0]}`),
+      status_endpoint: localUrlFor(req, `/api/platform-events/${item.aliases[0]}/status`),
+    })),
+    status: adapter ? rows[0] : Object.fromEntries(rows.map((item) => [item.platform, item])),
+  };
+}
+
+function platformSetupSecurityConfig() {
+  return {
+    LARK_APP_ID: Boolean(process.env.LARK_APP_ID),
+    LARK_APP_SECRET: Boolean(process.env.LARK_APP_SECRET),
+    LARK_ENCRYPT_KEY: Boolean(process.env.LARK_ENCRYPT_KEY),
+    LARK_VERIFICATION_TOKEN: Boolean(process.env.LARK_VERIFICATION_TOKEN),
+    ZOOM_WEBHOOK_SECRET_TOKEN: Boolean(process.env.ZOOM_WEBHOOK_SECRET_TOKEN),
+    WEBEX_WEBHOOK_SECRET: Boolean(process.env.WEBEX_WEBHOOK_SECRET),
+    MICROSOFT_GRAPH_CLIENT_STATE: Boolean(process.env.MICROSOFT_GRAPH_CLIENT_STATE),
+    GOOGLE_PUBSUB_OIDC_AUDIENCE: Boolean(process.env.GOOGLE_PUBSUB_OIDC_AUDIENCE),
+    GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL: Boolean(process.env.GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL),
+    GOOGLE_PUBSUB_BEARER_TOKEN: Boolean(process.env.GOOGLE_PUBSUB_BEARER_TOKEN),
+  };
+}
+
+function platformSetupOptionsFromQuery(req, url, adapter = null) {
+  const baseUrl = url.searchParams.get('base_url') ?? url.searchParams.get('baseUrl') ?? localUrlFor(req, '');
+  const options = { baseUrl, env: process.env };
+  if (!adapter || adapter.key === 'google_meet') {
+    const targetResource = url.searchParams.get('google_target_resource') ?? url.searchParams.get('target_resource');
+    const pubsubTopic = url.searchParams.get('google_pubsub_topic') ?? url.searchParams.get('pubsub_topic');
+    if (targetResource || pubsubTopic) {
+      options.googleMeetSubscription = {
+        targetResource,
+        pubsubTopic,
+      };
+    }
+  }
+  if (!adapter || adapter.key === 'microsoft_teams') {
+    const joinWebUrl = url.searchParams.get('teams_join_web_url') ?? url.searchParams.get('join_web_url');
+    const clientState = url.searchParams.get('teams_client_state') ?? url.searchParams.get('client_state');
+    if (joinWebUrl || clientState) {
+      options.microsoftTeamsSubscription = {
+        joinWebUrl,
+        notificationUrl: localUrlFor(req, '/api/platform-events/teams'),
+        clientState,
+      };
+    }
+  }
+  if (!adapter || adapter.key === 'zoom') {
+    const zoomName = url.searchParams.get('zoom_subscription_name');
+    if (zoomName || url.searchParams.get('zoom_scope') || url.searchParams.get('zoom_account_id')) {
+      options.zoomSubscription = {
+        name: zoomName,
+        webhookUrl: localUrlFor(req, '/api/platform-events/zoom'),
+        subscriptionScope: url.searchParams.get('zoom_scope'),
+        accountId: url.searchParams.get('zoom_account_id'),
+      };
+    }
+  }
+  if (!adapter || adapter.key === 'webex') {
+    const webexName = url.searchParams.get('webex_subscription_name') ?? url.searchParams.get('webex_webhook_name');
+    const webexSecret = url.searchParams.get('webex_secret');
+    const webexOwnedBy = url.searchParams.get('webex_owned_by');
+    if (webexName || webexSecret || webexOwnedBy) {
+      options.webexSubscription = {
+        name: webexName,
+        targetUrl: localUrlFor(req, '/api/platform-events/webex'),
+        secret: webexSecret,
+        ownedBy: webexOwnedBy,
+      };
+    }
+  }
+  return options;
+}
+
+function platformSubscriptionFromQuery(url, platformKey) {
+  const prefix = {
+    google_meet: 'google_',
+    microsoft_teams: 'teams_',
+    zoom: 'zoom_',
+    webex: 'webex_',
+  }[platformKey] ?? '';
+  const value = (...names) => {
+    for (const name of names) {
+      const direct = url.searchParams.get(name);
+      if (direct != null) return direct;
+      if (prefix) {
+        const prefixed = url.searchParams.get(`${prefix}${name}`);
+        if (prefixed != null) return prefixed;
+      }
+    }
+    return null;
+  };
+  return {
+    id: value('subscription_id', 'id'),
+    name: value('subscription_name', 'name'),
+    expirationDateTime: value('subscription_expires_at', 'expires_at', 'expiration_date_time'),
+    expireTime: value('expire_time'),
+  };
+}
+
+function platformSubscriptionMaintenanceFromQuery(url, adapter = null) {
+  const options = {
+    now: url.searchParams.get('now'),
+    renewalWindowMs: url.searchParams.get('renewal_window_ms'),
+    renewalTtlSeconds: url.searchParams.get('renewal_ttl_seconds'),
+    renewalTtl: url.searchParams.get('renewal_ttl'),
+  };
+  if (adapter) {
+    return evaluatePlatformSubscriptionMaintenance(
+      adapter.key,
+      platformSubscriptionFromQuery(url, adapter.key),
+      options,
+    );
+  }
+  const subscriptions = Object.fromEntries(
+    platformEventAdapterDefinitions.map((item) => [
+      item.key,
+      platformSubscriptionFromQuery(url, item.key),
+    ]),
+  );
+  return Object.fromEntries(
+    evaluateAllPlatformSubscriptionMaintenance(subscriptions, options).map((item) => [item.platform, item]),
+  );
+}
+
+function publicPlatformEventSetup(req, url, adapter = null) {
+  const options = platformSetupOptionsFromQuery(req, url, adapter);
+  const setup = adapter
+    ? buildPlatformSetup(adapter.key, options)
+    : allPlatformSetupManifests(options);
+  const readiness = adapter
+    ? evaluatePlatformSetupReadiness(adapter.key, options)
+    : Object.fromEntries(evaluateAllPlatformSetupReadiness(options).map((item) => [item.platform, item]));
+  return {
+    generated_at: new Date().toISOString(),
+    setup_endpoint: localUrlFor(req, '/api/platform-events/setup'),
+    security_env_configured: platformSetupSecurityConfig(),
+    readiness,
+    maintenance: platformSubscriptionMaintenanceFromQuery(url, adapter),
+    setup,
+  };
+}
+
+function updatePlatformEventStatus(adapter, patch = {}) {
+  const current = platformEventStatus[adapter.key];
+  platformEventStatus[adapter.key] = {
+    ...current,
+    ...patch,
+  };
+  return platformEventStatus[adapter.key];
+}
+
+function platformSignalStartBody(signalPayload = {}, body = {}, adapter = {}) {
+  return {
+    ...signalPayload,
+    axis_source: adapter.source,
+    detector_source: signalPayload.detector_source ?? signalPayload.detectorSource ?? adapter.source,
+    event_label: body.start_event_label ?? body.event_label,
+    raw_type: body.start_raw_type ?? `platform.${adapter.source}.started`,
+    force: signalPayload.force ?? body.force ?? false,
+    suppress_auto_annotations: body.suppress_auto_annotations ?? body.suppressAutoAnnotations ?? true,
+    suppress_demo_annotations: body.suppress_demo_annotations ?? body.suppressDemoAnnotations ?? true,
+  };
+}
+
+function platformSignalEndBody(signalPayload = {}, body = {}, adapter = {}) {
+  return {
+    ...signalPayload,
+    axis_source: adapter.source,
+    detector_source: signalPayload.detector_source ?? signalPayload.detectorSource ?? adapter.source,
+    event_label: body.end_event_label ?? body.event_label,
+    raw_type: body.end_raw_type ?? `platform.${adapter.source}.ended`,
+  };
+}
+
+function platformParticipantKey(signal = {}) {
+  return String(
+    signal.participant_id
+      ?? signal.participant_name
+      ?? signal.source_event_id
+      ?? 'unknown_participant',
+  );
+}
+
+function platformParticipantEventId(signal = {}, adapter = {}) {
+  const participant = platformParticipantKey(signal)
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'unknown-participant';
+  if (signal.source_event_id) return `evt-${adapter.source}-${signal.source_event_id}-${signal.type}-${participant}`;
+  return `evt-${adapter.source}-${signal.type}-${participant}-${signal.occurred_at_ms}`;
+}
+
+function platformParticipantEventFromSignal(signal = {}, current = {}, adapter = {}) {
+  const startMs = parseAbsoluteMs(current.meeting?.start_time);
+  const occurredAtMs = parseAbsoluteMs(signal.occurred_at_ms);
+  const timeMs = startMs != null && occurredAtMs != null
+    ? Math.max(0, occurredAtMs - startMs)
+    : 0;
+  const participantName = signal.participant_name || signal.participant_id || '参会人';
+  const joined = signal.type === 'participant_joined';
+  return {
+    id: platformParticipantEventId(signal, adapter),
+    time_ms: timeMs,
+    type: joined ? 'participant_join' : 'participant_leave',
+    label: `${participantName}${joined ? '加入' : '离开'}`,
+    source: adapter.source,
+    metadata: {
+      raw_type: `platform.${adapter.source}.${signal.type}`,
+      platform: adapter.key,
+      meeting_id: signal.meeting?.meeting_id ?? null,
+      source_event_id: signal.source_event_id ?? null,
+      participant_id: signal.participant_id ?? null,
+      participant_name: signal.participant_name ?? null,
+    },
+  };
+}
+
+function shouldSkipPlatformParticipantEvent(existingEvents = [], event = {}, filterWindowMs = 3000) {
+  if (existingEvents.some((item) => item.id === event.id)) return true;
+  const participantId = event.metadata?.participant_id;
+  const participantName = event.metadata?.participant_name;
+  return existingEvents.some((item) => (
+    item.source === event.source
+      && item.type === event.type
+      && Math.abs(Number(item.time_ms ?? 0) - Number(event.time_ms ?? 0)) <= filterWindowMs
+      && (
+        (participantId && item.metadata?.participant_id === participantId)
+          || (!participantId && participantName && item.metadata?.participant_name === participantName)
+      )
+  ));
+}
+
+function platformArtifactKey(signal = {}) {
+  return String(
+    signal.artifact_id
+      ?? signal.artifact_url
+      ?? signal.source_event_id
+      ?? signal.artifact_kind
+      ?? 'unknown_artifact',
+  );
+}
+
+function platformArtifactEventId(signal = {}, adapter = {}) {
+  const kind = String(signal.artifact_kind || 'artifact')
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'artifact';
+  const artifact = platformArtifactKey(signal)
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'unknown-artifact';
+  if (signal.source_event_id) return `evt-${adapter.source}-${signal.source_event_id}-${kind}-${artifact}`;
+  return `evt-${adapter.source}-artifact-${kind}-${artifact}-${signal.occurred_at_ms}`;
+}
+
+function platformArtifactEventType(signal = {}) {
+  const kind = String(signal.artifact_kind || '').toLowerCase();
+  if (kind === 'recording') return 'recording_completed';
+  if (kind === 'transcript') return 'transcript_ready';
+  if (kind === 'smart_notes' || kind === 'smart_note') return 'smart_notes_ready';
+  return 'artifact_ready';
+}
+
+function platformArtifactEventLabel(signal = {}) {
+  const kind = String(signal.artifact_kind || '').toLowerCase();
+  if (kind === 'recording') return '录制已生成';
+  if (kind === 'transcript') return '转写已生成';
+  if (kind === 'smart_notes' || kind === 'smart_note') return '智能纪要已生成';
+  return '会议产物已生成';
+}
+
+function platformArtifactEventFromSignal(signal = {}, current = {}, adapter = {}) {
+  const startMs = parseAbsoluteMs(current.meeting?.start_time);
+  const occurredAtMs = parseAbsoluteMs(signal.occurred_at_ms);
+  const timeMs = startMs != null && occurredAtMs != null
+    ? Math.max(0, occurredAtMs - startMs)
+    : 0;
+  return {
+    id: platformArtifactEventId(signal, adapter),
+    time_ms: timeMs,
+    type: platformArtifactEventType(signal),
+    label: platformArtifactEventLabel(signal),
+    source: adapter.source,
+    metadata: {
+      raw_type: `platform.${adapter.source}.${signal.artifact_kind ?? 'artifact'}.ready`,
+      platform: adapter.key,
+      meeting_id: signal.meeting?.meeting_id ?? null,
+      source_event_id: signal.source_event_id ?? null,
+      artifact_kind: signal.artifact_kind ?? null,
+      artifact_id: signal.artifact_id ?? null,
+      artifact_url: signal.artifact_url ?? null,
+    },
+  };
+}
+
+function shouldSkipPlatformArtifactEvent(existingEvents = [], event = {}, filterWindowMs = 5000) {
+  if (existingEvents.some((item) => item.id === event.id)) return true;
+  const artifactId = event.metadata?.artifact_id;
+  const artifactUrl = event.metadata?.artifact_url;
+  const artifactKind = event.metadata?.artifact_kind;
+  return existingEvents.some((item) => (
+    item.source === event.source
+      && item.type === event.type
+      && Math.abs(Number(item.time_ms ?? 0) - Number(event.time_ms ?? 0)) <= filterWindowMs
+      && (
+        (artifactId && item.metadata?.artifact_id === artifactId)
+          || (!artifactId && artifactUrl && item.metadata?.artifact_url === artifactUrl)
+          || (!artifactId && !artifactUrl && artifactKind && item.metadata?.artifact_kind === artifactKind)
+      )
+  ));
+}
+
+async function appendPlatformParticipantSignal(signal = {}, body = {}, adapter = {}) {
+  const current = await store.load();
+  if (!isRealMeetingAxis(current.meeting)) {
+    return { skipped: true, reason: 'no_real_meeting_axis', state: current };
+  }
+  if (!sameMeeting(current.meeting, signal.meeting)) {
+    return {
+      skipped: true,
+      reason: 'participant_signal_meeting_mismatch',
+      meeting_id: current.meeting?.meeting_id ?? null,
+      signal_meeting_id: signal.meeting?.meeting_id ?? null,
+      state: current,
+    };
+  }
+  const filterWindowMs = boundedNumber(
+    body.participant_filter_window_ms ?? body.participantFilterWindowMs,
+    3000,
+    0,
+    60_000,
+  );
+  const event = platformParticipantEventFromSignal(signal, current, adapter);
+  const existingEvents = current.events ?? [];
+  if (shouldSkipPlatformParticipantEvent(existingEvents, event, filterWindowMs)) {
+    return {
+      skipped: true,
+      reason: 'duplicate_participant_signal_filtered',
+      filter_window_ms: filterWindowMs,
+      event,
+      state: current,
+    };
+  }
+  const next = mergeTimelineWithRebasedAnnotations(current, {
+    events: [...existingEvents, event],
+  });
+  const state = await saveAndBroadcast(next, 'state');
+  return {
+    skipped: false,
+    event,
+    state,
+  };
+}
+
+async function appendPlatformArtifactSignal(signal = {}, body = {}, adapter = {}) {
+  const current = await store.load();
+  if (!isRealMeetingAxis(current.meeting)) {
+    return { skipped: true, reason: 'no_real_meeting_axis', state: current };
+  }
+  if (!sameMeeting(current.meeting, signal.meeting)) {
+    return {
+      skipped: true,
+      reason: 'artifact_signal_meeting_mismatch',
+      meeting_id: current.meeting?.meeting_id ?? null,
+      signal_meeting_id: signal.meeting?.meeting_id ?? null,
+      state: current,
+    };
+  }
+  const filterWindowMs = boundedNumber(
+    body.artifact_filter_window_ms ?? body.artifactFilterWindowMs,
+    5000,
+    0,
+    300_000,
+  );
+  const event = platformArtifactEventFromSignal(signal, current, adapter);
+  const existingEvents = current.events ?? [];
+  if (shouldSkipPlatformArtifactEvent(existingEvents, event, filterWindowMs)) {
+    return {
+      skipped: true,
+      reason: 'duplicate_artifact_signal_filtered',
+      filter_window_ms: filterWindowMs,
+      event,
+      state: current,
+    };
+  }
+  const next = mergeTimelineWithRebasedAnnotations(current, {
+    events: [...existingEvents, event],
+  });
+  const state = await saveAndBroadcast(next, 'state');
+  return {
+    skipped: false,
+    event,
+    state,
+  };
+}
+
+function platformSubscriptionLifecycleAction(signal = {}) {
+  const lifecycleType = String(signal.lifecycle_type || '').toLowerCase();
+  if (lifecycleType === 'expiration_reminder') return 'renew_subscription';
+  if (lifecycleType === 'expired' || lifecycleType === 'subscription_removed') return 'recreate_subscription';
+  if (lifecycleType === 'suspended') return 'resolve_and_reactivate_subscription';
+  if (lifecycleType === 'reauthorization_required') return 'reauthorize_subscription';
+  if (lifecycleType === 'missed') return 'backfill_missed_events';
+  return 'inspect_subscription_state';
+}
+
+async function appendPlatformSubscriptionLifecycleSignal(signal = {}, body = {}, adapter = {}) {
+  const current = await store.load();
+  const lifecycle = {
+    platform: adapter.key,
+    source: adapter.source,
+    type: signal.lifecycle_type || 'unknown',
+    action: platformSubscriptionLifecycleAction(signal),
+    occurred_at: new Date(signal.occurred_at_ms).toISOString(),
+    source_event_id: signal.source_event_id ?? null,
+    subscription_id: signal.subscription_id ?? null,
+    subscription_name: signal.subscription_name ?? null,
+    expires_at: signal.expires_at_ms == null ? null : new Date(signal.expires_at_ms).toISOString(),
+    resource: signal.resource ?? null,
+    tenant_id: signal.tenant_id ?? null,
+    client_state_present: signal.client_state != null,
+  };
+  return {
+    skipped: false,
+    lifecycle,
+    state: current,
+  };
+}
+
+function platformEventTimelineClient(body = {}, req = {}, adapter = {}) {
+  return {
+    startMeeting(input = {}) {
+      return startOpenMeetingSession(platformSignalStartBody(input, body, adapter));
+    },
+    endMeeting(input = {}) {
+      return endOpenMeetingSession(platformSignalEndBody(input, body, adapter));
+    },
+    insertMark(input = {}) {
+      return appendAnnotation(annotationInputWithRequestMetadata(input, req));
+    },
+  };
+}
+
+async function ingestPlatformEvent(platform, body = {}, req = {}, options = {}) {
+  const adapter = platformEventAdapterFor(platform);
+  if (!adapter) {
+    const error = new Error(`Unsupported meeting platform: ${platform}`);
+    error.status = 404;
+    throw error;
+  }
+  const receivedAtMs = Date.now();
+  const rawInput = platformEventRawInput(body);
+  const signals = adapter.normalize(rawInput, { receivedAtMs });
+  const client = platformEventTimelineClient(body, req, adapter);
+  const results = await applyMeetingSignals(client, signals, {
+    participantAsAnnotation: body.participant_as_annotation === true || body.participantAsAnnotation === true,
+    onParticipantSignal: body.participant_as_annotation === true || body.participantAsAnnotation === true
+      ? undefined
+      : (signal) => appendPlatformParticipantSignal(signal, body, adapter),
+    onArtifactSignal: body.artifact_callback === 'status_only'
+      ? async (signal) => signal
+      : (signal) => appendPlatformArtifactSignal(signal, body, adapter),
+    onSubscriptionLifecycleSignal: (signal) => appendPlatformSubscriptionLifecycleSignal(signal, body, adapter),
+  });
+  const appliedCount = results.filter((item) => item.applied && item.response?.skipped !== true).length;
+  const skippedCount = results.length - appliedCount;
+  const lifecycleResults = results.filter((item) => (
+    item.signal?.type === 'subscription_lifecycle'
+      && item.applied
+      && item.response?.skipped !== true
+  ));
+  const lastLifecycle = lifecycleResults.findLast((item) => item.response?.lifecycle)?.response?.lifecycle;
+  const currentStatus = platformEventStatus[adapter.key];
+  updatePlatformEventStatus(adapter, {
+    received_count: currentStatus.received_count + 1,
+    normalized_signal_count: currentStatus.normalized_signal_count + signals.length,
+    applied_signal_count: currentStatus.applied_signal_count + appliedCount,
+    skipped_signal_count: currentStatus.skipped_signal_count + skippedCount,
+    lifecycle_event_count: currentStatus.lifecycle_event_count + lifecycleResults.length,
+    last_received_at: new Date(receivedAtMs).toISOString(),
+    last_event_type: String(platformRawEventType(rawInput)),
+    last_signal_type: signals.at(-1)?.type ?? null,
+    last_lifecycle: lastLifecycle ?? currentStatus.last_lifecycle,
+    last_verification: options.verification ?? null,
+    last_error: null,
+  });
+  return {
+    ok: true,
+    platform: adapter.key,
+    source: adapter.source,
+    received_at: new Date(receivedAtMs).toISOString(),
+    raw_event_type: platformRawEventType(rawInput),
+    signal_count: signals.length,
+    applied_signal_count: appliedCount,
+    skipped_signal_count: skippedCount,
+    signals,
+    results,
+    state: results.findLast((item) => item.response?.state)?.response?.state ?? await store.load(),
+    status: platformEventStatus[adapter.key],
+  };
+}
+
 async function handleApi(req, res, url) {
   if (req.method === 'OPTIONS') {
     return sendNoContent(res);
@@ -5981,6 +7202,90 @@ async function handleApi(req, res, url) {
 
   if (req.method === 'GET' && url.pathname === '/api/annotation-ingest-info') {
     return sendJson(res, 200, await annotationIngestInfoPayload(req));
+  }
+
+  const platformRoute = parsePlatformEventRoute(url.pathname);
+  if (platformRoute?.action === 'setup' && req.method === 'GET') {
+    const adapter = platformRoute.platform ? platformEventAdapterFor(platformRoute.platform) : null;
+    if (platformRoute.platform && !adapter) {
+      return sendJson(res, 404, {
+        error: `Unsupported meeting platform: ${platformRoute.platform}`,
+        ...publicPlatformEventSetup(req, url),
+      });
+    }
+    try {
+      return sendJson(res, 200, publicPlatformEventSetup(req, url, adapter));
+    } catch (error) {
+      return sendJson(res, error.status ?? 400, {
+        error: error.message ?? String(error),
+      });
+    }
+  }
+
+  if (platformRoute?.action === 'status' && req.method === 'GET') {
+    const adapter = platformRoute.platform ? platformEventAdapterFor(platformRoute.platform) : null;
+    if (platformRoute.platform && !adapter) {
+      return sendJson(res, 404, {
+        error: `Unsupported meeting platform: ${platformRoute.platform}`,
+        ...publicPlatformEventStatus(req),
+      });
+    }
+    return sendJson(res, 200, publicPlatformEventStatus(req, adapter));
+  }
+
+  if (platformRoute?.action === 'ingest' && url.searchParams.has('validationToken')) {
+    const adapter = platformEventAdapterFor(platformRoute.platform);
+    if (adapter?.key === 'microsoft_teams') {
+      return sendText(res, 200, microsoftGraphValidationResponse(url) ?? '');
+    }
+  }
+
+  if (platformRoute?.action === 'ingest' && req.method === 'POST') {
+    const adapter = platformEventAdapterFor(platformRoute.platform);
+    const { body, rawBody } = await readJsonWithRaw(req);
+    try {
+      if (adapter?.key === 'zoom' && body?.event === 'endpoint.url_validation') {
+        const response = buildZoomUrlValidationResponse(body.payload ?? body);
+        updatePlatformEventStatus(adapter, {
+          last_received_at: new Date().toISOString(),
+          last_event_type: 'endpoint.url_validation',
+          last_signal_type: null,
+          last_verification: { platform: adapter.key, ok: true, skipped: false, reason: 'zoom_url_validation_response' },
+          last_error: null,
+        });
+        return sendJson(res, 200, response);
+      }
+      const verification = adapter
+        ? await platformWebhookVerification(adapter, req, body, rawBody)
+        : null;
+      if (verification && verification.ok === false) {
+        updatePlatformEventStatus(adapter, {
+          last_received_at: new Date().toISOString(),
+          last_event_type: String(platformRawEventType(platformEventRawInput(body))),
+          last_verification: verification,
+          last_error: verification.reason ?? 'platform_webhook_verification_failed',
+        });
+        return sendJson(res, 401, {
+          error: verification.reason ?? 'platform_webhook_verification_failed',
+          platform: adapter?.key ?? platformRoute.platform,
+          verification,
+          status: adapter ? platformEventStatus[adapter.key] : null,
+        });
+      }
+      return sendJson(res, 200, await ingestPlatformEvent(platformRoute.platform, body, req, { verification }));
+    } catch (error) {
+      if (adapter) {
+        updatePlatformEventStatus(adapter, {
+          last_received_at: new Date().toISOString(),
+          last_error: error.message ?? String(error),
+        });
+      }
+      return sendJson(res, error.status ?? 400, {
+        error: error.message ?? String(error),
+        platform: adapter?.key ?? platformRoute.platform,
+        status: adapter ? platformEventStatus[adapter.key] : null,
+      });
+    }
   }
 
   if (req.method === 'GET' && url.pathname === '/api/meeting-session/status') {
@@ -5998,6 +7303,58 @@ async function handleApi(req, res, url) {
         note: 'Call start when a real meeting session starts; use annotation endpoints for live marks; import transcript after the meeting.',
       },
     });
+  }
+
+  if (req.method === 'POST' && [
+    '/api/meeting-platform/runtime-events',
+    '/api/meeting-platform/observe-candidates',
+  ].includes(url.pathname)) {
+    const body = await readJson(req);
+    const action = url.pathname.endsWith('/observe-candidates')
+      ? 'observe_platform_candidates'
+      : String(body.action ?? body.type ?? '').trim();
+    if (action === 'observe_platform_candidates') {
+      const candidates = observedMeetingCandidates(body.payload ?? body.input ?? body);
+      const current = await store.load();
+      return sendJson(res, 200, {
+        ok: true,
+        action,
+        observed_at_ms: Date.now(),
+        candidate_count: candidates.length,
+        candidates,
+        selected_candidate: candidates.find((candidate) => candidate.active) ?? candidates[0] ?? null,
+        current_meeting: current.meeting ?? null,
+        mutates_timeline: false,
+        note: 'Candidate observation is a local discovery signal; the page DOM observer owns start/end axis events.',
+      });
+    }
+    if (['insert_annotation', 'speaker_track', 'participant_track'].includes(action)) {
+      const input = body.payload ?? body.input ?? body.mark ?? body.annotation ?? body;
+      return sendJson(res, 200, {
+        ok: true,
+        action,
+        result: await appendAnnotation(input),
+      });
+    }
+    return sendJson(res, 400, {
+      error: `Unsupported meeting platform runtime action: ${action || '(empty)'}`,
+      supported_actions: ['observe_platform_candidates', 'insert_annotation', 'speaker_track', 'participant_track'],
+    });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/meeting-platform/p0-reference') {
+    const body = await readJson(req);
+    const current = await store.load();
+    const requestedMeetingId = firstNonEmpty(body.meeting_id, body.meetingId, current.meeting?.meeting_id);
+    const meeting = requestedMeetingId === current.meeting?.meeting_id
+      ? current.meeting
+      : {
+        platform: firstNonEmpty(body.platform, current.meeting?.platform, 'unknown'),
+        meeting_id: requestedMeetingId,
+      };
+    if (!meeting?.meeting_id) return sendJson(res, 400, { error: 'meeting_id is required' });
+    const result = updateMeetingPlatformP0Reference(meeting, body);
+    return sendJson(res, result.updated ? 200 : result.queued ? 202 : 400, result);
   }
 
   if (req.method === 'POST' && url.pathname === '/api/meeting-session/start') {
@@ -6290,10 +7647,12 @@ async function handleApi(req, res, url) {
     });
     scheduleProbeAutoSearchLoop();
     const resetResult = await resetTemporaryAxisForProbeIfRequested(body);
+    const recentEventRestore = await restoreRecentStartEventForProbe(body);
     return sendJson(res, 200, {
       ...publicRealMeetingProbeStatus(req),
       temporary_axis_reset: resetResult.reset,
       temporary_axis_reset_reason: resetResult.reason,
+      recent_event_restore: recentEventRestore,
     });
   }
 
@@ -6649,7 +8008,7 @@ async function handleApi(req, res, url) {
     const useMinutesOnly = ['minute', 'minutes', 'transcript'].includes(purpose);
     const payload = useMinutesOnly
       ? oauthStartPayload(minuteOAuthScopes, { ignoreDefaultScopes: true, scopeMode: 'minutes' })
-      : oauthStartPayload(requestedScope);
+      : oauthStartPayload(withMeetingSearchScope(requestedScope));
     if (['1', 'true', 'yes'].includes(String(url.searchParams.get('redirect') ?? '').toLowerCase())) {
       return sendRedirect(res, payload.auth_url);
     }
@@ -6830,10 +8189,19 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, await appendAnnotation(body));
   }
 
-  if (req.method === 'POST' && url.pathname === '/api/import/lark-transcript') {
+  if (req.method === 'POST' && (url.pathname === '/api/import/lark-transcript' || url.pathname === '/api/import/transcript')) {
     const body = await readJson(req);
     const current = await store.load();
-    const meeting = { ...current.meeting, ...(body.meeting ?? {}) };
+    const incomingMeeting = body.meeting ?? {};
+    const meeting = { ...current.meeting, ...incomingMeeting };
+    if (!meeting.start_time && incomingMeeting.start_time_ms != null) {
+      const startMs = parseAbsoluteMs(incomingMeeting.start_time_ms);
+      if (startMs != null) meeting.start_time = new Date(startMs).toISOString();
+    }
+    if (!meeting.end_time && incomingMeeting.end_time_ms != null) {
+      const endMs = parseAbsoluteMs(incomingMeeting.end_time_ms);
+      if (endMs != null) meeting.end_time = new Date(endMs).toISOString();
+    }
     const segments = normalizeTranscript(body.transcript ?? body, meeting);
     const next = mergeTimelineWithRebasedAnnotations(current, { meeting, segments });
     return sendJson(res, 200, await saveAndBroadcast(next, 'state'));
@@ -6897,6 +8265,7 @@ async function handleApi(req, res, url) {
     const eventCallbackUrl = process.env.LARK_EVENT_CALLBACK_URL || localUrlFor(req, '/api/lark/events');
     const result = await processLarkEventPayload(payload, {
       source: publicWebhookStatus(eventCallbackUrl) ? 'lark_http_event' : 'lark_http_local_event',
+      received_at: logEntry.at,
     });
     logEntry.timeline_processed = result.ok !== false;
     logEntry.timeline_started = result.timeline_started;
@@ -6912,6 +8281,16 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
+
+    const sdkModulePath = req.method === 'GET' ? sdkBrowserModules.get(url.pathname) : null;
+    if (sdkModulePath) {
+      res.writeHead(200, corsHeaders({
+        'content-type': 'text/javascript; charset=utf-8',
+        'cache-control': 'no-cache',
+      }));
+      createReadStream(sdkModulePath).pipe(res);
+      return;
+    }
 
     const filePath = safePublicPath(req.url ?? '/');
     if (!filePath || !existsSync(filePath)) return sendText(res, 404, 'Not found');

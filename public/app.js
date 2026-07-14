@@ -3,6 +3,9 @@ import {
   shouldHideDemoTimelineForProbe as shouldHideDemoTimelineForProbeState,
   sourceLabelForMeeting,
 } from './uiState.mjs';
+import {
+  createMeetingTimelineAnnotationProducer,
+} from '/sdk/producer.mjs';
 
 let state = null;
 let stream = null;
@@ -23,14 +26,41 @@ let probeAutoBindInFlight = false;
 let realDemoMonitor = null;
 let realDemoMonitorInFlight = false;
 let realDemoProgressStream = null;
+let timelineView = {
+  axisKey: null,
+  startMs: 0,
+  durationMs: null,
+  fullDurationMs: null,
+};
+const standardAnnotationProducer = createMeetingTimelineAnnotationProducer({
+  baseUrl: window.location.origin,
+  source: 'sdk_reference_producer',
+  producerId: 'timeline-demo',
+});
 
 const $ = (id) => document.getElementById(id);
+const MIN_TIMELINE_VIEW_MS = 30_000;
+const TIMELINE_ZOOM_FACTOR = 1.8;
+const SPEAKER_MERGE_GAP_MS = 15_000;
+const SPEAKER_REPEAT_FILTER_MS = 30_000;
+const SPEAKER_LABEL_MIN_GAP_PX = 76;
+const SPEAKER_COLORS = [
+  { fill: '#dbeafe', stroke: '#93c5fd', text: '#1e3a8a' },
+  { fill: '#dcfce7', stroke: '#86efac', text: '#166534' },
+  { fill: '#fef3c7', stroke: '#fcd34d', text: '#92400e' },
+  { fill: '#fee2e2', stroke: '#fca5a5', text: '#991b1b' },
+  { fill: '#ede9fe', stroke: '#c4b5fd', text: '#5b21b6' },
+];
 
 function fmtTime(ms) {
   const total = Math.max(0, Math.round(ms / 1000));
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function fmtDurationCompact(ms) {
@@ -42,12 +72,44 @@ function fmtDurationCompact(ms) {
   return seconds ? `${minutes}m${seconds}s` : `${minutes}m`;
 }
 
+function fmtLatency(ms) {
+  const value = Number(ms);
+  if (!Number.isFinite(value)) return '';
+  if (value < 1000) return `${Math.round(value)}ms`;
+  if (value < 10_000) return `${(value / 1000).toFixed(1)}s`;
+  if (value < 60_000) return `${Math.round(value / 1000)}s`;
+  return fmtDurationCompact(value);
+}
+
 function escapeHtml(text) {
   return String(text ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
+}
+
+function stableHash(text) {
+  return [...String(text ?? '')].reduce((hash, char) => (
+    (Math.imul(hash, 31) + char.codePointAt(0)) | 0
+  ), 0);
+}
+
+function speakerName(seg = {}) {
+  return String(seg.speaker_name || seg.speaker_id || '未知发言人');
+}
+
+function speakerId(seg = {}) {
+  return String(seg.speaker_id || speakerName(seg));
+}
+
+function speakerColorFor(seg = {}) {
+  return SPEAKER_COLORS[Math.abs(stableHash(speakerId(seg))) % SPEAKER_COLORS.length];
+}
+
+function truncateSvgLabel(text, maxLength = 8) {
+  const value = String(text ?? '');
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}...` : value;
 }
 
 function fmtAbsoluteTime(value) {
@@ -147,6 +209,117 @@ function currentMeetingEndOffsetMs() {
   return eventOffsets.length ? Math.min(...eventOffsets) : null;
 }
 
+function timelineAxisKey() {
+  const meeting = state?.meeting ?? {};
+  return [
+    meeting.meeting_id ?? 'no-meeting',
+    meeting.start_time ?? 'no-start',
+  ].join('|');
+}
+
+function fullTimelineDurationMs() {
+  return Math.max(1, Number(state?.duration_ms ?? 0));
+}
+
+function minTimelineViewMs() {
+  return Math.min(fullTimelineDurationMs(), MIN_TIMELINE_VIEW_MS);
+}
+
+function clampTimelineView() {
+  const full = fullTimelineDurationMs();
+  const minView = minTimelineViewMs();
+  const duration = clampNumber(Number(timelineView.durationMs ?? full), minView, full);
+  const maxStart = Math.max(0, full - duration);
+  const start = clampNumber(Number(timelineView.startMs ?? 0), 0, maxStart);
+  timelineView = {
+    ...timelineView,
+    startMs: start,
+    durationMs: duration,
+  };
+  return {
+    startMs: start,
+    endMs: start + duration,
+    durationMs: duration,
+    fullDurationMs: full,
+    isFull: start <= 0 && duration >= full,
+  };
+}
+
+function syncTimelineViewWithState() {
+  const key = timelineAxisKey();
+  const full = fullTimelineDurationMs();
+  if (timelineView.axisKey !== key) {
+    timelineView = {
+      axisKey: key,
+      startMs: 0,
+      durationMs: full,
+      fullDurationMs: full,
+    };
+  } else {
+    const previousFull = Number(timelineView.fullDurationMs ?? full);
+    const wasFull = Number(timelineView.startMs ?? 0) <= 0
+      && Number(timelineView.durationMs ?? previousFull) >= previousFull;
+    timelineView = {
+      ...timelineView,
+      durationMs: wasFull ? full : timelineView.durationMs,
+      fullDurationMs: full,
+    };
+  }
+  return clampTimelineView();
+}
+
+function setTimelineViewport(startMs, durationMs) {
+  timelineView = {
+    ...timelineView,
+    startMs,
+    durationMs,
+  };
+  renderTimeline();
+  renderMeta();
+}
+
+function zoomTimeline(factor, anchorRatio = 0.5) {
+  const viewport = syncTimelineViewWithState();
+  const nextDuration = viewport.durationMs / factor;
+  const anchor = viewport.startMs + viewport.durationMs * anchorRatio;
+  setTimelineViewport(anchor - nextDuration * anchorRatio, nextDuration);
+}
+
+function fitTimelineView() {
+  setTimelineViewport(0, fullTimelineDurationMs());
+}
+
+function panTimelineTo(startMs) {
+  setTimelineViewport(startMs, timelineView.durationMs ?? fullTimelineDurationMs());
+}
+
+function timelineViewportLabel(viewport = syncTimelineViewWithState()) {
+  if (viewport.isFull) return `窗口 ${fmtTime(0)}-${fmtTime(viewport.fullDurationMs)} · 全局`;
+  return `窗口 ${fmtTime(viewport.startMs)}-${fmtTime(viewport.endMs)} · ${fmtTime(viewport.durationMs)}`;
+}
+
+function renderTimelineControls() {
+  const controls = {
+    zoomOut: $('timelineZoomOutBtn'),
+    zoomIn: $('timelineZoomInBtn'),
+    fit: $('timelineFitBtn'),
+    pan: $('timelinePanInput'),
+    label: $('timelineWindowLabel'),
+  };
+  if (!controls.zoomOut || !controls.zoomIn || !controls.fit || !controls.pan || !controls.label) return;
+  const hidden = shouldHideDemoTimelineForProbe();
+  const viewport = syncTimelineViewWithState();
+  const maxStart = Math.max(0, viewport.fullDurationMs - viewport.durationMs);
+  controls.label.textContent = hidden ? '窗口尚未建轴' : timelineViewportLabel(viewport);
+  controls.pan.max = String(Math.round(maxStart));
+  controls.pan.step = String(viewport.fullDurationMs > 30 * 60 * 1000 ? 10_000 : 1000);
+  controls.pan.value = String(Math.round(viewport.startMs));
+  controls.pan.disabled = hidden || maxStart <= 0;
+  controls.zoomOut.disabled = hidden || viewport.isFull;
+  controls.zoomIn.disabled = hidden || viewport.durationMs <= minTimelineViewMs();
+  controls.fit.disabled = hidden || viewport.isFull;
+}
+
 function currentPreparedRealAxisActive() {
   if (state?.presentation?.real_axis_active) return true;
   if (shouldHideDemoTimelineForProbe()) return false;
@@ -209,11 +382,20 @@ function eventSourceLabel(source) {
     lark_probe_auto_search: 'probe 自动扫描',
     lark_passive_meeting_scan: '被动扫描',
     open_meeting_session: '开放会话',
+    google_meet_webhook: 'Google Meet',
+    microsoft_teams_webhook: 'Teams',
+    zoom_webhook: 'Zoom',
     local_simulation: '本地模拟',
     local_pending: 'pending 临时轴',
     lark_event: '飞书事件',
   };
   return labels[source] ?? source ?? '未知来源';
+}
+
+function eventMarkerMeta(event = {}) {
+  const delay = Number(event.metadata?.delivery_delay_ms);
+  const delayLabel = Number.isFinite(delay) ? ` · 延迟 ${fmtLatency(delay)}` : '';
+  return `${eventSourceLabel(event.source)}${delayLabel}`;
 }
 
 function timelineMarkerMeta(item = {}, source = timeSourceInfo(item)) {
@@ -269,6 +451,9 @@ function realAxisSourceLabel(source) {
     lark_probe_auto_search: 'probe 自动扫描建轴',
     lark_passive_meeting_scan: '被动扫描建轴',
     open_meeting_session: '开放会议会话建轴',
+    google_meet_webhook: 'Google Meet webhook 建轴',
+    microsoft_teams_webhook: 'Microsoft Teams webhook 建轴',
+    zoom_webhook: 'Zoom webhook 建轴',
     local_simulation: '本地模拟轴',
     annotation_fallback: 'pending 标注临时轴',
     demo_sample: '样例轴',
@@ -445,16 +630,28 @@ function renderMeta() {
   $('meetingMeta').textContent = `${sourceLabelForMeeting(meeting)}${sourceCaveat} · 轴零点 ${meeting.start_time}（${startTimeSourceLabel(meeting)}）${axisBuiltAt} · ${meeting.title} · ${meeting.meeting_id}${suffix}`;
   const realDuration = currentMeetingEndOffsetMs();
   const visualDuration = Number(state.duration_ms ?? 0);
-  $('durationLabel').textContent = realDuration != null
+  const viewport = syncTimelineViewWithState();
+  const durationText = realDuration != null
     ? `会议时长 ${fmtTime(realDuration)}${visualDuration > realDuration ? ` · 显示范围 ${fmtTime(visualDuration)}` : ''}`
     : `显示范围 ${fmtTime(visualDuration)}`;
+  $('durationLabel').textContent = viewport.isFull
+    ? durationText
+    : `${durationText} · ${fmtTime(viewport.startMs)}-${fmtTime(viewport.endMs)}`;
   $('meetingStartInput').value = meeting.start_time ?? '';
 }
 
 function timelineSvg() {
-  const visualDurationMs = Math.max(1, Number(state.duration_ms ?? 0));
+  const viewport = syncTimelineViewWithState();
+  const viewportStartMs = viewport.startMs;
+  const viewportEndMs = viewport.endMs;
+  const viewportDurationMs = Math.max(1, viewport.durationMs);
+  const timeVisible = (ms) => Number.isFinite(Number(ms))
+    && Number(ms) >= viewportStartMs
+    && Number(ms) <= viewportEndMs;
+  const intervalVisible = (startMs, endMs) => Number(endMs) >= viewportStartMs && Number(startMs) <= viewportEndMs;
   const sequenceWithSource = state.sequence.map((item) => ({ item, source: timeSourceInfo(item) }));
   const calibratedSequence = sequenceWithSource.filter((entry) => !entry.source.warning);
+  const visibleCalibratedSequence = calibratedSequence.filter(({ item }) => timeVisible(item.time_ms));
   const uncalibratedSequence = sequenceWithSource.filter((entry) => entry.source.warning);
   const uncalibratedRows = Math.ceil(uncalibratedSequence.length / 2);
   const width = 1040;
@@ -462,7 +659,7 @@ function timelineSvg() {
   const left = 92;
   const right = 32;
   const laneWidth = width - left - right;
-  const scale = (ms) => left + Math.max(0, Math.min(1, ms / visualDurationMs)) * laneWidth;
+  const scale = (ms) => left + Math.max(0, Math.min(1, (ms - viewportStartMs) / viewportDurationMs)) * laneWidth;
   const textPosition = (x, preferredGap = 8, reserve = 260) => (
     x > width - right - reserve
       ? { x: x - preferredGap, anchor: 'end' }
@@ -478,25 +675,90 @@ function timelineSvg() {
     30 * 60 * 1000,
     60 * 60 * 1000,
     2 * 60 * 60 * 1000,
-  ].find((candidate) => visualDurationMs / candidate <= 8) ?? 4 * 60 * 60 * 1000;
-  for (let ms = 0; ms <= visualDurationMs; ms += step) ticks.push(ms);
-  if (ticks.at(-1) !== visualDurationMs) ticks.push(visualDurationMs);
+  ].find((candidate) => viewportDurationMs / candidate <= 8) ?? 4 * 60 * 60 * 1000;
+  const firstTick = Math.ceil(viewportStartMs / step) * step;
+  ticks.push(viewportStartMs);
+  for (let ms = firstTick; ms <= viewportEndMs; ms += step) ticks.push(ms);
+  ticks.push(viewportEndMs);
+  const uniqueTicks = [...new Set(ticks.map((ms) => Math.round(ms)))].sort((a, b) => a - b);
 
-  const segmentRects = state.segments.map((seg, index) => {
-    const x = scale(seg.start_ms);
-    const w = Math.max(4, scale(seg.end_ms) - x);
-    const y = 92 + (index % 3) * 34;
+  const rawSpeakerTurns = state.segments.map((seg) => {
+    const startMs = Number(seg.start_ms);
+    const endMs = Number(seg.end_ms);
+    return {
+      ...seg,
+      start_ms: startMs,
+      end_ms: Number.isFinite(endMs) && endMs > startMs ? endMs : startMs + 1_000,
+      speaker_id: speakerId(seg),
+      speaker_name: speakerName(seg),
+      count: 1,
+    };
+  }).filter((seg) => (
+    Number.isFinite(seg.start_ms)
+    && Number.isFinite(seg.end_ms)
+    && seg.end_ms > seg.start_ms
+  )).sort((a, b) => a.start_ms - b.start_ms || a.end_ms - b.end_ms);
+
+  const mergedSpeakerTurns = [];
+  rawSpeakerTurns.forEach((seg) => {
+    const prev = mergedSpeakerTurns[mergedSpeakerTurns.length - 1];
+    if (prev && prev.speaker_id === seg.speaker_id && seg.start_ms - prev.end_ms <= SPEAKER_MERGE_GAP_MS) {
+      prev.end_ms = Math.max(prev.end_ms, seg.end_ms);
+      prev.count += 1;
+      return;
+    }
+    mergedSpeakerTurns.push({ ...seg });
+  });
+
+  const filteredSpeakerTurns = [];
+  mergedSpeakerTurns.filter((seg) => intervalVisible(seg.start_ms, seg.end_ms)).forEach((seg) => {
+    const prev = filteredSpeakerTurns[filteredSpeakerTurns.length - 1];
+    const sameSpeaker = prev && prev.speaker_id === seg.speaker_id;
+    const closeInTime = prev && seg.start_ms - prev.start_ms < SPEAKER_REPEAT_FILTER_MS;
+    const closeInPx = prev && Math.abs(scale(seg.start_ms) - scale(prev.start_ms)) < SPEAKER_LABEL_MIN_GAP_PX;
+    if (sameSpeaker && (closeInTime || closeInPx)) {
+      prev.end_ms = Math.max(prev.end_ms, seg.end_ms);
+      prev.count += seg.count;
+      return;
+    }
+    filteredSpeakerTurns.push({ ...seg });
+  });
+
+  const speakerRowEnds = [left - 999, left - 999, left - 999];
+  const speakerMarkers = filteredSpeakerTurns.map((seg) => {
+    const visibleStart = Math.max(seg.start_ms, viewportStartMs);
+    const x = scale(visibleStart);
+    const labelText = truncateSvgLabel(seg.speaker_name);
+    const badgeWidth = Math.min(96, Math.max(42, labelText.length * 12 + 20));
+    let row = speakerRowEnds.findIndex((end) => x - end >= SPEAKER_LABEL_MIN_GAP_PX);
+    const showLabel = row !== -1;
+    if (row === -1) row = Math.abs(stableHash(`${seg.speaker_id}:${seg.start_ms}`)) % speakerRowEnds.length;
+    const y = 82 + row * 30;
+    const color = speakerColorFor(seg);
+    const badgeX = x + badgeWidth + 8 > width - right ? x - badgeWidth - 8 : x + 8;
+    const textX = badgeX + 10;
+    if (showLabel) speakerRowEnds[row] = Math.max(x, badgeX + badgeWidth);
+    const title = `${seg.speaker_name} ${fmtTime(seg.start_ms)}-${fmtTime(seg.end_ms)}${seg.count > 1 ? ` · 合并${seg.count}段` : ''}`;
     return `
-      <rect x="${x}" y="${y}" width="${w}" height="22" rx="4" fill="#dbeafe" stroke="#93c5fd" />
-      <text x="${x + 6}" y="${y + 15}" fill="#1e3a8a" font-size="11">${escapeHtml(seg.speaker_name)}</text>
+      <g>
+        <title>${escapeHtml(title)}</title>
+        <line x1="${x}" y1="68" x2="${x}" y2="176" stroke="${color.stroke}" stroke-width="1.5" stroke-dasharray="3 4" opacity="0.75" />
+        <circle cx="${x}" cy="${y + 11}" r="4" fill="${color.text}" />
+        ${showLabel ? `
+          <rect x="${badgeX}" y="${y}" width="${badgeWidth}" height="22" rx="4" fill="${color.fill}" stroke="${color.stroke}" />
+          <text x="${textX}" y="${y + 15}" fill="${color.text}" font-size="11">${escapeHtml(labelText)}</text>
+        ` : `
+          <circle cx="${x}" cy="${y + 11}" r="7" fill="none" stroke="${color.stroke}" opacity="0.7" />
+        `}
+      </g>
     `;
   }).join('');
 
-  const eventMarkers = state.events.map((event) => {
+  const eventMarkers = state.events.filter((event) => timeVisible(event.time_ms)).map((event) => {
     const x = scale(event.time_ms);
     const label = textPosition(x, 7, 180);
     const color = event.type.includes('screen') ? '#c46a13' : event.type.includes('record') ? '#c43d3d' : '#0f8b62';
-    const sourceLabel = eventSourceLabel(event.source);
+    const sourceLabel = eventMarkerMeta(event);
     return `
       <line x1="${x}" y1="186" x2="${x}" y2="238" stroke="${color}" stroke-width="2" />
       <circle cx="${x}" cy="188" r="5" fill="${color}" />
@@ -505,7 +767,7 @@ function timelineSvg() {
     `;
   }).join('');
 
-  const sequenceMarkers = calibratedSequence.map(({ item, source }, index) => {
+  const sequenceMarkers = visibleCalibratedSequence.map(({ item, source }, index) => {
     const x = scale(item.time_ms);
     const label = textPosition(x);
     const row = index % 4;
@@ -542,26 +804,27 @@ function timelineSvg() {
     const seg = state.segments.find((x) => x.id === alignment.active_segment_id);
     if (!item || !seg) return '';
     if (timeSourceInfo(item).warning) return '';
+    if (!timeVisible(item.time_ms) || !intervalVisible(seg.start_ms, seg.end_ms)) return '';
     const x1 = scale(item.time_ms);
-    const x2 = scale(Math.min(Math.max(item.time_ms, seg.start_ms), seg.end_ms));
+    const x2 = scale(Math.min(Math.max(item.time_ms, seg.start_ms, viewportStartMs), seg.end_ms, viewportEndMs));
     return `<line x1="${x1}" y1="334" x2="${x2}" y2="126" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 4" />`;
   }).join('');
 
   return `
     <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="meeting timeline">
       <rect x="0" y="0" width="${width}" height="${height}" fill="#fcfcfd" />
-      ${ticks.map((ms) => {
+      ${uniqueTicks.map((ms) => {
         const x = scale(ms);
         return `
           <line x1="${x}" y1="42" x2="${x}" y2="380" stroke="#e2e8f0" />
           <text x="${x - 17}" y="28" fill="#667085" font-size="11">${fmtTime(ms)}</text>
         `;
       }).join('')}
-      <text x="18" y="108" fill="#475467" font-size="12" font-weight="700">转写</text>
+      <text x="18" y="108" fill="#475467" font-size="12" font-weight="700">发言人</text>
       <text x="18" y="204" fill="#475467" font-size="12" font-weight="700">事件</text>
       <text x="18" y="292" fill="#475467" font-size="12" font-weight="700">标注</text>
       <line x1="${left}" y1="384" x2="${width - right}" y2="384" stroke="#98a2b3" stroke-width="2" />
-      ${segmentRects}
+      ${speakerMarkers}
       ${eventMarkers}
       ${alignmentLines}
       ${sequenceMarkers}
@@ -572,6 +835,7 @@ function timelineSvg() {
 }
 
 function renderTimeline() {
+  renderTimelineControls();
   if (shouldHideDemoTimelineForProbe()) {
     const pendingCount = state?.presentation?.pending_annotation_count ?? state?.sequence?.length ?? 0;
     const pendingText = pendingCount
@@ -1548,6 +1812,12 @@ async function wire() {
     await load();
     await loadReadiness();
   });
+  $('timelineZoomOutBtn').addEventListener('click', () => zoomTimeline(1 / TIMELINE_ZOOM_FACTOR));
+  $('timelineZoomInBtn').addEventListener('click', () => zoomTimeline(TIMELINE_ZOOM_FACTOR));
+  $('timelineFitBtn').addEventListener('click', fitTimelineView);
+  $('timelinePanInput').addEventListener('input', (event) => {
+    panTimelineTo(Number(event.target.value));
+  });
   $('importSequenceBtn').addEventListener('click', async () => {
     const sequence = JSON.parse($('sequenceInput').value);
     state = await api('/api/import/sequence', { method: 'POST', body: JSON.stringify({ sequence }) });
@@ -1589,17 +1859,16 @@ async function wire() {
       method: 'POST',
       body: JSON.stringify({ timeout_ms: 120_000, note: 'direct meeting validation', reset_temporary_axis: true, auto_search: true }),
     });
+    if (realMeetingProbe.recent_event_restore?.state) {
+      state = realMeetingProbe.recent_event_restore.state;
+      $('streamStatus').textContent = '已从刚刚投递的飞书会议开始事件恢复时间轴。';
+    }
     renderRealMeetingProbe();
     renderAcceptanceGuide();
     await loadDeliveryDiagnostics();
     await loadReadiness();
   });
   $('prepareRealDemoBtn').addEventListener('click', async () => {
-    const likelyNeedsAuth = Boolean(realDemoStatus?.auth_start?.redirect_url)
-      || meetingSearchFallbackStatus().needsReauth;
-    const authPopup = likelyNeedsAuth
-      ? window.open('about:blank', 'lark_real_demo_oauth', 'popup,width=960,height=760')
-      : null;
     try {
       const result = await api('/api/lark/real-demo/prepare', {
         method: 'POST',
@@ -1620,17 +1889,12 @@ async function wire() {
         $('streamStatus').textContent = `真实等待状态已开启，并已通过扫描绑定会议：${result.trigger.meeting_title || result.trigger.selected_meeting_id}`;
         await load();
       } else if (result.auth_required && (result.auth_start?.redirect_url || result.auth_start?.auth_url)) {
-        const authUrl = result.auth_start.redirect_url || result.auth_start.auth_url;
-        openAuthPopup(authUrl, 'lark_real_demo_oauth', authPopup);
-        const scopes = result.auth_start.scopes?.join(' ') || 'vc:meeting.search:read';
-        $('streamStatus').textContent = `真实等待状态已开启但尚未建轴，已打开飞书授权窗口：scope=${scopes}`;
+        $('streamStatus').textContent = '真实等待状态已开启；启动不会自动打开飞书页面。实时事件可直接建轴，如需账号会议扫描兜底，请主动点击“授权会议扫描”。';
       } else {
-        if (authPopup) authPopup.close();
         $('streamStatus').textContent = result.next_step || '真实等待状态已开启但尚未建轴：现在可以直接开启飞书会议。扫描兜底需要单独点击“扫描我的真实会议”或打开“被动扫描建轴”。';
       }
       await loadReadiness();
     } catch (error) {
-      if (authPopup) authPopup.close();
       $('streamStatus').textContent = `进入真实等待状态失败：${error.message}`;
     }
   });
@@ -1666,9 +1930,14 @@ async function wire() {
       method: 'POST',
       body: JSON.stringify({ timeout_ms: 180_000, note: 'direct meeting end-to-end validation', reset_temporary_axis: true, auto_search: true }),
     });
+    if (realMeetingProbe.recent_event_restore?.state) {
+      state = realMeetingProbe.recent_event_restore.state;
+    }
     renderRealMeetingProbe();
     renderAcceptanceGuide();
-    $('streamStatus').textContent = '验收探针已启动但不会建轴：现在请在飞书客户端直接开启会议；带 captured_at_ms 的标注先到会进入 pending，真实事件到达后自动重绑定。';
+    $('streamStatus').textContent = realMeetingProbe.recent_event_restore?.state
+      ? '验收探针已启动，并已从刚刚投递的飞书会议开始事件恢复时间轴。'
+      : '验收探针已启动但不会建轴：现在请在飞书客户端直接开启会议；带 captured_at_ms 的标注先到会进入 pending，真实事件到达后自动重绑定。';
     await loadDeliveryDiagnostics();
     await loadReadiness();
   });
@@ -2079,7 +2348,7 @@ async function wire() {
     const capturedAt = $('liveCapturedAtInput').value.trim();
     const label = $('liveLabelInput').value.trim() || '实时标注';
     const body = {
-      source: 'browser_demo',
+      source: 'sdk_reference_producer',
       kind: 'live_mark',
       label,
       realtime: true,
@@ -2097,16 +2366,14 @@ async function wire() {
       body.captured_at_ms = Date.now();
     }
     if (offset != null) body.time_ms = offset;
-    const result = await api('/api/annotations', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
+    const delivery = await standardAnnotationProducer.publish(body);
+    const result = delivery.response;
     state = result.state;
     if (offset == null) $('liveOffsetInput').value = '';
     $('liveCapturedAtInput').value = '';
     renderAll();
     const source = timeSourceInfo(result.item);
-    $('streamStatus').textContent = `实时标注已写入：${result.item.label} @ ${fmtTime(result.item.time_ms)} · ${source.label}`;
+    $('streamStatus').textContent = `实时标注已写入：${result.item.label} @ ${fmtTime(result.item.time_ms)} · ${source.label} · ${delivery.delivery_latency_ms}ms`;
   });
   $('liveCapturedAtInput').addEventListener('input', renderDebugInputControls);
 

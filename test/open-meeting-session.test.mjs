@@ -152,6 +152,17 @@ try {
   assert.equal(annotation.ack.meeting_id, 'open-session-real-lark-001');
   assert.equal(annotation.ack.normalized_time_ms, 12_000);
 
+  const duplicateStart = await postJson(baseUrl, '/api/meeting-session/start', {
+    platform: 'lark',
+    meeting_id: 'open-session-real-lark-001',
+    start_time_ms: startMs + 30_000,
+    detector_source: 'reloaded_browser_observer',
+  });
+  assert.equal(duplicateStart.ok, true);
+  assert.equal(duplicateStart.deduplicated, true);
+  assert.equal(duplicateStart.meeting.start_time, new Date(startMs).toISOString());
+  assert.equal(duplicateStart.state.sequence.some((item) => item.id === 'open-session-ann-1'), true);
+
   const sseState = await ssePromise;
   assert.equal(sseState.meeting.source, 'open_meeting_session');
 

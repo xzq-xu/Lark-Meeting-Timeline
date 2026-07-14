@@ -1,0 +1,445 @@
+import { compactObject } from '../index.mjs';
+import {
+  buildMeetingPlatformConsumerHandoff,
+} from './platform-consumer-handoff.mjs';
+import {
+  buildMeetingPlatformRuntimeBundle,
+  buildMeetingPlatformRuntimeBundleMatrix,
+} from './platform-runtime-bundle.mjs';
+import {
+  buildMeetingPlatformAdaptationStrategy,
+} from './platform-strategy.mjs';
+import {
+  buildMeetingPlatformAdapterSelection,
+} from './platform-adapter-selection.mjs';
+import {
+  normalizeMeetingPlatform,
+} from './platform-setup.mjs';
+
+export const MEETING_PLATFORM_IMPLEMENTATION_HANDOFF_SCHEMA = 'meeting_platform_implementation_handoff';
+export const MEETING_PLATFORM_IMPLEMENTATION_HANDOFF_MATRIX_SCHEMA = 'meeting_platform_implementation_handoff_matrix';
+export const MEETING_PLATFORM_IMPLEMENTATION_HANDOFF_SCHEMA_VERSION = 1;
+
+const DEFAULT_IMPLEMENTATION_PLATFORMS = Object.freeze([
+  'google_meet',
+  'zoom',
+  'microsoft_teams',
+  'webex',
+  'lark',
+]);
+
+function firstNonEmpty(...values) {
+  return values.find((value) => value != null && value !== '');
+}
+
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value !== 'string' && typeof value[Symbol.iterator] === 'function') return Array.from(value);
+  return value == null ? [] : [value];
+}
+
+function unique(values = []) {
+  return [...new Set(values.filter((value) => value != null && value !== '').map((value) => String(value)))];
+}
+
+function selectedPlatforms(options = {}) {
+  return unique(asArray(firstNonEmpty(
+    options.platforms,
+    options.platform_keys,
+    DEFAULT_IMPLEMENTATION_PLATFORMS,
+  )).map((platform) => normalizeMeetingPlatform(platform)));
+}
+
+function byPlatform(rows = []) {
+  return Object.fromEntries(asArray(rows).map((row) => [row.platform, row]));
+}
+
+function priorityOrder(options = {}) {
+  return unique(asArray(firstNonEmpty(
+    options.priorityPlatformOrder,
+    options.priority_platform_order,
+    DEFAULT_IMPLEMENTATION_PLATFORMS,
+  )).map((platform) => normalizeMeetingPlatform(platform)));
+}
+
+function commandWithBase(name, options = {}, extra = '') {
+  const baseUrl = firstNonEmpty(options.baseUrl, options.base_url);
+  const args = [
+    baseUrl ? `--base-url=${baseUrl}` : '',
+    String(extra).trim(),
+  ].filter(Boolean).join(' ');
+  return args ? `npm run ${name} -- ${args}` : `npm run ${name}`;
+}
+
+function flowSteps(platform, surface, bundle = {}, options = {}) {
+  return [
+    {
+      step: 1,
+      id: 'install_sdk',
+      action: 'add_package_and_create_sdk_facade',
+      method: "createMeetingAppTimelineSdk({ baseUrl, platforms: [platform] })",
+      output: 'meeting_app_timeline_sdk',
+    },
+    {
+      step: 2,
+      id: 'install_surface_runtime',
+      action: surface === 'browser_extension'
+        ? 'install_browser_content_script_or_extension_runtime'
+        : surface === 'webview_preload'
+          ? 'install_webview_preload_bridge'
+          : 'install_native_or_host_detector_bridge',
+      install_function: bundle.runtime?.lightweight_connector_bridge?.install_function,
+      output: 'meeting_timeline.* messages_delivered_to_host_runtime_endpoint',
+    },
+    {
+      step: 3,
+      id: 'select_adapter_path',
+      action: 'lock_local_axis_annotation_and_reconcile_sources',
+      sdk_method: "sdk.platformAdapterSelection(platform, { meetingAppRecordSet/providerRecords? })",
+      output: 'meeting_platform_adapter_selection',
+      required_before: 'install_surface_runtime_or_run_preflight',
+      timestamp_field: 'captured_at_ms',
+    },
+    {
+      step: 4,
+      id: 'run_adapter_preflight',
+      action: 'prove_current_meeting_window_with_live_dom_or_native_evidence',
+      sdk_method: "sdk.platformAdapterPreflight({ platform, snapshots/nativeEvidence })",
+      message_types: [
+        'meeting_timeline.preflight_current_window',
+        'meeting_timeline.preflight_candidates',
+      ],
+      output: 'meeting_platform_adapter_preflight',
+      required_before: 'bind_current_axis_or_insert_realtime_annotation',
+      url_only_status: 'needs_live_page_evidence',
+    },
+    {
+      step: 5,
+      id: 'bind_current_axis',
+      action: 'observe_platform_candidates_before_the_first_mark',
+      message_type: bundle.messaging?.candidate_observation?.message_type,
+      sdk_method: 'sdk.observePlatformCandidates({ tabs/windows })',
+      required_before: 'insert_annotation',
+    },
+    {
+      step: 6,
+      id: 'insert_realtime_annotations',
+      action: 'write_marks_with_device_capture_time',
+      sdk_method: "sdk.insertAnnotation(platform, { captured_at_ms, ...mark })",
+      endpoint: bundle.host?.endpoints?.insertMark,
+      required_field: 'captured_at_ms',
+    },
+    {
+      step: 7,
+      id: 'emit_speaker_positions',
+      action: 'optionally_emit_speaker_or_participant_track_markers_without_transcript_text',
+      sdk_method: 'sdk.speakerTrack(platform, sample) / sdk.participantTrack(platform, sample)',
+      output: 'speaker_or_participant_position_markers',
+    },
+    {
+      step: 8,
+      id: 'provider_reconcile',
+      action: 'ingest_provider_events_only_as_reconcile_or_backfill',
+      sdk_method: 'sdk.ingestProvider(platform, providerEvent)',
+      realtime_blocking: false,
+    },
+    {
+      step: 9,
+      id: 'verify_handoff',
+      action: 'run_static_handoff_runtime_bundle_and_adapter_preflight_checks',
+      commands: [
+        commandWithBase('meeting-platform:consumer-handoff', options, `--platforms=${platform}`),
+        commandWithBase('meeting-platform:runtime-bundle', options, `--platforms=${platform}`),
+        commandWithBase('meeting-platform:adapter-selection', options, `--platforms=${platform}`),
+        commandWithBase('meeting-platform:adapter-preflight', options, `--platforms=${platform}`),
+      ],
+    },
+  ];
+}
+
+function acceptanceCommands(platform, options = {}) {
+  return {
+    implementation_handoff: commandWithBase('meeting-platform:implementation-handoff', options, `--platforms=${platform}`),
+    consumer_handoff: commandWithBase('meeting-platform:consumer-handoff', options, `--platforms=${platform}`),
+    runtime_bundle: commandWithBase('meeting-platform:runtime-bundle', options, `--platforms=${platform}`),
+    adapter_route: commandWithBase('meeting-platform:adapter-route', options, `--platforms=${platform}`),
+    adapter_selection: commandWithBase('meeting-platform:adapter-selection', options, `--platforms=${platform}`),
+    adapter_preflight: commandWithBase('meeting-platform:adapter-preflight', options, `--platforms=${platform}`),
+    handoff_readiness: commandWithBase('meeting-platform:handoff-readiness', options, `--platforms=${platform}`),
+    runtime_host_verify: `npm run meeting-platform:runtime-host-verify -- --platforms=${platform}`,
+  };
+}
+
+function adapterPreflightHandoff(preflightRow = {}, consumerRow = {}) {
+  return compactObject({
+    status: firstNonEmpty(preflightRow.status, consumerRow.adapter_preflight_status),
+    accepted: preflightRow.accepted === true,
+    selected_surface: firstNonEmpty(preflightRow.selected_surface, consumerRow.adapter_preflight_selected_surface),
+    startup_ready: preflightRow.startup_ready === true || consumerRow.adapter_preflight_startup_ready === true,
+    live_evidence_ready: preflightRow.live_evidence_ready === true || consumerRow.adapter_preflight_live_evidence_ready === true,
+    realtime_annotation_ready: preflightRow.realtime_annotation_ready === true || consumerRow.adapter_preflight_realtime_ready === true,
+    production_lifecycle_ready: preflightRow.production_lifecycle_ready === true,
+    meeting_start_ready: preflightRow.meeting_start_ready === true,
+    meeting_end_ready: preflightRow.meeting_end_ready === true,
+    speaker_track_ready: preflightRow.speaker_track_ready === true,
+    issue_codes: preflightRow.issue_codes,
+    first_next_action: firstNonEmpty(preflightRow.first_next_action, consumerRow.adapter_preflight_first_next_action),
+    required_before: 'bind_current_axis_or_insert_realtime_annotation',
+    live_evidence_required: true,
+    url_only_status: 'needs_live_page_evidence',
+    sdk_methods: [
+      'sdk.platformAdapterPreflight({ platform, snapshots/nativeEvidence })',
+      'sdk.platformAdapterCurrentWindowPreflight({ platform, document/window })',
+      'sdk.platformAdapterCandidatePreflight({ tabs/windows })',
+    ],
+    bridge_messages: [
+      'meeting_timeline.preflight_current_window',
+      'meeting_timeline.preflight_candidates',
+    ],
+  });
+}
+
+function recommendedSurface(row = {}, bundle = {}) {
+  return firstNonEmpty(
+    row.recommended_first_surface,
+    bundle.readiness?.lightweight_connector_ready === true ? 'browser_extension' : undefined,
+    bundle.readiness?.runtime_ready === true ? 'native_detector' : undefined,
+    'manual_or_local_detector',
+  );
+}
+
+function runtimeEventActions(bundle = {}) {
+  return unique((bundle.messaging?.runtime_event?.plan?.actions ?? []).map((item) => item.action));
+}
+
+function buildSingleHandoff(platform, inputs = {}) {
+  const {
+    options = {},
+    roadmapRow = {},
+    consumerRow = {},
+    preflightRow = {},
+    bundle,
+  } = inputs;
+  const key = normalizeMeetingPlatform(platform);
+  const runtimeBundle = bundle ?? buildMeetingPlatformRuntimeBundle(key, options);
+  const strategy = buildMeetingPlatformAdaptationStrategy(key, options);
+  const adapterSelection = buildMeetingPlatformAdapterSelection(key, {}, options);
+  const surface = recommendedSurface(roadmapRow, runtimeBundle);
+  const provider = runtimeBundle.provider_reconcile ?? {};
+  const preflight = adapterPreflightHandoff(preflightRow, consumerRow);
+  const productionGaps = unique([
+    ...(roadmapRow.production_gaps ?? []),
+    ...(runtimeBundle.readiness?.missing_items ?? []),
+  ]);
+  const runtimeReady = runtimeBundle.readiness?.runtime_ready === true
+    && runtimeBundle.readiness?.provider_required_for_realtime !== true
+    && runtimeBundle.readiness?.transcript_blocks_realtime !== true;
+  const bridgeReady = runtimeBundle.readiness?.lightweight_connector_ready === true
+    || surface === 'native_detector';
+  const implementationReady = consumerRow.consumer_ready === true && runtimeReady && bridgeReady;
+
+  return compactObject({
+    type: 'meeting_platform_implementation_handoff',
+    schema: MEETING_PLATFORM_IMPLEMENTATION_HANDOFF_SCHEMA,
+    schema_version: MEETING_PLATFORM_IMPLEMENTATION_HANDOFF_SCHEMA_VERSION,
+    platform: key,
+    display_name: runtimeBundle.display_name ?? roadmapRow.display_name,
+    objective: 'external_project_can_install_a_realtime_meeting_annotation_timeline_adapter',
+    priority_tier: roadmapRow.priority_tier,
+    rank_hint: roadmapRow.rank_hint,
+    implementation_ready: implementationReady,
+    pilot_ready: roadmapRow.pilot_ready === true,
+    production_ready: roadmapRow.production_ready === true,
+    recommended_first_surface: surface,
+    next_phase: roadmapRow.next_phase,
+    next_action: roadmapRow.next_action,
+    package_entrypoints: {
+      package: '@ai-annotation/meeting-timeline-sdk',
+      root_create_function: 'createMeetingAppTimelineSdk',
+      kit_create_function: 'createMeetingPlatformTimelineKit',
+      runtime_bundle_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-runtime-bundle',
+      implementation_handoff_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-implementation-handoff',
+      adapter_selection_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-selection',
+      adapter_preflight_module: '@ai-annotation/meeting-timeline-sdk/adapters/platform-adapter-preflight',
+    },
+    install_surface: {
+      surface,
+      browser_matches: runtimeBundle.browser?.matches ?? [],
+      browser_permissions: runtimeBundle.browser?.permissions ?? [],
+      host_permissions: runtimeBundle.browser?.host_permissions ?? [],
+      content_script_manifest: runtimeBundle.browser?.manifest,
+      runtime_preset: runtimeBundle.runtime?.preset,
+      start_options: runtimeBundle.runtime?.start_options,
+      lightweight_connector_bridge: runtimeBundle.runtime?.lightweight_connector_bridge,
+      observation_loop: runtimeBundle.runtime?.observation_loop,
+      observer_scheduler: runtimeBundle.runtime?.observer_scheduler,
+      runtime_host: runtimeBundle.runtime?.runtime_host,
+    },
+    runtime_events: {
+      endpoint: runtimeBundle.messaging?.runtime_event?.endpoint,
+      schema: runtimeBundle.messaging?.runtime_event?.schema,
+      accepted_methods: runtimeBundle.messaging?.accepted_methods ?? [],
+      message_types: runtimeBundle.messaging?.lightweight_connector_message_types ?? [],
+      actions: runtimeEventActions(runtimeBundle),
+      candidate_observation: runtimeBundle.messaging?.candidate_observation,
+      examples: runtimeBundle.messaging?.examples,
+    },
+    provider_reconcile: {
+      path: roadmapRow.provider_path ?? provider.provider_path,
+      transport: provider.transport,
+      permission_risk: roadmapRow.provider_permission_risk ?? provider.permission_risk,
+      required_for_realtime: provider.required_for_realtime === true,
+      realtime_blocking: false,
+    },
+    adapter_selection: {
+      schema: adapterSelection.schema,
+      ready: adapterSelection.readiness?.selection_ready === true,
+      axis_source: adapterSelection.selection?.axis_source,
+      axis_surface: adapterSelection.selection?.axis_surface,
+      annotation_source: adapterSelection.selection?.annotation_source,
+      timestamp_field: adapterSelection.selection?.timestamp_field,
+      provider_reconcile_source: adapterSelection.selection?.provider_reconcile_source,
+      provider_reconcile_required_for_production: adapterSelection.selection?.provider_reconcile_required_for_production,
+      provider_events_block_realtime: adapterSelection.runtime_policy?.provider_events_block_realtime,
+      transcript_blocks_realtime: adapterSelection.runtime_policy?.transcript_blocks_realtime,
+      startup_order: adapterSelection.runtime_policy?.startup_order,
+      next_actions: adapterSelection.next_actions,
+    },
+    adapter_preflight: preflight,
+    contracts: {
+      timestamp_field: 'captured_at_ms',
+      local_axis_first: true,
+      provider_events_block_realtime: false,
+      transcript_blocks_realtime: false,
+      per_meeting_annotation_isolation_required: true,
+      adapter_selection_required_before_runtime_surface_install: true,
+      adapter_selection_timestamp_field: 'captured_at_ms',
+      adapter_preflight_required_before_realtime_insert: true,
+      adapter_preflight_live_evidence_required: true,
+      adapter_preflight_url_only_status: 'needs_live_page_evidence',
+      meeting_end_must_close_current_axis: true,
+      speaker_track_text_required: false,
+      participant_track_text_required: false,
+    },
+    implementation_flow: flowSteps(key, surface, runtimeBundle, options),
+    acceptance: {
+      static_ready_condition: 'implementation_ready === true',
+      live_evidence_condition: 'adapter_preflight.realtime_annotation_ready === true before first insertAnnotation',
+      pilot_condition: 'pilot_ready === true && collect_real_meeting_axis_evidence',
+      production_condition: 'production_ready === true after handoff readiness evidence',
+      commands: acceptanceCommands(key, options),
+    },
+    readiness: {
+      consumer_ready: consumerRow.consumer_ready === true,
+      runtime_ready: runtimeBundle.readiness?.runtime_ready === true,
+      observer_plan_ready: runtimeBundle.readiness?.observer_plan_ready === true,
+      observer_scheduler_ready: runtimeBundle.readiness?.observer_scheduler_ready === true,
+      runtime_host_ready: runtimeBundle.readiness?.runtime_host_ready === true,
+      lightweight_connector_ready: runtimeBundle.readiness?.lightweight_connector_ready === true,
+      adapter_selection_ready: adapterSelection.readiness?.selection_ready === true,
+      adapter_preflight_startup_ready: preflight.startup_ready === true,
+      adapter_preflight_live_evidence_ready: preflight.live_evidence_ready === true,
+      adapter_preflight_realtime_ready: preflight.realtime_annotation_ready === true,
+      provider_required_for_realtime: runtimeBundle.readiness?.provider_required_for_realtime === true,
+      transcript_blocks_realtime: runtimeBundle.readiness?.transcript_blocks_realtime === true,
+    },
+    adaptation_strategy: {
+      recommended_mode: strategy.recommended_mode,
+      current_phase: strategy.current_phase,
+      phases: strategy.phases,
+    },
+    production_gaps: productionGaps,
+    next_actions: unique([
+      roadmapRow.next_action,
+      preflight.realtime_annotation_ready === true ? undefined : 'collect_live_dom_or_native_window_evidence_for_adapter_preflight',
+      ...productionGaps,
+      ...(runtimeBundle.next_actions ?? []),
+    ]),
+  });
+}
+
+export function buildMeetingPlatformImplementationHandoff(platform, options = {}) {
+  const key = normalizeMeetingPlatform(platform);
+  const sharedOptions = {
+    ...options,
+    platforms: [key],
+  };
+  const consumerHandoff = buildMeetingPlatformConsumerHandoff(sharedOptions);
+  const roadmapRow = consumerHandoff.adaptation_roadmap?.rows?.[0] ?? {};
+  const consumerRow = consumerHandoff.rows?.[0] ?? {};
+  const preflightRow = consumerHandoff.adapter_preflight_matrix?.rows?.[0] ?? {};
+  return buildSingleHandoff(key, {
+    options: sharedOptions,
+    roadmapRow,
+    consumerRow,
+    preflightRow,
+  });
+}
+
+export function buildMeetingPlatformImplementationHandoffMatrix(options = {}) {
+  const platforms = selectedPlatforms(options);
+  const order = priorityOrder(options);
+  const sharedOptions = {
+    ...options,
+    platforms,
+  };
+  const consumerHandoff = buildMeetingPlatformConsumerHandoff(sharedOptions);
+  const runtimeBundleMatrix = buildMeetingPlatformRuntimeBundleMatrix(sharedOptions);
+  const roadmapRows = byPlatform(consumerHandoff.adaptation_roadmap?.rows);
+  const consumerRows = byPlatform(consumerHandoff.rows);
+  const preflightRows = byPlatform(consumerHandoff.adapter_preflight_matrix?.rows);
+  const bundles = byPlatform(runtimeBundleMatrix.bundles);
+  const handoffs = platforms.map((platform) => buildSingleHandoff(platform, {
+    options: {
+      ...sharedOptions,
+      platforms: [platform],
+    },
+    roadmapRow: roadmapRows[platform],
+    consumerRow: consumerRows[platform],
+    preflightRow: preflightRows[platform],
+    bundle: bundles[platform],
+  })).sort((left, right) => Number(left.rank_hint ?? 999) - Number(right.rank_hint ?? 999));
+
+  return {
+    type: 'meeting_platform_implementation_handoff_matrix',
+    schema: MEETING_PLATFORM_IMPLEMENTATION_HANDOFF_MATRIX_SCHEMA,
+    schema_version: MEETING_PLATFORM_IMPLEMENTATION_HANDOFF_SCHEMA_VERSION,
+    platform_count: handoffs.length,
+    implementation_ready_count: handoffs.filter((handoff) => handoff.implementation_ready).length,
+    pilot_ready_count: handoffs.filter((handoff) => handoff.pilot_ready).length,
+    production_ready_count: handoffs.filter((handoff) => handoff.production_ready).length,
+    adapter_preflight_startup_ready_count: handoffs.filter((handoff) => handoff.adapter_preflight?.startup_ready).length,
+    adapter_preflight_realtime_ready_count: handoffs.filter((handoff) => handoff.adapter_preflight?.realtime_annotation_ready).length,
+    adapter_selection_ready_count: handoffs.filter((handoff) => handoff.adapter_selection?.ready).length,
+    recommended_first_platform: handoffs[0]?.platform,
+    recommended_first_surface: handoffs[0]?.recommended_first_surface,
+    priority_order: order,
+    platforms: handoffs.map((handoff) => handoff.platform),
+    rows: handoffs.map((handoff) => ({
+      platform: handoff.platform,
+      display_name: handoff.display_name,
+      rank_hint: handoff.rank_hint,
+      priority_tier: handoff.priority_tier,
+      recommended_first_surface: handoff.recommended_first_surface,
+      implementation_ready: handoff.implementation_ready,
+      pilot_ready: handoff.pilot_ready,
+      production_ready: handoff.production_ready,
+      provider_path: handoff.provider_reconcile?.path,
+      provider_permission_risk: handoff.provider_reconcile?.permission_risk,
+      runtime_event_endpoint: handoff.runtime_events?.endpoint,
+      adapter_selection_ready: handoff.adapter_selection?.ready === true,
+      adapter_selection_axis_source: handoff.adapter_selection?.axis_source,
+      adapter_selection_axis_surface: handoff.adapter_selection?.axis_surface,
+      adapter_selection_timestamp_field: handoff.adapter_selection?.timestamp_field,
+      adapter_preflight_status: handoff.adapter_preflight?.status,
+      adapter_preflight_selected_surface: handoff.adapter_preflight?.selected_surface,
+      adapter_preflight_startup_ready: handoff.adapter_preflight?.startup_ready === true,
+      adapter_preflight_realtime_ready: handoff.adapter_preflight?.realtime_annotation_ready === true,
+      browser_match_count: handoff.install_surface?.browser_matches?.length ?? 0,
+      production_gap_count: handoff.production_gaps?.length ?? 0,
+      next_action: handoff.next_action,
+    })),
+    handoffs,
+    next_actions: unique(handoffs.flatMap((handoff) => handoff.next_actions ?? [])),
+  };
+}

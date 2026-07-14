@@ -1,0 +1,132 @@
+function safe(read, fallbackValue) {
+  try {
+    const value = read();
+    return value === undefined || value === null ? fallbackValue : value;
+  } catch (_) {
+    return fallbackValue;
+  }
+}
+
+function textValue(value) {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  return undefined;
+}
+
+function property(element, name) {
+  return textValue(safe(function () { return element[name](); }, undefined));
+}
+
+function controlRecord(element) {
+  return {
+    role: property(element, 'role'),
+    subrole: property(element, 'subrole'),
+    name: property(element, 'name'),
+    description: property(element, 'description'),
+    help: property(element, 'help'),
+    value: property(element, 'value'),
+    identifier: property(element, 'accessibilityIdentifier'),
+    enabled: property(element, 'enabled'),
+    selected: property(element, 'selected'),
+    focused: property(element, 'focused'),
+  };
+}
+
+function meaningfulControl(record) {
+  return Boolean(record.name || record.description || record.help || record.value || record.identifier)
+    || /button|text|radio|check|menu|image/i.test(String(record.role || ''));
+}
+
+function walk(element, output, state, depth) {
+  if (depth > state.maxDepth || state.visited >= state.maxNodes) return;
+  state.visited += 1;
+  const record = controlRecord(element);
+  if (meaningfulControl(record)) output.push(record);
+  if (state.visited >= state.maxNodes) return;
+  const children = safe(function () { return element.uiElements(); }, []);
+  for (let index = 0; index < children.length && state.visited < state.maxNodes; index += 1) {
+    walk(children[index], output, state, depth + 1);
+  }
+}
+
+function isTarget(name, bundleId) {
+  const app = String(name || '').toLowerCase();
+  const bundle = String(bundleId || '').toLowerCase();
+  return app === 'microsoft teams'
+    || app === 'microsoft teams (work or school)'
+    || app === 'teams'
+    || app === 'msteams'
+    || app === 'zoom'
+    || app === 'zoom workplace'
+    || app === 'zoom.us'
+    || bundle === 'com.microsoft.teams2'
+    || bundle === 'com.microsoft.teams'
+    || bundle === 'us.zoom.xos';
+}
+
+function run() {
+  const systemEvents = Application('System Events');
+  const processes = safe(function () { return systemEvents.applicationProcesses(); }, []);
+  const processNames = safe(function () { return systemEvents.applicationProcesses.name(); }, []);
+  const applications = [];
+  const errors = [];
+  let accessibilityTrusted = null;
+
+  for (let index = 0; index < processes.length; index += 1) {
+    const process = processes[index];
+    const name = processNames[index];
+    if (!isTarget(name, '')) continue;
+    const bundleId = property(process, 'bundleIdentifier');
+
+    const application = {
+      name: name,
+      process_name: name,
+      bundle_id: bundleId,
+      pid: property(process, 'unixId'),
+      frontmost: property(process, 'frontmost'),
+      visible: property(process, 'visible'),
+      windows: [],
+    };
+    let windows;
+    try {
+      windows = process.windows();
+      accessibilityTrusted = true;
+    } catch (error) {
+      accessibilityTrusted = false;
+      errors.push({
+        application: name,
+        code: 'accessibility_permission_required',
+        message: String(error),
+      });
+      windows = [];
+    }
+
+    for (let windowIndex = 0; windowIndex < windows.length; windowIndex += 1) {
+      const window = windows[windowIndex];
+      const controls = [];
+      const state = { visited: 0, maxNodes: 800, maxDepth: 7 };
+      walk(window, controls, state, 0);
+      application.windows.push({
+        title: property(window, 'name'),
+        role: property(window, 'role'),
+        subrole: property(window, 'subrole'),
+        focused: property(window, 'focused'),
+        visible: property(window, 'visible'),
+        position: safe(function () { return window.position(); }, undefined),
+        size: safe(function () { return window.size(); }, undefined),
+        controls: controls,
+        scanned_node_count: state.visited,
+      });
+    }
+    applications.push(application);
+  }
+
+  return JSON.stringify({
+    scanner: 'macos_system_events_accessibility',
+    accessibility_trusted: accessibilityTrusted,
+    applications: applications,
+    errors: errors,
+  });
+}
+
+run();

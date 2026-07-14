@@ -10,6 +10,15 @@
 - 接收飞书事件回调的 URL verification 和 plaintext event
 - 收到飞书直开会议开始事件后自动创建无转写的实时会议时间轴
 - 开放会议会话协议 `POST /api/meeting-session/start`，供桌面观察器、汉王端或人工入口在真实会议开始时建轴
+- 跨平台会议事件入口 `POST /api/platform-events/:platform`，可接 Google Meet / Microsoft Teams / Zoom adapter 归一化后的开始、结束、参会人和会后产物信号；参会人变化与 transcript/recording/smart notes ready 会进入事件轨道并做基础重复过滤，订阅 lifecycle 事件只进入接入诊断状态
+- 跨平台 webhook 安全入口：Zoom URL validation / HMAC 校验、Microsoft Graph validationToken / clientState 校验、Google Pub/Sub OIDC JWT / bearer gate
+- 跨平台 setup 诊断入口 `GET /api/platform-events/setup`，返回 Google Meet / Microsoft Teams / Zoom 所需事件、权限、回调地址、readiness 检查、订阅维护建议、平台能力契约和可选订阅 request body
+- SDK rollout planner，可把 Google Meet / Teams / Zoom / Webex / Lark 的 provider 事件 gate 与本地 DOM gate 合成 `production_ready` / `realtime_ready_provider_pending` / `needs_live_dom_and_provider_evidence` 等接入状态
+- SDK live adapter，可把本地会议 App 观察、provider webhook 回填和实时标注插入封成同一个跨平台入口
+- SDK live evidence session，可在真实会议进行中持续收集本地 DOM / provider 样本，实时判断能否把当前标注落到会议轴，并在采样完成后导出 handoff 包
+- SDK evidence package，可把单场真实会议的 provider webhook 记录、本地 DOM 记录、rollout plan 和 handoff 摘要封成可复验交接包
+- SDK runtime host replay，可把现场采集的会议 App 快照或 evidence package 回放到 runtime host，验收 start / speaker / end 是否能按真实时间戳写入时间轴
+- SDK provider replay，可把 Google Meet / Teams / Zoom / Webex / Lark 的 provider 原始事件样本跑过统一 normalizer 和 runtime event contract，验证 start/end/participant/artifact 覆盖，同时保持 provider 事件不阻塞实时标注
 - 本地手动开始/结束实时会议，用作没有公网 webhook 时的 fallback
 - 会中实时写入外部标注事件，并通过 SSE 自动刷新页面
 - 开放标注接口 `POST /api/annotations`，供后续墨水屏/手写设备接入
@@ -17,6 +26,209 @@
 - 手动导入飞书转写 JSON
 - 手动导入任意数据序列 JSON
 - 在浏览器中可视化 transcript、meeting events、external sequence 的对齐结果
+
+Google Meet、Microsoft Teams、Zoom 不再要求 SDK 使用方自行实现 adapter。生成可安装的 Chrome/Edge 扩展与 Teams/Zoom desktop host：
+
+```bash
+npm run meeting-platform:adapters:release -- --offline=true
+```
+
+产物位于 `data/three-platform-adapters/`；安装后只需配置时间轴服务地址。架构和官方事件校准说明见 [多会议平台时间轴适配方案](docs/meeting-platform-adapters.md)。[会议软件适配快照](docs/meeting-platform-multi-software-adaptation.md) 是历史设计记录，不是当前接入任务清单。
+SDK 包的设备无关发布标准见：[会议时间轴 SDK 发布验收单](docs/meeting-timeline-sdk-release-acceptance.md)。
+五个平台可直接照做的现场通过标准见：[多会议平台 P0 现场验收单](docs/meeting-platform-p0-field-acceptance.md)。
+最新执行进度与未完成项对齐见：[会议时间轴 SDK 进度快照（2026-07-09）](docs/meeting-platform-progress-checkpoint-2026-07-09.md)。
+
+交付 SDK 前执行：
+
+```bash
+npm run sdk:release-acceptance
+```
+
+该门禁不连接电子纸或 Android 设备；它通过标准标注生产者验证包导入、稳定 ID 重试、五平台统一协议、时间轴位置和跨会议隔离。真实会议网页兼容性由后面的现场验收单单独判断。
+
+Google Meet、Microsoft Teams、Zoom 的真实会议验收使用自动验收器；它会构建扩展、启动隔离浏览器、自动插入标注并验证会议开始、发言人、标注和会议结束：
+
+```bash
+npm run meeting-platform:live-acceptance -- --platform=google-meet
+npm run meeting-platform:live-acceptance -- --platform=teams
+npm run meeting-platform:live-acceptance -- --platform=zoom
+npm run meeting-platform:live-acceptance:verify
+```
+
+测试人员只负责在启动的浏览器中登录、加入/创建会议、发言至少两秒并离会，不需要实现或手动调用 adapter。旧的手工 DOM 采样流程仅保留给 Webex、Lark 或新增自定义平台调试：
+
+```bash
+npm run meeting-app:extension
+cd data/meeting-app-extension
+npm install
+npm run build
+```
+
+也可以直接跑完整构建验收：
+
+```bash
+npm run meeting-app:extension:build
+```
+
+然后在 `chrome://extensions` 或 `edge://extensions` 打开开发者模式，选择 `data/meeting-app-extension` 作为 unpacked extension。自定义平台调试时可在 DevTools 里调用 `window.__meetingTimelineLiveCapture.captureActive()`、`captureEnded()`、`evidencePackage()` 或 `diagnose()`。
+
+把 `window.__meetingTimelineLiveCapture.exportRecords()` 或 `evidencePackage()` 的返回值保存成 JSON 后，用 evidence gate 校验是否真的满足生产接入：
+
+```bash
+npm run meeting-app:evidence-gate -- --input=data/meeting-app-live-evidence.json --report-file=data/meeting-app-live-gate-report.json
+```
+
+这个 gate 默认不允许 fixture 兜底，并要求 `production_ready=true`；如果缺 active speaker、meeting ended 或平台识别，会在报告里给出 `missing_required_coverage` 和 `next_actions`。
+
+多平台推进时，把各平台的采样 JSON 放进 `data/meeting-app-evidence/`，再生成矩阵报告：
+
+```bash
+npm run meeting-app:evidence-matrix
+```
+
+矩阵会写出 `data/meeting-app-evidence-matrix.json`，汇总 Google Meet、Teams、Zoom、Webex、Lark 的 `production_ready` 状态和缺口，便于逐个平台收敛真实 DOM 适配。
+
+没有真实 DOM 样本前，可以先跑 fixture 级轨道连通性检查：
+
+```bash
+npm run meeting-app:fixture-tracks
+```
+
+它会写出 `data/meeting-app-fixture-track-readiness.json`，验证 Google Meet、Teams、Zoom、Webex、Lark 的 fixture 快照是否能驱动 `speaker_track` 和 `participant_track`。这只能证明 SDK wiring 和轨道格式，不替代真实会议页采样。
+
+交给外部宿主项目实现浏览器扩展、WebView 或桌面 Accessibility 采集器前，可以先导出会议 App 适配清单：
+
+```bash
+npm run meeting-app:adapter-manifest
+```
+
+它会写出 `data/meeting-app-adapter-manifests/` 和 `data/meeting-app-adapter-manifest-report.json`，把 Google Meet、Teams、Zoom、Webex、Lark 的 URL match、扩展权限、content script、MutationObserver 参数、DOM/AX selector、`observe_candidates` 消息契约、`captured_at_ms` 时间戳字段和 live snapshot 前置要求整理成机器可读交付物。这个清单只证明静态 SDK contract 和采集边界，真实上线前仍要用现场 DOM/evidence gate 验证。
+
+如果要为暂未内置的会议软件准备接入规范，可以导出 adapter spec：
+
+```bash
+npm run meeting-app:adapter-spec
+```
+
+它会写出 `data/meeting-app-adapter-specs/` 和 `data/meeting-app-adapter-spec-report.json`。也可以传 `-- --spec-file=whereby.json` 或 `-- --template-adapter-key=slack-huddle --template-file=data/slack-huddle-spec-template.json`，先把新平台的 URL match、权限、selector、MutationObserver 和非阻塞规则固化成可验收 contract。
+
+如果接入方已经有 adapter spec，可以进一步导出可运行配置：
+
+```bash
+npm run meeting-app:adapter-runtime-config
+```
+
+它会写出 `data/meeting-app-adapter-runtime-configs/` 和 `data/meeting-app-adapter-runtime-config-report.json`。也支持传 `-- --spec-file=data/whereby-spec.json`，输出 `content_script_options`、`browser_runtime_options`、`capture_options`、扩展 manifest 片段和 `captured_at_ms` 非阻塞契约，供浏览器扩展、WebView preload 或 Electron content script 直接消费。
+
+如果要把适配工作交给另一个项目或另一个同事，可以直接导出完整 handoff package：
+
+```bash
+npm run meeting-app:adapter-handoff-package
+```
+
+它会写出 `data/meeting-app-adapter-handoff-packages/` 和 `data/meeting-app-adapter-handoff-package-report.json`。每个平台目录里包含 `adapter-spec.json`、`runtime-config.json`、`extension-manifest-fragment.json`、`verification-plan.json`、`integration-readme.md`，内置平台还会包含 `adapter-manifest.json`；这就是给 Google Meet、Teams、Zoom、Webex、Lark 或自定义会议软件宿主项目的最小接入包。`verification-plan.json` 明确列出真实 DOM snapshot、candidate observation、speaker/participant track 和当前轴标注插入这些上线前必须补齐的证据。
+
+宿主项目补齐真实证据后，可以把 evidence JSON 放到 `data/meeting-app-adapter-evidence/`，再跑：
+
+```bash
+npm run meeting-app:adapter-verify
+```
+
+它会写出 `data/meeting-app-adapter-verification-report.json`，按每个平台的 `verification-plan.json` 检查静态契约、真实 DOM snapshot、candidate observation、speaker/participant track 和当前轴标注插入是否齐全。这个报告比 handoff package 更接近“是否可以把某个会议软件打开给用户试用”的判断。
+
+如果要给外部项目做多会议软件接入决策，可以生成 capability 矩阵：
+
+```bash
+npm run meeting-app:adapter-capability
+```
+
+它会写出 `data/meeting-app-adapter-capability-report.json`，把 Google Meet、Teams、Zoom、Webex、Lark 的官方 provider 事件、本地/浏览器 observation、speaker/participant 轨道、会后 transcript backfill 和 live evidence 状态合成 `recommended_mode`、`pilot_ready`、`production_ready`。报告里还包含 `execution_plan_matrix`，把每个平台拆成 `capture_meeting_app_snapshot`、`start_or_reconcile_meeting_axis`、`insert_annotation_on_current_axis`、`emit_speaker_position_markers`、`configure_provider_reconcile` 等步骤，用来回答“外部项目下一步具体要实现哪条 runtime path”。
+
+给宿主项目真正接入时，SDK 还提供 `buildMeetingAppAdapterIntegrationPackage()` / `buildMeetingAppAdapterIntegrationPackageMatrix()` 和 `kit.meetingAppAdapterIntegrationPackage()` / `kit.meetingAppAdapterIntegrationPackageMatrix()`。这一层把 handoff package、capability report、execution plan、runtime delivery、SDK entrypoints、验收命令和 evidence contract 合成单个平台或多平台接入包，适合直接交给 Google Meet、Teams、Zoom、Webex、Lark 的宿主工程消费；配套的 `assertMeetingAppAdapterIntegrationPackage()` / `assertMeetingAppAdapterIntegrationPackageMatrix()` 默认检查 pilot 接入，传 `target: 'production'` 才会要求真实会议证据齐全，因此不会把静态可接入误判为正式可上线。
+
+SDK 主入口 `@ai-annotation/meeting-timeline-sdk` 已直接导出 `createMeetingAppTimelineSdk()`、`createMeetingPlatformTimelineKit()`、`buildMeetingAppAdapterIntegrationPackageMatrix()`、`detectMeetingPlatformForBrowser()` 和 runtime event helpers；宿主项目可以先用 `createMeetingAppTimelineSdk()` 一次拿到 client、kit、本地 integration runtime、runtime event client、package matrix、adapter profile、observer plan、runtime handoff、host package 和 connector package 能力，只有做更细粒度 bundle 时再使用 `adapters/*` subpath。
+
+```bash
+npm run meeting-app:adapter-integration-package
+```
+
+它会写出 `data/meeting-app-adapter-integration-packages/` 和 `data/meeting-app-adapter-integration-package-report.json`。每个平台目录都会带 `runtime-delivery.json` 和 `integration-package.json`，下游宿主工程可以直接读取 adapter route、content-script bridge、runtime event endpoint、host endpoints 和 `captured_at_ms` 契约。
+
+同一个命令也随 SDK 包发布为 `meeting-app-adapter-integration-package`，宿主项目安装 `@ai-annotation/meeting-timeline-sdk` 后可以直接从 `node_modules/.bin` 或 `npx` 生成接入包，不需要复制本仓库的 `scripts/`。
+
+如果外部项目需要更完整的“一次性交付包”，可以直接导出 connector package：
+
+```bash
+npm run meeting-app:connector-package
+```
+
+它会写出 `data/meeting-app-connector-package/` 和 `data/meeting-app-connector-package-report.json`，把 host package、handoff matrix、observer plan、scheduler config、runtime event plan、adapter blueprint matrix、startup plan matrix、connector handoff、connector bridge handoff、host install checklist、connector smoke plan、provider replay matrix 和浏览器扩展 scaffold 合在一起。目录内的 `connector-quickstart.md` 是给下游工程的第一入口，说明先看哪些 JSON、各平台默认启动面、runtime event 示例和 `captured_at_ms` 硬契约；`connector-release-gate.json` 是聚合准入判断，会把 package acceptance、host checklist、adoption index、field intake、bridge handoff、bridge smoke、smoke run 和 host bootstrap acceptance 合成试点/生产 gate；`connector-adapter-matrix.json` 是给宿主工程真正装配 runtime 的逐平台表，会列出 Google Meet/Teams/Zoom/Webex/Lark 的 selected surface、install step、input sources、`observe_platform_candidates -> insert_annotation` 顺序、SDK 方法、provider replay 状态和 evidence contract；`host-adapter-config-index.json` 和 `host-adapter-configs/{platform}.json` 是更轻的宿主侧读取入口，会把单个平台需要的 selected surface、runtime endpoint、`captured_at_ms` 契约、bridge contract、SDK facade 和 provider replay 状态压成一份可直接加载的配置；`host-adapter-bootstrap-plan-matrix.json` 会把这些配置继续压成逐平台启动计划，明确 URL/window 识别、加载 host config、安装 adapter、observe candidates 和 insert annotation 的顺序，`host-adapter-bootstrap-plan-matrix-acceptance.json` 则可作为下游宿主接入前的独立 CI gate；`connector-platform-roadmap.json` 会按 Google Meet/Teams/Zoom/Webex/Lark 给出推荐接入顺序、first surface、install target、release 状态和下一步；`connector-adoption-index.json` 是给接入面板或项目负责人看的平台索引，会列出 P0 轴来源、安装目标、实时标注状态、bridge 状态和生产前 evidence 缺口；`connector-field-intake-index.json` 会继续把这些缺口翻译成现场采集路径：要采哪些 active/end 快照、哪些 provider start/end 事件、样本文件写到哪里、跑哪条命令生成 evidence package 和 real-intake gate；`provider-replay-matrix.json` 会把各平台 provider 原始事件样本跑过统一 runtime contract，证明 provider 事件只做非阻塞回填；`connector-bridge-handoff.json` 会把轻量 connector hub、content-script/WebView bridge、消息类型和 host endpoint 要求整理成单独文件，`connector-bridge-handoff-acceptance.json` 可作为 bridge 接入的独立 gate；`connector-bridge-smoke-report.json` 会 dry-run `meeting_timeline.observe_candidates`、`meeting_timeline.insert_mark`、track sample 和 preflight 消息，证明 bridge 能按顺序转成 `observe_platform_candidates` 与 `insert_annotation` runtime event；`host-install-checklist.json` 则是给 CI 或接入面板直接消费的逐平台安装清单，`host-install-checklist-acceptance.json` 可直接作为这份清单的独立 gate；`connector-smoke-plan.json` 给出每个平台的最小冒烟顺序：observe candidates、insert annotation，再补 speaker/participant 位置标记，`connector-smoke-plan-acceptance.json` 则验证这条顺序是否能作为接入 smoke gate；`connector-smoke-run-report.json` 是 SDK runtime client 的 dry-run 执行报告，证明这份顺序能映射到实际客户端方法。这个入口也随 SDK 包发布为 `meeting-app-connector-package`，适合下游项目直接生成 Google Meet、Teams、Zoom、Webex、Lark 的浏览器扩展或 native detector 接入材料。
+
+下游接入方可以再用 SDK 子模块 `@ai-annotation/meeting-timeline-sdk/adapters/meeting-app-connector-package` 对这份包做 CI 验收，检查实时标注必须依赖的 `captured_at_ms`、本地 observer、runtime event endpoint、speaker/participant 轨道和 browser extension scaffold 是否齐全；同一子模块也能从 connector package 创建 runtime event client，让 Google Meet content script、Teams WebView preload、Zoom/Webex native helper 或 Lark 长连接代理直接发送 `observe_meeting_app`、`insert_annotation`、`speaker_track` 等统一事件。宿主项目需要单个平台配置时，可以直接调用 `sdk.connectorHostAdapterConfig('google-meet')` 或 `buildMeetingAppTimelineHostAdapterConfig(connectorPackage, 'google-meet')`，拿到与 `host-adapter-configs/{platform}.json` 等价的运行时配置，并用 `assertMeetingAppTimelineHostAdapterConfig()` 做 CI gate；如果宿主项目只有当前 URL、tab 或 window 候选，则调用 `sdk.resolveConnectorHostAdapterConfig({ tabs }, connectorPackage)`，SDK 会先识别 Google Meet / Teams / Zoom / Webex / Lark，再绑定对应 host config；如果要直接启动宿主接入流程，则调用 `sdk.connectorHostAdapterBootstrapPlan({ tabs }, connectorPackage)`，得到 resolve、load config、install adapter、observe candidates、insert annotation 的有序计划；如果要一次性检查 Google Meet / Teams / Zoom / Webex / Lark 的宿主启动契约，则调用 `sdk.connectorHostAdapterBootstrapPlanMatrix(connectorPackage)`，得到逐平台 bootstrap plan、安装目标和 CI gate 结果。如果宿主项目只接单个平台，可以用更轻的 `@ai-annotation/meeting-timeline-sdk/adapters/meeting-platform-connector`：`buildMeetingPlatformConnector('google-meet')` 生成平台级接入契约，`createMeetingPlatformConnectorRuntime()` 固定平台名后直接暴露 `insertAnnotation()`、`observeMeetingApp()`、`observePlatformCandidates()` 和 `normalizeProviderEvent()`；如果宿主项目要同时适配 Google Meet / Teams / Zoom / Webex / Lark，则用 `createMeetingPlatformConnectorHub()` 从当前 URL、tab 或窗口候选里自动识别平台并路由标注，或用 `installMeetingPlatformConnectorContentScriptBridge()` 在 content script/WebView preload 里直接接收 `meeting_timeline.*` 消息并写入统一时间轴。
+
+如果同时采到了官方 provider 事件样本，把样本 JSON 放进 `data/provider-evidence/`，再生成跨平台 rollout 矩阵：
+
+```bash
+npm run meeting-platform:provider-replay
+npm run meeting-platform:rollout-matrix
+```
+
+第一条命令会写出 `data/meeting-platform-provider-replay-report.json`，把 Google Meet / Teams / Zoom / Webex / Lark 的 provider 原始事件或 SDK 内置样本跑过统一 normalizer 和 runtime event contract，检查 start/end/participant/artifact 覆盖，并确认 provider 事件不阻塞实时标注。第二条命令会写出 `data/meeting-platform-rollout-matrix.json`，把 provider start/end 事件证据、本地 DOM 证据，以及 `data/meeting-platform-evidence-packages/` 里的 SDK handoff 包合成 `production_ready` / `realtime_ready_provider_pending` / `needs_live_dom_and_provider_evidence` 等状态，用来判断某个平台是否能先进入真实 pilot。
+
+如果别的项目已经交付了 SDK `platform-evidence-package`，把 JSON 放进 `data/meeting-platform-evidence-packages/` 后直接复验：
+
+```bash
+npm run meeting-platform:live-readiness
+```
+
+它会写出 `data/meeting-platform-live-readiness-report.json`，把每个平台的 live adapter 方法、`captured_at_ms` 时间戳约束、provider/transcript 非阻塞策略和 evidence package 复验合成一个 CI/配置页可直接消费的 readiness matrix。默认按 production 验收；只看 pilot 能否实时落标注时用 `-- --require-production-ready=false`。
+
+如果你只想看“哪些平台今天能上一个统一接入页”，先跑 crosswalk 快速对比命令：
+
+```bash
+npm run meeting-platform:adapter-crosswalk -- --base-url=http://localhost:8787 --platforms=google-meet,teams,zoom,webex,lark
+```
+
+它会输出每个平台的：
+
+- `compatibility_score`：sdk 接线、实时标注、候选观察、provider 可回填能力的加权评分；
+- `readiness`：按阈值映射为 `ready_for_rollout / ready_for_pilot / pre_pilot / bootstrap_required`；
+- `provider_path`：provider 事件主路径（例如 Google Meet 的 `google_workspace_events_pubsub`）；
+- `first_next_action`：下个最小采样动作（如“先补本地活体快照”或“补 provider start/end 回填样本”）。
+
+加 `--json=true` 可拿到结构化 JSON，默认会直接打印文本版便于人工巡检。
+
+```bash
+npm run meeting-platform:evidence-package
+```
+
+它会写出 `data/meeting-platform-evidence-package-report.json`，重新计算包里的 rollout plan，而不是信任包内旧结论。默认要求 `production_ready`；只验收“可实时落标注、provider 可后补”的 pilot 状态时用 `-- --require-production-ready=false`。
+
+如果要验证采到的现场快照是否真的能驱动 SDK runtime host 写入实时会议轴，用 replay gate：
+
+```bash
+npm run meeting-platform:runtime-host-replay -- --input=data/meeting-platform-evidence-packages/google-meet-live.json --platforms=google-meet --include-reports=true
+```
+
+它会从 `meeting_app_record_set`、`meeting_app_snapshot_records`、`snapshots/items/records` 或 evidence package 里抽取会中与结束快照，按 `captured_at_ms/observedAtMs` 回放到 `createMeetingPlatformRuntimeHost()`，并检查 `startMeeting`、发言人 `insertMark`、`endMeeting` 是否真实写出且时间戳对齐。默认脚本会扫描 `data/meeting-platform-evidence-packages/` 并写出 `data/meeting-platform-runtime-host-replay-report.json`；没有结束态快照时会失败，不用 fixture 兜底。
+
+交给其他项目接入前，最后跑 handoff readiness。这个入口现在会内置 runtime host replay gate，确认 evidence package 不只是字段完整，而是真的能驱动 SDK 写会议开始、发言人标记和会议结束：
+
+```bash
+npm run meeting-platform:handoff-readiness
+```
+
+报告里的 `runtime_host_replay_ready_count` 必须等于 `platform_count`，每行的 `runtime_host_replay_accepted=true` 才代表该平台可以作为可复用 SDK 接入单元交付。
+
+如果接入方直接使用 `platform-integration-runtime`，等价的 SDK 总入口是 `runMeetingPlatformIntegrationRuntimeManifest({ requireHandoffReady: true, ...evidenceByPlatform })` 或 runtime 实例的 `runManifest()`。如果接入方用 `platform-host-integration` 生成 host scaffold，则使用生成出的 `host.runIntegrationRuntimeManifest()`、`host.runHandoffReadiness()`、`npm run meeting-platform:integration-runtime-run-manifest` 和 `npm run meeting-platform:handoff-readiness`。这些入口会把静态 runtime wiring、adapter route、speaker/participant 位置轨、handoff readiness 和 runtime replay 合成一个 `host_integration_ready` 结论。`platform-consumer-handoff` 现在也会输出 `lightweight_connector_handoff`，把 `createMeetingPlatformConnectorHub()`、`createMeetingPlatformConnectorBrowserRuntime()` 和 `installMeetingPlatformConnectorContentScriptBridge()` 作为轻量接入路径列给下游项目；只需要 content script/WebView preload 发 `meeting_timeline.*` 消息时，不必先接完整 integration runtime。
+
+SDK 包级交付前再跑一次 package smoke：
+
+```bash
+npm run sdk:package-smoke
+```
+
+它会对 `packages/meeting-timeline-sdk` 执行 `npm pack`，并在临时 consumer 项目里按包名导入 core、`platform-kit`、`platform-rollout`、`platform-strategy`、`platform-adaptation-package`、`platform-runtime-bundle`、`meeting-platform-runtime-host-verifier`、`platform-evidence-correlation`、`platform-evidence-session`、`platform-live-adapter` 的 suite/readiness、Google Meet adapter、meeting app gate、`meeting-app-adapter-manifest`、`meeting-app-adapter-spec`、`meeting-app-adapter-runtime-config`、`meeting-app-adapter-handoff-package`、`meeting-app-adapter-capability`、`meeting-app-adapter-integration-package`、`meeting-app-track-pipeline` 和 `meeting-app-track-runtime`，确认外部项目不是依赖仓库内部相对路径。
 
 ## 启动
 
@@ -29,9 +241,23 @@ npm run start
 
 `npm run start` 会设置 `REAL_DEMO_AUTO_ARM=1`：服务启动后自动进入真实等待状态，并启用当前用户会议扫描兜底；租户级泛扫描默认关闭，避免误绑定同租户其他人的会议。扫描兜底默认 2 秒一次，用来覆盖飞书会议开始事件偶发迟到的情况。默认不会自动写入验收标注、虚拟墨水屏标注或设备流标注，确保每场真实会议的标注序列只来自本场真实设备/接口输入。需要关闭这个默认行为做底层调试时，用：
 
+启动服务和进入真实等待状态都不会自动打开飞书页面。实时建轴可以直接等待飞书事件；只有需要妙记或当前账号会议扫描兜底时，才由用户主动点击页面中的“登录飞书账号（妙记）”或“授权会议扫描兜底”，也可以显式运行 `npm run auth:open`。
+
 ```bash
 npm run start:plain
 ```
+
+跨平台 webhook 真实接入时可按需配置：
+
+```bash
+ZOOM_WEBHOOK_SECRET_TOKEN=...
+MICROSOFT_GRAPH_CLIENT_STATE=...
+GOOGLE_PUBSUB_BEARER_TOKEN=...
+GOOGLE_PUBSUB_OIDC_AUDIENCE=...
+GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL=...
+```
+
+未配置时对应平台校验会在本地开发中跳过；配置后失败的 Zoom 签名、Teams clientState、Google Pub/Sub OIDC JWT 或 Google bearer 会被 `POST /api/platform-events/:platform` 拒绝，并写入 `/api/platform-events/status` 的 `last_verification`。生产接 Google Pub/Sub push 时优先配置 OIDC audience 和 service account email；`GOOGLE_PUBSUB_BEARER_TOKEN` 只建议作为本地或网关前置鉴权的轻量兜底。
 
 面向产品目标的一键演示命令是：
 
@@ -39,7 +265,15 @@ npm run start:plain
 npm run demo:live
 ```
 
-它会进入真实等待态、打开飞书授权页、等待 `vc:meeting.search:read` callback、触发当前用户会议扫描兜底、等待真实会议轴出现，并通过开放标注接口写入验收标注。命令结束会写出 `data/live-demo-report.json`；这个命令对应“用户直接开启飞书会议后，时间轴实时出现标注，文字转写会后处理”的主验收链路。
+它会进入真实等待态、等待真实会议轴出现，并通过开放标注接口写入验收标注，但不会自动打开任何飞书页面。命令结束会写出 `data/live-demo-report.json`；这个命令对应“用户直接开启飞书会议后，时间轴实时出现标注，文字转写会后处理”的主验收链路。
+
+需要同时重新授权 `vc:meeting.search:read` 并启用当前用户会议扫描兜底时，显式运行：
+
+```bash
+npm run demo:live:auth
+```
+
+只有这个带 `:auth` 的命令才会打开飞书 OAuth 页面并等待 callback。
 
 开会验收时可以另开一个终端观察真实证据流：
 
@@ -473,7 +707,7 @@ POST /api/lark/sync-minute
 GET /api/transcript-status
 ```
 
-它会返回 `status`、`segment_count`、`meeting_ended`、`minute_token_present`、`next_action` 等字段。会议中没有转写是正常状态，`realtime_blocking=false`；实时标注会先进入时间轴，会议结束后再通过 `POST /api/lark/sync-minute` 或 `POST /api/import/lark-transcript` 补齐转写。
+它会返回 `status`、`segment_count`、`meeting_ended`、`minute_token_present`、`next_action` 等字段。会议中没有转写是正常状态，`realtime_blocking=false`；实时标注会先进入时间轴，会议结束后再通过 `POST /api/lark/sync-minute` 或平台中性的 `POST /api/import/transcript` 补齐转写。`POST /api/import/lark-transcript` 仍作为旧兼容入口保留。
 
 服务会请求：
 

@@ -320,6 +320,7 @@ export function normalizeTranscript(rawTranscript, meeting = {}) {
     const start_ms = parseRelativeOrAbsoluteMs(startValue, meetingStartMs) ?? 0;
     const end_ms = parseRelativeOrAbsoluteMs(endValue, meetingStartMs) ?? Math.max(start_ms + 1, start_ms + 12_000);
     const speaker = speakerOf(item);
+    const source = String(firstDefined(item.source, meeting.platform ? `${meeting.platform}_transcript` : null, 'transcript_import'));
     return {
       id: String(firstDefined(item.id, item.segment_id, item.sentence_id, `seg-${index + 1}`)),
       start_ms,
@@ -328,7 +329,7 @@ export function normalizeTranscript(rawTranscript, meeting = {}) {
       speaker_name: speaker.speaker_name,
       text: textOf(item),
       language: firstDefined(item.language, item.language_code, item.languageCode, null),
-      source: 'lark_minute',
+      source,
       raw: item,
     };
   }).filter((seg) => seg.text).sort((a, b) => a.start_ms - b.start_ms || a.end_ms - b.end_ms);
@@ -405,7 +406,7 @@ export function normalizeLarkEventPayload(payload, meeting = {}) {
   const explicitOffset = parseOffsetMs(firstDefined(event?.time_ms, event?.offset_ms, event?.relative_time_ms));
   const time_ms = explicitOffset ?? (absolute != null && meetingStartMs != null ? Math.max(0, absolute - meetingStartMs) : 0);
   return {
-    id: String(firstDefined(header.event_id, payload?.uuid, event?.id, `evt-${type}-${time_ms}`)),
+    id: String(firstDefined(header.event_id, payload?.event_id, payload?.uuid, event?.event_id, event?.id, `evt-${type}-${time_ms}`)),
     time_ms,
     type,
     label: labelForEvent(type),
@@ -680,7 +681,7 @@ export function alignSequence(timeline, options = {}) {
 
 export function buildTimeline({ meeting = {}, segments = [], events = [], sequence = [] } = {}) {
   const normalizedMeeting = {
-    platform: 'lark',
+    platform: meeting.platform ?? 'lark',
     meeting_id: meeting.meeting_id ?? meeting.id ?? 'unknown-meeting',
     external_meeting_id: meeting.external_meeting_id ?? meeting.lark_meeting_id ?? null,
     meeting_url: meeting.meeting_url ?? meeting.url ?? null,
@@ -708,15 +709,23 @@ export function buildTimeline({ meeting = {}, segments = [], events = [], sequen
     alignments: [],
     updated_at: new Date().toISOString(),
   };
-  const maxEnd = Math.max(
+  const liveMaxEnd = Math.max(
     10 * MINUTE,
     ...timeline.segments.map((x) => x.end_ms),
     ...timeline.events.map((x) => x.time_ms + 30_000),
     ...timeline.sequence.map((x) => x.time_ms + 30_000),
   );
+  const endedMaxEnd = Math.max(
+    1,
+    ...timeline.segments.map((x) => x.end_ms),
+    ...timeline.events.map((x) => x.time_ms),
+    ...timeline.sequence.map((x) => x.time_ms + 30_000),
+  );
   const explicitEnd = parseAbsoluteMs(normalizedMeeting.end_time);
   const start = parseAbsoluteMs(normalizedMeeting.start_time);
-  timeline.duration_ms = explicitEnd != null && start != null ? Math.max(maxEnd, explicitEnd - start) : maxEnd;
+  timeline.duration_ms = explicitEnd != null && start != null
+    ? Math.max(endedMaxEnd, explicitEnd - start)
+    : liveMaxEnd;
   timeline.alignments = alignSequence(timeline);
   return timeline;
 }

@@ -98,10 +98,11 @@ try {
   assert.equal(endedStatus.meeting_ended, true);
   assert.equal(endedStatus.sync_endpoint, '/api/lark/sync-minute');
 
-  await postJson(baseUrl, '/api/import/lark-transcript', {
+  await postJson(baseUrl, '/api/import/transcript', {
     meeting: {
+      platform: 'google_meet',
       meeting_id: 'transcript-status-live',
-      start_time: '2026-06-26T03:00:00.000Z',
+      start_time_ms: Date.parse('2026-06-26T03:00:00.000Z'),
       minute_token: 'minute-status-token',
     },
     transcript: [{
@@ -110,12 +111,16 @@ try {
       end_ms: 4000,
       speaker_name: 'Tester',
       text: '会后导入的转写',
+      source: 'google_meet_transcript',
     }],
   });
   const syncedStatus = await getJson(baseUrl, '/api/transcript-status');
   assert.equal(syncedStatus.status, 'synced');
   assert.equal(syncedStatus.has_transcript, true);
   assert.equal(syncedStatus.segment_count, 1);
+  const importedState = await getJson(baseUrl, '/api/state');
+  assert.equal(importedState.meeting.platform, 'google_meet');
+  assert.equal(importedState.segments[0].source, 'google_meet_transcript');
 
   const readiness = await getJson(baseUrl, '/api/readiness');
   assert.equal(readiness.current.transcript_status.status, 'synced');

@@ -33,7 +33,18 @@
         <div class="timeline-panel">
           <div class="panel-title">
             <h2>统一时间轴</h2>
-            <span id="durationLabel"></span>
+            <div class="timeline-title-tools">
+              <span id="durationLabel"></span>
+              <div class="timeline-zoom-controls" aria-label="时间轴缩放">
+                <button id="timelineZoomOutBtn" type="button" title="缩小时间轴">−</button>
+                <button id="timelineFitBtn" type="button" title="显示完整时间轴">Fit</button>
+                <button id="timelineZoomInBtn" type="button" title="放大时间轴">+</button>
+              </div>
+            </div>
+          </div>
+          <div class="timeline-window-controls">
+            <span id="timelineWindowLabel">窗口 00:00-00:00</span>
+            <input id="timelinePanInput" type="range" min="0" max="0" step="1000" value="0" aria-label="移动时间轴窗口" />
           </div>
           <div id="timeline" class="timeline"></div>
         </div>

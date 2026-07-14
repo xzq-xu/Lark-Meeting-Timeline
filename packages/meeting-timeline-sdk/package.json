@@ -1,0 +1,60 @@
+{
+  "name": "@ai-annotation/meeting-timeline-sdk",
+  "version": "0.1.0",
+  "description": "Reusable client SDK for inserting human annotations into a meeting timeline.",
+  "type": "module",
+  "main": "./index.mjs",
+  "types": "./index.d.ts",
+  "bin": {
+    "meeting-app-adapter-integration-package": "./bin/meeting-app-adapter-integration-package.mjs",
+    "meeting-app-connector-package": "./bin/meeting-app-connector-package.mjs",
+    "meeting-platform-consumer-handoff": "./bin/meeting-platform-consumer-handoff.mjs",
+    "meeting-platform-adapter-blueprint": "./bin/meeting-platform-adapter-blueprint.mjs",
+    "meeting-platform-adapter-decision": "./bin/meeting-platform-adapter-decision.mjs",
+    "meeting-platform-raw-signal": "./bin/meeting-platform-raw-signal.mjs",
+    "meeting-platform-adapter-selection": "./bin/meeting-platform-adapter-selection.mjs",
+    "meeting-platform-adapter-export-package": "./bin/meeting-platform-adapter-export-package.mjs",
+    "meeting-platform-adapter-import-plan": "./bin/meeting-platform-adapter-import-plan.mjs",
+    "meeting-platform-adapter-install-manifest": "./bin/meeting-platform-adapter-install-manifest.mjs",
+    "meeting-platform-adapter-launch-plan": "./bin/meeting-platform-adapter-launch-plan.mjs",
+    "meeting-platform-adapter-portfolio": "./bin/meeting-platform-adapter-portfolio.mjs",
+    "meeting-platform-adapter-preflight": "./bin/meeting-platform-adapter-preflight.mjs",
+    "meeting-platform-adapter-smoke": "./bin/meeting-platform-adapter-smoke.mjs",
+    "meeting-platform-adapter-startup": "./bin/meeting-platform-adapter-startup.mjs",
+    "meeting-timeline-desktop-adapter": "./bin/meeting-timeline-desktop-adapter.mjs",
+    "meeting-platform-adapter-runtime-recipe": "./bin/meeting-platform-adapter-runtime-recipe.mjs",
+    "meeting-platform-adapter-runtime-manifest": "./bin/meeting-platform-adapter-runtime-manifest.mjs",
+    "meeting-platform-adapter-runtime-target": "./bin/meeting-platform-adapter-runtime-target.mjs",
+    "meeting-platform-host-integration": "./bin/meeting-platform-host-integration.mjs",
+    "meeting-platform-provider-replay": "./bin/meeting-platform-provider-replay.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.mjs"
+    },
+    "./producer": {
+      "types": "./producer.d.ts",
+      "import": "./producer.mjs"
+    },
+    "./adapters/*": {
+      "types": "./adapters/*.d.ts",
+      "import": "./adapters/*.mjs"
+    }
+  },
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "index.mjs",
+    "index.d.ts",
+    "producer.mjs",
+    "producer.d.ts",
+    "errors.mjs",
+    "bin",
+    "cli",
+    "adapters",
+    "README.md"
+  ]
+}

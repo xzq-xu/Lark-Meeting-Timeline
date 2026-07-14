@@ -1,0 +1,120 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import {
+  buildThreePlatformLiveAcceptanceReport,
+  evaluateThreePlatformLiveEvidence,
+} from '../scripts/three-platform-live-acceptance-core.mjs';
+import { verifyThreePlatformLiveAcceptance } from '../scripts/verify-three-platform-live-acceptance.mjs';
+
+const startMs = 1_784_100_000_000;
+
+function liveEvidence(platform, meetingId = `${platform}-real-1`) {
+  return {
+    schema: 'meeting_platform_field_evidence_input',
+    schema_version: 1,
+    platform,
+    meeting_id: meetingId,
+    run_id: `${platform}:${meetingId}`,
+    meeting: {
+      platform,
+      meeting_id: meetingId,
+      start_time: new Date(startMs).toISOString(),
+      end_time: new Date(startMs + 20_000).toISOString(),
+      source: 'open_meeting_session',
+    },
+    meetingAppRecords: [
+      {
+        phase: 'active',
+        source: 'meeting_app_extension_auto_evidence',
+        captured_at_ms: startMs,
+        snapshot: {
+          schema: 'meeting_app_dom_capture',
+          source: 'meeting_app_extension_auto_evidence',
+          url: `https://example.test/${meetingId}`,
+          inMeeting: true,
+          interaction: { in_call: true, can_leave: true },
+          semanticSignalTypes: ['meeting_leave_available', 'active_speaker_candidate'],
+        },
+      },
+      {
+        phase: 'ended',
+        source: 'meeting_app_extension_auto_evidence',
+        captured_at_ms: startMs + 20_000,
+        snapshot: {
+          schema: 'meeting_app_dom_capture',
+          source: 'meeting_app_extension_auto_evidence',
+          url: `https://example.test/${meetingId}`,
+          inMeeting: false,
+          interaction: { pre_join: true },
+          semanticSignalTypes: ['meeting_join_available'],
+        },
+      },
+    ],
+    annotations: [{
+      id: `three-platform-live-acceptance-${platform}-${startMs + 5_000}`,
+      source: 'three_platform_live_acceptance',
+      captured_at_ms: startMs + 5_000,
+      visible_latency_ms: 45,
+      timeline_error_ms: 0,
+      visible_instance_count: 1,
+    }],
+    speaker_markers: [{
+      id: `speaker-${platform}`,
+      source: `${platform}_speaker`,
+      kind: 'speaker_started',
+      intent: 'speaker_track',
+      speaker_name: 'Alex Chen',
+      captured_at_ms: startMs + 2_000,
+      visible_latency_ms: 50,
+      timeline_error_ms: 0,
+    }],
+    measurements: {
+      active_observer_to_axis_latency_ms: 20,
+      ended_observer_to_axis_latency_ms: 30,
+      previous_meeting_annotation_count_on_new_axis: 0,
+    },
+  };
+}
+
+const evaluations = ['google_meet', 'microsoft_teams', 'zoom'].map((platform) => (
+  evaluateThreePlatformLiveEvidence(liveEvidence(platform), { platform })
+));
+assert.equal(evaluations.every((row) => row.accepted), true);
+assert.equal(buildThreePlatformLiveAcceptanceReport(evaluations).accepted, true);
+
+const falsePositive = liveEvidence('microsoft_teams', 'teams.microsoft.com-v2');
+falsePositive.meetingAppRecords[0].snapshot = {
+  schema: 'meeting_app_dom_capture',
+  source: 'meeting_app_extension_auto_evidence',
+  url: 'https://teams.microsoft.com/v2/',
+  title: 'Microsoft Teams',
+  interaction: {},
+  semanticSignals: [],
+  semanticSignalTypes: [],
+  page: { controls: [{ label: 'Retry' }, { label: 'Clear cache and retry' }] },
+};
+const rejectedFalsePositive = evaluateThreePlatformLiveEvidence(falsePositive);
+assert.equal(rejectedFalsePositive.accepted, false);
+assert.equal(rejectedFalsePositive.failed_check_ids.includes('real_active_snapshot'), true);
+
+const contaminated = liveEvidence('zoom');
+contaminated.measurements.previous_meeting_annotation_count_on_new_axis = 1;
+const rejectedContamination = evaluateThreePlatformLiveEvidence(contaminated);
+assert.equal(rejectedContamination.accepted, false);
+assert.equal(rejectedContamination.failed_check_ids.includes('cross_meeting_isolation'), true);
+
+const tempDir = await mkdtemp(join(tmpdir(), 'three-platform-live-acceptance-'));
+try {
+  for (const platform of ['google_meet', 'microsoft_teams', 'zoom']) {
+    await writeFile(join(tempDir, `${platform}.json`), `${JSON.stringify(liveEvidence(platform), null, 2)}\n`, 'utf8');
+  }
+  const report = await verifyThreePlatformLiveAcceptance({ inputDir: tempDir });
+  assert.equal(report.accepted, true);
+  assert.equal(report.accepted_platform_count, 3);
+} finally {
+  await rm(tempDir, { recursive: true, force: true });
+}
+
+console.log('ok three platform live acceptance');
