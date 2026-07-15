@@ -146,6 +146,17 @@ const zoomCoreLeave = chooseThreePlatformBrowserAutomationAction({
 });
 assert.equal(zoomCoreLeave.phase, 'leave_meeting');
 
+const teamsChineseLeave = chooseThreePlatformBrowserAutomationAction({
+  platform: 'teams',
+  autoJoin: true,
+  autoLeave: true,
+  activeMeeting: true,
+  completionSeen: true,
+  leaveReady: true,
+  pages: [page('teams-live-cn', 'https://teams.live.com/v2/', [control({ aria: '退出', text: '离开' })])],
+});
+assert.equal(teamsChineseLeave.phase, 'leave_meeting');
+
 const zoomConfirmLeave = chooseThreePlatformBrowserAutomationAction({
   platform: 'zoom',
   autoJoin: true,
@@ -226,6 +237,28 @@ const teamsError = chooseThreePlatformBrowserAutomationAction({
   pages: [page('teams-error', 'https://teams.microsoft.com/v2/', [control({ text: 'Retry' }), control({ text: 'Clear cache and retry' })], 'Microsoft Teams')],
 });
 assert.equal(teamsError, null);
+
+const teamsPersonalMeetingCard = chooseThreePlatformBrowserAutomationAction({
+  platform: 'teams',
+  autoJoin: true,
+  pages: [page('teams-personal-home', 'https://teams.live.com/v2/', [
+    control({ text: '创建会议链接' }),
+    control({ text: '使用会议 ID 加入' }),
+    control({ text: '加入' }),
+  ], '开会 | Microsoft Teams')],
+});
+assert.equal(teamsPersonalMeetingCard.phase, 'open_meeting_card');
+assert.deepEqual(teamsPersonalMeetingCard.selector, { text: '加入' });
+
+const teamsPersonalPreJoin = chooseThreePlatformBrowserAutomationAction({
+  platform: 'teams',
+  autoJoin: true,
+  pages: [page('teams-personal-prejoin', 'https://teams.live.com/v2/', [
+    control({ text: '立即加入' }),
+  ], 'Meeting join | Microsoft Teams')],
+});
+assert.equal(teamsPersonalPreJoin.phase, 'join_meeting');
+assert.deepEqual(teamsPersonalPreJoin.selector, { text: '立即加入' });
 
 const expression = buildThreePlatformBrowserActionExpression(meetJoin);
 assert.match(expression, /Ask to join/);

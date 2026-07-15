@@ -3894,6 +3894,9 @@ npm run meeting-platform:live-acceptance -- --platform=teams
 npm run meeting-platform:live-acceptance -- --platform=zoom
 npm run meeting-platform:live-acceptance -- --platform=zoom --meeting-url='https://zoom.us/j/<meeting-id>?pwd=<token>' --speaker-peer=true --auto-join=true --auto-leave=true --allow-external-actions=true
 
+# 本机已有其他会议轴时，用独立状态库验收，不会结束或覆盖现有轴
+npm run meeting-platform:live-acceptance -- --platform=teams --base-url=http://localhost:8790 --isolated-state=true --auto-join=true --auto-leave=true --allow-external-actions=true
+
 npm run meeting-platform:live-acceptance:verify
 npm run meeting-platform:live-acceptance:verify -- --require-speaker=true
 ```

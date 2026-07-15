@@ -242,6 +242,32 @@ assert.equal(teamsPrejoin.page.interaction.can_join, true);
 assert.equal(teamsPrejoin.page.controlSignalSummary.join_available, true);
 assert.ok(teamsPrejoin.page.semanticSignals.some((signal) => signal.type === 'meeting_join_available'));
 
+const teamsChineseLive = normalizeCapturedMeetingAppDomSnapshot({
+  document: fakeDocument({
+    url: 'https://teams.live.com/v2/',
+    title: '开会 | Microsoft Teams 会议 | Microsoft Teams',
+    nodes: [
+      node('button', { 'aria-label': '打开摄像头' }, '摄像头'),
+      node('button', { 'aria-label': '将麦克风静音' }, '麦克风'),
+      node('button', { 'aria-label': '共享内容' }, '共享'),
+      node('button', { 'aria-label': '退出' }, '离开'),
+      node('div', { role: 'status', 'aria-live': 'polite' }, '正在等待其他人加入…'),
+    ],
+  }),
+}, {
+  observedAtMs: startMs + 1_500,
+  captureProfile: 'microsoft_teams',
+  requireInMeetingEvidence: true,
+});
+assert.equal(teamsChineseLive.platform, 'microsoft_teams');
+assert.equal(teamsChineseLive.inMeeting, true);
+assert.equal(teamsChineseLive.page.interaction.in_call, true);
+assert.equal(teamsChineseLive.page.interaction.can_leave, true);
+assert.equal(teamsChineseLive.page.controlSignalSummary.leave_available, true);
+assert.equal(teamsChineseLive.page.controlSignalSummary.microphone_available, true);
+assert.equal(teamsChineseLive.page.controlSignalSummary.camera_available, true);
+assert.equal(teamsChineseLive.page.controlSignalSummary.screen_share_available, true);
+
 const zoomCaptured = captureMeetingAppDomSnapshot({
   document: fakeDocument({
     url: 'https://us06web.zoom.us/wc/987654321/start',

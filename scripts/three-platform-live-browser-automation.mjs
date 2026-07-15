@@ -50,6 +50,8 @@ const LABELS = Object.freeze({
     '离开通话',
     '退出通话',
     '离开会议',
+    '离开',
+    '退出',
     '挂断',
   ],
   confirm_leave: [
@@ -57,6 +59,8 @@ const LABELS = Object.freeze({
     'end meeting',
     '离开会议',
     '退出会议',
+    '离开',
+    '退出',
     '结束会议',
   ],
   name: [
@@ -134,7 +138,11 @@ function meetingJoinSurface(page = {}, platform) {
   let path = '';
   try { path = new URL(String(page.url ?? '')).pathname.toLowerCase(); } catch {}
   if (platform === 'google_meet') return /^\/[a-z]{3}-[a-z]{4}-[a-z]{3}\/?$/.test(path);
-  if (platform === 'microsoft_teams') return path.includes('meetup-join') || path.includes('/meet/') || path.includes('/pre-join/');
+  if (platform === 'microsoft_teams') {
+    const rootSpaJoin = /^\/v2\/?$/.test(path)
+      && visibleControls(page).some((item) => ['button', 'a'].includes(item.tag) && exactLabel(item, LABELS.join));
+    return rootSpaJoin || path.includes('meetup-join') || path.includes('/meet/') || path.includes('/pre-join/');
+  }
   if (platform === 'zoom') return path.includes('/wc/') || path.includes('/j/') || path.includes('/join/');
   return false;
 }
@@ -214,7 +222,17 @@ function nextJoinAction(page, platform, completed, displayName) {
     ['button', 'a'].includes(item.tag)
     && exactLabel(item, LABELS.join)
   ));
-  if (join && !actionCompleted(completed, page, 'join_meeting')) return action(page, 'join_meeting', 'click', join);
+  if (join) {
+    let path = '';
+    try { path = new URL(String(page.url ?? '')).pathname.toLowerCase(); } catch {}
+    const phase = platform === 'microsoft_teams'
+      && /^\/v2\/?$/.test(path)
+      && join.id !== 'prejoin-join-button'
+      && !text(page.title).includes('meeting join')
+      ? 'open_meeting_card'
+      : 'join_meeting';
+    if (!actionCompleted(completed, page, phase)) return action(page, phase, 'click', join);
+  }
   return null;
 }
 

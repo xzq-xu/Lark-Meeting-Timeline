@@ -133,6 +133,8 @@ async function ensureService(baseUrl, options = {}) {
     env: {
       ...process.env,
       PORT: parsed.port || '8787',
+      ...(options.dataDir ? { TIMELINE_DATA_DIR: options.dataDir } : {}),
+      ...(options.evidenceDir ? { MEETING_PLATFORM_FIELD_EVIDENCE_DIR: options.evidenceDir } : {}),
       REAL_DEMO_AUTO_ARM: '0',
       REAL_DEMO_AUTO_ANNOTATION: '0',
       REAL_DEMO_DEVICE_SIMULATOR: '0',
@@ -358,6 +360,24 @@ async function waitForExtensionAttachment(port, platform, sinceMs, timeoutMs = 2
   throw new Error(`Meeting Timeline content script did not attach to a ${platform} page`);
 }
 
+async function configureExtensionBaseUrl(worker, baseUrl) {
+  const expression = [
+    'new Promise((resolve) => {',
+    `  const baseUrl = ${JSON.stringify(baseUrl)};`,
+    '  chrome.storage.local.set({ meeting_timeline_base_url: baseUrl }, () => resolve({',
+    '    ok: !chrome.runtime.lastError,',
+    '    base_url: baseUrl,',
+    '    error: chrome.runtime.lastError?.message,',
+    '  }));',
+    '})',
+  ].join('\n');
+  const configured = await cdpEvaluate(worker, expression);
+  if (configured?.ok !== true || configured.base_url !== baseUrl) {
+    throw new Error(`Meeting Timeline extension base URL configuration failed: ${JSON.stringify(configured)}`);
+  }
+  return configured;
+}
+
 async function jsonFiles(root) {
   let entries = [];
   try { entries = await readdir(root, { withFileTypes: true }); } catch { return []; }
@@ -439,6 +459,7 @@ async function main() {
     : speakerPeer || args.get('synthetic-audio') === 'true';
   const automationPreview = args.get('preview-browser-automation') === 'true';
   const allowExternalActions = args.get('allow-external-actions') === 'true';
+  const isolatedState = args.get('isolated-state') === 'true' || args.has('timeline-data-dir');
   if ((autoJoin || autoLeave) && !allowExternalActions) {
     throw new Error('Browser meeting automation requires --allow-external-actions=true because joining or leaving changes external meeting state.');
   }
@@ -449,6 +470,9 @@ async function main() {
     throw new Error('The synthetic speaker peer requires a shared Zoom meeting URL, not zoom.us/test.');
   }
   const launchedAtMs = Date.now();
+  const serviceDataDir = isolatedState
+    ? resolve(String(args.get('timeline-data-dir') ?? join(outputDir, 'service-state', `${platform}-${launchedAtMs}`)))
+    : null;
   const speakerPeerProfileDir = resolve(String(
     args.get('speaker-peer-profile-dir') ?? `${profileDir}-speaker-peer`,
   ));
@@ -461,6 +485,7 @@ async function main() {
   await Promise.all([
     mkdir(outputDir, { recursive: true }),
     mkdir(profileDir, { recursive: true }),
+    ...(serviceDataDir ? [mkdir(serviceDataDir, { recursive: true })] : []),
     ...(speakerPeer ? [mkdir(speakerPeerProfileDir, { recursive: true })] : []),
   ]);
   const fakeAudio = await prepareFakeAudio(args, outputDir, platform);
@@ -477,7 +502,11 @@ async function main() {
   const manifest = JSON.parse(await readFile(join(extensionDir, 'manifest.json'), 'utf8'));
   if (!manifest.content_scripts?.length) throw new Error('The generated browser extension has no content script');
 
-  const service = await ensureService(baseUrl, { startServer: args.get('start-server') !== 'false' });
+  const service = await ensureService(baseUrl, {
+    startServer: args.get('start-server') !== 'false',
+    dataDir: serviceDataDir,
+    evidenceDir,
+  });
   let browser = null;
   let speakerPeerBrowser = null;
   let finishPromise = null;
@@ -545,6 +574,7 @@ async function main() {
       await waitForDebugPort(speakerPeerDebugPort);
     }
     const worker = await waitForExtensionWorker(debugPort);
+    const extensionConfiguration = await configureExtensionBaseUrl(worker, baseUrl);
     const attached = await waitForExtensionAttachment(debugPort, platform, launchedAtMs);
     console.log(`LIVE_ACCEPTANCE_READY platform=${platform} browser=${chromePath}`);
     console.log(speakerPeer
@@ -573,8 +603,10 @@ async function main() {
         probe_url: startupProbeUrl,
         extension_dir: extensionDir,
         browser_profile_dir: profileDir,
+        service_data_dir: serviceDataDir,
         debug_port: debugPort,
         extension_worker_url: worker.url,
+        extension_configuration: extensionConfiguration,
         extension_attachment: attached,
         fake_audio_file: fakeAudio?.file ?? null,
         synthetic_audio_generated: fakeAudio?.generated === true,
@@ -740,7 +772,9 @@ async function main() {
           launched_at_ms: launchedAtMs,
           meeting_url: meetingUrl,
           browser_profile_dir: profileDir,
+          service_data_dir: serviceDataDir,
           extension_dir: extensionDir,
+          extension_configuration: extensionConfiguration,
           fake_audio_file: fakeAudio?.file ?? null,
           synthetic_audio_generated: fakeAudio?.generated === true,
           fake_audio_target: fakeAudio ? (speakerPeer ? 'speaker_peer' : 'observer') : null,

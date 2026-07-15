@@ -252,6 +252,20 @@ function installGeneratedContentScript(source, options = {}) {
       client,
       options: bridgeOptions,
       installed: true,
+      observer: {
+        getState() {
+          return {
+            sessionState: {
+              activeMeeting: {
+                platform: bridgeOptions.platform,
+                meeting_id: 'abc-defg-hij',
+                meeting_url: globalThis.location.href,
+                title: globalThis.document.title,
+              },
+            },
+          };
+        },
+      },
       preflight() {
         return { accepted: true, meeting_id: 'abc-defg-hij', platform: 'google_meet' };
       },
@@ -729,6 +743,15 @@ try {
   assert.equal(contentScriptRuntime.sentMessages[2].input.action, 'join');
   assert.equal(contentScriptRuntime.sentMessages[2].input.meeting_id, 'abc-defg-hij');
   assert.equal(contentScriptRuntime.sentMessages[2].input.observer_surface, 'browser_extension');
+
+  await contentScriptRuntime.click('Leave call');
+  assert.equal(contentScriptRuntime.sentMessages.length, 5);
+  assert.equal(contentScriptRuntime.sentMessages[3].method, 'recordP0Reference');
+  assert.equal(contentScriptRuntime.sentMessages[3].input.action, 'leave');
+  assert.equal(contentScriptRuntime.sentMessages[4].method, 'endMeeting');
+  assert.equal(contentScriptRuntime.sentMessages[4].input.meeting_id, 'abc-defg-hij');
+  assert.equal(contentScriptRuntime.sentMessages[4].input.detector_source, 'meeting_app_extension_operator_leave');
+  assert.equal(contentScriptRuntime.sentMessages[4].input.meeting_app_record.snapshot.lifecycle.event, 'operator_leave');
 } finally {
   contentScriptRuntime.restore();
 }

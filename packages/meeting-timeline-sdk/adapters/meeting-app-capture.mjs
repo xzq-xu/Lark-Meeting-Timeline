@@ -163,7 +163,7 @@ const PLATFORM_INTERACTION_HINTS = Object.freeze({
     screen_share: Object.freeze([/\bpresent now\b/i]),
   }),
   microsoft_teams: Object.freeze({
-    leave: Object.freeze([/\bleave\b/i, /\bhang up\b/i]),
+    leave: Object.freeze([/\bleave\b/i, /\bhang up\b/i, /^离开$/, /^退出$/]),
     screen_share: Object.freeze([/\bshare content\b/i]),
     chat: Object.freeze([/\bshow conversation\b/i]),
   }),
