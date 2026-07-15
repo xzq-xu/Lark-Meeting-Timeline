@@ -105,6 +105,48 @@ assert.equal(windowSelection.detectedMeeting.meeting_id, 'qwe-rtyu-iop');
 assert.equal(windowSelection.candidates.length, 1);
 assert.equal(windowSelection.selectedSnapshot.active, undefined);
 
+const hiddenInCallSelection = selectMeetingSnapshot([{
+  url: 'https://teams.live.com/v2/',
+  title: '开会 | Microsoft Teams 会议 | Microsoft Teams',
+  platform: 'microsoft_teams',
+  meeting_id: 'teams.live.com-v2',
+  inMeeting: true,
+  visible: false,
+}], {
+  requireInMeetingEvidence: true,
+});
+assert.equal(hiddenInCallSelection.detectedMeeting.platform, 'microsoft_teams');
+assert.equal(hiddenInCallSelection.selectedSnapshot.active, true);
+assert.equal(hiddenInCallSelection.selectedSnapshot.visible, false);
+
+const hiddenPreJoinSelection = selectMeetingSnapshot([{
+  url: 'https://teams.live.com/v2/',
+  title: '开会 | Microsoft Teams',
+  platform: 'microsoft_teams',
+  meeting_id: 'teams.live.com-v2',
+  visible: false,
+}], {
+  requireInMeetingEvidence: true,
+});
+assert.equal(hiddenPreJoinSelection.detectedMeeting, null);
+
+const hiddenInCallObserver = createLocalMeetingObserver({
+  source: 'browser_extension',
+  requireInMeetingEvidence: true,
+});
+const hiddenInCallStart = hiddenInCallObserver.observeCandidates([{
+  url: 'https://teams.live.com/v2/',
+  title: '开会 | Microsoft Teams 会议 | Microsoft Teams',
+  platform: 'microsoft_teams',
+  meeting_id: 'teams.live.com-v2',
+  inMeeting: true,
+  visible: false,
+}], {
+  observedAtMs: startMs + 45_500,
+});
+assert.deepEqual(hiddenInCallStart.signals.map((item) => item.type), ['meeting_started']);
+assert.equal(hiddenInCallObserver.getState().activeMeeting.meeting_id, 'teams.live.com-v2');
+
 const candidateObserver = createLocalMeetingObserver({ source: 'browser_extension' });
 const candidateStart = candidateObserver.observeCandidates({
   windows: [{

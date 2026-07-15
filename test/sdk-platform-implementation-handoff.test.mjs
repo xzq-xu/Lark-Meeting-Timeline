@@ -102,7 +102,8 @@ assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').adapt
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').adapter_preflight_selected_surface, 'native_detector');
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').adapter_preflight_startup_ready, true);
 assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').adapter_preflight_realtime_ready, false);
-assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').browser_match_count, 2);
+assert.equal(matrix.rows.find((row) => row.platform === 'microsoft_teams').browser_match_count >= 2, true);
+assert.equal(matrix.handoffs.find((row) => row.platform === 'microsoft_teams').install_surface.browser_matches.includes('https://teams.live.com/*'), true);
 assert.equal(matrix.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 assert.equal(matrix.handoffs.find((handoff) => handoff.platform === 'webex').provider_reconcile.path, 'webex_webhooks');
 

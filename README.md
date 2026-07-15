@@ -33,7 +33,7 @@ Google Meet、Microsoft Teams、Zoom 不再要求 SDK 使用方自行实现 adap
 npm run meeting-platform:adapters:release -- --offline=true
 ```
 
-产物位于 `data/three-platform-adapters/`；安装后只需配置时间轴服务地址。架构和官方事件校准说明见 [多会议平台时间轴适配方案](docs/meeting-platform-adapters.md)。[会议软件适配快照](docs/meeting-platform-multi-software-adaptation.md) 是历史设计记录，不是当前接入任务清单。
+产物位于 `data/three-platform-adapters/`；安装后只需配置时间轴服务地址。SDK tarball 自带预构建浏览器扩展，其他项目安装后运行 `npx meeting-timeline-adapters --out-dir=./meeting-timeline-browser-extension` 即可导出，不需要回到本仓库构建。架构和官方事件校准说明见 [多会议平台时间轴适配方案](docs/meeting-platform-adapters.md)。[会议软件适配快照](docs/meeting-platform-multi-software-adaptation.md) 是历史设计记录，不是当前接入任务清单。
 SDK 包的设备无关发布标准见：[会议时间轴 SDK 发布验收单](docs/meeting-timeline-sdk-release-acceptance.md)。
 五个平台可直接照做的现场通过标准见：[多会议平台 P0 现场验收单](docs/meeting-platform-p0-field-acceptance.md)。
 最新执行进度与未完成项对齐见：[会议时间轴 SDK 进度快照（2026-07-09）](docs/meeting-platform-progress-checkpoint-2026-07-09.md)。
@@ -52,10 +52,24 @@ Google Meet、Microsoft Teams、Zoom 的真实会议验收使用自动验收器�
 npm run meeting-platform:live-acceptance -- --platform=google-meet
 npm run meeting-platform:live-acceptance -- --platform=teams
 npm run meeting-platform:live-acceptance -- --platform=zoom
+npm run meeting-platform:live-acceptance -- --platform=zoom --synthetic-audio=true
+npm run meeting-platform:live-acceptance -- --platform=zoom --meeting-url='https://zoom.us/j/<meeting-id>?pwd=<token>' --speaker-peer=true --auto-join=true --auto-leave=true --allow-external-actions=true
 npm run meeting-platform:live-acceptance:verify
+npm run meeting-platform:live-acceptance:verify -- --require-speaker=true
 ```
 
-测试人员只负责在启动的浏览器中登录、加入/创建会议、发言至少两秒并离会，不需要实现或手动调用 adapter。旧的手工 DOM 采样流程仅保留给 Webex、Lark 或新增自定义平台调试：
+正式 tarball 安装后可运行 `meeting-timeline-adapters --status=true --json=true`，直接读取打包时的逐平台核心与发言人真实验收状态，不需要回源码仓库查 `release-manifest.json`。
+
+测试人员只负责在启动的浏览器中登录、加入/创建会议并离会，不需要实现或手动调用 adapter；Zoom 默认打开官方 `zoom.us/test` 测试会议入口。加上 `--synthetic-audio=true` 后，macOS 验收器会生成并循环注入固定英文语音；其他系统可传 `--fake-audio-file=/absolute/path/to/mono.wav`。官方测试会只能验证单参会者生命周期，不能可靠证明远端发言人识别。对普通共享会议传 `--speaker-peer=true` 后，验收器会额外启动独立的合成发言参会者，观察者只加载 SDK，从而自动验证远端稳定发言段和滤波。未启用合成语音时才需要人工发言至少两秒。旧的手工 DOM 采样流程仅保留给 Webex、Lark 或新增自定义平台调试：
+
+显式允许验收器改变外部会议状态时，可以把浏览器入会、电脑音频和离会也自动化。Zoom 官方测试会可直接运行；Google Meet/Teams 还需传真实 `--meeting-url`，账号登录和等候室放行仍由平台控制：
+
+```bash
+npm run meeting-platform:live-acceptance -- --platform=zoom --synthetic-audio=true --auto-join=true --auto-leave=true --allow-external-actions=true
+```
+
+缺少 `--allow-external-actions=true` 时，验收器会拒绝执行自动入会/离会，避免普通启动命令意外创建或加入会议。
+要先确认真实页面会选择哪个控件而不执行点击，可运行 `--startup-only=true --preview-browser-automation=true`；启动报告只记录候选动作和可见控件数量。
 
 ```bash
 npm run meeting-app:extension
@@ -78,7 +92,7 @@ npm run meeting-app:extension:build
 npm run meeting-app:evidence-gate -- --input=data/meeting-app-live-evidence.json --report-file=data/meeting-app-live-gate-report.json
 ```
 
-这个 gate 默认不允许 fixture 兜底，并要求 `production_ready=true`；如果缺 active speaker、meeting ended 或平台识别，会在报告里给出 `missing_required_coverage` 和 `next_actions`。
+三平台 live acceptance 默认把真实 `meeting_started`、实时标注和 `meeting_ended` 作为核心门禁，并单独报告远端稳定发言人证据。`production_ready=true` 表示核心时间轴链路可交付，`full_production_ready=true` 才表示发言人实测也完成；需要把发言人作为硬门禁时传 `--require-speaker=true`。其他 evidence gate 仍不允许 fixture 兜底，并会在报告里给出 `missing_required_coverage` 和 `next_actions`。
 
 多平台推进时，把各平台的采样 JSON 放进 `data/meeting-app-evidence/`，再生成矩阵报告：
 

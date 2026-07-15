@@ -22,6 +22,7 @@
     "meeting-platform-adapter-smoke": "./bin/meeting-platform-adapter-smoke.mjs",
     "meeting-platform-adapter-startup": "./bin/meeting-platform-adapter-startup.mjs",
     "meeting-timeline-desktop-adapter": "./bin/meeting-timeline-desktop-adapter.mjs",
+    "meeting-timeline-adapters": "./bin/meeting-timeline-adapters.mjs",
     "meeting-platform-adapter-runtime-recipe": "./bin/meeting-platform-adapter-runtime-recipe.mjs",
     "meeting-platform-adapter-runtime-manifest": "./bin/meeting-platform-adapter-runtime-manifest.mjs",
     "meeting-platform-adapter-runtime-target": "./bin/meeting-platform-adapter-runtime-target.mjs",
@@ -55,6 +56,7 @@
     "bin",
     "cli",
     "adapters",
+    "runtime",
     "README.md"
   ]
 }

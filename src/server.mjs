@@ -192,7 +192,7 @@ function loadDotEnv() {
 
 loadDotEnv();
 const lark = createLarkClient(process.env);
-const port = Number(process.env.PORT || 8789);
+const port = Number(process.env.PORT || 8787);
 let authState = loadAuthState();
 let larkWsClient = null;
 let probeAutoSearchTimer = null;
@@ -2237,6 +2237,12 @@ function canLocalSessionCarryIntoMeeting(current = {}, meeting = {}) {
   return deltaMs >= -30_000 && deltaMs <= 30 * 60_000;
 }
 
+function shouldReconcileLocalAxisWithProvider(currentMeeting = {}, incomingMeeting = {}) {
+  return ['open_meeting_session', 'local_detector'].includes(currentMeeting.source)
+    && String(incomingMeeting.source ?? '').endsWith('_webhook')
+    && sameMeeting(currentMeeting, incomingMeeting);
+}
+
 function shouldCarrySequenceIntoNewAxis(current = {}, meeting = {}) {
   if (current.meeting?.pending_binding) return true;
   if (current.meeting?.source === 'local_simulation') return true;
@@ -2408,6 +2414,44 @@ async function startOpenMeetingSession(body = {}) {
     throw error;
   }
   if (currentIsActiveReal && sameMeeting(current.meeting, meeting) && !body.force) {
+    if (shouldReconcileLocalAxisWithProvider(current.meeting, meeting)) {
+      const startEvent = {
+        id: body.event_id ?? `evt-${axisSource}-${meeting.meeting_id}-start`,
+        time_ms: 0,
+        type: 'meeting_start',
+        label: body.event_label ?? '平台会议事件开始',
+        source: axisSource,
+        metadata: {
+          raw_type: body.raw_type ?? `platform.${axisSource}.started`,
+          detector_source: body.detector_source ?? body.source ?? null,
+          note: body.note ?? null,
+          reconciled_from_source: current.meeting.source,
+        },
+      };
+      const events = [...(current.events ?? [])];
+      const startIndex = events.findIndex((item) => item.type === 'meeting_start');
+      if (startIndex >= 0) events[startIndex] = startEvent;
+      else events.unshift(startEvent);
+      const next = mergeTimelineWithRebasedAnnotations(current, { meeting, events });
+      const saved = await saveAndBroadcast(next, 'state');
+      const sessionEvidence = persistMeetingAppSessionEvidence(body, saved.meeting, saved, 'active', Date.now());
+      return {
+        ok: true,
+        deduplicated: false,
+        reconciled: true,
+        meeting: saved.meeting,
+        state: saved,
+        auto_acceptance_annotation: null,
+        device_simulator_annotation: null,
+        session_evidence: sessionEvidence,
+        contract: {
+          source: axisSource,
+          strict_lark_event_axis: false,
+          product_axis: true,
+          note: 'The provider event upgraded the matching local axis while preserving and rebasing its annotations.',
+        },
+      };
+    }
     const sessionEvidence = persistMeetingAppSessionEvidence(body, current.meeting, current, 'active', Date.now());
     return {
       ok: true,
@@ -6179,17 +6223,6 @@ function oauthStartPayload(scopes = [], options = {}) {
   };
 }
 
-function withMeetingSearchScope(scopes = '') {
-  const rows = String(scopes ?? '')
-    .split(/[\s,]+/)
-    .map((scope) => scope.trim())
-    .filter(Boolean);
-  for (const scope of ['vc:meeting.search:read', 'vc:meeting.meetingid:read', 'calendar:calendar:read', 'calendar:calendar.event:read']) {
-    if (!rows.includes(scope)) rows.push(scope);
-  }
-  return rows.join(' ');
-}
-
 function oauthRedirectUrlFor(req, scopes = []) {
   const params = new URLSearchParams();
   const requestedScope = Array.isArray(scopes) ? scopes.filter(Boolean).join(' ') : String(scopes ?? '');
@@ -8008,7 +8041,7 @@ async function handleApi(req, res, url) {
     const useMinutesOnly = ['minute', 'minutes', 'transcript'].includes(purpose);
     const payload = useMinutesOnly
       ? oauthStartPayload(minuteOAuthScopes, { ignoreDefaultScopes: true, scopeMode: 'minutes' })
-      : oauthStartPayload(withMeetingSearchScope(requestedScope));
+      : oauthStartPayload(requestedScope);
     if (['1', 'true', 'yes'].includes(String(url.searchParams.get('redirect') ?? '').toLowerCase())) {
       return sendRedirect(res, payload.auth_url);
     }

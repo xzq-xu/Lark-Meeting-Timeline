@@ -10,6 +10,12 @@ import { verifyThreePlatformLiveAcceptance } from '../scripts/verify-three-platf
 
 const startMs = 1_784_100_000_000;
 
+const LIVE_URLS = Object.freeze({
+  google_meet: 'https://meet.google.com/abc-defg-hij',
+  microsoft_teams: 'https://teams.microsoft.com/v2/?meetingjoin=true',
+  zoom: 'https://app.zoom.us/wc/987654321/join?pwd=test-token',
+});
+
 function liveEvidence(platform, meetingId = `${platform}-real-1`) {
   return {
     schema: 'meeting_platform_field_evidence_input',
@@ -32,10 +38,11 @@ function liveEvidence(platform, meetingId = `${platform}-real-1`) {
         snapshot: {
           schema: 'meeting_app_dom_capture',
           source: 'meeting_app_extension_auto_evidence',
-          url: `https://example.test/${meetingId}`,
+          url: LIVE_URLS[platform],
           inMeeting: true,
           interaction: { in_call: true, can_leave: true },
           semanticSignalTypes: ['meeting_leave_available', 'active_speaker_candidate'],
+          capture: { profile: platform },
         },
       },
       {
@@ -45,10 +52,11 @@ function liveEvidence(platform, meetingId = `${platform}-real-1`) {
         snapshot: {
           schema: 'meeting_app_dom_capture',
           source: 'meeting_app_extension_auto_evidence',
-          url: `https://example.test/${meetingId}`,
+          url: LIVE_URLS[platform],
           inMeeting: false,
           interaction: { pre_join: true },
           semanticSignalTypes: ['meeting_join_available'],
+          capture: { profile: platform },
         },
       },
     ],
@@ -82,7 +90,32 @@ const evaluations = ['google_meet', 'microsoft_teams', 'zoom'].map((platform) =>
   evaluateThreePlatformLiveEvidence(liveEvidence(platform), { platform })
 ));
 assert.equal(evaluations.every((row) => row.accepted), true);
+assert.equal(evaluations.every((row) => row.core_accepted), true);
+assert.equal(evaluations.every((row) => row.speaker_accepted), true);
 assert.equal(buildThreePlatformLiveAcceptanceReport(evaluations).accepted, true);
+
+const coreOnly = liveEvidence('zoom', 'zoom-core-only');
+coreOnly.speaker_markers = [];
+const coreOnlyEvaluation = evaluateThreePlatformLiveEvidence(coreOnly);
+assert.equal(coreOnlyEvaluation.accepted, true);
+assert.equal(coreOnlyEvaluation.core_accepted, true);
+assert.equal(coreOnlyEvaluation.production_ready, true);
+assert.equal(coreOnlyEvaluation.speaker_accepted, false);
+assert.equal(coreOnlyEvaluation.full_production_ready, false);
+assert.deepEqual(coreOnlyEvaluation.failed_check_ids, []);
+assert.deepEqual(coreOnlyEvaluation.warning_check_ids, [
+  'stable_speaker_marker',
+  'speaker_marker_visible_latency',
+]);
+
+const strictCoreOnlyEvaluation = evaluateThreePlatformLiveEvidence(coreOnly, { requireSpeaker: true });
+assert.equal(strictCoreOnlyEvaluation.accepted, false);
+assert.equal(strictCoreOnlyEvaluation.production_ready, true);
+assert.equal(strictCoreOnlyEvaluation.full_production_ready, false);
+assert.deepEqual(strictCoreOnlyEvaluation.failed_check_ids, [
+  'stable_speaker_marker',
+  'speaker_marker_visible_latency',
+]);
 
 const falsePositive = liveEvidence('microsoft_teams', 'teams.microsoft.com-v2');
 falsePositive.meetingAppRecords[0].snapshot = {
@@ -99,6 +132,14 @@ const rejectedFalsePositive = evaluateThreePlatformLiveEvidence(falsePositive);
 assert.equal(rejectedFalsePositive.accepted, false);
 assert.equal(rejectedFalsePositive.failed_check_ids.includes('real_active_snapshot'), true);
 
+const untrustedDomain = liveEvidence('zoom', 'fake-zoom-domain');
+untrustedDomain.meetingAppRecords.forEach((record) => {
+  record.snapshot.url = 'https://example.test/wc/987654321/join';
+});
+const rejectedUntrustedDomain = evaluateThreePlatformLiveEvidence(untrustedDomain);
+assert.equal(rejectedUntrustedDomain.accepted, false);
+assert.equal(rejectedUntrustedDomain.failed_check_ids.includes('real_active_snapshot'), true);
+
 const contaminated = liveEvidence('zoom');
 contaminated.measurements.previous_meeting_annotation_count_on_new_axis = 1;
 const rejectedContamination = evaluateThreePlatformLiveEvidence(contaminated);
@@ -113,6 +154,27 @@ try {
   const report = await verifyThreePlatformLiveAcceptance({ inputDir: tempDir });
   assert.equal(report.accepted, true);
   assert.equal(report.accepted_platform_count, 3);
+  assert.equal(report.production_ready, true);
+  assert.equal(report.full_production_ready, true);
+
+  await writeFile(join(tempDir, 'zoom.json'), `${JSON.stringify(coreOnly, null, 2)}\n`, 'utf8');
+  const coreReport = await verifyThreePlatformLiveAcceptance({
+    inputDir: tempDir,
+    platforms: ['zoom'],
+  });
+  assert.equal(coreReport.accepted, true);
+  assert.equal(coreReport.production_ready, true);
+  assert.equal(coreReport.full_production_ready, false);
+  assert.deepEqual(coreReport.remaining_speaker_platforms, ['zoom']);
+
+  const strictReport = await verifyThreePlatformLiveAcceptance({
+    inputDir: tempDir,
+    platforms: ['zoom'],
+    requireSpeaker: true,
+  });
+  assert.equal(strictReport.accepted, false);
+  assert.equal(strictReport.production_ready, true);
+  assert.equal(strictReport.full_production_ready, false);
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }

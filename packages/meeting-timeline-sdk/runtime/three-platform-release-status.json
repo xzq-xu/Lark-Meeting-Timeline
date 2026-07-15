@@ -1,0 +1,23 @@
+{
+  "type": "three_platform_adapter_release_status",
+  "schema": "three_platform_adapter_release_status",
+  "schema_version": 1,
+  "generated_at": null,
+  "source": "sdk_source_package_placeholder",
+  "production_ready": false,
+  "speaker_ready": false,
+  "full_production_ready": false,
+  "adapters": [],
+  "remaining_platforms": [
+    "google_meet",
+    "microsoft_teams",
+    "zoom"
+  ],
+  "remaining_speaker_platforms": [
+    "google_meet",
+    "microsoft_teams",
+    "zoom"
+  ],
+  "remaining_gate": "Install the generated three-platform release tarball to read field acceptance status.",
+  "speaker_remaining_gate": "Remote speaker field evidence is not bundled in the SDK source package."
+}

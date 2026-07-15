@@ -195,4 +195,44 @@ for (const surface of inactiveSurfaces) {
   );
 }
 
+const teamsLiveCalls = [];
+const teamsLiveNodes = [
+  node('button', { 'aria-label': '打开摄像头' }, '摄像头'),
+  node('button', { 'aria-label': '将麦克风静音' }, '麦克风'),
+  node('button', { 'aria-label': '共享内容' }, '共享'),
+  node('button', { 'aria-label': '退出' }, '离开'),
+  node('div', { role: 'status', 'aria-live': 'polite' }, '正在等待其他人加入…'),
+];
+const teamsLiveDocument = {
+  nodeType: 9,
+  title: '开会 | Microsoft Teams 会议 | Microsoft Teams',
+  location: { href: 'https://teams.live.com/v2/' },
+  body: {},
+  querySelectorAll(selector) {
+    return teamsLiveNodes.filter((item) => selectorMatches(item, selector));
+  },
+};
+const teamsLiveWindow = {
+  document: teamsLiveDocument,
+  location: teamsLiveDocument.location,
+};
+const teamsLiveRuntime = createMeetingAppLocalContentRuntime({
+  async startMeeting(input) { teamsLiveCalls.push({ method: 'startMeeting', input }); },
+  async endMeeting(input) { teamsLiveCalls.push({ method: 'endMeeting', input }); },
+  async insertMark(input) { teamsLiveCalls.push({ method: 'insertMark', input }); },
+  async insertMarks(input) { teamsLiveCalls.push({ method: 'insertMarks', input }); },
+}, {
+  window: teamsLiveWindow,
+  document: teamsLiveDocument,
+  location: teamsLiveDocument.location,
+  platform: 'microsoft_teams',
+  windowMessaging: false,
+});
+const teamsLiveSample = await teamsLiveRuntime.sample({
+  observedAtMs: startMs + 2_000,
+  trigger: 'teams_live_chinese_regression',
+});
+assert.equal(teamsLiveSample.snapshot.inMeeting, true);
+assert.equal(teamsLiveCalls.some((call) => call.method === 'startMeeting'), true);
+
 console.log('ok meeting app local content runtime');

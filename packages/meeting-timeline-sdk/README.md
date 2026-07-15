@@ -29,6 +29,14 @@ import { createMeetingTimelineClient } from './packages/meeting-timeline-sdk/ind
 }
 ```
 
+正式三平台发行 tarball 已把 Google Meet、Teams Web、Zoom Web 的预构建扩展一起打进包内。安装包后直接导出扩展，不需要 SDK 使用方克隆本仓库、执行 bundler 或编写 selector：
+
+```bash
+npx meeting-timeline-adapters --out-dir=./meeting-timeline-browser-extension
+```
+
+随后在 Chrome/Edge 中加载该目录；Teams/Zoom 桌面客户端则直接启动同一包提供的 `meeting-timeline-desktop-adapter`。两条命令都只需要配置 `MEETING_TIMELINE_BASE_URL`，平台状态机由 SDK 运行时负责。
+
 提交给外部项目接入前，建议在仓库根目录跑一次包级 smoke：
 
 ```bash
@@ -129,7 +137,13 @@ await applyMeetingSignals(timeline, signals);
 | Microsoft Teams | 桌面观察器或 WebView preload；网页版可用浏览器扩展 | Teams 窗口、会议控件、Accessibility/DOM 和发言状态 | Microsoft Graph `meetingCallEvents` |
 | Zoom | Native desktop helper；网页版可用浏览器扩展 | Zoom 进程、会议窗口、离会控件和发言状态 | Zoom Meeting Webhooks |
 
-默认接入方式不是让业务项目实现 adapter，而是直接生成并安装仓库内置运行时：
+默认接入方式不是让业务项目实现 adapter。使用正式 tarball 时直接导出包内预构建运行时：
+
+```sh
+npx meeting-timeline-adapters --out-dir=./meeting-timeline-browser-extension
+```
+
+只有在 SDK 源码仓库内重新制作发行物时才运行：
 
 ```sh
 npm run meeting-platform:adapters:release -- --offline=true
@@ -3840,6 +3854,8 @@ meeting-timeline-desktop-adapter \
   --platforms=teams,zoom \
   --interval-ms=750 \
   --evidence-file=desktop-adapter-evidence.jsonl
+
+meeting-timeline-adapters --status=true
 ```
 
 macOS 首次读取 Teams/Zoom 控件时需要给终端或打包宿主“辅助功能”权限。Windows adapter 必须与 Teams/Zoom 运行在同一登录会话和权限级别。desktop host 内置开始、结束和发言人去抖，不要求调用方自己构造 `windows[]`。
@@ -3868,19 +3884,24 @@ node scripts/verify-three-platform-browser-extension.mjs \
   --report-file=data/three-platform-browser-extension-verification.json
 ```
 
-静态测试、安装启动和真实域名注入通过仍不等于生产验收。每个平台必须在真实会议中采集 `meeting_started`、稳定 `speaker_started`、实时设备标注和 `meeting_ended` 后，才能把 `production_ready` 设为 `true`。
+静态测试、安装启动和真实域名注入通过仍不等于生产验收。每个平台必须在真实会议中采集 `meeting_started`、实时设备标注和 `meeting_ended` 后，才能把核心 `production_ready` 设为 `true`。远端稳定 `speaker_started` 与显示延迟单独写入 `speaker_ready`；三平台两层都通过时 `full_production_ready` 才为 `true`。正式发行 tarball 会内置打包时的状态，安装后可用 `meeting-timeline-adapters --status=true --json=true` 查询。
 
-仓库提供自动化真实会议验收器。它会启动带扩展的隔离 Chromium；测试人员只需登录、加入或创建会议、发言至少两秒并离会，工具会自动插入实时验收标注并校验四类证据：
+仓库提供自动化真实会议验收器。它会启动带扩展的隔离 Chromium；单账号核心模式只需登录、加入或创建会议并离会，工具会自动插入实时验收标注并校验开始、标注和结束证据：
 
 ```sh
 npm run meeting-platform:live-acceptance -- --platform=google-meet
 npm run meeting-platform:live-acceptance -- --platform=teams
 npm run meeting-platform:live-acceptance -- --platform=zoom
+npm run meeting-platform:live-acceptance -- --platform=zoom --meeting-url='https://zoom.us/j/<meeting-id>?pwd=<token>' --speaker-peer=true --auto-join=true --auto-leave=true --allow-external-actions=true
+
+# 本机已有其他会议轴时，用独立状态库验收，不会结束或覆盖现有轴
+npm run meeting-platform:live-acceptance -- --platform=teams --base-url=http://localhost:8790 --isolated-state=true --auto-join=true --auto-leave=true --allow-external-actions=true
 
 npm run meeting-platform:live-acceptance:verify
+npm run meeting-platform:live-acceptance:verify -- --require-speaker=true
 ```
 
-验收器会拒绝登录页、预加入页、错误页、fixture 和 URL-only 候选；还会检查标注延迟、时间轴误差、重复写入以及跨会议残留。账号登录和真实会议交互无法由 SDK 伪造，但不需要使用方编写任何 adapter 代码。
+验收器会拒绝登录页、预加入页、错误页、fixture 和 URL-only 候选；还会检查标注延迟、时间轴误差、重复写入以及跨会议残留。对共享会议启用 `--speaker-peer=true` 会启动独立合成发言参会者并默认启用 `--require-speaker=true`，避免把本机自发言误当成远端 speaker 验收；该模式不能使用 `zoom.us/test`。账号登录和真实会议交互无法由 SDK 伪造，但不需要使用方编写任何 adapter 代码。
 
 ## Webhook 验证工具
 

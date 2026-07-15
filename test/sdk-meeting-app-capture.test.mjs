@@ -50,6 +50,7 @@ function selectorAttrMatches(item, selector) {
 function queryNodes(nodes, selector) {
   const text = String(selector);
   if (text === '*') return nodes;
+  if (text === 'iframe, frame') return nodes.filter((item) => ['IFRAME', 'FRAME'].includes(item.tagName));
   const generic = nodes.filter((item) => selectorAttrMatches(item, text));
   if (generic.length) return generic;
   if (text === 'button') return nodes.filter((item) => item.tagName === 'BUTTON');
@@ -241,6 +242,32 @@ assert.equal(teamsPrejoin.page.interaction.can_join, true);
 assert.equal(teamsPrejoin.page.controlSignalSummary.join_available, true);
 assert.ok(teamsPrejoin.page.semanticSignals.some((signal) => signal.type === 'meeting_join_available'));
 
+const teamsChineseLive = normalizeCapturedMeetingAppDomSnapshot({
+  document: fakeDocument({
+    url: 'https://teams.live.com/v2/',
+    title: '开会 | Microsoft Teams 会议 | Microsoft Teams',
+    nodes: [
+      node('button', { 'aria-label': '打开摄像头' }, '摄像头'),
+      node('button', { 'aria-label': '将麦克风静音' }, '麦克风'),
+      node('button', { 'aria-label': '共享内容' }, '共享'),
+      node('button', { 'aria-label': '退出' }, '离开'),
+      node('div', { role: 'status', 'aria-live': 'polite' }, '正在等待其他人加入…'),
+    ],
+  }),
+}, {
+  observedAtMs: startMs + 1_500,
+  captureProfile: 'microsoft_teams',
+  requireInMeetingEvidence: true,
+});
+assert.equal(teamsChineseLive.platform, 'microsoft_teams');
+assert.equal(teamsChineseLive.inMeeting, true);
+assert.equal(teamsChineseLive.page.interaction.in_call, true);
+assert.equal(teamsChineseLive.page.interaction.can_leave, true);
+assert.equal(teamsChineseLive.page.controlSignalSummary.leave_available, true);
+assert.equal(teamsChineseLive.page.controlSignalSummary.microphone_available, true);
+assert.equal(teamsChineseLive.page.controlSignalSummary.camera_available, true);
+assert.equal(teamsChineseLive.page.controlSignalSummary.screen_share_available, true);
+
 const zoomCaptured = captureMeetingAppDomSnapshot({
   document: fakeDocument({
     url: 'https://us06web.zoom.us/wc/987654321/start',
@@ -267,6 +294,50 @@ assert.equal(zoomCaptured.page.interaction.can_leave, true);
 assert.equal(zoomCaptured.page.interaction.participant_roster_observed, true);
 assert.equal(zoomCaptured.page.controlSignalSummary.participants_available, true);
 assert.ok(zoomCaptured.page.semanticSignals.some((signal) => signal.type === 'participants_control'));
+
+const zoomChineseCaptured = captureMeetingAppDomSnapshot({
+  document: fakeDocument({
+    url: 'https://app.zoom.us/wc/987654321/join',
+    title: 'Test Zoom Meeting',
+    nodes: [
+      node('button', { 'aria-label': '离开' }, '离开'),
+      node('button', { 'aria-label': 'open the participants list pane' }, '1 参会者'),
+      node('button', { 'aria-label': 'mute my microphone' }, '静音'),
+    ],
+  }),
+}, {
+  observedAtMs: startMs + 2_500,
+  captureProfile: 'zoom',
+});
+assert.equal(zoomChineseCaptured.inMeeting, true);
+assert.equal(zoomChineseCaptured.page.interaction.can_leave, true);
+assert.equal(zoomChineseCaptured.page.controlSignalSummary.participants_available, true);
+assert.equal(zoomChineseCaptured.page.interaction.microphone_control_available, true);
+
+const zoomMeetingFrame = node('iframe');
+zoomMeetingFrame.contentDocument = fakeDocument({
+  url: 'https://app.zoom.us/wc/987654321/join?from=pwa',
+  title: 'Web Zoom Meeting',
+  nodes: [
+    node('button', { 'aria-label': '离开' }, '离开'),
+    node('button', { 'aria-label': 'open the participants list pane' }, '1 参会者'),
+    node('div', { 'data-user-id': 'self', 'aria-label': 'Timeline Adapter Acceptance is speaking' }),
+  ],
+});
+const zoomFrameCaptured = captureMeetingAppDomSnapshot({
+  document: fakeDocument({
+    url: 'https://app.zoom.us/wc/987654321/join?fromPWA=1',
+    title: 'Test Zoom Meeting',
+    nodes: [zoomMeetingFrame],
+  }),
+}, {
+  observedAtMs: startMs + 2_700,
+  captureProfile: 'zoom',
+  includeSameOriginFrames: true,
+});
+assert.equal(zoomFrameCaptured.inMeeting, true);
+assert.equal(zoomFrameCaptured.capture.frame_document_count, 1);
+assert.equal(zoomFrameCaptured.page.interaction.active_speaker_candidate.id, 'self');
 
 const larkCaptured = captureMeetingAppDomSnapshot({
   document: fakeDocument({

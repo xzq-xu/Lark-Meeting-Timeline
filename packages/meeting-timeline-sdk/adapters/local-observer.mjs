@@ -172,12 +172,13 @@ function scoreMeetingCandidate(snapshot = {}, detected = {}, options = {}) {
 }
 
 function closedCandidate(snapshot = {}) {
+  const explicitInMeeting = hasInMeetingEvidence(snapshot);
   return snapshot.closed === true
     || snapshot.in_meeting === false
     || snapshot.inMeeting === false
-    || snapshot.visible === false
-    || snapshot.window?.visible === false
-    || snapshot.tab?.visible === false
+    || (snapshot.visible === false && !explicitInMeeting)
+    || (snapshot.window?.visible === false && !explicitInMeeting)
+    || (snapshot.tab?.visible === false && !explicitInMeeting)
     || snapshot.discarded === true
     || snapshot.tab?.discarded === true;
 }
@@ -284,11 +285,12 @@ export function observeMeetingSnapshot(state = null, snapshot = {}, options = {}
   const previous = normalizeObserverState(state);
   const atMs = observedAtMs(snapshot, options);
   const detected = meetingFromSnapshot(snapshot);
+  const explicitInMeeting = hasInMeetingEvidence(snapshot);
   const endedBySnapshot = snapshot.active === false
     || snapshot.in_meeting === false
     || snapshot.inMeeting === false
     || snapshot.closed === true
-    || snapshot.visible === false;
+    || (snapshot.visible === false && !explicitInMeeting);
   const signals = [];
 
   if (!detected || endedBySnapshot) {

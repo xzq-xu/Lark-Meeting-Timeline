@@ -2,10 +2,12 @@
 
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { chmod, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { buildThreePlatformReleaseReadiness } from './three-platform-release-readiness.mjs';
+import { verifyThreePlatformLiveAcceptance } from './verify-three-platform-live-acceptance.mjs';
 
 const execFileAsync = promisify(execFile);
 const args = new Map(process.argv.slice(2).map((raw) => {
@@ -15,8 +17,11 @@ const args = new Map(process.argv.slice(2).map((raw) => {
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = resolve(String(args.get('out-dir') ?? 'data/three-platform-adapters'));
 const baseUrl = String(args.get('base-url') ?? process.env.MEETING_TIMELINE_BASE_URL ?? 'http://localhost:8787').replace(/\/+$/, '');
+const liveEvidenceDir = resolve(String(args.get('live-evidence-dir') ?? 'data/meeting-platform-field-evidence'));
 const offline = args.get('offline') === 'true';
 const jsonOutput = args.get('json') === 'true';
+const requireLiveAcceptance = args.get('require-live-acceptance') === 'true';
+const requireSpeakerAcceptance = args.get('require-speaker-acceptance') === 'true';
 
 async function command(program, commandArgs, options = {}) {
   const startedAt = Date.now();
@@ -106,6 +111,9 @@ async function writeReadme(tarballName) {
     '',
     '同一扩展已经内置三个平台的 URL 匹配、DOM/无障碍语义归一化、开始/结束检测、发言人滤波、时间轴写入和证据导出。',
     '',
+    `同一个 SDK tarball 也内置了这份预构建扩展。安装 \`desktop-host/${tarballName}\` 后可运行 \`meeting-timeline-adapters --out-dir=./meeting-timeline-browser-extension\` 导出，不需要回到源码仓库构建。`,
+    '安装后运行 `meeting-timeline-adapters --status=true` 可直接查看打包时的逐平台真实会议核心验收与远端发言人验收状态；不需要回到发行目录读取清单。',
+    '',
     '## Teams / Zoom 桌面客户端',
     '',
     `SDK 安装包位于 \`desktop-host/${tarballName}\`。macOS 双击 \`install-macos.command\`，Windows 运行 \`install-windows.cmd\`。`,
@@ -120,9 +128,9 @@ async function writeReadme(tarballName) {
     '',
     '## 发布状态',
     '',
-    '构建、安装启动和合成状态机测试通过不等于真实会议生产验收。以 `release-manifest.json` 为准：只有真实会议中的开始、发言人、标注、结束四类证据齐全后，单个平台的 `production_ready` 才能变为 `true`。',
+    '构建、安装启动和合成状态机测试通过不等于真实会议生产验收。以 `release-manifest.json` 为准：真实会议中的开始、实时标注和结束证据齐全后，单个平台的 `production_ready` 才能变为 `true`；远端稳定发言人另列为 `speaker_real_meeting_accepted`，三类平台全部通过后 `full_production_ready` 才会为 `true`。',
     '',
-    '在源码仓库中可运行自动验收器：`npm run meeting-platform:live-acceptance -- --platform=google-meet`，平台也可传 `teams` 或 `zoom`。测试人员只需在启动的隔离浏览器中登录、加入会议、发言并离会，不需要实现 adapter。三平台完成后运行 `npm run meeting-platform:live-acceptance:verify`。',
+    '在源码仓库中可运行单账号核心验收器：`npm run meeting-platform:live-acceptance -- --platform=zoom --auto-join=true --auto-leave=true --allow-external-actions=true`，平台也可传 `google-meet` 或 `teams`。该模式在真实会议开始、自动标注落轴后即可离会并验证结束，不要求第二账号。远端发言人补充验收使用普通共享会议 URL，并传 `--meeting-url=<url> --speaker-peer=true --require-speaker=true --auto-join=true --auto-leave=true --allow-external-actions=true`；其他系统可用 `--fake-audio-file=/absolute/path/to/mono.wav`。三平台核心验收后运行 `npm run meeting-platform:live-acceptance:verify`，需要把发言人也作为硬门禁时追加 `-- --require-speaker=true`。',
     '',
   ].join('\n'), 'utf8');
   return path;
@@ -134,6 +142,11 @@ async function main() {
   const extensionDir = join(outDir, 'browser-extension');
   const desktopDir = join(outDir, 'desktop-host');
   await Promise.all([mkdir(extensionBuildDir, { recursive: true }), mkdir(extensionDir, { recursive: true }), mkdir(desktopDir, { recursive: true })]);
+  const liveAcceptance = await verifyThreePlatformLiveAcceptance({
+    inputDir: liveEvidenceDir,
+    requireSpeaker: requireSpeakerAcceptance,
+  });
+  const releaseReadiness = buildThreePlatformReleaseReadiness(liveAcceptance);
 
   const extensionArgs = [
     'scripts/export-meeting-app-extension.mjs',
@@ -159,7 +172,44 @@ async function main() {
   const zip = await command('zip', ['-q', '-r', extensionZip, '.'], { cwd: extensionDir });
   if (!zip.ok) throw new Error(`Extension zip failed: ${zip.stderr || zip.error}`);
 
-  const pack = await command('npm', ['pack', join(repoRoot, 'packages/meeting-timeline-sdk'), '--json', `--pack-destination=${desktopDir}`]);
+  const sdkPackageBuildDir = join(outDir, '.sdk-package-build');
+  await cp(join(repoRoot, 'packages/meeting-timeline-sdk'), sdkPackageBuildDir, { recursive: true });
+  const bundledExtensionDir = join(sdkPackageBuildDir, 'runtime', 'browser-extension');
+  await mkdir(dirname(bundledExtensionDir), { recursive: true });
+  await cp(extensionDir, bundledExtensionDir, { recursive: true });
+  const bundledReleaseStatusPath = join(sdkPackageBuildDir, 'runtime', 'three-platform-release-status.json');
+  const bundledReleaseAdapters = releaseReadiness.adapters.map((adapter) => ({
+    ...adapter,
+    evidence_file: adapter.evidence_file ? relative(repoRoot, adapter.evidence_file) : null,
+  }));
+  const bundledReleaseStatus = {
+    type: 'three_platform_adapter_release_status',
+    schema: 'three_platform_adapter_release_status',
+    schema_version: 1,
+    generated_at: new Date().toISOString(),
+    source: 'three_platform_adapter_release',
+    production_ready: releaseReadiness.production_ready,
+    speaker_ready: releaseReadiness.speaker_ready,
+    full_production_ready: releaseReadiness.full_production_ready,
+    adapters: bundledReleaseAdapters,
+    remaining_platforms: releaseReadiness.remaining_platforms,
+    remaining_speaker_platforms: releaseReadiness.remaining_speaker_platforms,
+    remaining_gate: releaseReadiness.remaining_gate,
+    speaker_remaining_gate: releaseReadiness.speaker_remaining_gate,
+  };
+  await writeFile(bundledReleaseStatusPath, `${JSON.stringify(bundledReleaseStatus, null, 2)}\n`, 'utf8');
+  const stagedPackageJsonPath = join(sdkPackageBuildDir, 'package.json');
+  const stagedPackageJson = JSON.parse(await readFile(stagedPackageJsonPath, 'utf8'));
+  stagedPackageJson.meetingTimelineAdapters = {
+    platforms: ['google_meet', 'microsoft_teams', 'zoom'],
+    browser_extension: 'runtime/browser-extension',
+    desktop_host_binary: 'meeting-timeline-desktop-adapter',
+    browser_export_binary: 'meeting-timeline-adapters',
+    release_status: 'runtime/three-platform-release-status.json',
+  };
+  await writeFile(stagedPackageJsonPath, `${JSON.stringify(stagedPackageJson, null, 2)}\n`, 'utf8');
+
+  const pack = await command('npm', ['pack', sdkPackageBuildDir, '--json', `--pack-destination=${desktopDir}`]);
   if (!pack.ok) throw new Error(`SDK pack failed: ${pack.stderr || pack.error}`);
   const packRows = JSON.parse(pack.stdout);
   const tarballName = packRows[0]?.filename;
@@ -172,6 +222,12 @@ async function main() {
     'package/adapters/desktop-meeting-host.mjs',
     'package/adapters/desktop-scanners/macos.jxa',
     'package/adapters/desktop-scanners/windows.ps1',
+    'package/bin/meeting-timeline-adapters.mjs',
+    'package/runtime/browser-extension/manifest.json',
+    'package/runtime/browser-extension/content-script.js',
+    'package/runtime/browser-extension/live-capture.js',
+    'package/runtime/browser-extension/background.js',
+    'package/runtime/three-platform-release-status.json',
   ];
   const missingPackageFiles = requiredPackageFiles.filter((file) => !tarList.stdout.split('\n').includes(file));
   if (!tarList.ok || missingPackageFiles.length > 0) {
@@ -198,7 +254,44 @@ async function main() {
     && desktopDiagnosis?.platforms?.includes('microsoft_teams')
     && desktopDiagnosis?.platforms?.includes('zoom');
   if (!desktopInstallStartOk) throw new Error(`Desktop package start failed: ${desktopStart.stderr || desktopStart.stdout || desktopStart.error}`);
+
+  const packagedExtensionDir = join(outDir, '.packaged-extension-smoke');
+  const adaptersBinary = process.platform === 'win32'
+    ? join(desktopInstallDir, 'meeting-timeline-adapters.cmd')
+    : join(desktopInstallDir, 'bin', 'meeting-timeline-adapters');
+  const packagedExtensionExport = await command(adaptersBinary, [
+    `--out-dir=${packagedExtensionDir}`,
+    '--json=true',
+  ]);
+  let packagedExtensionReport = null;
+  let packagedExtensionManifest = null;
+  try { packagedExtensionReport = JSON.parse(packagedExtensionExport.stdout); } catch {}
+  try { packagedExtensionManifest = JSON.parse(await readFile(join(packagedExtensionDir, 'manifest.json'), 'utf8')); } catch {}
+  const packagedExtensionExportOk = packagedExtensionExport.ok
+    && packagedExtensionReport?.ok === true
+    && packagedExtensionManifest?.manifest_version === 3
+    && packagedExtensionReport?.platforms?.length === 3;
+  if (!packagedExtensionExportOk) {
+    throw new Error(`Packaged browser extension export failed: ${packagedExtensionExport.stderr || packagedExtensionExport.stdout || packagedExtensionExport.error}`);
+  }
+  const packagedReleaseStatusCommand = await command(adaptersBinary, [
+    '--status=true',
+    '--json=true',
+  ]);
+  let packagedReleaseStatus = null;
+  try { packagedReleaseStatus = JSON.parse(packagedReleaseStatusCommand.stdout); } catch {}
+  const packagedReleaseStatusOk = packagedReleaseStatusCommand.ok
+    && packagedReleaseStatus?.schema === 'three_platform_adapter_release_status'
+    && packagedReleaseStatus?.production_ready === releaseReadiness.production_ready
+    && packagedReleaseStatus?.speaker_ready === releaseReadiness.speaker_ready
+    && packagedReleaseStatus?.full_production_ready === releaseReadiness.full_production_ready
+    && packagedReleaseStatus?.adapters?.length === 3;
+  if (!packagedReleaseStatusOk) {
+    throw new Error(`Packaged release status failed: ${packagedReleaseStatusCommand.stderr || packagedReleaseStatusCommand.stdout || packagedReleaseStatusCommand.error}`);
+  }
   await rm(desktopInstallDir, { recursive: true, force: true });
+  await rm(packagedExtensionDir, { recursive: true, force: true });
+  await rm(sdkPackageBuildDir, { recursive: true, force: true });
 
   const launchers = await writeLaunchers(desktopDir, basename(tarballPath));
   const readmePath = await writeReadme(basename(tarballPath));
@@ -217,7 +310,9 @@ async function main() {
     generated_at: new Date().toISOString(),
     ok: true,
     delivery_ready: true,
-    production_ready: false,
+    production_ready: releaseReadiness.production_ready,
+    speaker_ready: releaseReadiness.speaker_ready,
+    full_production_ready: releaseReadiness.full_production_ready,
     base_url: baseUrl,
     out_dir: outDir,
     platforms: ['google_meet', 'microsoft_teams', 'zoom'],
@@ -241,14 +336,27 @@ async function main() {
         start: { ok: desktopStart.ok, duration_ms: desktopStart.duration_ms, command: desktopStart.command },
         diagnosis: desktopDiagnosis,
       },
+      bundled_browser_extension: {
+        ok: packagedExtensionExportOk,
+        command: packagedExtensionExport.command,
+        platforms: packagedExtensionReport.platforms,
+        manifest_version: packagedExtensionManifest.manifest_version,
+      },
+      bundled_release_status: {
+        ok: packagedReleaseStatusOk,
+        command: packagedReleaseStatusCommand.command,
+        schema: packagedReleaseStatus.schema,
+        production_ready: packagedReleaseStatus.production_ready,
+        speaker_ready: packagedReleaseStatus.speaker_ready,
+        full_production_ready: packagedReleaseStatus.full_production_ready,
+        adapter_count: packagedReleaseStatus.adapters.length,
+      },
     },
-    adapters: [
-      { platform: 'google_meet', installable: true, startable: true, web_ready: true, desktop_ready: false, real_meeting_accepted: false, production_ready: false },
-      { platform: 'microsoft_teams', installable: true, startable: true, web_ready: true, desktop_ready: true, real_meeting_accepted: false, production_ready: false },
-      { platform: 'zoom', installable: true, startable: true, web_ready: true, desktop_ready: true, real_meeting_accepted: false, production_ready: false },
-    ],
+    live_acceptance: liveAcceptance,
+    adapters: releaseReadiness.adapters,
     artifacts,
-    remaining_gate: 'Capture real meeting_started, speaker_started, realtime annotation, and meeting_ended evidence for each platform.',
+    remaining_gate: releaseReadiness.remaining_gate,
+    speaker_remaining_gate: releaseReadiness.speaker_remaining_gate,
   };
   await writeFile(join(outDir, 'release-manifest.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   await rm(extensionBuildDir, { recursive: true, force: true });
@@ -257,8 +365,11 @@ async function main() {
     console.log(`three_platform_adapter_release | ok=yes | dir=${outDir}`);
     console.log(`browser_extension=${relative(repoRoot, extensionDir)}`);
     console.log(`desktop_package=${relative(repoRoot, tarballPath)}`);
-    console.log('production_ready=no (real meeting evidence pending)');
+    console.log(`production_ready=${report.production_ready ? 'yes' : 'no'}${report.production_ready ? '' : ' (real meeting evidence pending)'}`);
+    console.log(`speaker_ready=${report.speaker_ready ? 'yes' : 'no'}${report.speaker_ready ? '' : ' (remote speaker evidence pending; core release is not blocked)'}`);
   }
+  if (requireLiveAcceptance && !report.production_ready) process.exitCode = 2;
+  if (requireSpeakerAcceptance && !report.full_production_ready) process.exitCode = 2;
   return report;
 }
 

@@ -1,7 +1,7 @@
 import {
   compactObject,
   normalizeAbsoluteMs,
-} from './internal-utils.mjs';
+} from '../index.mjs';
 import {
   MEETING_PLATFORM_KEYS,
   buildPlatformIntegrationPlan,

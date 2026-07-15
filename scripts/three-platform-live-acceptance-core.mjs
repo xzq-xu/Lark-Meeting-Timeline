@@ -6,6 +6,11 @@ export const THREE_PLATFORM_LIVE_ACCEPTANCE_PLATFORMS = Object.freeze([
   'zoom',
 ]);
 
+export const THREE_PLATFORM_SPEAKER_CHECK_IDS = Object.freeze([
+  'stable_speaker_marker',
+  'speaker_marker_visible_latency',
+]);
+
 function asArray(value) {
   if (Array.isArray(value)) return value;
   return value == null ? [] : [value];
@@ -41,11 +46,64 @@ function recordTime(record = {}) {
   return absoluteMs(record.captured_at_ms ?? record.capturedAtMs ?? record.snapshot?.observedAtMs ?? record.snapshot?.observed_at_ms) ?? 0;
 }
 
-function realRecord(record = {}) {
+function recordUrl(record = {}) {
+  return String(
+    record.snapshot?.url
+      ?? record.snapshot?.page?.url
+      ?? record.snapshot?.dom?.url
+      ?? '',
+  ).trim();
+}
+
+function officialMeetingUrl(record = {}, platform) {
+  let url;
+  try { url = new URL(recordUrl(record)); } catch { return false; }
+  const host = url.hostname.toLowerCase();
+  const path = url.pathname.toLowerCase();
+  if (platform === 'google_meet') {
+    return host === 'meet.google.com' && /^\/[a-z]{3}-[a-z]{4}-[a-z]{3}\/?$/.test(path);
+  }
+  if (platform === 'microsoft_teams') {
+    return host === 'teams.microsoft.com'
+      || host.endsWith('.teams.microsoft.com')
+      || host === 'teams.live.com'
+      || host.endsWith('.teams.live.com')
+      || host === 'teams.cloud.microsoft'
+      || host.endsWith('.teams.cloud.microsoft');
+  }
+  if (platform === 'zoom') {
+    const zoomHost = host === 'zoom.us'
+      || host.endsWith('.zoom.us')
+      || host === 'zoom.com'
+      || host.endsWith('.zoom.com');
+    return zoomHost && (path.includes('/wc/') || path.includes('/j/') || path.includes('/join/'));
+  }
+  return false;
+}
+
+function captureProfileMatches(record = {}, platform) {
+  const profile = record.snapshot?.capture?.profile;
+  if (!profile) return false;
+  try { return normalizeMeetingPlatform(profile) === platform; } catch { return false; }
+}
+
+function trustedCaptureProvenance(record = {}, platform) {
+  const snapshot = record.snapshot ?? {};
+  const source = `${record.source ?? ''} ${snapshot.source ?? ''}`.toLowerCase();
+  if (!source.includes('meeting_app_extension_')) return false;
+  if (snapshot.schema !== 'meeting_app_dom_capture') return false;
+  const phase = String(record.phase ?? '').toLowerCase();
+  if (phase === 'ended' && snapshot.lifecycle?.meeting_was_active === true) return true;
+  return captureProfileMatches(record, platform);
+}
+
+function realRecord(record = {}, platform) {
   const source = `${record.source ?? ''} ${record.snapshot?.source ?? ''}`.toLowerCase();
   const title = String(record.snapshot?.title ?? '').toLowerCase();
   return Boolean(record.snapshot)
-    && !/fixture|synthetic|simulation|sdk fixture/.test(`${source} ${title}`);
+    && !/fixture|synthetic|simulation|sdk fixture/.test(`${source} ${title}`)
+    && officialMeetingUrl(record, platform)
+    && trustedCaptureProvenance(record, platform);
 }
 
 function semanticTypes(snapshot = {}) {
@@ -157,8 +215,10 @@ function rowsWithin(rows = [], startMs, endMs) {
   });
 }
 
-function selectRun(records = [], meeting = {}) {
-  const sorted = records.filter(realRecord).sort((left, right) => recordTime(left) - recordTime(right));
+function selectRun(records = [], meeting = {}, platform) {
+  const sorted = records
+    .filter((record) => realRecord(record, platform))
+    .sort((left, right) => recordTime(left) - recordTime(right));
   const meetingStartMs = absoluteMs(meeting.start_time ?? meeting.start_time_ms);
   const activeCandidates = sorted.filter((record) => (
     String(record.phase ?? '').toLowerCase() === 'active'
@@ -185,7 +245,7 @@ export function evaluateThreePlatformLiveEvidence(input = {}, options = {}) {
     platform = normalizeMeetingPlatform(options.platform ?? input.platform);
   } catch {}
   const meeting = input.meeting ?? {};
-  const run = selectRun(input.meetingAppRecords ?? input.meeting_app_records ?? [], meeting);
+  const run = selectRun(input.meetingAppRecords ?? input.meeting_app_records ?? [], meeting, platform);
   const activeMs = run.active ? recordTime(run.active) : null;
   const endedMs = run.ended ? recordTime(run.ended) : null;
   const rangeEndMs = endedMs ?? Number.MAX_SAFE_INTEGER;
@@ -232,7 +292,15 @@ export function evaluateThreePlatformLiveEvidence(input = {}, options = {}) {
     check('cross_meeting_isolation', previousMeetingAnnotationCount === 0, { previous_annotation_count: previousMeetingAnnotationCount }),
     check('no_duplicate_annotation', !duplicateVisible),
   ];
-  const accepted = checks.every((item) => item.passed);
+  const requireSpeaker = options.requireSpeaker === true || options.require_speaker === true;
+  const speakerCheckIds = new Set(THREE_PLATFORM_SPEAKER_CHECK_IDS);
+  const coreChecks = checks.filter((item) => !speakerCheckIds.has(item.id));
+  const speakerChecks = checks.filter((item) => speakerCheckIds.has(item.id));
+  const coreAccepted = coreChecks.every((item) => item.passed);
+  const speakerAccepted = speakerChecks.every((item) => item.passed);
+  const accepted = coreAccepted && (!requireSpeaker || speakerAccepted);
+  const failedCoreCheckIds = coreChecks.filter((item) => !item.passed).map((item) => item.id);
+  const failedSpeakerCheckIds = speakerChecks.filter((item) => !item.passed).map((item) => item.id);
   return {
     type: 'three_platform_live_evidence_evaluation',
     schema: 'three_platform_live_evidence_evaluation',
@@ -241,8 +309,13 @@ export function evaluateThreePlatformLiveEvidence(input = {}, options = {}) {
     file: options.file,
     meeting_id: input.meeting_id ?? meeting.meeting_id ?? null,
     run_id: input.run_id ?? input.runId ?? null,
+    acceptance_profile: requireSpeaker ? 'core_and_speaker' : 'core',
+    speaker_acceptance_required: requireSpeaker,
     accepted,
-    production_ready: accepted,
+    core_accepted: coreAccepted,
+    speaker_accepted: speakerAccepted,
+    production_ready: coreAccepted,
+    full_production_ready: coreAccepted && speakerAccepted,
     active_at_ms: activeMs,
     annotation_at_ms: annotationCapturedMs,
     ended_at_ms: endedMs,
@@ -257,11 +330,17 @@ export function evaluateThreePlatformLiveEvidence(input = {}, options = {}) {
       previous_meeting_annotation_count_on_new_axis: previousMeetingAnnotationCount,
     },
     checks,
-    failed_check_ids: checks.filter((item) => !item.passed).map((item) => item.id),
+    failed_check_ids: requireSpeaker
+      ? [...failedCoreCheckIds, ...failedSpeakerCheckIds]
+      : failedCoreCheckIds,
+    failed_core_check_ids: failedCoreCheckIds,
+    failed_speaker_check_ids: failedSpeakerCheckIds,
+    warning_check_ids: requireSpeaker ? [] : failedSpeakerCheckIds,
   };
 }
 
 export function buildThreePlatformLiveAcceptanceReport(evaluations = [], options = {}) {
+  const requireSpeaker = options.requireSpeaker === true || options.require_speaker === true;
   const requiredPlatforms = (options.platforms ?? THREE_PLATFORM_LIVE_ACCEPTANCE_PLATFORMS)
     .map((platform) => normalizeMeetingPlatform(platform));
   const rows = requiredPlatforms.map((platform) => {
@@ -271,22 +350,43 @@ export function buildThreePlatformLiveAcceptanceReport(evaluations = [], options
     return candidates.at(-1) ?? {
       platform,
       accepted: false,
+      core_accepted: false,
+      speaker_accepted: false,
       production_ready: false,
+      full_production_ready: false,
       failed_check_ids: ['missing_real_meeting_evidence'],
+      failed_core_check_ids: ['missing_real_meeting_evidence'],
+      failed_speaker_check_ids: ['missing_real_meeting_evidence'],
+      warning_check_ids: requireSpeaker ? [] : ['missing_real_meeting_evidence'],
     };
   });
-  const accepted = rows.length > 0 && rows.every((row) => row.accepted === true);
+  const coreAccepted = rows.length > 0 && rows.every((row) => row.core_accepted === true);
+  const speakerAccepted = rows.length > 0 && rows.every((row) => row.speaker_accepted === true);
+  const accepted = coreAccepted && (!requireSpeaker || speakerAccepted);
   return {
     type: 'three_platform_live_acceptance_report',
     schema: 'three_platform_live_acceptance_report',
     schema_version: 1,
     generated_at: new Date().toISOString(),
+    acceptance_profile: requireSpeaker ? 'core_and_speaker' : 'core',
+    speaker_acceptance_required: requireSpeaker,
     required_platforms: requiredPlatforms,
     platform_count: rows.length,
-    accepted_platform_count: rows.filter((row) => row.accepted).length,
+    accepted_platform_count: rows.filter((row) => (
+      row.core_accepted === true && (!requireSpeaker || row.speaker_accepted === true)
+    )).length,
+    core_accepted_platform_count: rows.filter((row) => row.core_accepted === true).length,
+    speaker_accepted_platform_count: rows.filter((row) => row.speaker_accepted === true).length,
     accepted,
-    production_ready: accepted,
+    core_accepted: coreAccepted,
+    speaker_accepted: speakerAccepted,
+    production_ready: coreAccepted,
+    full_production_ready: coreAccepted && speakerAccepted,
     rows,
-    remaining_platforms: rows.filter((row) => !row.accepted).map((row) => row.platform),
+    remaining_platforms: rows.filter((row) => (
+      row.core_accepted !== true || (requireSpeaker && row.speaker_accepted !== true)
+    )).map((row) => row.platform),
+    remaining_core_platforms: rows.filter((row) => row.core_accepted !== true).map((row) => row.platform),
+    remaining_speaker_platforms: rows.filter((row) => row.speaker_accepted !== true).map((row) => row.platform),
   };
 }
