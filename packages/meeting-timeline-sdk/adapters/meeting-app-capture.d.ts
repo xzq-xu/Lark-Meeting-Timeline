@@ -88,6 +88,10 @@ export interface MeetingAppDomCaptureOptions extends MeetingAppObserverOptions {
   include_shadow_dom?: boolean;
   deepDom?: boolean;
   deep_dom?: boolean;
+  includeSameOriginFrames?: boolean;
+  include_same_origin_frames?: boolean;
+  maxFrameDocuments?: number;
+  max_frame_documents?: number;
   maxShadowRoots?: number;
   max_shadow_roots?: number;
   maxShadowHosts?: number;
@@ -161,6 +165,7 @@ export interface MeetingAppDomCaptureSnapshot extends MeetingAppSnapshot {
   capture?: {
     profile?: MeetingAppDomCaptureProfilePlatform;
     profile_display_name?: string;
+    frame_document_count?: number;
     shadow_root_count?: number;
     control_count?: number;
     participant_count?: number;

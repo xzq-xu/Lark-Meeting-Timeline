@@ -1,14 +1,12 @@
 const DEFAULT_BASE_URL = 'https://open.feishu.cn';
 const DEFAULT_AUTHORIZE_PATH = '/open-apis/authen/v1/index';
-const DEFAULT_LOCAL_PORT = '8789';
 
 export function createLarkClient(env = process.env) {
   const baseUrl = (env.LARK_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, '');
   const appId = env.LARK_APP_ID;
   const appSecret = env.LARK_APP_SECRET;
   const authorizePath = env.LARK_OAUTH_AUTHORIZE_PATH || DEFAULT_AUTHORIZE_PATH;
-  const localPort = String(env.PORT || DEFAULT_LOCAL_PORT);
-  const redirectUri = env.LARK_REDIRECT_URI || `http://localhost:${localPort}/api/auth/lark/callback`;
+  const redirectUri = env.LARK_REDIRECT_URI || 'http://localhost:8787/api/auth/lark/callback';
   const oauthScopes = env.LARK_OAUTH_SCOPES || '';
   let tenantTokenCache = null;
   let appTokenCache = null;

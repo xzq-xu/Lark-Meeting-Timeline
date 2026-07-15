@@ -52,6 +52,7 @@ assert.equal(generatedPackage.scripts.build, 'node build.mjs');
 const manifest = JSON.parse(await readFile(join(outDir, 'manifest.json'), 'utf8'));
 assert.equal(manifest.manifest_version, 3);
 assert.deepEqual(manifest.content_scripts[0].js, ['content-script.js', 'live-capture.js']);
+assert.equal(manifest.content_scripts[0].all_frames, false);
 assert.equal(manifest.host_permissions.includes('<all_urls>'), false);
 assert.equal(manifest.host_permissions.includes('https://timeline.example.com/*'), true);
 assert.equal(manifest.content_scripts[0].matches.includes('https://meet.google.com/*'), true);
@@ -68,8 +69,15 @@ assert.match(buildSource, /src\/live-capture\.entry\.mjs/);
 assert.match(buildSource, /src\/background\.entry\.mjs/);
 assert.match(buildSource, /src\/popup\.entry\.mjs/);
 
+const contentScriptSource = await readFile(join(outDir, 'src/content-script.entry.mjs'), 'utf8');
+assert.match(contentScriptSource, /captureOptions: \{ includeSameOriginFrames: true \}/);
+assert.match(contentScriptSource, /sampleIntervalMs: 750/);
+assert.match(contentScriptSource, /meeting_app_extension_lifecycle_evidence/);
+assert.match(contentScriptSource, /addEventListener\?\.\("pagehide"/);
+
 const liveCaptureSource = await readFile(join(outDir, 'src/live-capture.entry.mjs'), 'utf8');
 assert.match(liveCaptureSource, /__meetingTimelineLiveCapture/);
+assert.match(liveCaptureSource, /includeSameOriginFrames: true/);
 assert.match(liveCaptureSource, /captureActive/);
 assert.match(liveCaptureSource, /captureEnded/);
 assert.match(liveCaptureSource, /meeting_app_dom_adaptation_diagnosis/);

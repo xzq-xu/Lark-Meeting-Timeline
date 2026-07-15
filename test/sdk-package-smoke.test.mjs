@@ -51,6 +51,9 @@ assert.equal(packedFiles.includes('bin/meeting-platform-adapter-runtime-target.m
 assert.equal(packedFiles.includes('bin/meeting-platform-host-integration.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-platform-provider-replay.mjs'), true);
 assert.equal(packedFiles.includes('bin/meeting-timeline-desktop-adapter.mjs'), true);
+assert.equal(packedFiles.includes('bin/meeting-timeline-adapters.mjs'), true);
+assert.equal(packedFiles.includes('cli/install-meeting-adapters.mjs'), true);
+assert.equal(packedFiles.includes('runtime/three-platform-release-status.json'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-adapter-integration-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-app-connector-package.mjs'), true);
 assert.equal(packedFiles.includes('cli/meeting-platform-consumer-handoff.mjs'), true);
@@ -254,6 +257,23 @@ await execFileAsync('npm', [
 ], {
   cwd: consumerDir,
 });
+
+const { stdout: bundledStatusStdout } = await execFileAsync(
+  join(consumerDir, 'node_modules', '.bin', 'meeting-timeline-adapters'),
+  [
+    '--status=true',
+    '--json=true',
+  ],
+  {
+    cwd: consumerDir,
+  },
+);
+const bundledStatusReport = JSON.parse(bundledStatusStdout);
+assert.equal(bundledStatusReport.schema, 'three_platform_adapter_release_status');
+assert.equal(bundledStatusReport.ok, true);
+assert.equal(bundledStatusReport.source, 'sdk_source_package_placeholder');
+assert.equal(bundledStatusReport.production_ready, false);
+assert.equal(bundledStatusReport.full_production_ready, false);
 
 const { stdout: binStdout } = await execFileAsync(
   join(consumerDir, 'node_modules', '.bin', 'meeting-app-adapter-integration-package'),

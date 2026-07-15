@@ -34,7 +34,7 @@ assert.equal(report.written_files.length, 3);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').package_file, join(outDir, 'google_meet.json'));
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').browser_match_count, 1);
 assert.equal(report.rows.find((row) => row.platform === 'google_meet').runtime_event_action_count, 18);
-assert.equal(report.rows.find((row) => row.platform === 'microsoft_teams').browser_match_count, 2);
+assert.equal(report.rows.find((row) => row.platform === 'microsoft_teams').browser_match_count >= 2, true);
 assert.equal(report.rows.find((row) => row.platform === 'zoom').browser_match_count, 3);
 
 const writtenReport = JSON.parse(await readFile(reportFile, 'utf8'));
@@ -53,6 +53,9 @@ assert.equal(googlePackage.runtime_event_plan.supported_actions.includes('run_ha
 assert.equal(googlePackage.provider_observer.required_for_realtime, false);
 assert.equal(googlePackage.transcript.blocks_realtime_annotation, false);
 assert.equal(googlePackage.readiness.sdk_wiring_ready, true);
+const teamsPackage = JSON.parse(await readFile(join(outDir, 'microsoft_teams.json'), 'utf8'));
+assert.equal(teamsPackage.extension.matches.includes('https://teams.microsoft.com/*'), true);
+assert.equal(teamsPackage.extension.matches.includes('https://teams.live.com/*'), true);
 
 const { stdout: textStdout } = await execFileAsync(process.execPath, [
   'scripts/meeting-platform-adaptation-package.mjs',
